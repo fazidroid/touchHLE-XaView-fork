@@ -31,6 +31,7 @@ pub enum Button {
 }
 
 /// Struct containing all user-configurable options.
+#[derive(Clone)]
 pub struct Options {
     pub fullscreen: bool,
     pub initial_orientation: DeviceOrientation,
@@ -51,6 +52,7 @@ pub struct Options {
     pub fps_limit: Option<f64>,
     pub force_composition: bool,
     pub network_access: bool,
+    pub popup_errors: bool,
 }
 
 impl Default for Options {
@@ -75,6 +77,7 @@ impl Default for Options {
             fps_limit: Some(60.0), // Original iPhone is 60Hz and uses v-sync,
             force_composition: false,
             network_access: false,
+            popup_errors: true,
         }
     }
 }
@@ -177,6 +180,8 @@ impl Options {
             self.preferred_languages = Some(value.split(',').map(ToOwned::to_owned).collect());
         } else if arg == "--headless" {
             self.headless = true;
+            // Can't show the dialog box when headless!
+            self.popup_errors = false;
         } else if arg == "--print-fps" {
             self.print_fps = true;
         } else if let Some(value) = arg.strip_prefix("--fps-limit=") {
@@ -194,6 +199,8 @@ impl Options {
             self.force_composition = true;
         } else if arg == "--allow-network-access" {
             self.network_access = true;
+        } else if arg == "--no-error-popup" {
+            self.popup_errors = false;
         } else {
             return Ok(false);
         };
