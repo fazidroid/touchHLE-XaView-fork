@@ -85,9 +85,34 @@ fn CFURLCopyFileSystemPath(
     msg![env; path copy]
 }
 
+fn CFURLCreateCopyAppendingPathComponent(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    url: CFURLRef,
+    path_component: CFStringRef,
+    is_directory: bool,
+) -> CFURLRef {
+    assert!(allocator.is_null());
+    let new_url =
+        msg![env; url URLByAppendingPathComponent:path_component isDirectory:is_directory];
+    msg![env; new_url copy]
+}
+
+fn CFURLCreateCopyDeletingLastPathComponent(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    url: CFURLRef,
+) -> CFURLRef {
+    assert!(allocator.is_null());
+    let new_url = msg![env; url URLByDeletingLastPathComponent];
+    msg![env; new_url copy]
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLGetFileSystemRepresentation(_, _, _, _)),
     export_c_func!(CFURLCreateFromFileSystemRepresentation(_, _, _, _)),
     export_c_func!(CFURLCopyPathExtension(_)),
     export_c_func!(CFURLCopyFileSystemPath(_, _)),
+    export_c_func!(CFURLCreateCopyAppendingPathComponent(_, _, _, _)),
+    export_c_func!(CFURLCreateCopyDeletingLastPathComponent(_, _)),
 ];

@@ -218,6 +218,7 @@ typedef unsigned long CFOptionFlags;
 typedef const struct _CFDictionary *CFDictionaryRef;
 typedef const struct _CFString *CFStringRef;
 typedef const struct _CFString *CFMutableStringRef;
+typedef const struct _CFURL *CFURLRef;
 
 CFTypeRef CFRetain(CFTypeRef cf);
 void CFRelease(CFTypeRef cf);
@@ -225,6 +226,8 @@ Boolean CFEqual(CFTypeRef cf1, CFTypeRef cf2);
 CFHashCode CFHash(CFTypeRef cf);
 
 // `CFString.h`
+
+enum { kCFStringEncodingASCII = 0x600 };
 
 typedef int CFComparisonResult;
 typedef unsigned int CFStringCompareFlags;
@@ -283,6 +286,21 @@ const void *CFDictionaryGetValue(CFDictionaryRef dict, const void *key);
 CFIndex CFDictionaryGetCount(CFDictionaryRef dict);
 void CFDictionaryGetKeysAndValues(CFDictionaryRef dict, const void **keys,
                                   const void **values);
+
+// `CFURL.h`
+
+CFURLRef CFURLCreateFromFileSystemRepresentation(CFAllocatorRef allocator,
+                                                 const char *buffer,
+                                                 CFIndex bufLen,
+                                                 Boolean isDirectory);
+CFStringRef CFURLCopyFileSystemPath(CFURLRef anURL, CFIndex pathStyle);
+
+CFURLRef CFURLCreateCopyAppendingPathComponent(CFAllocatorRef allocator,
+                                               CFURLRef url,
+                                               CFStringRef pathComponent,
+                                               Boolean isDirectory);
+CFURLRef CFURLCreateCopyDeletingLastPathComponent(CFAllocatorRef allocator,
+                                                  CFURLRef url);
 
 // === Main code ===
 
@@ -1228,9 +1246,10 @@ int test_realpath() {
 }
 
 int test_CFStringFind() {
-  CFStringRef a = CFStringCreateWithCString(NULL, "/a/b/c/b", 0x600);
-  CFStringRef b = CFStringCreateWithCString(NULL, "/b", 0x600);
-  CFStringRef d = CFStringCreateWithCString(NULL, "/d", 0x600);
+  CFStringRef a =
+      CFStringCreateWithCString(NULL, "/a/b/c/b", kCFStringEncodingASCII);
+  CFStringRef b = CFStringCreateWithCString(NULL, "/b", kCFStringEncodingASCII);
+  CFStringRef d = CFStringCreateWithCString(NULL, "/d", kCFStringEncodingASCII);
   // 0 for default options
   CFRange r = CFStringFind(a, b, 0);
   if (!(r.location == 2 && r.length == 2)) {
@@ -1769,8 +1788,10 @@ int test_CFMutableDictionary_CustomCallbacks_CFTypes() {
     return -1;
   }
 
-  CFStringRef key = CFStringCreateWithCString(NULL, "Key", 0x600);
-  CFStringRef value = CFStringCreateWithCString(NULL, "Value", 0x600);
+  CFStringRef key =
+      CFStringCreateWithCString(NULL, "Key", kCFStringEncodingASCII);
+  CFStringRef value =
+      CFStringCreateWithCString(NULL, "Value", kCFStringEncodingASCII);
   if (key == NULL || value == NULL) {
     CFRelease(key);
     CFRelease(value);
@@ -1779,8 +1800,10 @@ int test_CFMutableDictionary_CustomCallbacks_CFTypes() {
   }
 
   // Create copies to be stored in the dictionary
-  CFStringRef key1 = CFStringCreateWithCString(NULL, "Key", 0x600);
-  CFStringRef value1 = CFStringCreateWithCString(NULL, "Value", 0x600);
+  CFStringRef key1 =
+      CFStringCreateWithCString(NULL, "Key", kCFStringEncodingASCII);
+  CFStringRef value1 =
+      CFStringCreateWithCString(NULL, "Value", kCFStringEncodingASCII);
 
   int retainCountBefore = retainCount;
   int releaseCountBefore = releaseCount;
@@ -1822,7 +1845,8 @@ int test_CFMutableDictionary_CustomCallbacks_CFTypes() {
     return -5;
   }
 
-  CFStringRef valueNew = CFStringCreateWithCString(NULL, "NewValue", 0x600);
+  CFStringRef valueNew =
+      CFStringCreateWithCString(NULL, "NewValue", kCFStringEncodingASCII);
   if (valueNew == NULL) {
     CFRelease(key);
     CFRelease(value);
@@ -2362,6 +2386,102 @@ int test_inet_pton() {
   return 0;
 }
 
+int test_case_CFURL(const char *basePathCStr, const char *urlPathCStr,
+                    const char *fileNameCStr,
+                    const char *expectedAppendedCStr) {
+  CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, urlPathCStr,
+                                                         strlen(urlPathCStr),
+                                                         1 // isDirectory
+  );
+  if (url == NULL) {
+    return -1;
+  }
+
+  CFStringRef fileName =
+      CFStringCreateWithCString(NULL, fileNameCStr, kCFStringEncodingASCII);
+  CFURLRef appendedURL =
+      CFURLCreateCopyAppendingPathComponent(NULL, url, fileName,
+                                            0 // isDirectory
+      );
+  CFRelease(fileName);
+  if (appendedURL == NULL) {
+    CFRelease(url);
+    return -2;
+  }
+
+  CFStringRef gotPath =
+      CFURLCopyFileSystemPath(appendedURL, 0); // kCFURLPOSIXPathStyle
+  if (gotPath == NULL) {
+    CFRelease(appendedURL);
+    CFRelease(url);
+    return -3;
+  }
+
+  CFStringRef expectedAppended = CFStringCreateWithCString(
+      NULL, expectedAppendedCStr, kCFStringEncodingASCII);
+  if (!CFEqual(gotPath, expectedAppended)) {
+    CFRelease(expectedAppended);
+    CFRelease(gotPath);
+    CFRelease(appendedURL);
+    CFRelease(url);
+    return -4;
+  }
+  CFRelease(expectedAppended);
+  CFRelease(gotPath);
+
+  CFURLRef deletedURL =
+      CFURLCreateCopyDeletingLastPathComponent(NULL, appendedURL);
+  if (deletedURL == NULL) {
+    CFRelease(appendedURL);
+    CFRelease(url);
+    return -5;
+  }
+
+  gotPath = CFURLCopyFileSystemPath(deletedURL, 0); // kCFURLPOSIXPathStyle
+  if (gotPath == NULL) {
+    CFRelease(deletedURL);
+    CFRelease(appendedURL);
+    CFRelease(url);
+    return -6;
+  }
+
+  CFStringRef expectedBase =
+      CFStringCreateWithCString(NULL, basePathCStr, kCFStringEncodingASCII);
+  if (!CFEqual(gotPath, expectedBase)) {
+    CFRelease(expectedBase);
+    CFRelease(gotPath);
+    CFRelease(deletedURL);
+    CFRelease(appendedURL);
+    CFRelease(url);
+    return -7;
+  }
+
+  CFRelease(expectedBase);
+  CFRelease(gotPath);
+  CFRelease(deletedURL);
+  CFRelease(appendedURL);
+  CFRelease(url);
+
+  return 0;
+}
+
+int test_CFURL() {
+  // base path, url path, filename, expected path
+  int res = test_case_CFURL("/a/b/c", "/a/b/c", "test.txt", "/a/b/c/test.txt");
+  if (res != 0) {
+    return res;
+  }
+  res = test_case_CFURL("/a/b/c", "/a/b/c/", "test.txt", "/a/b/c/test.txt");
+  if (res != 0) {
+    return res - 10;
+  }
+  res = test_case_CFURL("/a/b/c", "/a/b/c/", "test.txt", "/a/b/c/test.txt");
+  if (res != 0) {
+    return res - 20;
+  }
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -2412,6 +2532,7 @@ struct {
     FUNC_DEF(test_inet_addr),
     FUNC_DEF(test_inet_ntop),
     FUNC_DEF(test_inet_pton),
+    FUNC_DEF(test_CFURL),
 };
 // clang-format on
 

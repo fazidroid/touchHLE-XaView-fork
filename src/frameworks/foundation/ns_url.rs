@@ -5,12 +5,13 @@
  */
 //! `NSURL`.
 
-use super::ns_string::{from_rust_string, to_rust_string, NSUTF8StringEncoding};
+use super::ns_string::{from_rust_string, get_static_str, to_rust_string, NSUTF8StringEncoding};
 use super::NSUInteger;
 use crate::fs::{GuestPath, GuestPathBuf};
 use crate::mem::MutPtr;
 use crate::objc::{
-    autorelease, id, msg, nil, objc_classes, release, retain, ClassExports, HostObject, NSZonePtr,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
+    NSZonePtr,
 };
 use crate::Environment;
 use std::borrow::Cow;
@@ -159,6 +160,26 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; ns_string getCString:buffer
                          maxLength:buffer_size
                           encoding:NSUTF8StringEncoding]
+}
+
+- (id)URLByAppendingPathComponent:(id)path_component // NSString *
+                      isDirectory:(bool)is_directory {
+    let &NSURLHostObject::FileURL { ns_string, .. } = env.objc.borrow(this) else {
+        unimplemented!(); // TODO
+    };
+    let mut path: id = msg![env; ns_string stringByAppendingPathComponent:path_component];
+    if is_directory {
+        path = msg![env; path stringByAppendingString:(get_static_str(env, "/"))];
+    }
+    msg_class![env; NSURL fileURLWithPath:path]
+}
+
+- (id)URLByDeletingLastPathComponent {
+    let &NSURLHostObject::FileURL { ns_string, .. } = env.objc.borrow(this) else {
+        unimplemented!(); // TODO
+    };
+    let path: id = msg![env; ns_string stringByDeletingLastPathComponent];
+    msg_class![env; NSURL fileURLWithPath:path]
 }
 
 // TODO: more constructors, more accessors
