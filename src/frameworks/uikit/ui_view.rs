@@ -28,7 +28,7 @@ use crate::frameworks::foundation::ns_string::get_static_str;
 use crate::frameworks::foundation::{ns_array, NSInteger, NSUInteger};
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports,
-    HostObject, NSZonePtr,
+    HostObject, NSZonePtr, ObjC,
 };
 use crate::Environment;
 
@@ -488,8 +488,31 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // TODO: support setNeedsDisplayInRect:
 - (())setNeedsDisplay {
-    let layer = env.objc.borrow::<UIViewHostObject>(this).layer;
-    msg![env; layer setNeedsDisplay]
+    // UIView has a method called drawRect: that subclasses override if they
+    // need custom drawing. touchHLE's UIView (a CALayerDelegate) provides
+    // an implementation of drawLayer:inContext: that calls drawRect:.
+    // This maintains a clean separation of UIView and CALayer.
+    //
+    // To avoid wasting space and time on unnecessary bitmaps and drawing,
+    // let's optimize here by only marking the layer as needing display if
+    // the UIView's subclass overrides drawRect: or drawLayer:inContext:.
+    let this_class = ObjC::read_isa(this, &env.mem);
+
+    let ui_view_class = env.objc.get_known_class("UIView", &mut env.mem);
+
+    let draw_layer_sel = env.objc.lookup_selector("drawLayer:inContext:").unwrap();
+    let draw_rect_sel = env.objc.lookup_selector("drawRect:").unwrap();
+
+    if env
+        .objc
+        .class_overrides_method_of_superclass(this_class, draw_rect_sel, ui_view_class)
+        || env
+            .objc
+            .class_overrides_method_of_superclass(this, draw_layer_sel, ui_view_class)
+    {
+        let layer = env.objc.borrow::<UIViewHostObject>(this).layer;
+        msg![env; layer setNeedsDisplay]
+    }
 }
 
 - (CGRect)bounds {
