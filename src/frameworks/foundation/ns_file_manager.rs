@@ -25,6 +25,7 @@ const NSUserDomainMask: NSSearchPathDomainMask = 1;
 
 pub const NSFileModificationDate: &str = "NSFileModificationDate";
 pub const NSFileSize: &str = "NSFileSize";
+const NSFileSystemFreeSize: &str = "NSFileSystemFreeSize";
 
 pub const CONSTANTS: ConstantExports = &[
     (
@@ -32,6 +33,10 @@ pub const CONSTANTS: ConstantExports = &[
         HostConstant::NSString(NSFileModificationDate),
     ),
     ("_NSFileSize", HostConstant::NSString(NSFileSize)),
+    (
+        "_NSFileSystemFreeSize",
+        HostConstant::NSString(NSFileSystemFreeSize),
+    ),
 ];
 
 fn NSSearchPathForDirectoriesInDomains(
@@ -320,6 +325,29 @@ pub const CLASSES: ClassExports = objc_classes! {
     let guest_path = GuestPath::new(&path);
 
     file_attributes_common(env, guest_path)
+}
+
+- (id)attributesOfFileSystemForPath:(id)_path
+                              error:(MutPtr<id>)error {
+    // TODO: other attributes
+    log!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
+
+    assert!(error.is_null()); // TODO
+
+    let dict = msg_class![env; NSMutableDictionary new];
+
+    // Reporting 1 Gb of free space should be enough
+    // TODO: unify with `statfs`
+    // TODO: account for path
+    let size: u64 = 1024 * 1024 * 1024;
+    let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
+
+    let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
+    () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
+
+    let dict_imm = msg![env; dict copy];
+    release(env, dict);
+    autorelease(env, dict_imm)
 }
 
 @end
