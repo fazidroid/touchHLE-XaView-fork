@@ -51,6 +51,10 @@ pub struct MachO {
     pub external_relocations: Vec<(u32, String)>,
     /// Address/program counter value for the entry point.
     pub entry_point_pc: Option<u32>,
+    /// End address of the highest-addressed segment.
+    /// This is used by get_end() to return the first address after the last
+    /// segment in the executable.
+    pub last_segment_end: u32,
 }
 
 #[derive(Debug)]
@@ -65,6 +69,13 @@ pub struct Section {
     pub type_: SectionType,
     /// Information specific to special dynamic linker sections, if this is one.
     pub dyld_indirect_symbol_info: Option<DyldIndirectSymbolInfo>,
+}
+
+impl Section {
+    /// Returns address of the next section.
+    pub fn next_section_addr(&self) -> u32 {
+        self.addr + self.size
+    }
 }
 
 /// Various kinds of sections. We're only interested in the ones used by the
@@ -304,6 +315,7 @@ impl MachO {
         let mut all_sections = Vec::new();
         let mut sym_tab_info: Option<(u32, u32, u32, u32)> = None;
         let mut segment_offsets = Vec::new();
+        let mut last_segment_end: u32 = 0;
 
         // Info used for the result
         let mut dynamic_libraries = Vec::new();
@@ -386,6 +398,7 @@ impl MachO {
 
                     all_sections.extend_from_slice(&sections);
                     segment_offsets.push(vmaddr);
+                    last_segment_end = last_segment_end.max(vmaddr + vmsize + slide);
                 }
                 LoadCommand::SymTab {
                     symoff,
@@ -678,6 +691,7 @@ impl MachO {
             exported_symbols,
             external_relocations,
             entry_point_pc,
+            last_segment_end,
         })
     }
 

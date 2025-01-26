@@ -24,6 +24,7 @@ pub mod ifaddrs;
 pub mod keymgr;
 pub mod libkern;
 pub mod mach;
+pub mod mach_o;
 pub mod math;
 pub mod mmap;
 pub mod net;
@@ -71,6 +72,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         mach::thread_info::FUNCTIONS,
         mach::time::FUNCTIONS,
         mach::vm_map::FUNCTIONS,
+        mach_o::FUNCTIONS,
         math::FUNCTIONS,
         mmap::FUNCTIONS,
         net::if_::FUNCTIONS,
