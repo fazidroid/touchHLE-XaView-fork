@@ -684,6 +684,12 @@ impl GLES for GLES1Native {
     unsafe fn GenRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *mut GLuint) {
         gles11::GenRenderbuffersOES(n, renderbuffers)
     }
+    unsafe fn IsFramebufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
+        gles11::IsFramebufferOES(renderbuffer)
+    }
+    unsafe fn IsRenderbufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
+        gles11::IsRenderbufferOES(renderbuffer)
+    }
     unsafe fn BindFramebufferOES(&mut self, target: GLenum, framebuffer: GLuint) {
         gles11::BindFramebufferOES(target, framebuffer)
     }

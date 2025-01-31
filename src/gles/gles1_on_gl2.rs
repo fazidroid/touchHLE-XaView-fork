@@ -1890,6 +1890,12 @@ impl GLES for GLES1OnGL2 {
     unsafe fn GenRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *mut GLuint) {
         gl21::GenRenderbuffersEXT(n, renderbuffers)
     }
+    unsafe fn IsFramebufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
+        gl21::IsFramebufferEXT(renderbuffer)
+    }
+    unsafe fn IsRenderbufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
+        gl21::IsRenderbufferEXT(renderbuffer)
+    }
     unsafe fn BindFramebufferOES(&mut self, target: GLenum, framebuffer: GLuint) {
         gl21::BindFramebufferEXT(target, framebuffer)
     }

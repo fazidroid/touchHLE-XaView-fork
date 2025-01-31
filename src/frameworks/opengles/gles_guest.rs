@@ -1177,6 +1177,16 @@ fn glGenRenderbuffersOES(env: &mut Environment, n: GLsizei, renderbuffers: MutPt
         unsafe { gles.GenRenderbuffersOES(n, renderbuffers) }
     })
 }
+fn glIsFramebufferOES(env: &mut Environment, framebuffer: GLuint) -> GLboolean {
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.IsFramebufferOES(framebuffer)
+    })
+}
+fn glIsRenderbufferOES(env: &mut Environment, renderbuffer: GLuint) -> GLboolean {
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.IsRenderbufferOES(renderbuffer)
+    })
+}
 fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindFramebufferOES(target, framebuffer)
@@ -1541,6 +1551,8 @@ pub const FUNCTIONS: FunctionExports = &[
     // OES_framebuffer_object
     export_c_func!(glGenFramebuffersOES(_, _)),
     export_c_func!(glGenRenderbuffersOES(_, _)),
+    export_c_func!(glIsFramebufferOES(_)),
+    export_c_func!(glIsRenderbufferOES(_)),
     export_c_func!(glBindFramebufferOES(_, _)),
     export_c_func!(glBindRenderbufferOES(_, _)),
     export_c_func!(glRenderbufferStorageOES(_, _, _, _)),

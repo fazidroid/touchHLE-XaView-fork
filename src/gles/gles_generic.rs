@@ -339,6 +339,8 @@ pub trait GLES {
     // OES_framebuffer_object (incomplete)
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint);
     unsafe fn GenRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *mut GLuint);
+    unsafe fn IsFramebufferOES(&mut self, framebuffer: GLuint) -> GLboolean;
+    unsafe fn IsRenderbufferOES(&mut self, renderbuffer: GLuint) -> GLboolean;
     unsafe fn BindFramebufferOES(&mut self, target: GLenum, framebuffer: GLuint);
     unsafe fn BindRenderbufferOES(&mut self, target: GLenum, renderbuffer: GLuint);
     unsafe fn RenderbufferStorageOES(
