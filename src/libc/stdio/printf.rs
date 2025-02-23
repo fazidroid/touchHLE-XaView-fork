@@ -75,9 +75,14 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             ' '
         };
 
+        let left_justified = if get_format_char(&env.mem, format_char_idx) == b'-' {
+            format_char_idx += 1;
+            true
+        } else {
+            false
+        };
         let pad_width = if get_format_char(&env.mem, format_char_idx) == b'*' {
             let pad_width = args.next::<i32>(env);
-            assert!(pad_width >= 0); // TODO: Implement right-padding
             format_char_idx += 1;
             pad_width
         } else {
@@ -88,6 +93,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             }
             pad_width
         };
+        assert!(pad_width >= 0); // TODO: Implement right-padding
 
         let precision = if get_format_char(&env.mem, format_char_idx) == b'.' {
             format_char_idx += 1;
@@ -163,6 +169,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
         match specifier {
             // Integer specifiers
             b'c' => {
+                assert!(!left_justified);
                 // TODO: support length modifier
                 assert!(length_modifier.is_none());
                 let c: u8 = args.next(env);
@@ -171,6 +178,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             }
             // Apple extension? Seemingly works in both NSLog and printf.
             b'C' => {
+                assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let c: unichar = args.next(env);
                 // TODO
@@ -184,22 +192,35 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 // TODO: support length modifier
                 assert!(length_modifier.is_none());
                 let c_string: ConstPtr<u8> = args.next(env);
-                assert!(pad_char == ' ' && pad_width == 0); // TODO
+                assert!(pad_char == ' '); // TODO
                 if !c_string.is_null() {
                     if let Some(precision) = precision {
+                        assert!(!left_justified);
                         let str_len = strlen(env, c_string);
                         res.extend_from_slice(
                             env.mem.bytes_at(c_string, str_len.min(precision as _)),
                         )
                     } else {
-                        res.extend_from_slice(env.mem.cstr_at(c_string));
+                        if pad_width > 0 {
+                            let pad_width = pad_width as usize;
+                            let str = env.mem.cstr_at_utf8(c_string).unwrap();
+                            if left_justified {
+                                write!(&mut res, "{:<1$}", str, pad_width).unwrap();
+                            } else {
+                                write!(&mut res, "{:>1$}", str, pad_width).unwrap();
+                            }
+                        } else {
+                            res.extend_from_slice(env.mem.cstr_at(c_string));
+                        }
                     }
                 } else {
+                    assert!(!left_justified);
                     assert!(precision.is_none());
                     res.extend_from_slice("(null)".as_bytes());
                 }
             }
             b'S' => {
+                assert!(!left_justified);
                 // TODO: support length modifier
                 assert!(length_modifier.is_none());
                 // TODO: support other locales
@@ -214,6 +235,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'd' | b'i' | b'u' => {
+                assert!(!left_justified);
                 // Note: on 32-bit system int and long are i32,
                 // so single length_modifier is ignored (but not double one!)
                 let int: i64 = if specifier == b'u' {
@@ -249,6 +271,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'@' if NS_LOG => {
+                assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let object: id = args.next(env);
                 // TODO: use localized description if available?
@@ -263,6 +286,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'x' => {
+                assert!(!left_justified);
                 // Note: on 32-bit system unsigned int and unsigned long
                 // are u32, so length_modifier is ignored
                 let uint: u32 = args.next(env);
@@ -287,6 +311,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'X' => {
+                assert!(!left_justified);
                 assert!(precision.is_none());
                 // Note: on 32-bit system unsigned int and unsigned long
                 // are u32, so length_modifier is ignored
@@ -303,12 +328,14 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'p' => {
+                assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let ptr: MutVoidPtr = args.next(env);
                 res.extend_from_slice(format!("{:?}", ptr).as_bytes());
             }
             // Float specifiers
             b'f' => {
+                assert!(!left_justified);
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;
                 let precision = precision.unwrap_or(6);
@@ -323,6 +350,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'e' => {
+                assert!(!left_justified);
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;
                 let precision = precision.unwrap_or(6);
@@ -351,6 +379,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'g' => {
+                assert!(!left_justified);
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;
 

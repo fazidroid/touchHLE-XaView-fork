@@ -453,6 +453,20 @@ int test_vsnprintf() {
   str = str_format("%I");
   res += !!strcmp(str, "I");
   free(str);
+  // Test %s with padding
+  const char *s = "Hello";
+  str = str_format("[%10s]", s);
+  res += !!strcmp(str, "[     Hello]");
+  free(str);
+  str = str_format("[%-10s]", s);
+  res += !!strcmp(str, "[Hello     ]");
+  free(str);
+  str = str_format("[%*s]", 10, s);
+  res += !!strcmp(str, "[     Hello]");
+  free(str);
+  str = str_format("[%-*s]", 10, s);
+  res += !!strcmp(str, "[Hello     ]");
+  free(str);
 
   return res;
 }
