@@ -76,6 +76,8 @@ fn sysctlbyname(
         "hw.machine" => String(b"iPhone1,1"),
         "hw.model" => String(b"M68AP"),
         "hw.ncpu" => SysInfoType::Int32(1),
+        "hw.cputype" => SysInfoType::Int32(12),
+        "hw.cpusubtype" => SysInfoType::Int32(6),
         "hw.cpufrequency" => SysInfoType::Int64(412000000),
         "hw.busfrequency" => SysInfoType::Int64(103000000),
         "hw.physmem" => SysInfoType::Int32(121634816), // not sure about this type
