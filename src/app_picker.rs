@@ -550,6 +550,15 @@ fn show_app_picker_gui(
         if icon_tapped != nil {
             match icon_grid_stuff.as_ref().unwrap().icon_map.get(&icon_tapped) {
                 Some(&TappedIcon::App(app_idx)) => {
+                    // Provide visual feedback that the app has been picked
+                    // (it may take a while for the splash screen to appear etc)
+                    () = msg![env; icon_tapped setAlpha:(0.5 as CGFloat)];
+                    // Redraw screen, even if this makes the next frame early
+                    // (the app picker will never be redrawn after this).
+                    crate::frameworks::core_animation::recomposite_if_necessary(
+                        env, /* force: */ true,
+                    );
+
                     let app_path = &apps.as_ref().unwrap()[app_idx].path;
                     echo!("Picked: {}", app_path.display());
                     break app_path.clone();

@@ -37,10 +37,11 @@ unsafe fn load_matrix(gles: &mut dyn GLES, matrix: Matrix<4>) {
 
 /// For use by `NSRunLoop`: call this 60 times per second. Composites the app's
 /// visible layers (i.e. UI) and presents it to the screen. Does nothing if
-/// composition isn't in use or it's too soon.
+/// composition isn't in use or it's too soon (the latter check is skipped if
+/// `force` is set to [true]).
 ///
 /// Returns the time a recomposite is due, if any.
-pub fn recomposite_if_necessary(env: &mut Environment) -> Option<Instant> {
+pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<Instant> {
     // Assumes the last window in the list is the one on top.
     // TODO: this is not correct once we support zPosition.
     // TODO: can there be windows smaller than the screen? If so we need to draw
@@ -80,7 +81,7 @@ pub fn recomposite_if_necessary(env: &mut Environment) -> Option<Instant> {
         .composition
         .recomposite_next
     {
-        if recomposite_next > now {
+        if !force && recomposite_next > now {
             log_dbg!("Not recompositing yet, wait {:?}", recomposite_next - now);
             return Some(recomposite_next);
         }
