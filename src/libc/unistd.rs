@@ -38,6 +38,8 @@ fn usleep(env: &mut Environment, useconds: useconds_t) -> i32 {
 
 #[allow(non_camel_case_types)]
 pub type pid_t = i32;
+#[allow(non_camel_case_types)]
+type gid_t = u32;
 
 fn getpid(_env: &mut Environment) -> pid_t {
     // Not a real value, since touchHLE only simulates a single process.
@@ -46,6 +48,10 @@ fn getpid(_env: &mut Environment) -> pid_t {
 }
 fn getppid(_env: &mut Environment) -> pid_t {
     // Included just for completeness. Surely no app ever calls this.
+    0
+}
+fn getgid(_env: &mut Environment) -> gid_t {
+    // Not a real value
     0
 }
 
@@ -135,4 +141,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(unlink(_)),
     export_c_func!(gethostname(_, _)),
     export_c_func!(getpagesize()),
+    export_c_func!(getgid()),
 ];
