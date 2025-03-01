@@ -23,6 +23,7 @@ pub const FUNCTION_LISTS: &[super::FunctionExports] = &[
     libc::errno::FUNCTIONS,
     libc::ifaddrs::FUNCTIONS,
     libc::keymgr::FUNCTIONS,
+    libc::libkern::os_atomic::FUNCTIONS,
     libc::mach_host::FUNCTIONS,
     libc::mach_semaphore::FUNCTIONS,
     libc::mach_thread_info::FUNCTIONS,

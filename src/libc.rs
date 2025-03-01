@@ -20,6 +20,7 @@ pub mod dlfcn;
 pub mod errno;
 pub mod ifaddrs;
 pub mod keymgr;
+pub mod libkern;
 pub mod mach_host;
 pub mod mach_init;
 pub mod mach_semaphore;
