@@ -8,7 +8,7 @@
 
 use crate::frameworks::{
     av_audio, core_animation, core_foundation, core_graphics, core_location, foundation, game_kit,
-    media_player, opengles, store_kit, uikit,
+    media_player, opengles, store_kit, system_configuration, uikit,
 };
 
 /// All the lists of classes that the runtime should search through.
@@ -68,6 +68,7 @@ pub const CLASS_LISTS: &[super::ClassExports] = &[
     media_player::media_picker_controller::CLASSES,
     media_player::media_query::CLASSES,
     opengles::eagl::CLASSES,
+    system_configuration::sc_network_reachability::CLASSES,
     store_kit::sk_payment_queue::CLASSES,
     store_kit::sk_product::CLASSES,
     uikit::ui_accelerometer::CLASSES,
