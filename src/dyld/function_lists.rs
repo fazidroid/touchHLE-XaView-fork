@@ -51,6 +51,7 @@ pub const FUNCTION_LISTS: &[super::FunctionExports] = &[
     libc::sys::mount::FUNCTIONS,
     libc::sys::ptrace::FUNCTIONS,
     libc::sys::timeb::FUNCTIONS,
+    libc::sys::socket::FUNCTIONS,
     libc::sys::utsname::FUNCTIONS,
     libc::sysctl::FUNCTIONS,
     libc::time::FUNCTIONS,

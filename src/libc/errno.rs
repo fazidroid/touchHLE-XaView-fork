@@ -18,6 +18,7 @@ pub const EDEADLK: i32 = 11;
 pub const EBUSY: i32 = 16;
 pub const EEXIST: i32 = 17;
 pub const EINVAL: i32 = 22;
+pub const EPROTONOSUPPORT: i32 = 43;
 
 #[derive(Default)]
 pub struct State {
