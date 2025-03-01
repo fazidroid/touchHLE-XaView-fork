@@ -21,6 +21,13 @@ use crate::Environment;
 use std::collections::HashSet;
 use std::io::Write;
 
+const ALL_SPECIFIERS: [u8; 25] = [
+    // IEEE printf specification
+    b'd', b'i', b'o', b'u', b'x', b'X', b'f', b'F', b'e', b'E', b'g', b'G', b'a', b'A', b'c', b's',
+    b'p', b'n', b'C', b'S', b'%', // NSString formatting
+    b'@', b'D', b'U', b'O',
+];
+
 const INTEGER_SPECIFIERS: [u8; 6] = [b'd', b'i', b'o', b'u', b'x', b'X'];
 const FLOAT_SPECIFIERS: [u8; 3] = [b'f', b'e', b'g'];
 
@@ -123,6 +130,14 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
 
         let specifier = get_format_char(&env.mem, format_char_idx);
         format_char_idx += 1;
+
+        if !ALL_SPECIFIERS.contains(&specifier) {
+            // According to `printf` specs, this behaviour is undefined.
+            // But as seen on both macOS and iOS, the '%' just got skipped.
+            // Also, we need to back-track 1 position
+            format_char_idx -= 1;
+            continue;
+        }
 
         if specifier == b'\0' {
             // Apparently, errno is not set in this case (tested on macOS),

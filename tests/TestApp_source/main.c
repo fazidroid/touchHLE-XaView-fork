@@ -449,6 +449,10 @@ int test_vsnprintf() {
   str = str_format("%.8x-%.8x-%.2x", 10, 9999999, 9999999);
   res += !!strcmp(str, "0000000a-0098967f-98967f");
   free(str);
+  // Test unknown specifier skip
+  str = str_format("%I");
+  res += !!strcmp(str, "I");
+  free(str);
 
   return res;
 }
