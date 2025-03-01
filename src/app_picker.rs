@@ -558,6 +558,10 @@ fn show_app_picker_gui(
                     crate::frameworks::core_animation::recomposite_if_necessary(
                         env, /* force: */ true,
                     );
+                    // Ensure touchHLE is responsive from the OS perspective,
+                    // otherwise screen redraw might not show up? (Unclear if
+                    // this explanation is correct.)
+                    run_run_loop_single_iteration(env, main_run_loop);
 
                     let app_path = &apps.as_ref().unwrap()[app_idx].path;
                     echo!("Picked: {}", app_path.display());
