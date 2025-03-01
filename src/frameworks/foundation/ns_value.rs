@@ -8,6 +8,7 @@
 use super::NSUInteger;
 use crate::frameworks::foundation::ns_string::from_rust_string;
 use crate::frameworks::foundation::NSInteger;
+use crate::mem::{ConstVoidPtr, MutVoidPtr};
 use crate::objc::{
     autorelease, id, msg, msg_class, objc_classes, retain, Class, ClassExports, HostObject,
     NSZonePtr,
@@ -71,9 +72,23 @@ pub const CLASSES: ClassExports = objc_classes! {
 // implemented here yet (TODO).
 @implementation NSValue: NSObject
 
++ (id)valueWithPointer:(ConstVoidPtr)ptr {
+    // TODO: implement with `value:withObjCType:` instead
+    msg_class![env; NSNumber numberWithUnsignedInt:(ptr.to_bits())]
+}
+
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
     retain(env, this)
+}
+
+- (MutVoidPtr)pointerValue {
+    let class: Class = msg![env; this class];
+    assert!(class == env.objc.get_known_class("NSNumber", &mut env.mem));
+    // According to the docs, `If the value object was not created to hold
+    // a pointer-sized data item, the result is undefined.`
+    let val = msg![env; this unsignedIntValue];
+    MutVoidPtr::from_bits(val)
 }
 
 @end
