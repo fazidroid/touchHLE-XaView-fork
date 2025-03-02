@@ -200,18 +200,16 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                         res.extend_from_slice(
                             env.mem.bytes_at(c_string, str_len.min(precision as _)),
                         )
-                    } else {
-                        if pad_width > 0 {
-                            let pad_width = pad_width as usize;
-                            let str = env.mem.cstr_at_utf8(c_string).unwrap();
-                            if left_justified {
-                                write!(&mut res, "{:<1$}", str, pad_width).unwrap();
-                            } else {
-                                write!(&mut res, "{:>1$}", str, pad_width).unwrap();
-                            }
+                    } else if pad_width > 0 {
+                        let pad_width = pad_width as usize;
+                        let str = env.mem.cstr_at_utf8(c_string).unwrap();
+                        if left_justified {
+                            write!(&mut res, "{:<1$}", str, pad_width).unwrap();
                         } else {
-                            res.extend_from_slice(env.mem.cstr_at(c_string));
+                            write!(&mut res, "{:>1$}", str, pad_width).unwrap();
                         }
+                    } else {
+                        res.extend_from_slice(env.mem.cstr_at(c_string));
                     }
                 } else {
                     assert!(!left_justified);
