@@ -5,7 +5,7 @@
  */
 //! The `NSScanner` class.
 
-use crate::frameworks::foundation::ns_string::from_u16_vec;
+use crate::frameworks::foundation::ns_string::{from_u16_vec, to_rust_string};
 use crate::frameworks::foundation::{unichar, NSUInteger};
 use crate::mem::MutPtr;
 use crate::objc::{
@@ -53,7 +53,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
-- (id)initWithString:(id)string {
+- (id)initWithString:(id)string { // NSString *
     assert!(string != nil);
     let string: id = msg![env; string copy]; // Same behaviour as simulator
     let len: NSUInteger = msg![env; string length];
@@ -105,6 +105,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (bool)scanCharactersFromSet:(id)cset intoString:(MutPtr<id>)str {
     let inv_cset: id = msg![env; cset invertedSet];
     msg![env; this scanUpToCharactersFromSet:inv_cset intoString:str]
+}
+
+- (bool)scanHexInt:(MutPtr<u32>)result {
+    assert!(!result.is_null());
+    let NSScannerHostObject { string, len, pos } = env.objc.borrow::<NSScannerHostObject>(this).clone();
+    assert!(pos < len);
+    let susbstring: id = msg![env; string substringFromIndex:pos];
+    let tmp = to_rust_string(env, susbstring);
+    assert!(!tmp.starts_with("0x") && !tmp.starts_with("0X"));
+    // TODO: use `charactersToBeSkipped`
+    let tmp2 = tmp.trim_start();
+    assert!(tmp.len() == tmp2.len());
+    assert!(!tmp2.chars().next().unwrap().is_ascii_hexdigit()); // TODO
+    env.mem.write(result, 0);
+    false
 }
 
 @end
