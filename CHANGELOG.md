@@ -44,8 +44,13 @@ Compatibility:
   - [Hero of Sparta 2](https://appdb.touchhle.org/apps/453) (@ciciplusplus)
   - [Hero of Sparta](https://appdb.touchhle.org/apps/452) (@ciciplusplus)
   - [Bridge Odyssey](https://appdb.touchhle.org/apps/465) (@ciciplusplus)
+  - [Terminator Salvation](https://appdb.touchhle.org/apps/344) (@ciciplusplus)
+  - [Brothers In Arms: Hour Of Heroes](https://appdb.touchhle.org/apps/369) (@ciciplusplus)
+  - [Crusade Of Destiny](https://appdb.touchhle.org/apps/792) (@ciciplusplus)
+  - [Arvale](https://appdb.touchhle.org/apps/671) (@ciciplusplus)
+  - [Battlefield: Bad Company 2](https://appdb.touchhle.org/apps/817) (@ciciplusplus)
 - API support improvements:
-  - Various small contributions. (@hikari-no-yume, @alborrajo, @ciciplusplus, @atasro2, @abnormalmaps, @hujerhoe, @acieslewicz, @WhatAmISupposedToPutHere)
+  - Various small contributions. (@hikari-no-yume, @alborrajo, @ciciplusplus, @atasro2, @abnormalmaps, @hujerhoe, @acieslewicz, @WhatAmISupposedToPutHere, @JaGoTu)
   - UITextField now supports real text input with a keyboard. On Windows/macOS physical keyboard is used, on Android it's done via a system soft keyboard. (@ciciplusplus)
   - UIScrollView and UITextView partial implementations. (@Skryptonyte, @ciciplusplus)
 
