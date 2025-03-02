@@ -920,7 +920,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)encoding {
-    assert_eq!(encoding, NSASCIIStringEncoding); // TODO: other encodings
+    assert!(encoding == NSASCIIStringEncoding || encoding == NSUTF8StringEncoding); // TODO: other encodings
     // TODO: implement escaping as per RFC 2396
     let str = to_rust_string(env, this);
     // FIXME: figure out why '[' and ']' are escaped on iOS simulator
