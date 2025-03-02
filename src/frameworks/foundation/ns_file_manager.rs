@@ -304,9 +304,45 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("[(NSFileManager *){:?} fileAttributesAtPath:{} traverse:{}]", this, path, traverse);
     let guest_path = GuestPath::new(&path);
 
+    file_attributes_common(env, guest_path)
+}
+
+- (id)attributesOfItemAtPath:(id)path // NSString *
+                       error:(MutPtr<id>)error { // NSError **
+    assert!(error.is_null()); // TODO
+
+    // TODO: other attributes
+    log!("Warning: NSFileManager attributesOfItemAtPath:error: returns only NSFileModificationDate and NSFileSize attributes!");
+
+    let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
+    // TODO: traverse link
+    log_dbg!("[(NSFileManager *){:?} attributesOfItemAtPath:{} error:{:?}]", this, path, error);
+    let guest_path = GuestPath::new(&path);
+
+    file_attributes_common(env, guest_path)
+}
+
+@end
+
+@implementation NSDirectoryEnumerator: NSEnumerator
+
+- (id)nextObject {
+    let host_obj = env.objc.borrow_mut::<NSDirectoryEnumeratorHostObject>(this);
+    host_obj.iterator.next().map_or(nil, |s| ns_string::from_rust_string(env, String::from(s)))
+}
+
+@end
+
+};
+
+/// Helper function for `fileAttributesAtPath:traverseLink:` and
+/// `attributesOfItemAtPath:error:`
+fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
+    // TODO: support more attributes
     let unix_timestamp: f64 = env.fs.modified(guest_path).unwrap() as f64;
     let unix_ref_date: id = msg_class![env; NSDate dateWithTimeIntervalSince1970:0f64];
-    let unix_date: id = msg_class![env; NSDate dateWithTimeInterval:unix_timestamp sinceDate:unix_ref_date];
+    let unix_date: id =
+        msg_class![env; NSDate dateWithTimeInterval:unix_timestamp sinceDate:unix_ref_date];
 
     let size = env.fs.size(guest_path).unwrap();
     let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
@@ -323,16 +359,3 @@ pub const CLASSES: ClassExports = objc_classes! {
     release(env, dict);
     autorelease(env, dict_imm)
 }
-
-@end
-
-@implementation NSDirectoryEnumerator: NSEnumerator
-
-- (id)nextObject {
-    let host_obj = env.objc.borrow_mut::<NSDirectoryEnumeratorHostObject>(this);
-    host_obj.iterator.next().map_or(nil, |s| ns_string::from_rust_string(env, String::from(s)))
-}
-
-@end
-
-};
