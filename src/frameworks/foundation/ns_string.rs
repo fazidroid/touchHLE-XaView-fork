@@ -58,6 +58,7 @@ const C_STRING_FRIENDLY_ENCODINGS: &[NSStringEncoding] = &[
     NSASCIIStringEncoding,
     NSUTF8StringEncoding,
     NSWindowsCP1252StringEncoding,
+    NSMacOSRomanStringEncoding,
 ];
 
 pub const NSMaximumStringLength: NSUInteger = (i32::MAX - 1) as _;
@@ -102,6 +103,13 @@ impl StringHostObject {
 
         match encoding {
             NSASCIIStringEncoding => {
+                assert!(bytes.iter().all(|byte| byte.is_ascii()));
+                // Safety: guaranteed by above assertion
+                let string = unsafe { String::from_utf8_unchecked(bytes.into_owned()) };
+                StringHostObject::Utf8(Cow::Owned(string))
+            }
+            NSMacOSRomanStringEncoding => {
+                // TODO: support non ASCII symbols
                 assert!(bytes.iter().all(|byte| byte.is_ascii()));
                 // Safety: guaranteed by above assertion
                 let string = unsafe { String::from_utf8_unchecked(bytes.into_owned()) };
