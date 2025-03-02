@@ -9,10 +9,11 @@ use super::ns_array::ArrayHostObject;
 use super::ns_property_list_serialization::{
     deserialize_plist_from_file, NSPropertyListBinaryFormat_v1_0,
 };
-use super::ns_string::{from_rust_string, to_rust_string};
+use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use super::{ns_array, ns_keyed_unarchiver, ns_string, ns_url, NSUInteger};
 use crate::abi::{CallFromHost, GuestFunction, VaList};
 use crate::frameworks::core_foundation::{CFHashCode, CFIndex};
+use crate::frameworks::foundation::ns_file_manager::{NSFileModificationDate, NSFileSize};
 use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::objc::{
@@ -475,6 +476,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     // TODO: strip '@' and call super
     assert!(!key_str.starts_with('@'));
     msg![env; this objectForKey:key]
+}
+
+// NSDictionary(NSFileAttributes) category
+// TODO: implement categories properly
+- (id)fileModificationDate {
+    let modif_date_key = get_static_str(env, NSFileModificationDate);
+    msg![env; this objectForKey:modif_date_key]
+}
+- (u64)fileSize {
+    let size_key = get_static_str(env, NSFileSize);
+    let num = msg![env; this objectForKey:size_key];
+    if num != nil {
+        msg![env; num unsignedLongLongValue]
+    } else {
+        // GnuStep docs claiming to return NSNotFound here [ref](https://www.gnustep.org/resources/documentation/Developer/Base/Reference/NSFileManager.html#method$NSDictionary(NSFileAttributes)-fileSize)
+        // But as seen on iPhone Simulator, it's returning 0 with an empty dict
+        0
+    }
 }
 
 @end

@@ -23,8 +23,8 @@ const NSDocumentDirectory: NSSearchPathDirectory = 9;
 type NSSearchPathDomainMask = NSUInteger;
 const NSUserDomainMask: NSSearchPathDomainMask = 1;
 
-const NSFileModificationDate: &str = "NSFileModificationDate";
-const NSFileSize: &str = "NSFileSize";
+pub const NSFileModificationDate: &str = "NSFileModificationDate";
+pub const NSFileSize: &str = "NSFileSize";
 
 pub const CONSTANTS: ConstantExports = &[
     (
