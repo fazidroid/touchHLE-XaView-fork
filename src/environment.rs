@@ -11,6 +11,7 @@
 mod mutex;
 
 use crate::abi::{CallFromHost, GuestFunction, GuestRet};
+use crate::audio::openal::OpenALManager;
 use crate::libc::semaphore::sem_t;
 use crate::mem::{GuestUSize, MutPtr, MutVoidPtr};
 use crate::{
@@ -94,6 +95,7 @@ pub struct Environment {
     pub fs: fs::Fs,
     /// The window is only absent when running in headless mode.
     pub window: Option<window::Window>,
+    pub openal_manager: OpenALManager,
     pub mem: mem::Mem,
     /// Loaded binaries. Index `0` is always the app binary, other entries are
     /// dynamic libraries.
@@ -440,6 +442,7 @@ impl Environment {
             bundle,
             fs,
             window,
+            openal_manager: OpenALManager::new()?,
             mem,
             bins,
             objc,
@@ -623,6 +626,7 @@ impl Environment {
             bundle,
             fs,
             window,
+            openal_manager: OpenALManager::new()?,
             mem,
             bins,
             objc,
