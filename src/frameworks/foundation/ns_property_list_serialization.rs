@@ -104,9 +104,12 @@ pub(super) fn deserialize_plist_from_file(
         return nil;
     };
 
-    let Ok(root) = Value::from_reader(Cursor::new(bytes)) else {
-        log_dbg!("Couldn't parse plist, returning nil.");
-        return nil;
+    let root = match Value::from_reader(Cursor::new(bytes)) {
+        Ok(root) => root,
+        Err(err) => {
+            log_dbg!("Couldn't parse plist, returning nil: {}", err);
+            return nil;
+        }
     };
 
     if array_expected && root.as_array().is_none() {
