@@ -270,6 +270,13 @@ fn fclose(env: &mut Environment, file_ptr: MutPtr<FILE>) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
+    if file_ptr.is_null() {
+        // According to the docs, this should segfault.
+        // But as tested on iPhone Simulator, it doesn't
+        log!("fclose(NULL) => EOF");
+        return EOF;
+    }
+
     let FILE { fd } = env.mem.read(file_ptr);
 
     env.mem.free(file_ptr.cast());
