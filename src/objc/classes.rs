@@ -39,7 +39,9 @@ pub(super) struct ClassHostObject {
     pub(super) is_metaclass: bool,
     pub(super) superclass: Class,
     pub(super) methods: HashMap<SEL, IMP>,
-    pub(super) ivars: HashMap<String, ConstPtr<GuestUSize>>,
+    /// Maps ivar name to a tuple of an offset (as pointer) and an alignment.
+    /// (Alignment is used during ivar reconciliation.)
+    pub(super) ivars: HashMap<String, (ConstPtr<GuestUSize>, u32)>,
     /// Offset into the allocated memory for the object where the ivars of
     /// instances of this class or metaclass (respectively: normal objects or
     /// classes) should live. This is always >= the value in the superclass.
@@ -658,7 +660,6 @@ impl ObjC {
 
         // Third pass to ensure no superclass has "grown into" any of its
         // subclasses.
-        // TODO: Shift ivar offsets in the subclasses where it happens
         // (https://alwaysprocessing.blog/2023/03/12/objc-ivar-abi)
         if let Some(root_class) = root_class {
             // BFS starting from root for ivar reconciliation
@@ -670,7 +671,7 @@ impl ObjC {
             queue.push_back(root_class);
             while !queue.is_empty() {
                 let next = queue.pop_front().unwrap();
-                let (need, diff) = self.need_ivar_reconciliation(next);
+                let (need, mut diff) = self.need_ivar_reconciliation(next);
                 if need {
                     let ClassHostObject {
                         name, superclass, ..
@@ -684,12 +685,32 @@ impl ObjC {
                     let ClassHostObject {
                         ref mut instance_start,
                         ref mut instance_size,
-                        ref ivars,
+                        ref mut ivars,
                         ..
                     } = self.borrow_mut(next);
 
-                    // TODO: ivars slide
-                    assert!(ivars.is_empty());
+                    if !ivars.is_empty() {
+                        let mut max_alignment: u32 = 1;
+                        for (offset, align) in ivars.values() {
+                            if offset.is_null() {
+                                // anonymous bitfield
+                                continue;
+                            }
+                            max_alignment = max_alignment.max(*align);
+                        }
+
+                        let align_mask = max_alignment - 1;
+                        diff = (diff + align_mask) & !align_mask;
+
+                        for (offset, _) in ivars.values_mut() {
+                            if offset.is_null() {
+                                // anonymous bitfield
+                                continue;
+                            }
+
+                            *offset = Ptr::from_bits((*offset).to_bits() + diff);
+                        }
+                    }
 
                     *instance_start += diff;
                     *instance_size += diff;
