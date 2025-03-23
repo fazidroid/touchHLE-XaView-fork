@@ -30,6 +30,7 @@ use crate::mem::{
 };
 use crate::Environment;
 
+use crate::abi::DotDotDot;
 use crate::libc::netdb::{socklen_t, IPPROTO_TCP, IPPROTO_UDP};
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -159,6 +160,12 @@ fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> File
 
     log_dbg!("socket({}, {}, {}) => {}", domain, type_, protocol, fd);
     fd
+}
+
+fn ioctl(env: &mut Environment, fd: i32, request: u32, _args: DotDotDot) -> i32 {
+    assert!(is_socket(env, fd));
+    log!("TODO: ioctl({} (socket), {:#x?}, ...) => -1", fd, request);
+    -1
 }
 
 fn setsockopt(
@@ -872,6 +879,7 @@ fn sendto(
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(socket(_, _, _)),
+    export_c_func!(ioctl(_, _, _)),
     export_c_func!(setsockopt(_, _, _, _, _)),
     export_c_func!(bind(_, _, _)),
     export_c_func!(listen(_, _)),
