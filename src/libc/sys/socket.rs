@@ -444,6 +444,45 @@ fn select(
     count
 }
 
+fn accept(
+    env: &mut Environment,
+    socket: i32,
+    _addr: MutPtr<sockaddr>,
+    _addr_len: MutPtr<socklen_t>,
+) -> i32 {
+    let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
+    assert!(type_ == SOCK_STREAM);
+
+    let listener = State::get(env)
+        .sockets
+        .get(&socket)
+        .unwrap()
+        .tcp_listener
+        .as_ref()
+        .unwrap();
+    match listener.accept() {
+        Ok((_, addr)) => {
+            log!("accept: New client: {}", addr);
+            unimplemented!()
+        }
+        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+            // No incoming connection is ready
+            // TODO: if this happened, take a deep breath and do:
+            // - block guest thread with a new [ThreadBlock] type
+            // - poll for data in thread scheduling part
+            // - write/read/accept/etc data once it is ready
+            // - unblock guest thread
+            unimplemented!("accept: TCP listener for socket {} would block on accepting, block current guest thread {}.", socket, env.current_thread)
+        }
+        Err(e) => {
+            panic!(
+                "accept: Socket {} has error accepting connection: {}",
+                socket, e
+            );
+        }
+    }
+}
+
 fn recvfrom(
     env: &mut Environment,
     socket: i32,
@@ -586,6 +625,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(listen(_, _)),
     export_c_func!(connect(_, _, _)),
     export_c_func!(select(_, _, _, _, _)),
+    export_c_func!(accept(_, _, _)),
     export_c_func!(recvfrom(_, _, _, _, _, _)),
     export_c_func!(sendto(_, _, _, _, _, _)),
 ];
