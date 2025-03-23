@@ -357,6 +357,7 @@ pub enum GuestFile {
     File(File),
     IpaBundleFile(IpaFile),
     ResourceFile(paths::ResourceFile),
+    Socket,
 }
 
 impl GuestFile {
@@ -381,6 +382,7 @@ impl GuestFile {
             GuestFile::File(file) => file.sync_all(),
             GuestFile::IpaBundleFile(_) | GuestFile::ResourceFile(_) => Ok(()),
             GuestFile::Directory => panic!("Attempt to sync a directory as a guest file"),
+            _ => unimplemented!(),
         }
     }
     pub fn set_len(&self, len: u64) -> std::io::Result<()> {
@@ -393,6 +395,7 @@ impl GuestFile {
                 panic!("Attempt to resize a read-only file: {:?}", file)
             }
             GuestFile::Directory => panic!("Attempt to resize a directory as a guest file"),
+            _ => unimplemented!(),
         }
     }
 }
@@ -404,6 +407,7 @@ impl Read for GuestFile {
             GuestFile::IpaBundleFile(file) => file.read(buf),
             GuestFile::ResourceFile(file) => file.get().read(buf),
             GuestFile::Directory => panic!("Attempt to read from a directory as a guest file"),
+            _ => unimplemented!(),
         }
     }
 }
@@ -419,6 +423,7 @@ impl Write for GuestFile {
                 panic!("Attempt to write to a read-only file: {:?}", file)
             }
             GuestFile::Directory => panic!("Attempt to write to a directory as a guest file"),
+            _ => unimplemented!(),
         }
     }
 
@@ -432,6 +437,7 @@ impl Write for GuestFile {
                 panic!("Attempt to flush a read-only file: {:?}", file)
             }
             GuestFile::Directory => panic!("Attempt to flush a directory as a guest file"),
+            _ => unimplemented!(),
         }
     }
 }
@@ -443,6 +449,7 @@ impl Seek for GuestFile {
             GuestFile::IpaBundleFile(file) => file.seek(pos),
             GuestFile::ResourceFile(file) => file.get().seek(pos),
             GuestFile::Directory => panic!("Attempt to seek in a directory as a guest file"),
+            _ => unimplemented!(),
         }
     }
 }
