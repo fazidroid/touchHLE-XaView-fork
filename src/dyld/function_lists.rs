@@ -14,6 +14,7 @@ use crate::libc;
 
 /// All the lists of functions that the linker should search through.
 pub const FUNCTION_LISTS: &[super::FunctionExports] = &[
+    libc::arpa::inet::FUNCTIONS,
     libc::clocale::FUNCTIONS,
     libc::ctype::FUNCTIONS,
     libc::cxxabi::FUNCTIONS,

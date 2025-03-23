@@ -10,6 +10,8 @@ use crate::export_c_func;
 use crate::libc::errno::{set_errno, EPROTONOSUPPORT};
 use crate::Environment;
 
+pub const AF_INET: i32 = 2;
+
 fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> i32 {
     log!(
         "Warning: socket({}, {}, {}) is unimplemented, returning -1",

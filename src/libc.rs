@@ -11,6 +11,7 @@
 
 mod generic_char;
 
+pub mod arpa;
 pub mod clocale;
 pub mod crypto;
 pub mod ctype;

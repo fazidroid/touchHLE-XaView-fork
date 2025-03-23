@@ -10,6 +10,9 @@ use crate::export_c_func;
 use crate::mem::{ConstPtr, MutPtr, Ptr};
 use crate::Environment;
 
+#[allow(non_camel_case_types)]
+pub type socklen_t = u32;
+
 // TODO: struct definition
 #[allow(non_camel_case_types)]
 struct hostent {}
