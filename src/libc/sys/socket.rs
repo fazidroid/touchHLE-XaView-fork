@@ -340,11 +340,16 @@ fn select(
     // TODO: other type of sets
     assert!(error_fds.is_null());
 
-    let timeval = env.mem.read(timeout);
-    let tv_sec = timeval.tv_sec;
-    assert_eq!(tv_sec, 0); // TODO
-    let tv_usec = timeval.tv_usec;
-    assert_eq!(tv_usec, 0); // TODO
+    let should_block = if !timeout.is_null() {
+        let timeval = env.mem.read(timeout);
+        let tv_sec = timeval.tv_sec;
+        assert_eq!(tv_sec, 0); // TODO
+        let tv_usec = timeval.tv_usec;
+        assert_eq!(tv_usec, 0); // TODO
+        false
+    } else {
+        true
+    };
 
     let mut count = 0;
 
@@ -376,6 +381,7 @@ fn select(
                         }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             log_dbg!("select: Socket {} would block on peeking, continue.", fd);
+                            assert!(!should_block); // TODO
                             false
                         }
                         Err(e) => {
@@ -427,6 +433,7 @@ fn select(
                             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                                 // No incoming connection is ready
                                 log_dbg!("select: TCP listener for socket {} would block on accepting, continue.", fd);
+                                assert!(!should_block); // TODO
                                 return false;
                             }
                             Err(e) => {
@@ -458,6 +465,7 @@ fn select(
                                 "select: TCP stream for socket {} would block on peeking, continue.",
                                 fd
                             );
+                            assert!(!should_block); // TODO
                             false
                         }
                         Err(e) => {
@@ -502,6 +510,7 @@ fn select(
                         *bits |= 1 << bit_index;
                         true
                     } else {
+                        assert!(!should_block); // TODO
                         false
                     }
                 }
@@ -520,6 +529,7 @@ fn select(
                         *bits |= 1 << bit_index;
                         true
                     } else {
+                        assert!(!should_block); // TODO
                         false
                     }
                 }
