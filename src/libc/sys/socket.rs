@@ -338,7 +338,6 @@ fn select(
     set_errno(env, 0);
 
     // TODO: other type of sets
-    assert!(write_fds.is_null());
     assert!(error_fds.is_null());
 
     let timeval = env.mem.read(timeout);
@@ -347,127 +346,190 @@ fn select(
     let tv_usec = timeval.tv_usec;
     assert_eq!(tv_usec, 0); // TODO
 
-    let mut read_set = env.mem.read(read_fds);
-    log_dbg!("select: read_set before {:?}", read_set);
-    let count = process_set(env, &mut read_set, n_fds, |env, fd, bits, bit_index| {
-        log_dbg!("select: bit set at fd: {}", fd);
-        // Clean bit in the set for the current socket
-        *bits &= !(1 << bit_index);
-        let type_ = State::get(env).sockets.get(&fd).unwrap().type_;
-        match type_ {
-            SOCK_DGRAM => {
-                let udp_socket = State::get(env)
-                    .sockets
-                    .get(&fd)
-                    .unwrap()
-                    .udp_socket
-                    .as_ref()
-                    .unwrap();
-                // TODO: how many bytes we should peek?
-                let mut buf = [0; 1];
-                match udp_socket.peek(&mut buf) {
-                    Ok(received) => {
-                        log_dbg!("select: Socket {} peeked {} bytes", fd, received);
-                        // Set bit back
-                        *bits |= 1 << bit_index;
-                        true
-                    }
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        log_dbg!("select: Socket {} would block on peeking, continue.", fd);
-                        false
-                    }
-                    Err(e) => {
-                        panic!("select: Peek for socket {} failed: {e:?}", fd)
+    let mut count = 0;
+
+    if !read_fds.is_null() {
+        let mut read_set = env.mem.read(read_fds);
+        log_dbg!("select: read_set before {:?}", read_set);
+        count += process_set(env, &mut read_set, n_fds, |env, fd, bits, bit_index| {
+            log_dbg!("select: bit set in read_set at fd: {}", fd);
+            // Clean bit in the set for the current socket
+            *bits &= !(1 << bit_index);
+            let type_ = State::get(env).sockets.get(&fd).unwrap().type_;
+            match type_ {
+                SOCK_DGRAM => {
+                    let udp_socket = State::get(env)
+                        .sockets
+                        .get(&fd)
+                        .unwrap()
+                        .udp_socket
+                        .as_ref()
+                        .unwrap();
+                    // TODO: how many bytes we should peek?
+                    let mut buf = [0; 1];
+                    match udp_socket.peek(&mut buf) {
+                        Ok(received) => {
+                            log_dbg!("select: Socket {} peeked {} bytes", fd, received);
+                            // Set bit back
+                            *bits |= 1 << bit_index;
+                            true
+                        }
+                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            log_dbg!("select: Socket {} would block on peeking, continue.", fd);
+                            false
+                        }
+                        Err(e) => {
+                            panic!("select: Peek for socket {} failed: {e:?}", fd)
+                        }
                     }
                 }
+                SOCK_STREAM => {
+                    if State::get(env)
+                        .sockets
+                        .get(&fd)
+                        .unwrap()
+                        .tcp_stream
+                        .is_none()
+                    {
+                        // If we don't have a TCP stream it probably means
+                        // that a listener is waiting for connection
+                        let listener = State::get(env)
+                            .sockets
+                            .get(&fd)
+                            .unwrap()
+                            .tcp_listener
+                            .as_ref()
+                            .unwrap();
+                        // The listener is non-blocking,
+                        // so we can try to accept
+                        match listener.accept() {
+                            Ok((stream, addr)) => {
+                                log!("select: New client: {}", addr);
+                                // We already accepted the connection on
+                                // the host, but we need to postpone new
+                                // guest fd creation up until guest calls
+                                // accept()
+                                assert!(State::get(env)
+                                    .sockets
+                                    .get(&fd)
+                                    .unwrap()
+                                    .pending_tcp_stream
+                                    .is_none());
+                                State::get_mut(env)
+                                    .sockets
+                                    .get_mut(&fd)
+                                    .unwrap()
+                                    .pending_tcp_stream = Some(stream);
+                                // Set bit back
+                                *bits |= 1 << bit_index;
+                                return true;
+                            }
+                            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                                // No incoming connection is ready
+                                log_dbg!("select: TCP listener for socket {} would block on accepting, continue.", fd);
+                                return false;
+                            }
+                            Err(e) => {
+                                panic!(
+                                    "select: Socket {} has error accepting connection: {}",
+                                    fd, e
+                                );
+                            }
+                        }
+                    }
+                    let stream = State::get(env)
+                        .sockets
+                        .get(&fd)
+                        .unwrap()
+                        .tcp_stream
+                        .as_ref()
+                        .unwrap();
+                    // TODO: how many bytes we should peek?
+                    let mut buf = [0; 1];
+                    match stream.peek(&mut buf) {
+                        Ok(received) => {
+                            log_dbg!("select: received {} bytes (at least)", received);
+                            // Set bit back
+                            *bits |= 1 << bit_index;
+                            true
+                        }
+                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            log_dbg!(
+                                "select: TCP stream for socket {} would block on peeking, continue.",
+                                fd
+                            );
+                            false
+                        }
+                        Err(e) => {
+                            panic!("select: Peek for socket {} failed: {}", fd, e)
+                        }
+                    }
+                }
+                _ => unimplemented!(),
             }
-            SOCK_STREAM => {
-                if State::get(env)
-                    .sockets
-                    .get(&fd)
-                    .unwrap()
-                    .tcp_stream
-                    .is_none()
-                {
-                    // If we don't have a TCP stream it probably means
-                    // that a listener is waiting for connection
-                    let listener = State::get(env)
+        });
+        log_dbg!("select: read_set after {:?}", read_set);
+        env.mem.write(read_fds, read_set);
+    }
+
+    if !write_fds.is_null() {
+        let mut write_set = env.mem.read(write_fds);
+        log_dbg!("select: write_set before {:?}", write_set);
+        count += process_set(env, &mut write_set, n_fds, |env, fd, bits, bit_index| {
+            log_dbg!("select: bit set in write_set at fd: {}", fd);
+            // Clean bit in the set for the current socket
+            *bits &= !(1 << bit_index);
+            let type_ = State::get(env).sockets.get(&fd).unwrap().type_;
+            match type_ {
+                SOCK_STREAM => {
+                    assert!(State::get(env)
                         .sockets
                         .get(&fd)
                         .unwrap()
                         .tcp_listener
-                        .as_ref()
-                        .unwrap();
-                    // The listener is non-blocking,
-                    // so we can try to accept
-                    match listener.accept() {
-                        Ok((stream, addr)) => {
-                            log!("select: New client: {}", addr);
-                            // We already accepted the connection on
-                            // the host, but we need to postpone new
-                            // guest fd creation up until guest calls
-                            // accept()
-                            assert!(State::get(env)
-                                .sockets
-                                .get(&fd)
-                                .unwrap()
-                                .pending_tcp_stream
-                                .is_none());
-                            State::get_mut(env)
-                                .sockets
-                                .get_mut(&fd)
-                                .unwrap()
-                                .pending_tcp_stream = Some(stream);
-                            // Set bit back
-                            *bits |= 1 << bit_index;
-                            return true;
-                        }
-                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            // No incoming connection is ready
-                            log_dbg!("select: TCP listener for socket {} would block on accepting, continue.", fd);
-                            return false;
-                        }
-                        Err(e) => {
-                            panic!(
-                                "select: Socket {} has error accepting connection: {}",
-                                fd, e
-                            );
-                        }
-                    }
-                }
-                let stream = State::get(env)
-                    .sockets
-                    .get(&fd)
-                    .unwrap()
-                    .tcp_stream
-                    .as_ref()
-                    .unwrap();
-                // TODO: how many bytes we should peek?
-                let mut buf = [0; 1];
-                match stream.peek(&mut buf) {
-                    Ok(received) => {
-                        log!("select: received {} bytes (at least)", received);
+                        .is_none());
+                    // As we cannot "peek" on write, we just check
+                    // if TCP stream exist or not
+                    // TODO: find a better way
+                    if State::get(env)
+                        .sockets
+                        .get(&fd)
+                        .unwrap()
+                        .tcp_stream
+                        .is_some()
+                    {
                         // Set bit back
                         *bits |= 1 << bit_index;
                         true
-                    }
-                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        log_dbg!(
-                            "select: TCP stream for socket {} would block on peeking, continue.",
-                            fd
-                        );
+                    } else {
                         false
                     }
-                    Err(e) => {
-                        panic!("select: Peek for socket {} failed: {}", fd, e)
+                }
+                SOCK_DGRAM => {
+                    // As we cannot "peek" on write, we just check
+                    // if UDP socket exist or not
+                    // TODO: find a better way
+                    if State::get(env)
+                        .sockets
+                        .get(&fd)
+                        .unwrap()
+                        .udp_socket
+                        .is_some()
+                    {
+                        // Set bit back
+                        *bits |= 1 << bit_index;
+                        true
+                    } else {
+                        false
                     }
                 }
+                _ => unimplemented!(),
             }
-            _ => unimplemented!(),
-        }
-    });
-    log_dbg!("select: read_set after {:?}", read_set);
-    env.mem.write(read_fds, read_set);
+        });
+        log_dbg!("select: write_set after {:?}", write_set);
+        env.mem.write(write_fds, write_set);
+    }
+
     count
 }
 
