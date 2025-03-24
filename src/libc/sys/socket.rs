@@ -411,6 +411,10 @@ fn select(
                         match listener.accept() {
                             Ok((stream, addr)) => {
                                 log!("select: New client: {}", addr);
+                                // We set host socket as non-blocking in order
+                                // to have more control of how and when it's
+                                // used
+                                stream.set_nonblocking(true).unwrap();
                                 // We already accepted the connection on
                                 // the host, but we need to postpone new
                                 // guest fd creation up until guest calls
