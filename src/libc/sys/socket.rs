@@ -370,11 +370,25 @@ fn select(
                         .udp_socket
                         .as_ref()
                         .unwrap();
-                    // TODO: how many bytes we should peek?
+                    // Peek just one byte to check if we have some data
                     let mut buf = [0; 1];
                     match udp_socket.peek(&mut buf) {
                         Ok(received) => {
                             log_dbg!("select: Socket {} peeked {} bytes", fd, received);
+                            // Set bit back
+                            *bits |= 1 << bit_index;
+                            true
+                        }
+                        // On Windows, if we receive more bytes than we peek,
+                        // it will error, but it means that there is some data!
+                        Err(ref e)
+                            if cfg!(target_os = "windows") && e.raw_os_error() == Some(10040) =>
+                        {
+                            // 10040 code is WSAEMSGSIZE
+                            log_dbg!(
+                                "[Windows case] select: received {} bytes (at least)",
+                                buf.len()
+                            );
                             // Set bit back
                             *bits |= 1 << bit_index;
                             true
@@ -455,11 +469,25 @@ fn select(
                         .tcp_stream
                         .as_ref()
                         .unwrap();
-                    // TODO: how many bytes we should peek?
+                    // Peek just one byte to check if we have some data
                     let mut buf = [0; 1];
                     match stream.peek(&mut buf) {
                         Ok(received) => {
                             log_dbg!("select: received {} bytes (at least)", received);
+                            // Set bit back
+                            *bits |= 1 << bit_index;
+                            true
+                        }
+                        // On Windows, if we receive more bytes than we peek,
+                        // it will error, but it means that there is some data!
+                        Err(ref e)
+                            if cfg!(target_os = "windows") && e.raw_os_error() == Some(10040) =>
+                        {
+                            // 10040 code is WSAEMSGSIZE
+                            log_dbg!(
+                                "[Windows case] select: received {} bytes (at least)",
+                                buf.len()
+                            );
                             // Set bit back
                             *bits |= 1 << bit_index;
                             true
