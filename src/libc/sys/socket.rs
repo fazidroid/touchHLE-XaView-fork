@@ -25,12 +25,15 @@ use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::errno::set_errno;
 use crate::libc::posix_io::{find_or_create_socket, FileDescriptor};
 use crate::libc::time::timeval;
-use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, SafeRead};
+use crate::mem::{
+    guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, Ptr, SafeRead,
+};
 use crate::Environment;
 
 use crate::libc::netdb::{socklen_t, IPPROTO_TCP, IPPROTO_UDP};
 use std::collections::{HashMap, HashSet};
 use std::io;
+use std::io::{Read, Write};
 use std::net::{SocketAddr, SocketAddrV4, TcpListener, TcpStream, UdpSocket};
 
 pub const AF_INET: i32 = 2;
@@ -83,6 +86,14 @@ impl sockaddr {
         ];
         (ip, port)
     }
+    fn from_sockaddr_v4(addr: &SocketAddr) -> Self {
+        // Only IPV4 for the moment
+        assert!(addr.is_ipv4());
+        let SocketAddr::V4(ipv4addr) = addr else {
+            unreachable!()
+        };
+        sockaddr::from_ipv4_parts(ipv4addr.ip().octets(), ipv4addr.port())
+    }
     fn to_sockaddr_v4(self) -> SocketAddrV4 {
         let (ip, port) = self.to_ipv4_parts();
         SocketAddrV4::new(ip.into(), port)
@@ -105,6 +116,8 @@ struct SocketHostObject {
     options: HashSet<i32>,
     /// TCP socket which is yet to be connected
     tcp_listener: Option<TcpListener>,
+    /// TCP socket which was connected on host, but not (yet) on the guest side
+    pending_tcp_stream: Option<TcpStream>,
     /// Already connected TCP socket
     tcp_stream: Option<TcpStream>,
     /// UDP socket
@@ -138,6 +151,7 @@ fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> File
         type_,
         options: Default::default(),
         tcp_listener: None,
+        pending_tcp_stream: None,
         tcp_stream: None,
         udp_socket: None,
     };
@@ -396,8 +410,27 @@ fn select(
                             // The listener is non-blocking,
                             // so we can try to accept
                             match listener.accept() {
-                                Ok((_, addr)) => {
-                                    unimplemented!("select: New client: {}", addr)
+                                Ok((stream, addr)) => {
+                                    log!("select: New client: {}", addr);
+                                    // We already accepted the connection on
+                                    // the host, but we need to postpone new
+                                    // guest fd creation up until guest calls
+                                    // accept()
+                                    assert!(State::get(env)
+                                        .sockets
+                                        .get(&fd)
+                                        .unwrap()
+                                        .pending_tcp_stream
+                                        .is_none());
+                                    State::get_mut(env)
+                                        .sockets
+                                        .get_mut(&fd)
+                                        .unwrap()
+                                        .pending_tcp_stream = Some(stream);
+                                    // Set bit back
+                                    *bits |= 1 << bit_index;
+                                    count += 1;
+                                    continue;
                                 }
                                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                                     // No incoming connection is ready
@@ -423,7 +456,11 @@ fn select(
                         let mut buf = [0; 1];
                         match stream.peek(&mut buf) {
                             Ok(received) => {
-                                unimplemented!("select: received {} bytes", received)
+                                log!("select: received {} bytes (at least)", received);
+                                // Set bit back
+                                *bits |= 1 << bit_index;
+                                count += 1;
+                                continue;
                             }
                             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                                 log_dbg!("select: TCP stream for socket {} would block on peeking, continue.", fd);
@@ -447,11 +484,40 @@ fn select(
 fn accept(
     env: &mut Environment,
     socket: i32,
-    _addr: MutPtr<sockaddr>,
-    _addr_len: MutPtr<socklen_t>,
-) -> i32 {
+    address: MutPtr<sockaddr>,
+    address_len: MutPtr<socklen_t>,
+) -> FileDescriptor {
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
+
+    if let Some(stream) = State::get_mut(env)
+        .sockets
+        .get_mut(&socket)
+        .unwrap()
+        .pending_tcp_stream
+        .take()
+    {
+        let addr = stream.peer_addr().unwrap();
+        // We have already accepted TCP socket, we now need to
+        // let guest know as well!
+        let new_fd = find_or_create_socket(env);
+        assert!(!State::get(env).sockets.contains_key(&new_fd));
+        let host_object = SocketHostObject {
+            type_: SOCK_STREAM,
+            options: Default::default(),
+            tcp_listener: None,
+            pending_tcp_stream: None,
+            tcp_stream: Some(stream),
+            udp_socket: None,
+        };
+        State::get_mut(env).sockets.insert(new_fd, host_object);
+        assert!(!address.is_null());
+        let peer_guest_addr = sockaddr::from_sockaddr_v4(&addr);
+        env.mem.write(address, peer_guest_addr);
+        assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
+        env.mem.write(address_len, guest_size_of::<sockaddr>());
+        return new_fd;
+    }
 
     let listener = State::get(env)
         .sockets
@@ -481,6 +547,16 @@ fn accept(
             );
         }
     }
+}
+
+fn recv(
+    env: &mut Environment,
+    socket: i32,
+    buffer: MutVoidPtr,
+    length: GuestUSize,
+    flags: i32,
+) -> i32 {
+    recvfrom(env, socket, buffer, length, flags, Ptr::null(), Ptr::null())
 }
 
 fn recvfrom(
@@ -523,11 +599,51 @@ fn recvfrom(
                     // - unblock guest thread
                     unimplemented!("recvfrom: UDP socket {} would block on receiving, block current guest thread {}.", socket, env.current_thread)
                 }
-                Err(e) => panic!("recvfrom: Socket {} encountered IO error: {}", socket, e),
+                Err(e) => panic!(
+                    "recvfrom: UDP socket {} encountered IO error: {}",
+                    socket, e
+                ),
             };
+            if !address.is_null() {
+                let guest_addr = sockaddr::from_sockaddr_v4(&addr);
+                env.mem.write(address, guest_addr);
+                assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
+                env.mem.write(address_len, guest_size_of::<sockaddr>());
+            }
             (read, addr)
         }
-        _ => unimplemented!(),
+        SOCK_STREAM => {
+            assert!(address.is_null());
+            assert!(address_len.is_null());
+            let mut tcp_stream = env
+                .libc_state
+                .socket
+                .sockets
+                .get(&socket)
+                .unwrap()
+                .tcp_stream
+                .as_ref()
+                .unwrap();
+            let buf = env.mem.bytes_at_mut(buffer.cast(), length);
+            let read = match tcp_stream.read(buf) {
+                Ok(n) => n,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    // No data is ready
+                    // TODO: if this happened, take a deep breath and do:
+                    // - block guest thread with a new [ThreadBlock] type
+                    // - poll for data in thread scheduling part
+                    // - write/read/accept/etc data once it is ready
+                    // - unblock guest thread
+                    unimplemented!("recvfrom: TCP socket {} would block on receiving, block current guest thread {}.", socket, env.current_thread)
+                }
+                Err(e) => panic!(
+                    "recvfrom: TCP socket {} encountered IO error: {}",
+                    socket, e
+                ),
+            };
+            (read, tcp_stream.peer_addr().unwrap())
+        }
+        _ => unreachable!(),
     };
     log_dbg!(
         "recvfrom: Socket {} received {} bytes from addr {:?}",
@@ -535,19 +651,57 @@ fn recvfrom(
         num_bytes_read,
         addr
     );
-
-    if !address.is_null() {
-        // Only IPV4 for the moment
-        assert!(addr.is_ipv4());
-        let SocketAddr::V4(ipv4addr) = addr else {
-            unreachable!()
-        };
-        assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
-        let guest_addr = sockaddr::from_ipv4_parts(ipv4addr.ip().octets(), ipv4addr.port());
-        env.mem.write(address, guest_addr);
-        env.mem.write(address_len, guest_size_of::<sockaddr>());
-    }
     num_bytes_read.try_into().unwrap()
+}
+
+fn send(
+    env: &mut Environment,
+    socket: i32,
+    buffer: MutVoidPtr,
+    length: GuestUSize,
+    flags: i32,
+) -> i32 {
+    // TODO: handle errno properly
+    set_errno(env, 0);
+
+    let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
+    assert!(type_ == SOCK_STREAM);
+
+    assert_eq!(flags, 0); // TODO
+
+    let num_bytes_written = match type_ {
+        SOCK_STREAM => {
+            let mut tcp_stream = env
+                .libc_state
+                .socket
+                .sockets
+                .get(&socket)
+                .unwrap()
+                .tcp_stream
+                .as_ref()
+                .unwrap();
+            let buf = env.mem.bytes_at(buffer.cast(), length);
+            match tcp_stream.write(buf) {
+                Ok(written) => written,
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    // TODO: if this happened, take a deep breath and do:
+                    // - block guest thread with a new [ThreadBlock] type
+                    // - poll for data in thread scheduling part
+                    // - write/read/accept/etc data once it is ready
+                    // - unblock guest thread
+                    unimplemented!("send: TCP socket {} would block on sending, block current guest thread {}.", socket, env.current_thread)
+                }
+                Err(e) => panic!("send: Socket {} encountered IO error: {}", socket, e),
+            }
+        }
+        _ => unreachable!(),
+    };
+    log_dbg!(
+        "send: written {} bytes to TCP socket {}",
+        num_bytes_written,
+        socket
+    );
+    num_bytes_written.try_into().unwrap()
 }
 
 fn sendto(
@@ -563,7 +717,7 @@ fn sendto(
     set_errno(env, 0);
 
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
-    assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
+    assert!(type_ == SOCK_DGRAM);
 
     assert_eq!(flags, 0); // TODO
 
@@ -581,13 +735,6 @@ fn sendto(
     );
 
     let socket_address = sockaddr_val.to_sockaddr_v4();
-    let type_str = match type_ {
-        SOCK_STREAM => "TCP",
-        SOCK_DGRAM => "UDP",
-        _ => unreachable!(),
-    };
-    log_dbg!("sendto: {} socket address {:?}", type_str, socket_address);
-
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
             let udp_socket = env
@@ -613,8 +760,14 @@ fn sendto(
                 Err(e) => panic!("sendto: Socket {} encountered IO error: {}", socket, e),
             }
         }
-        _ => unimplemented!(),
+        _ => unreachable!(),
     };
+    log_dbg!(
+        "sendto: written {} bytes to UDP socket {} (address {:?})",
+        num_bytes_written,
+        socket,
+        socket_address
+    );
     num_bytes_written.try_into().unwrap()
 }
 
@@ -626,7 +779,9 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(connect(_, _, _)),
     export_c_func!(select(_, _, _, _, _)),
     export_c_func!(accept(_, _, _)),
+    export_c_func!(recv(_, _, _, _)),
     export_c_func!(recvfrom(_, _, _, _, _, _)),
+    export_c_func!(send(_, _, _, _)),
     export_c_func!(sendto(_, _, _, _, _, _)),
 ];
 
