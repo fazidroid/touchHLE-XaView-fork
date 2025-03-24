@@ -808,20 +808,51 @@ fn sendto(
 
     assert_eq!(dest_address_len, guest_size_of::<sockaddr>());
     let sockaddr_val = env.mem.read(dest_address);
+    let socket_address = sockaddr_val.to_sockaddr_v4();
     log_dbg!(
-        "sendto({}, {:?}. {}, {}, {:?} ({:?}), {})",
+        "sendto({}, {:?}, {}, {}, {:?} ({:?}, {:?}), {})",
         socket,
         buffer,
         length,
         flags,
         dest_address,
         sockaddr_val,
+        socket_address,
         dest_address_len
     );
 
-    let socket_address = sockaddr_val.to_sockaddr_v4();
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
+            if env
+                .libc_state
+                .socket
+                .sockets
+                .get(&socket)
+                .unwrap()
+                .udp_socket
+                .is_none()
+            {
+                // For the case of broadcast we allow a lazy host UDP socket
+                // creation
+                assert!(socket_address.ip().is_broadcast());
+                // TODO: is it a correct address to bind?
+                let host_socket = UdpSocket::bind("0.0.0.0:0").unwrap();
+                assert!(host_socket.local_addr().unwrap().ip().is_unspecified());
+                // We set host socket as non-blocking in order to have
+                // more control of how and when it's used
+                host_socket.set_nonblocking(true).unwrap();
+                for &option in &State::get(env).sockets.get(&socket).unwrap().options {
+                    if option == SO_BROADCAST {
+                        host_socket.set_broadcast(true).unwrap();
+                    }
+                }
+                assert!(host_socket.broadcast().unwrap());
+                State::get_mut(env)
+                    .sockets
+                    .get_mut(&socket)
+                    .unwrap()
+                    .udp_socket = Some(host_socket);
+            }
             let udp_socket = env
                 .libc_state
                 .socket
@@ -831,6 +862,9 @@ fn sendto(
                 .udp_socket
                 .as_ref()
                 .unwrap();
+            if socket_address.ip().is_broadcast() {
+                assert!(udp_socket.local_addr().unwrap().ip().is_unspecified());
+            }
             let buf = env.mem.bytes_at(buffer.cast(), length);
             match udp_socket.send_to(buf, socket_address) {
                 Ok(written) => written,
