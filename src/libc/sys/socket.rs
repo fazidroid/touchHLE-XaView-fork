@@ -337,6 +337,7 @@ fn select(
     // TODO: handle errno properly
     set_errno(env, 0);
 
+    assert!(n_fds > 0 && n_fds < 1024);
     // TODO: other type of sets
     assert!(error_fds.is_null());
 
