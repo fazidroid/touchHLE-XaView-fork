@@ -629,3 +629,17 @@ pub fn find_or_create_socket(env: &mut Environment) -> FileDescriptor {
     };
     find_or_create_fd(env, host_object)
 }
+
+/// Helper function for socket check, not part of API
+pub fn is_socket(env: &mut Environment, fd: FileDescriptor) -> bool {
+    let guest_file = &env
+        .libc_state
+        .posix_io
+        .files
+        .get(fd_to_file_idx(fd))
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .file;
+    matches!(guest_file, GuestFile::Socket)
+}

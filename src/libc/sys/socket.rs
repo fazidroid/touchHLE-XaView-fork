@@ -23,7 +23,7 @@
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::errno::set_errno;
-use crate::libc::posix_io::{find_or_create_socket, FileDescriptor};
+use crate::libc::posix_io::{find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
     guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, Ptr, SafeRead,
@@ -358,6 +358,8 @@ fn select(
         log_dbg!("select: read_set before {:?}", read_set);
         count += process_set(env, &mut read_set, n_fds, |env, fd, bits, bit_index| {
             log_dbg!("select: bit set in read_set at fd: {}", fd);
+            // Only sockets for now
+            assert!(is_socket(env, fd));
             // Clean bit in the set for the current socket
             *bits &= !(1 << bit_index);
             let type_ = State::get(env).sockets.get(&fd).unwrap().type_;
@@ -517,6 +519,8 @@ fn select(
         log_dbg!("select: write_set before {:?}", write_set);
         count += process_set(env, &mut write_set, n_fds, |env, fd, bits, bit_index| {
             log_dbg!("select: bit set in write_set at fd: {}", fd);
+            // Only sockets for now
+            assert!(is_socket(env, fd));
             // Clean bit in the set for the current socket
             *bits &= !(1 << bit_index);
             let type_ = State::get(env).sockets.get(&fd).unwrap().type_;
