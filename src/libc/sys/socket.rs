@@ -206,7 +206,8 @@ fn bind(
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
+    let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
+    let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
 
     assert_eq!(address_len, guest_size_of::<sockaddr>());
@@ -221,14 +222,11 @@ fn bind(
     };
     log_dbg!("bind: {} socket address {:?}", type_str, socket_address);
 
+    // re-borrow
+    let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
     match type_ {
         SOCK_STREAM => {
-            assert!(State::get(env)
-                .sockets
-                .get(&socket)
-                .unwrap()
-                .tcp_listener
-                .is_none());
+            assert!(socket_host_object.tcp_listener.is_none());
             let host_socket = TcpListener::bind(socket_address).unwrap();
             // We set host socket as non-blocking in order to have
             // more control of how and when it's used
@@ -241,17 +239,12 @@ fn bind(
                 .tcp_listener = Some(host_socket);
         }
         SOCK_DGRAM => {
-            assert!(State::get(env)
-                .sockets
-                .get(&socket)
-                .unwrap()
-                .udp_socket
-                .is_none());
+            assert!(socket_host_object.udp_socket.is_none());
             let host_socket = UdpSocket::bind(socket_address).unwrap();
             // We set host socket as non-blocking in order to have
             // more control of how and when it's used
             host_socket.set_nonblocking(true).unwrap();
-            for &option in &State::get(env).sockets.get(&socket).unwrap().options {
+            for &option in &socket_host_object.options {
                 if option == SO_BROADCAST {
                     host_socket.set_broadcast(true).unwrap();
                 }
@@ -362,16 +355,11 @@ fn select(
             assert!(is_socket(env, fd));
             // Clean bit in the set for the current socket
             *bits &= !(1 << bit_index);
-            let type_ = State::get(env).sockets.get(&fd).unwrap().type_;
+            let socket_host_object = State::get(env).sockets.get(&fd).unwrap();
+            let type_ = socket_host_object.type_;
             match type_ {
                 SOCK_DGRAM => {
-                    let udp_socket = State::get(env)
-                        .sockets
-                        .get(&fd)
-                        .unwrap()
-                        .udp_socket
-                        .as_ref()
-                        .unwrap();
+                    let udp_socket = socket_host_object.udp_socket.as_ref().unwrap();
                     // Peek just one byte to check if we have some data
                     let mut buf = [0; 1];
                     match udp_socket.peek(&mut buf) {
@@ -406,22 +394,10 @@ fn select(
                     }
                 }
                 SOCK_STREAM => {
-                    if State::get(env)
-                        .sockets
-                        .get(&fd)
-                        .unwrap()
-                        .tcp_stream
-                        .is_none()
-                    {
+                    if socket_host_object.tcp_stream.is_none() {
                         // If we don't have a TCP stream it probably means
                         // that a listener is waiting for connection
-                        let listener = State::get(env)
-                            .sockets
-                            .get(&fd)
-                            .unwrap()
-                            .tcp_listener
-                            .as_ref()
-                            .unwrap();
+                        let listener = socket_host_object.tcp_listener.as_ref().unwrap();
                         // The listener is non-blocking,
                         // so we can try to accept
                         match listener.accept() {
@@ -435,12 +411,7 @@ fn select(
                                 // the host, but we need to postpone new
                                 // guest fd creation up until guest calls
                                 // accept()
-                                assert!(State::get(env)
-                                    .sockets
-                                    .get(&fd)
-                                    .unwrap()
-                                    .pending_tcp_stream
-                                    .is_none());
+                                assert!(socket_host_object.pending_tcp_stream.is_none());
                                 State::get_mut(env)
                                     .sockets
                                     .get_mut(&fd)
@@ -464,13 +435,7 @@ fn select(
                             }
                         }
                     }
-                    let stream = State::get(env)
-                        .sockets
-                        .get(&fd)
-                        .unwrap()
-                        .tcp_stream
-                        .as_ref()
-                        .unwrap();
+                    let stream = socket_host_object.tcp_stream.as_ref().unwrap();
                     // Peek just one byte to check if we have some data
                     let mut buf = [0; 1];
                     match stream.peek(&mut buf) {
@@ -523,25 +488,15 @@ fn select(
             assert!(is_socket(env, fd));
             // Clean bit in the set for the current socket
             *bits &= !(1 << bit_index);
-            let type_ = State::get(env).sockets.get(&fd).unwrap().type_;
+            let socket_host_object = State::get(env).sockets.get(&fd).unwrap();
+            let type_ = socket_host_object.type_;
             match type_ {
                 SOCK_STREAM => {
-                    assert!(State::get(env)
-                        .sockets
-                        .get(&fd)
-                        .unwrap()
-                        .tcp_listener
-                        .is_none());
+                    assert!(socket_host_object.tcp_listener.is_none());
                     // As we cannot "peek" on write, we just check
                     // if TCP stream exist or not
                     // TODO: find a better way
-                    if State::get(env)
-                        .sockets
-                        .get(&fd)
-                        .unwrap()
-                        .tcp_stream
-                        .is_some()
-                    {
+                    if socket_host_object.tcp_stream.is_some() {
                         // Set bit back
                         *bits |= 1 << bit_index;
                         true
@@ -554,13 +509,7 @@ fn select(
                     // As we cannot "peek" on write, we just check
                     // if UDP socket exist or not
                     // TODO: find a better way
-                    if State::get(env)
-                        .sockets
-                        .get(&fd)
-                        .unwrap()
-                        .udp_socket
-                        .is_some()
-                    {
+                    if socket_host_object.udp_socket.is_some() {
                         // Set bit back
                         *bits |= 1 << bit_index;
                         true
@@ -608,7 +557,8 @@ fn accept(
     address: MutPtr<sockaddr>,
     address_len: MutPtr<socklen_t>,
 ) -> FileDescriptor {
-    let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
+    let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
+    let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM);
 
     if let Some(stream) = State::get_mut(env)
@@ -640,13 +590,9 @@ fn accept(
         return new_fd;
     }
 
-    let listener = State::get(env)
-        .sockets
-        .get(&socket)
-        .unwrap()
-        .tcp_listener
-        .as_ref()
-        .unwrap();
+    // re-borrow
+    let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
+    let listener = socket_host_object.tcp_listener.as_ref().unwrap();
     match listener.accept() {
         Ok((_, addr)) => {
             log!("accept: New client: {}", addr);
@@ -859,9 +805,7 @@ fn sendto(
 
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
-            if env
-                .libc_state
-                .socket
+            if State::get(env)
                 .sockets
                 .get(&socket)
                 .unwrap()
