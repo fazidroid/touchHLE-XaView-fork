@@ -22,7 +22,7 @@
 //! - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/index-wide.html)
 
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::libc::errno::set_errno;
+use crate::libc::errno::{set_errno, ECONNRESET};
 use crate::libc::posix_io::{find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
@@ -467,6 +467,13 @@ fn select(
                             *bits |= 1 << bit_index;
                             true
                         }
+                        // As tested on macOS, this marks socket as readable
+                        Err(ref e) if e.kind() == io::ErrorKind::ConnectionReset => {
+                            log!("select: Peek for socket {}: ConnectionReset", fd);
+                            // Set bit back
+                            *bits |= 1 << bit_index;
+                            true
+                        }
                         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                             log_dbg!(
                                 "select: TCP stream for socket {} would block on peeking, continue.",
@@ -685,7 +692,7 @@ fn recvfrom(
                 assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
                 env.mem.write(address_len, guest_size_of::<sockaddr>());
             }
-            (read, addr)
+            (read, Ok(addr))
         }
         SOCK_STREAM => {
             assert!(address.is_null());
@@ -702,6 +709,11 @@ fn recvfrom(
             let buf = env.mem.bytes_at_mut(buffer.cast(), length);
             let read = match tcp_stream.read(buf) {
                 Ok(n) => n,
+                Err(ref e) if e.kind() == io::ErrorKind::ConnectionReset => {
+                    set_errno(env, ECONNRESET);
+                    log!("recvfrom: TCP socket {}: ConnectionReset => -1", socket);
+                    return -1;
+                }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     // No data is ready
                     // TODO: if this happened, take a deep breath and do:
@@ -716,7 +728,7 @@ fn recvfrom(
                     socket, e
                 ),
             };
-            (read, tcp_stream.peer_addr().unwrap())
+            (read, tcp_stream.peer_addr())
         }
         _ => unreachable!(),
     };
@@ -724,7 +736,7 @@ fn recvfrom(
         "recvfrom: Socket {} received {} bytes from addr {:?}",
         socket,
         num_bytes_read,
-        addr
+        addr.ok()
     );
     num_bytes_read.try_into().unwrap()
 }
