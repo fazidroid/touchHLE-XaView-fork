@@ -450,6 +450,7 @@ fn mktime(env: &mut Environment, tm: MutPtr<tm>) -> time_t {
 type suseconds_t = i32;
 
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 #[repr(C, packed)]
 pub(super) struct timeval {
     pub(super) tv_sec: time_t,

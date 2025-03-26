@@ -344,10 +344,14 @@ fn select(
     let should_block = if !timeout.is_null() {
         let timeval = env.mem.read(timeout);
         let tv_sec = timeval.tv_sec;
-        assert_eq!(tv_sec, 0); // TODO
         let tv_usec = timeval.tv_usec;
-        assert_eq!(tv_usec, 0); // TODO
-        false
+        if tv_sec == 0 && tv_usec == 0 {
+            // Happy path, just polling once
+            false
+        } else {
+            log_dbg!("TODO: Ignore non-zero timeout {:?} in select()", timeval);
+            true
+        }
     } else {
         true
     };
