@@ -95,7 +95,7 @@ impl sockaddr {
         };
         sockaddr::from_ipv4_parts(ipv4addr.ip().octets(), ipv4addr.port())
     }
-    fn to_sockaddr_v4(self) -> SocketAddrV4 {
+    pub fn to_sockaddr_v4(self) -> SocketAddrV4 {
         let (ip, port) = self.to_ipv4_parts();
         SocketAddrV4::new(ip.into(), port)
     }

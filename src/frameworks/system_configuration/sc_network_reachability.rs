@@ -9,9 +9,15 @@ use crate::abi::GuestFunction;
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::core_foundation::cf_allocator::{kCFAllocatorDefault, CFAllocatorRef};
 use crate::frameworks::core_foundation::CFTypeRef;
-use crate::mem::{ConstPtr, ConstVoidPtr, MutVoidPtr, Ptr};
+use crate::libc::sys::socket::sockaddr;
+use crate::mem::{ConstPtr, MutPtr, MutVoidPtr, Ptr};
 use crate::objc::{msg, objc_classes, Class, ClassExports, HostObject};
 use crate::Environment;
+use std::net::SocketAddrV4;
+
+type SCNetworkReachabilityFlags = u32;
+const kSCNetworkReachabilityFlagsReachable: SCNetworkReachabilityFlags = 1 << 1;
+const kSCNetworkReachabilityFlagsIsDirect: SCNetworkReachabilityFlags = 1 << 17;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -26,7 +32,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 };
 
 struct SCNetworkReachabilityHostObject {
-    _filler: u8,
+    address: Option<SocketAddrV4>,
 }
 impl HostObject for SCNetworkReachabilityHostObject {}
 
@@ -53,7 +59,7 @@ fn SCNetworkReachabilityCreateWithName(
         .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
     let res = env.objc.alloc_object(
         isa,
-        Box::new(SCNetworkReachabilityHostObject { _filler: 0 }),
+        Box::new(SCNetworkReachabilityHostObject { address: None }), // TODO
         &mut env.mem,
     );
     log!(
@@ -69,21 +75,25 @@ fn SCNetworkReachabilityCreateWithName(
 fn SCNetworkReachabilityCreateWithAddress(
     env: &mut Environment,
     allocator: CFAllocatorRef,
-    address: ConstVoidPtr,
+    address: ConstPtr<sockaddr>,
 ) -> SCNetworkReachabilityRef {
     assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
     let isa = env
         .objc
         .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
+    let address_val = env.mem.read(address);
     let res = env.objc.alloc_object(
         isa,
-        Box::new(SCNetworkReachabilityHostObject { _filler: 0 }),
+        Box::new(SCNetworkReachabilityHostObject {
+            address: Some(address_val.to_sockaddr_v4()),
+        }),
         &mut env.mem,
     );
-    log!(
-        "TODO: SCNetworkReachabilityCreateWithAddress({:?}, {:?}) -> {:?}",
+    log_dbg!(
+        "SCNetworkReachabilityCreateWithAddress({:?}, {:?} ({})) -> {:?}",
         allocator,
         address,
+        address_val.to_sockaddr_v4(),
         res
     );
     res
@@ -92,7 +102,7 @@ fn SCNetworkReachabilityCreateWithAddress(
 fn SCNetworkReachabilityGetFlags(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
-    flags: MutVoidPtr,
+    flags: MutPtr<SCNetworkReachabilityFlags>,
 ) -> bool {
     let target_class: Class = msg![env; target class];
     assert_eq!(
@@ -100,6 +110,23 @@ fn SCNetworkReachabilityGetFlags(
         env.objc
             .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
+    let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
+    if let Some(addr) = host_object.address {
+        if addr.ip().is_link_local() {
+            log_dbg!(
+                "SCNetworkReachabilityGetFlags({:?}, {:?}) -> true",
+                target,
+                flags
+            );
+            // Those corresponds to local WiFi connection on a real iOS device
+            // TODO: actually check for the connectivity
+            // (but do we _really_ need it?)
+            let out_flags =
+                kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
+            env.mem.write(flags, out_flags);
+            return true;
+        }
+    }
     log!(
         "TODO: SCNetworkReachabilityGetFlags({:?}, {:?}) -> false",
         target,
