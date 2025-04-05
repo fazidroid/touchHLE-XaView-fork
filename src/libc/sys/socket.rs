@@ -22,7 +22,7 @@
 //! - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/index-wide.html)
 
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::libc::errno::{set_errno, EBADF, ECONNRESET};
+use crate::libc::errno::{set_errno, EBADF, ECONNRESET, EINVAL};
 use crate::libc::posix_io::{close, find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
@@ -42,6 +42,7 @@ pub const SOCK_STREAM: i32 = 1;
 pub const SOCK_DGRAM: i32 = 2;
 
 const SOL_SOCKET: i32 = 0xffff;
+const SO_DEBUG: i32 = 0x1;
 const SO_REUSEADDR: i32 = 0x4;
 const SO_BROADCAST: i32 = 0x20;
 
@@ -176,12 +177,9 @@ fn setsockopt(
     option_value: ConstVoidPtr,
     option_len: socklen_t,
 ) -> i32 {
-    let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
-    assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
+    // TODO: handle errno properly
+    set_errno(env, 0);
 
-    assert_eq!(level, SOL_SOCKET);
-    // TODO: SO_REUSEADDR is not supported in std::net (and not so portable)
-    assert!(option_name == SO_REUSEADDR || option_name == SO_BROADCAST);
     log_dbg!(
         "setsockopt({}, {}, {:?}, {:?}, {})",
         socket,
@@ -190,6 +188,24 @@ fn setsockopt(
         option_value,
         option_len
     );
+
+    if option_name == SO_DEBUG {
+        set_errno(env, EINVAL);
+        log!(
+            "Warning: Ignore setsockopt SO_DEBUG at level {} for socket {} => -1",
+            level,
+            socket
+        );
+        return -1;
+    }
+
+    let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
+    assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
+
+    assert_eq!(level, SOL_SOCKET);
+    // TODO: SO_REUSEADDR is not supported in std::net (and not so portable)
+    assert!(option_name == SO_REUSEADDR || option_name == SO_BROADCAST);
+
     assert_eq!(option_len, guest_size_of::<i32>());
     let tmp: ConstPtr<i32> = option_value.cast();
     assert_eq!(env.mem.read(tmp), 1);
