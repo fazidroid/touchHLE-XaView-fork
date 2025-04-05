@@ -338,8 +338,6 @@ fn select(
     set_errno(env, 0);
 
     assert!(n_fds > 0 && n_fds < 1024);
-    // TODO: other type of sets
-    assert!(error_fds.is_null());
 
     let should_block = if !timeout.is_null() {
         let timeval = env.mem.read(timeout);
@@ -542,6 +540,40 @@ fn select(
         });
         log_dbg!("select: write_set after {:?}", write_set);
         env.mem.write(write_fds, write_set);
+    }
+
+    if !error_fds.is_null() {
+        let mut error_set = env.mem.read(error_fds);
+        log_dbg!("select: error_set before {:?}", error_set);
+        count += process_set(env, &mut error_set, n_fds, |env, fd, bits, bit_index| {
+            log_dbg!("select: bit set in error_set at fd: {}", fd);
+            // Only sockets for now
+            assert!(is_socket(env, fd));
+            // Clean bit in the set for the current socket
+            *bits &= !(1 << bit_index);
+            let socket_host_object = State::get(env).sockets.get(&fd).unwrap();
+            let type_ = socket_host_object.type_;
+            match type_ {
+                SOCK_STREAM => {
+                    assert!(socket_host_object.tcp_listener.is_none());
+                    let stream = socket_host_object.tcp_stream.as_ref().unwrap();
+                    match stream.take_error() {
+                        Ok(None) => {
+                            log_dbg!("No error on TCP socket {}", fd);
+                            false
+                        }
+                        Ok(Some(error)) => unimplemented!("TCP socket {} error: {:?}", fd, error),
+                        Err(error) => panic!("TCP socket {} take_error failed: {:?}", fd, error),
+                    }
+                }
+                SOCK_DGRAM => {
+                    todo!()
+                }
+                _ => unimplemented!(),
+            }
+        });
+        log_dbg!("select: error_set after {:?}", error_set);
+        env.mem.write(error_fds, error_set);
     }
 
     count
