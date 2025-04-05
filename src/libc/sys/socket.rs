@@ -219,7 +219,13 @@ fn bind(
 
     assert_eq!(address_len, guest_size_of::<sockaddr>());
     let sockaddr_val = env.mem.read(address);
-    log_dbg!("bind({:?} ({:?}), {})", address, sockaddr_val, address_len);
+    log_dbg!(
+        "bind({}, {:?} ({:?}), {})",
+        socket,
+        address,
+        sockaddr_val,
+        address_len
+    );
 
     let socket_address = sockaddr_val.to_sockaddr_v4();
     let type_str = match type_ {
