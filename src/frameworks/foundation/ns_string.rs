@@ -96,7 +96,7 @@ enum StringHostObject {
 impl HostObject for StringHostObject {}
 impl StringHostObject {
     fn decode(bytes: Cow<[u8]>, encoding: NSStringEncoding) -> StringHostObject {
-        if bytes.len() == 0 {
+        if bytes.is_empty() {
             return StringHostObject::Utf8(Cow::Borrowed(""));
         }
 
@@ -947,7 +947,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let mut combined = to_rust_string(env, this).into_owned();
     // TODO: avoid copying
     let extension_string = to_rust_string(env, extension);
-    if extension_string.len() > 0 {
+    if !extension_string.is_empty(){
         combined.push('.');
         combined.push_str(&extension_string);
     }

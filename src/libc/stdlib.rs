@@ -406,7 +406,7 @@ fn wcstombs(
         return 0;
     }
     let wcstr = env.mem.wcstr_at(pwcs);
-    let len: GuestUSize = wcstr.bytes().len() as GuestUSize;
+    let len: GuestUSize = wcstr.len() as GuestUSize;
     let len = len.min(n);
     log_dbg!("wcstombs '{}', len {}, n {}", wcstr, len, n);
     env.mem
