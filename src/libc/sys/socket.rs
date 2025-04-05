@@ -22,7 +22,7 @@
 //! - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/index-wide.html)
 
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::libc::errno::{set_errno, ECONNRESET};
+use crate::libc::errno::{set_errno, EBADF, ECONNRESET};
 use crate::libc::posix_io::{close, find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
@@ -694,6 +694,25 @@ fn recvfrom(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
+
+    log_dbg!(
+        "recvfrom({}, {:?}, {}, {}, {:?}, {:?})",
+        socket,
+        buffer,
+        length,
+        flags,
+        address,
+        address_len
+    );
+
+    if !State::get(env).sockets.contains_key(&socket) {
+        set_errno(env, EBADF);
+        log!(
+            "Warning: recvfrom({}, ...) failed for unknown socket, returning -1",
+            socket
+        );
+        return -1;
+    }
 
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
