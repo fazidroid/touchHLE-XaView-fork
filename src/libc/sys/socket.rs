@@ -23,7 +23,7 @@
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::errno::{set_errno, ECONNRESET};
-use crate::libc::posix_io::{find_or_create_socket, is_socket, FileDescriptor};
+use crate::libc::posix_io::{close, find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
     guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, Ptr, SafeRead,
@@ -932,6 +932,13 @@ fn sendto(
     num_bytes_written.try_into().unwrap()
 }
 
+const SHUT_RDWR: i32 = 2;
+fn shutdown(env: &mut Environment, socket: i32, how: i32) -> i32 {
+    log_dbg!("shutdown({}, {})", socket, how);
+    assert_eq!(how, SHUT_RDWR);
+    close(env, socket)
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(socket(_, _, _)),
     export_c_func!(ioctl(_, _, _)),
@@ -945,6 +952,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(recvfrom(_, _, _, _, _, _)),
     export_c_func!(send(_, _, _, _)),
     export_c_func!(sendto(_, _, _, _, _, _)),
+    export_c_func!(shutdown(_, _)),
 ];
 
 /// A helper to close a socket, not a part of API
