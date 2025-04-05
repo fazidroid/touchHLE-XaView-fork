@@ -200,6 +200,7 @@ struct in_addr {
 };
 in_addr_t inet_addr(const char *);
 const char *inet_ntop(int, const void *, char *, socklen_t);
+int inet_pton(int, const char *, void *);
 
 // `CFBase.h`
 
@@ -2347,6 +2348,20 @@ int test_inet_ntop() {
   return 0;
 }
 
+int test_inet_pton() {
+  const char *ip_str = "127.0.0.1";
+  struct in_addr addr;
+
+  int res = inet_pton(2, ip_str, &addr);
+  if (res <= 0) {
+    return -1;
+  }
+  if (addr.s_addr != 16777343) {
+    return -2;
+  }
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -2396,6 +2411,7 @@ struct {
     FUNC_DEF(test_setjmp),
     FUNC_DEF(test_inet_addr),
     FUNC_DEF(test_inet_ntop),
+    FUNC_DEF(test_inet_pton),
 };
 // clang-format on
 

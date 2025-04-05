@@ -7,7 +7,7 @@
 
 use crate::libc::netdb::socklen_t;
 use crate::libc::sys::socket::AF_INET;
-use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, SafeRead};
+use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, SafeRead};
 use crate::{export_c_func, Environment};
 
 use crate::dyld::FunctionExports;
@@ -53,7 +53,21 @@ fn inet_ntop(
     dst.cast_const()
 }
 
+fn inet_pton(env: &mut Environment, af: i32, src: ConstPtr<u8>, dst: MutVoidPtr) -> i32 {
+    assert_eq!(af, AF_INET);
+    let str = env.mem.cstr_at_utf8(src.cast()).unwrap();
+    log_dbg!("inet_pton '{}'", str);
+    let address: Ipv4Addr = str.parse().unwrap();
+    let addr = in_addr {
+        s_addr: u32::from_le_bytes(address.octets()),
+    };
+    let addr_ptr: MutPtr<in_addr> = dst.cast();
+    env.mem.write(addr_ptr, addr);
+    1 // address was valid, success
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(inet_addr(_)),
     export_c_func!(inet_ntop(_, _, _, _)),
+    export_c_func!(inet_pton(_, _, _)),
 ];
