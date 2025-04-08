@@ -187,3 +187,6 @@ Other options:
 
         Enabling this option may solve some rendering issues, but implies
         a performance hit which is undesirable in most of the cases.
+
+    --allow-network-access
+        Allow apps running in touchHLE to access the Internet and the local network.
