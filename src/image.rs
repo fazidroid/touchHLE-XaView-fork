@@ -199,12 +199,11 @@ pub fn gamma_decode(intensity: f32) -> f32 {
 /// Decodes Imagination Technologies' PVRTC texture compression format to
 /// RGBA (8 bits per channel).
 pub fn decode_pvrtc(pvrtc_data: &[u8], is_2bit: bool, width: u32, height: u32) -> Vec<u32> {
-    #[allow(clippy::manual_div_ceil)]
     // This formula is from the IMG_texture_compression_pvrtc extension spec.
     let expected_size = if is_2bit {
-        (width.max(16) as usize * height.max(8) as usize * 2 + 7) / 8
+        (width.max(16) as usize * height.max(8) as usize * 2).div_ceil(8)
     } else {
-        (width.max(8) as usize * height.max(8) as usize * 4 + 7) / 8
+        (width.max(8) as usize * height.max(8) as usize * 4).div_ceil(8)
     };
     assert!(pvrtc_data.len() == expected_size);
 
