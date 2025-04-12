@@ -6,7 +6,8 @@
 //! `UIAlertView`.
 
 use crate::frameworks::foundation::ns_string;
-use crate::objc::{id, msg_super, objc_classes, ClassExports};
+use crate::objc::{id, msg_super, nil, objc_classes, ClassExports};
+use std::borrow::Cow;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -21,7 +22,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     log!("TODO: [(UIAlertView*){:?} initWithTitle:{:?} message:{:?} delegate:{:?} cancelButtonTitle:{:?} otherButtonTitles:{:?}]", this, title, message, delegate, cancelButtonTitle, otherButtonTitles);
 
-    let msg = ns_string::to_rust_string(env, message);
+    let msg = if message == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, message) };
     let title = ns_string::to_rust_string(env, title);
     log!("UIAlertView: title: {:?}, message: {:?}", title, msg);
 
