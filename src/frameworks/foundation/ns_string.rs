@@ -309,6 +309,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)stringWithCString:(ConstPtr<u8>)c_string length:(NSUInteger)length {
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithCString:c_string length:length];
+    autorelease(env, new)
+}
+
 + (id)stringWithCString:(ConstPtr<u8>)c_string
                encoding:(NSStringEncoding)encoding {
     let new: id = msg![env; this alloc];
@@ -1233,6 +1239,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)initWithCString:(ConstPtr<u8>)c_string {
     let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
     msg![env; this initWithCString:c_string encoding:encoding]
+}
+
+- (id)initWithCString:(ConstPtr<u8>)c_string length:(NSUInteger)len {
+    let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
+    msg![env; this initWithBytes:c_string length:len encoding:encoding]
 }
 
 - (id)initWithCString:(ConstPtr<u8>)c_string
