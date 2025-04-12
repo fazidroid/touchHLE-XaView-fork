@@ -1556,6 +1556,7 @@ impl GLES for GLES1OnGL2 {
             let palette_size = palette_entry_size * palette_entry_count;
 
             let index_count = width as usize * height as usize;
+            #[allow(clippy::manual_div_ceil)]
             let (index_word_size, index_word_count) = match index_is_nibble {
                 true => (1, (index_count + 1) / 2),
                 false => (4, (index_count + 3) / 4),
