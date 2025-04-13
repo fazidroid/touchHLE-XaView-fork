@@ -845,6 +845,7 @@ impl GLES for GLES1OnGL2 {
                 mode
             );
         }
+        gl21::CullFace(mode);
     }
     unsafe fn DepthFunc(&mut self, func: GLenum) {
         assert!([
