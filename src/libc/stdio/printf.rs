@@ -319,6 +319,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     if pad_char == '0' && precision.is_none() {
                         write!(&mut res, "{:0>1$X}", uint, pad_width).unwrap();
                     } else {
+                        assert!(pad_char == ' '); // TODO
                         write!(&mut res, "{:>1$X}", uint, pad_width).unwrap();
                     }
                 } else {
@@ -337,15 +338,9 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;
                 let precision = precision.unwrap_or(6);
-                if pad_char == '0' {
-                    res.extend_from_slice(
-                        format!("{:01$.2$}", float, pad_width, precision).as_bytes(),
-                    );
-                } else {
-                    res.extend_from_slice(
-                        format!("{:1$.2$}", float, pad_width, precision).as_bytes(),
-                    );
-                }
+
+                let formatted = f_format(float, pad_width, pad_char, precision);
+                res.extend_from_slice(formatted.as_bytes());
             }
             b'e' => {
                 assert!(!left_justified);
@@ -353,122 +348,66 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 let pad_width = pad_width as usize;
                 let precision = precision.unwrap_or(6);
 
-                let exponent = float.abs().log10().floor();
-                let mantissa = float.abs() / 10f64.powf(exponent);
-                let sign = if float.is_sign_negative() { "-" } else { "" };
-                if pad_char == '0' {
-                    let float_exp_notation =
-                        format!("{0:.1$}e{2:+03}", mantissa, precision, exponent);
-                    res.extend_from_slice(
-                        format!(
-                            "{0}{1:0>2$}",
-                            sign,
-                            float_exp_notation,
-                            pad_width.saturating_sub(sign.len())
-                        )
-                        .as_bytes(),
-                    );
-                } else {
-                    let float_exp_notation =
-                        format!("{0}{1:.2$}e{3:+03}", sign, mantissa, precision, exponent);
-                    res.extend_from_slice(
-                        format!("{0:>1$}", float_exp_notation, pad_width).as_bytes(),
-                    );
-                }
+                let formatted = e_format(float, pad_width, pad_char, precision);
+                res.extend_from_slice(formatted.as_bytes());
             }
             b'g' => {
                 assert!(!left_justified);
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;
 
-                let sign = if float.is_sign_negative() { "-" } else { "" };
-
-                let formatted_f_without_padding_or_sign = {
-                    // Precision in %g means max number of decimal digits in
-                    // the mantissa. For that, we first calculate the length
-                    // of the integer part and then we substract it from
-                    // precision and use the result in the format! statement
-                    let float_trunc_len = (float.abs().trunc() as i32).to_string().len();
-                    // Format without padding
-                    if let Some(precision) = precision {
-                        format!(
-                            "{:.1$}",
-                            float.abs(),
-                            precision.saturating_sub(float_trunc_len)
-                        )
+                // Reference https://en.cppreference.com/w/c/io/vfprintf
+                let P: i32 = if let Some(precision) = precision {
+                    if precision == 0 {
+                        1
                     } else {
-                        format!("{:.4}", float.abs())
+                        precision.try_into().unwrap()
                     }
+                } else {
+                    6
                 };
-                let formatted_f = {
-                    if pad_char == '0' {
-                        format!(
-                            "{}{:0>2$}",
-                            sign,
-                            formatted_f_without_padding_or_sign,
-                            pad_width - sign.len()
-                        )
-                    } else {
-                        let formatted_f_with_sign =
-                            format!("{}{}", sign, formatted_f_without_padding_or_sign);
-                        format!("{:>1$}", formatted_f_with_sign, pad_width)
-                    }
+                let X: i32 = if float == 0.0 {
+                    0
+                } else {
+                    float.abs().log10().floor() as i32
                 };
+                log_dbg!(
+                    "float {}, pad_width {}, pad_char '{}', P {}, X {}",
+                    float,
+                    pad_width,
+                    pad_char,
+                    P,
+                    X
+                );
+                if P > X && X >= -4 {
+                    let precision: usize = (P - X - 1).try_into().unwrap();
 
-                let formatted_e_without_padding_or_sign = {
-                    let exponent = float.abs().log10().floor();
-                    let mantissa = float.abs() / 10f64.powf(exponent);
-                    // Precision in %g means max number of decimal digits in
-                    // the mantissa. For that, we first calculate the length
-                    // of the mantissa's int part and then we substract it from
-                    // precision and use the result in the format! statement
-                    let mantissa_trunc_len = (mantissa.trunc() as i32).to_string().len();
-                    // Format without padding
-                    if let Some(precision) = precision {
-                        if precision > mantissa_trunc_len {
-                            format!(
-                                "{0:.1$}e{2:+03}",
-                                mantissa,
-                                precision - mantissa_trunc_len,
-                                exponent
-                            )
+                    let result = f_format(float, pad_width, pad_char, precision);
+
+                    // TODO: skip if alternative representation is requested
+                    let trimmed_result = if result.contains('.') {
+                        result.trim_end_matches('0').trim_end_matches('.')
+                    } else {
+                        &result
+                    };
+
+                    let trimmed_result = if pad_width > 0 && trimmed_result.len() < pad_width {
+                        if pad_char == '0' {
+                            format!("{:0>1$}", trimmed_result, pad_width)
                         } else {
-                            format!("{:.0}e{:+03}", mantissa, exponent)
+                            format!("{:>1$}", trimmed_result, pad_width)
                         }
                     } else {
-                        format!("{}e{:+03}", mantissa, exponent)
-                    }
-                };
-                let formatted_e = if pad_char == '0' {
-                    format!(
-                        "{0}{1:0>2$}",
-                        sign,
-                        formatted_e_without_padding_or_sign,
-                        pad_width.saturating_sub(sign.len())
-                    )
-                } else {
-                    let without_padding_with_sign =
-                        format!("{}{}", sign, formatted_e_without_padding_or_sign);
-                    format!("{0:>1$}", without_padding_with_sign, pad_width)
-                };
+                        trimmed_result.to_string()
+                    };
 
-                // Use shortest formatted string
-                let result = if formatted_e_without_padding_or_sign.len()
-                    < formatted_f_without_padding_or_sign.len()
-                    || precision.is_some_and(|x| x == 0)
-                {
-                    formatted_e
+                    res.extend_from_slice(trimmed_result.as_bytes());
                 } else {
-                    formatted_f
-                };
+                    let precision: usize = (P - 1).try_into().unwrap();
 
-                res.extend_from_slice(
-                    // TODO: skip if alternative representation is requested
-                    result
-                        .trim_end_matches('0')
-                        .trim_end_matches('.')
-                        .as_bytes(),
-                );
+                    let formatted = e_format(float, pad_width, pad_char, precision);
+                    res.extend_from_slice(formatted.as_bytes());
+                }
             }
             // TODO: more specifiers
             _ => unimplemented!(
@@ -482,6 +421,38 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
     log_dbg!("=> {:?}", std::str::from_utf8(&res));
 
     res
+}
+
+fn f_format(float: f64, pad_width: usize, pad_char: char, precision: usize) -> String {
+    if pad_char == '0' {
+        format!("{:01$.2$}", float, pad_width, precision)
+    } else {
+        assert!(pad_char == ' '); // TODO
+        format!("{:1$.2$}", float, pad_width, precision)
+    }
+}
+
+fn e_format(float: f64, pad_width: usize, pad_char: char, precision: usize) -> String {
+    let exponent = if float == 0.0 {
+        0.0
+    } else {
+        float.abs().log10().floor()
+    };
+    let mantissa = float.abs() / 10f64.powf(exponent);
+    let sign = if float.is_sign_negative() { "-" } else { "" };
+    if pad_char == '0' {
+        let float_exp_notation = format!("{0:.1$}e{2:+03}", mantissa, precision, exponent);
+        format!(
+            "{0}{1:0>2$}",
+            sign,
+            float_exp_notation,
+            pad_width.saturating_sub(sign.len())
+        )
+    } else {
+        assert!(pad_char == ' '); // TODO
+        let float_exp_notation = format!("{0}{1:.2$}e{3:+03}", sign, mantissa, precision, exponent);
+        format!("{0:>1$}", float_exp_notation, pad_width)
+    }
 }
 
 fn snprintf(
