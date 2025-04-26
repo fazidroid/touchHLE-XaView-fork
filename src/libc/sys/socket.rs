@@ -45,6 +45,7 @@ const SOL_SOCKET: i32 = 0xffff;
 const SO_DEBUG: i32 = 0x1;
 const SO_REUSEADDR: i32 = 0x4;
 const SO_BROADCAST: i32 = 0x20;
+const SO_ERROR: i32 = 0x1007;
 
 #[allow(non_camel_case_types)]
 pub type sa_family_t = u8;
@@ -180,6 +181,39 @@ fn ioctl(env: &mut Environment, fd: i32, request: u32, _args: DotDotDot) -> i32 
     -1
 }
 
+fn getsockopt(
+    env: &mut Environment,
+    socket: i32,
+    level: i32,
+    option_name: i32,
+    option_value: MutVoidPtr,
+    option_len: MutPtr<socklen_t>,
+) -> i32 {
+    // TODO: handle errno properly
+    set_errno(env, 0);
+
+    log_dbg!(
+        "getsockopt({}, {:#x}, {:#x}, {:?}, {:?})",
+        socket,
+        level,
+        option_name,
+        option_value,
+        option_len
+    );
+
+    assert_eq!(level, SOL_SOCKET);
+    // TODO: support other options
+    assert_eq!(option_name, SO_ERROR);
+
+    let option_len_val = env.mem.read(option_len);
+    assert_eq!(option_len_val, 4);
+
+    let option_value: MutPtr<i32> = option_value.cast();
+    env.mem.write(option_value, 0); // no errors
+
+    0 // Success
+}
+
 fn setsockopt(
     env: &mut Environment,
     socket: i32,
@@ -192,7 +226,7 @@ fn setsockopt(
     set_errno(env, 0);
 
     log_dbg!(
-        "setsockopt({}, {}, {:?}, {:?}, {})",
+        "setsockopt({}, {:#x}, {:#x}, {:?}, {})",
         socket,
         level,
         option_name,
@@ -988,6 +1022,7 @@ fn shutdown(env: &mut Environment, socket: i32, how: i32) -> i32 {
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(socket(_, _, _)),
     export_c_func!(ioctl(_, _, _)),
+    export_c_func!(getsockopt(_, _, _, _, _)),
     export_c_func!(setsockopt(_, _, _, _, _)),
     export_c_func!(bind(_, _, _)),
     export_c_func!(listen(_, _)),
