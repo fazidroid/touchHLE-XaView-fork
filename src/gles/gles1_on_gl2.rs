@@ -796,16 +796,7 @@ impl GLES for GLES1OnGL2 {
     unsafe fn ClipPlanef(&mut self, plane: GLenum, equation: *const GLfloat) {
         let mut max_planes = 0;
         gl21::GetIntegerv(gl21::MAX_CLIP_PLANES, &mut max_planes);
-        assert!(max_planes <= 6);
-        let planes = [
-            gl21::CLIP_PLANE0,
-            gl21::CLIP_PLANE1,
-            gl21::CLIP_PLANE2,
-            gl21::CLIP_PLANE3,
-            gl21::CLIP_PLANE4,
-            gl21::CLIP_PLANE5,
-        ];
-        assert!(planes.contains(&plane));
+        assert!(gl21::CLIP_PLANE0 <= plane && plane < (gl21::CLIP_PLANE0 + max_planes as u32));
 
         let mut equation_double: [GLdouble; 4] = [0.0; 4];
         #[allow(clippy::needless_range_loop)]
@@ -817,16 +808,7 @@ impl GLES for GLES1OnGL2 {
     unsafe fn ClipPlanex(&mut self, plane: GLenum, equation: *const GLfixed) {
         let mut max_planes = 0;
         gl21::GetIntegerv(gl21::MAX_CLIP_PLANES, &mut max_planes);
-        assert!(max_planes <= 6);
-        let planes = [
-            gl21::CLIP_PLANE0,
-            gl21::CLIP_PLANE1,
-            gl21::CLIP_PLANE2,
-            gl21::CLIP_PLANE3,
-            gl21::CLIP_PLANE4,
-            gl21::CLIP_PLANE5,
-        ];
-        assert!(planes.contains(&plane));
+        assert!(gl21::CLIP_PLANE0 <= plane && plane < (gl21::CLIP_PLANE0 + max_planes as u32));
 
         let mut equation_double: [GLdouble; 4] = [0.0; 4];
         #[allow(clippy::needless_range_loop)]
