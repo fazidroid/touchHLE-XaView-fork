@@ -12,10 +12,6 @@
 //! window system interaction in general, because it is assumed only one window
 //! will be needed for the runtime of the app.
 
-use crate::frameworks::uikit::ui_device::{
-    UIDeviceBatteryState, UIDeviceBatteryStateCharging, UIDeviceBatteryStateFull,
-    UIDeviceBatteryStateUnknown, UIDeviceBatteryStateUnplugged,
-};
 use crate::gles::present::present_frame;
 use crate::gles::{create_gles1_ctx, GLES};
 use crate::image::Image;
@@ -107,6 +103,14 @@ pub enum Event {
     /// take over.
     EnterDebugger,
     TextInput(TextInputEvent),
+}
+
+pub enum BatteryState {
+    Unknown,
+    OnBattery,
+    NoBattery,
+    Charging,
+    Full,
 }
 
 pub enum GLVersion {
@@ -1269,9 +1273,9 @@ pub fn show_error_messagebox(window: Option<&Window>, error_message: &str) {
 ///
 /// Returns:
 /// - pct: i32 - percentage of battery remaining.
-/// - status: [UIDeviceBatteryState] - the current status of the battery
+/// - status: [BatteryState] - the current status of the battery
 ///   (unplugged, charging, full, etc.)
-pub fn get_battery_status() -> (i32, UIDeviceBatteryState) {
+pub fn get_battery_status() -> (i32, BatteryState) {
     let mut pct = 0;
     // Unfortunately, Rust-SDL2 does not expose this function yet.
     // iPhoneOS does not measure the battery in seconds remaining,
@@ -1280,12 +1284,11 @@ pub fn get_battery_status() -> (i32, UIDeviceBatteryState) {
     (
         pct,
         match status {
-            SDL_PowerState::SDL_POWERSTATE_UNKNOWN => UIDeviceBatteryStateUnknown,
-            SDL_PowerState::SDL_POWERSTATE_ON_BATTERY => UIDeviceBatteryStateUnplugged,
-            SDL_PowerState::SDL_POWERSTATE_NO_BATTERY | SDL_PowerState::SDL_POWERSTATE_CHARGING => {
-                UIDeviceBatteryStateCharging
-            }
-            SDL_PowerState::SDL_POWERSTATE_CHARGED => UIDeviceBatteryStateFull,
+            SDL_PowerState::SDL_POWERSTATE_UNKNOWN => BatteryState::Unknown,
+            SDL_PowerState::SDL_POWERSTATE_ON_BATTERY => BatteryState::OnBattery,
+            SDL_PowerState::SDL_POWERSTATE_NO_BATTERY => BatteryState::NoBattery,
+            SDL_PowerState::SDL_POWERSTATE_CHARGING => BatteryState::Charging,
+            SDL_PowerState::SDL_POWERSTATE_CHARGED => BatteryState::Full,
         },
     )
 }

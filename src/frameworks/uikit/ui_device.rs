@@ -10,7 +10,7 @@ use crate::dyld::HostConstant;
 use crate::frameworks::foundation::ns_string;
 use crate::frameworks::foundation::NSInteger;
 use crate::objc::{id, objc_classes, ClassExports, TrivialHostObject};
-use crate::window::{get_battery_status, DeviceOrientation};
+use crate::window::{get_battery_status, BatteryState, DeviceOrientation};
 
 pub const UIDeviceOrientationDidChangeNotification: &str =
     "UIDeviceOrientationDidChangeNotification";
@@ -131,7 +131,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     pct as f32 / 100.0 // narrow down to 0.0 - 1.0
 }
 - (UIDeviceBatteryState)batteryState {
-    get_battery_status().1
+    match get_battery_status().1 {
+        BatteryState::Unknown => UIDeviceBatteryStateUnknown,
+        BatteryState::OnBattery => UIDeviceBatteryStateUnplugged,
+        BatteryState::NoBattery | BatteryState::Charging => UIDeviceBatteryStateCharging,
+        BatteryState::Full => UIDeviceBatteryStateFull,
+    }
 }
 
 @end
