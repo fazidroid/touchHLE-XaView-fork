@@ -8,7 +8,7 @@
 use super::{ns_string, NSTimeInterval, NSUInteger};
 use crate::frameworks::foundation::ns_string::to_rust_string;
 use crate::objc::{
-    autorelease, id, nil, objc_classes, release, retain, ClassExports, HostObject, NSZonePtr,
+    autorelease, id, nil, objc_classes, release, ClassExports, HostObject, NSZonePtr,
 };
 use crate::{msg, msg_class};
 
@@ -96,12 +96,19 @@ pub const CLASSES: ClassExports = objc_classes! {
         return nil;
     }
 
-    env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url;
-    retain(env, url);
+    let url_copy = msg![env; url copy];
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url_copy;
     env.objc.borrow_mut::<NSURLRequestHostObject>(this).cache_policy = cache_policy;
     env.objc.borrow_mut::<NSURLRequestHostObject>(this).timeout_interval = timeout_interval;
 
     this
+}
+
+- (id)URL {
+    env.objc.borrow::<NSURLRequestHostObject>(this).url
+}
+- (id)HTTPBody {
+    env.objc.borrow::<NSURLRequestHostObject>(this).http_body
 }
 
 - (())dealloc {
