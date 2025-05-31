@@ -293,6 +293,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("increaseLengthBy bytes {:?}, new_bytes {:?}; length {}, new_len {}", bytes, new_bytes, length, new_len);
 }
 
+- (())appendData:(id)other_data { // NSData *
+    let other_bytes: ConstVoidPtr = msg![env; other_data bytes];
+    let other_bytes: ConstPtr<u8> = other_bytes.cast();
+    let other_length: NSUInteger = msg![env; other_data length];
+    log_dbg!("appendData other_data {:?}, other_bytes {:?}, other_length {}", other_data, other_bytes, other_length);
+    msg![env; this appendBytes:other_bytes length:other_length]
+}
+
 - (())appendBytes:(ConstPtr<u8>)append_bytes length:(NSUInteger)append_length {
     let old_len = env.objc.borrow::<NSDataHostObject>(this).length;
     let old_bytes = env.objc.borrow::<NSDataHostObject>(this).bytes;
