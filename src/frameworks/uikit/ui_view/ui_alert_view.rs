@@ -23,7 +23,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: [(UIAlertView*){:?} initWithTitle:{:?} message:{:?} delegate:{:?} cancelButtonTitle:{:?} otherButtonTitles:{:?}]", this, title, message, delegate, cancelButtonTitle, otherButtonTitles);
 
     let msg = if message == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, message) };
-    let title = ns_string::to_rust_string(env, title);
+    let title = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
     log!("UIAlertView: title: {:?}, message: {:?}", title, msg);
 
     msg_super![env; this init]
