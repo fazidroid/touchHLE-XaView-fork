@@ -1335,11 +1335,33 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; NSData dataWithBytesNoCopy:(c_string.cast_void()) length:length]
 }
 
+- (id)componentsSeparatedByCharactersInSet:(id)cset { // NSCharacterSet*
+    let string = {
+        let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+        let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
+        if did_convert {
+            log_dbg!("[{:?} componentsSeparatedByCharactersInSet]: converted string to UTF-16", this);
+        }
+        orig_string.clone()
+    };
+
+    let substrings: Vec<&[u16]> = {
+        string.split(|&c| msg![env; cset characterIsMember:c]).collect()
+    };
+
+    let substrings: Vec<id> = substrings.into_iter().map(|substr| {
+        from_u16_vec(env, substr.to_vec())
+    }).collect();
+
+    let res = ns_array::from_vec(env, substrings);
+    autorelease(env, res)
+}
+
 - (id)substringWithRange:(NSRange)range {
     let host_object = env.objc.borrow_mut::<StringHostObject>(this);
     let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
     if did_convert {
-        log_dbg!("[{:?} length]: converted string to UTF-16", this);
+        log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
     }
     let host_string =
         orig_string[(range.location as usize)..((range.location + range.length) as usize)].to_vec();
@@ -1351,7 +1373,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_object = env.objc.borrow_mut::<StringHostObject>(this);
     let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
     if did_convert {
-        log_dbg!("[{:?} length]: converted string to UTF-16", this);
+        log_dbg!("[{:?} lineRangeForRange]: converted string to UTF-16", this);
     }
     let (start, end, _) = line_range_helper(orig_string, range, true, true);
     NSRange { location: start, length: end - start }
@@ -1364,7 +1386,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_object = env.objc.borrow_mut::<StringHostObject>(this);
     let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
     if did_convert {
-        log_dbg!("[{:?} length]: converted string to UTF-16", this);
+        log_dbg!("[{:?} getLineStart]: converted string to UTF-16", this);
     }
 
     let get_start = !start_ptr.is_null();
