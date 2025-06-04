@@ -155,6 +155,7 @@ const GET_PARAMS: ParamTable = ParamTable(&[
     (gl21::COLOR_LOGIC_OP, ParamType::Boolean, 1),
     (gl21::COLOR_MATERIAL, ParamType::Boolean, 1),
     (gl21::COLOR_WRITEMASK, ParamType::Boolean, 4),
+    // TODO: COMPRESSED_TEXTURE_FORMATS (needs to return only supported formats)
     (gl21::CULL_FACE, ParamType::Boolean, 1),
     (gl21::CULL_FACE_MODE, ParamType::Int, 1),
     (gl21::CURRENT_COLOR, ParamType::FloatSpecial, 4), // TODO correct type
@@ -280,6 +281,10 @@ const GET_PARAMS: ParamTable = ParamTable(&[
     (gl21::MAX_PALETTE_MATRICES_ARB, ParamType::Int, 1),
     // OES_matrix_palette -> ARB_vertex_blend
     (gl21::MAX_VERTEX_UNITS_ARB, ParamType::Int, 1),
+]);
+
+const UNSUPPORTED_GET_PARAMS: ParamTable = ParamTable(&[
+    (gl21::COMPRESSED_TEXTURE_FORMATS, ParamType::Int, 0), // Dynamically sized
 ]);
 
 const POINT_PARAMS: ParamTable = ParamTable(&[
@@ -614,16 +619,16 @@ impl GLES for GLES1OnGL2 {
         gl21::IsEnabled(cap)
     }
     unsafe fn Disable(&mut self, cap: GLenum) {
-        if ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == cap) {
+        if CAPABILITIES.contains(&cap) {
+            log_dbg!("glDisable{:#x}", cap);
+        } else if ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == cap) {
             log_dbg!("Tolerating glDisable({:#x}) of client state", cap);
         } else if UNSUPPORTED_CAPABILITIES.contains(&cap) {
             log_dbg!("Tolerating glDisable({:#x}) of unsupported capability", cap);
+        } else if GET_PARAMS.contains(cap) || UNSUPPORTED_GET_PARAMS.contains(cap) {
+            log_dbg!("Tolerating glDisable({:#x}) of parameter", cap);
         } else {
-            assert!(
-                CAPABILITIES.contains(&cap),
-                "Unexpected glDisable({:#x})",
-                cap
-            );
+            panic!("Unexpected glDisable({:#x})", cap);
         }
         gl21::Disable(cap);
     }
