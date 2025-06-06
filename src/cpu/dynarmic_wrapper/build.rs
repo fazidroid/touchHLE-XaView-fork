@@ -56,7 +56,8 @@ fn main() {
     // for Android.
     // https://stackoverflow.com/questions/69697715/cross-compiling-c-program-for-android-on-mac-failed-using-ndks-clang
     if os.eq_ignore_ascii_case("android") {
-        build.define("CMAKE_SYSTEM_NAME", "Linux");
+        build.define("CMAKE_SYSTEM_NAME", "Android");
+        build.define("CMAKE_SYSTEM_VERSION", "21");
         build.define("ANDROID", "ON");
     }
     // dynarmic can't be dynamically linked
