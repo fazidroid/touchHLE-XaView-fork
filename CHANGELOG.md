@@ -64,6 +64,7 @@ Usability:
 - Default options for various games. (@nighto)
 - macOS builds and releases of touchHLE now come as an application bundle (`.app` directory) rather than as a bare “Unix executable” file. This should fix problems some users encountered with running touchHLE outside of a terminal, and allows putting touchHLE in the Applications folder like a normal graphical app. To support this, user data (apps, options, etc) is now stored in “Application Support” rather than the current directory, and the bundled files (fonts, dylibs, etc) are now part of the app bundle. If you prefer the old layout, you can still get it if you move all the files out of the bundle. (@hikari-no-yume)
 - The new `--force-composition=` option which may solve rendering issues in some games. For some games it is applied with default options. (@ciciplusplus)
+- touchHLE now writes log messages to a file on all platforms, not just on Android. The file has been renamed from `log.txt` to `touchHLE_log.txt`. (@hikari-no-yume)
 - ALAC and Microsoft IMA ADPCM are now supported in Audio Toolbox, with the same caveats as other compressed codecs. (@abnormalmaps)
 
 Quality:
