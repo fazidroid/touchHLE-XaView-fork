@@ -232,13 +232,16 @@ jobs:
       env:
         CMAKE: ${{ github.workspace }}\vendor\cmake\bin\cmake
     - name: Build
-      run: cargo build --release && move target/release/touchHLE.exe .
+      run: cargo build --release
       env:
         CMAKE: ${{ github.workspace }}\vendor\cmake\bin\cmake
+    - name: Create bundle
+      shell: bash
+      run: cd dev-scripts && ./make-windows-bundle.sh ../target/release/touchHLE.exe && mv touchHLE_windows_bundle/ ..
     - uses: actions/upload-artifact@v4
       with:
         name: touchHLE_Windows_x86_64
-        path: touchHLE.exe
+        path: touchHLE_windows_bundle/
     - uses: actions/upload-artifact@v4
       with:
         name: TestApp_built_on_Windows

@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+# Creates the .app bundle containing the basic set of files needed for touchHLE
+# to run.
+
 if [[ $# == 1 ]]; then
     PATH_TO_BINARY="$1"
     shift
