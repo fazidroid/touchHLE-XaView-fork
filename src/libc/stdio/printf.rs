@@ -330,7 +330,16 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let ptr: MutVoidPtr = args.next(env);
-                res.extend_from_slice(format!("{:?}", ptr).as_bytes());
+                // '%p' is implementation defined,
+                // but this matches iOS simulator output
+                let tmp = format!("{:#x}", ptr.to_bits());
+                if pad_width > 0 {
+                    let pad_width = pad_width as usize;
+                    assert!(pad_char == ' '); // TODO
+                    write!(&mut res, "{:>1$}", tmp, pad_width).unwrap();
+                } else {
+                    res.extend_from_slice(tmp.as_bytes());
+                }
             }
             // Float specifiers
             b'f' => {

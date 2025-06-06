@@ -513,6 +513,10 @@ int test_vsnprintf() {
   str = str_format("[%-*s]", 10, s);
   res += !!strcmp(str, "[Hello     ]");
   free(str);
+  // Test %p with padding
+  str = str_format("%90p", &str);
+  res += (strlen(str) == 90) ? 0 : 1;
+  free(str);
 
   return res;
 }
