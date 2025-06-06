@@ -17,6 +17,7 @@ These are impractical to reimplement, but they are Free Software.
 
 ## `libz.1.2.3.dylib`
 
+* Aliases: `libz.1.1.3.dylib`, `libz.1.dylib`, `libz.dylib`
 * License: zlib License (see `COPYING.libz`)
 * Binary origin: compilation of zlib source code
 * Build code: <https://github.com/touchHLE/zlib-dylib>
