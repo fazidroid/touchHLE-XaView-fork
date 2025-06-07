@@ -59,6 +59,13 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             continue;
         }
 
+        let prepend_sign = if get_format_char(&env.mem, format_char_idx) == b'+' {
+            format_char_idx += 1;
+            true
+        } else {
+            false
+        };
+
         if get_format_char(&env.mem, format_char_idx) == b'#' {
             // Alternative form handling
             format_char_idx += 1;
@@ -169,6 +176,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
         match specifier {
             // Integer specifiers
             b'c' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 // TODO: support length modifier
                 assert!(length_modifier.is_none());
@@ -178,6 +186,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             }
             // Apple extension? Seemingly works in both NSLog and printf.
             b'C' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let c: unichar = args.next(env);
@@ -189,6 +198,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 write!(&mut res, "{}", c).unwrap();
             }
             b's' => {
+                assert!(!prepend_sign);
                 // TODO: support length modifier
                 assert!(length_modifier.is_none());
                 let c_string: ConstPtr<u8> = args.next(env);
@@ -218,6 +228,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'S' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 // TODO: support length modifier
                 assert!(length_modifier.is_none());
@@ -260,15 +271,28 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 if pad_width > 0 {
                     let pad_width = pad_width as usize;
                     if pad_char == '0' && precision.is_none() {
-                        write!(&mut res, "{:0>1$}", int_with_precision, pad_width).unwrap();
+                        if prepend_sign {
+                            assert!(int != 0); // TODO
+                            assert!(pad_width > 0);
+                            if int > 0 {
+                                write!(&mut res, "+{:0>1$}", int, pad_width - 1).unwrap();
+                            } else {
+                                write!(&mut res, "-{:0>1$}", int.abs(), pad_width - 1).unwrap();
+                            }
+                        } else {
+                            write!(&mut res, "{:0>1$}", int, pad_width).unwrap();
+                        }
                     } else {
+                        assert!(!prepend_sign);
                         write!(&mut res, "{:>1$}", int_with_precision, pad_width).unwrap();
                     }
                 } else {
+                    assert!(!prepend_sign);
                     res.extend_from_slice(int_with_precision.as_bytes());
                 }
             }
             b'@' if NS_LOG => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let object: id = args.next(env);
@@ -284,6 +308,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'x' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 // Note: on 32-bit system unsigned int and unsigned long
                 // are u32, so length_modifier is ignored
@@ -309,6 +334,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'X' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 assert!(precision.is_none());
                 // Note: on 32-bit system unsigned int and unsigned long
@@ -327,6 +353,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'p' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let ptr: MutVoidPtr = args.next(env);
@@ -343,6 +370,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             }
             // Float specifiers
             b'f' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;
@@ -352,6 +380,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 res.extend_from_slice(formatted.as_bytes());
             }
             b'e' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;
@@ -361,6 +390,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 res.extend_from_slice(formatted.as_bytes());
             }
             b'g' => {
+                assert!(!prepend_sign);
                 assert!(!left_justified);
                 let float: f64 = args.next(env);
                 let pad_width = pad_width as usize;

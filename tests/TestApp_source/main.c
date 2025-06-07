@@ -517,6 +517,13 @@ int test_vsnprintf() {
   str = str_format("%90p", &str);
   res += (strlen(str) == 90) ? 0 : 1;
   free(str);
+  // Test sign prepend
+  str = str_format("%+08d", 31501);
+  res += !!strcmp(str, "+0031501");
+  free(str);
+  str = str_format("%+08d", -31501);
+  res += !!strcmp(str, "-0031501");
+  free(str);
 
   return res;
 }
