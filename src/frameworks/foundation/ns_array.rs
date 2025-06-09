@@ -461,9 +461,31 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // TODO: more mutation methods
 
+- (())insertObject:(id)object
+           atIndex:(NSUInteger)index {
+    retain(env, object);
+    env.objc.borrow_mut::<ArrayHostObject>(this).array.insert(index as usize, object);
+}
+
 - (())addObject:(id)object {
     retain(env, object);
     env.objc.borrow_mut::<ArrayHostObject>(this).array.push(object);
+}
+
+- (())removeObject:(id)object {
+    let mut to_remove = Vec::new();
+    let count: NSUInteger = msg![env; this count];
+    for i in 0..count {
+        let curr_object: id = msg![env; this objectAtIndex:i];
+        let equal: bool = msg![env; object isEqual:curr_object];
+        if equal {
+            to_remove.push(i);
+        }
+    }
+    // TODO: runtime here is O(n^2), it could be O(n) instead
+    for i in to_remove {
+        () = msg![env; this removeObjectAtIndex:i];
+    }
 }
 
 - (())removeObjectAtIndex:(NSUInteger)index {
