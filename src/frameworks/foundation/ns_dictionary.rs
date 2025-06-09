@@ -739,6 +739,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, res)
 }
 
+- (id)objectEnumerator { // NSEnumerator*
+    let values: id = msg![env; this allValues];
+    msg![env; values objectEnumerator]
+}
+
 @end
 
 // Special variant for use by CFDictionary with NULL callbacks: objects aren't
