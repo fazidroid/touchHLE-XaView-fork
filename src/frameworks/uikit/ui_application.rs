@@ -345,6 +345,12 @@ pub(super) fn exit(env: &mut Environment) {
     {
         let pool: id = msg_class![env; NSAutoreleasePool new];
         let delegate: id = msg![env; ui_application delegate];
+        // Apple's docs (was) vaguely mention that `synchronize` is
+        // invoked on periodic internals.
+        // Second best - and implemented here - is to save before app exits.
+        // TODO: call `synchronize` periodically
+        let user_defaults: id = msg_class![env; NSUserDefaults standardUserDefaults];
+        let _: bool = msg![env; user_defaults synchronize];
         if env
             .objc
             .object_has_method_named(&env.mem, delegate, "applicationWillResignActive:")
