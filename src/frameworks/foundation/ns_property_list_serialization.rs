@@ -262,6 +262,7 @@ fn serialize_plist(env: &mut Environment, plist: id) -> Value {
             NSNumberHostObject::Bool(b) => Value::Boolean(*b),
             NSNumberHostObject::Int(i) => Value::from(*i),
             NSNumberHostObject::Float(f) => Value::from(*f),
+            NSNumberHostObject::Double(d) => Value::from(*d),
             NSNumberHostObject::LongLong(ll) => Value::from(*ll),
             _ => todo!("num {:?}", num),
         }
