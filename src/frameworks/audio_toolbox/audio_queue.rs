@@ -234,8 +234,17 @@ pub fn AudioQueueSetParameter(
     let host_object = state.audio_queues.get_mut(&in_aq).unwrap();
 
     host_object.volume = in_value;
+    log_dbg!(
+        "AudioQueueSetParameter kAudioQueueParam_Volume is set to {}",
+        host_object.volume
+    );
     if let Some(al_source) = host_object.al_source {
         let _context_manager = env.framework_state.audio_toolbox.make_al_context_current();
+        // If not clamped, OpenAL generates an error.
+        // While Apple's docs states that this range is expected,
+        // setting outside of range values do not generate errors
+        // (tested on both macOS and iOS).
+        let in_value = in_value.clamp(0.0, 1.0);
         unsafe {
             al::alSourcef(al_source, al::AL_MAX_GAIN, in_value);
             assert!(al::alGetError() == 0);
@@ -624,10 +633,15 @@ fn prime_audio_queue(
     }
 
     if host_object.al_source.is_none() {
+        // If not clamped, OpenAL generates an error.
+        // While Apple's docs states that this range is expected,
+        // setting outside of range values do not generate errors
+        // (tested on both macOS and iOS).
+        let volume = host_object.volume.clamp(0.0, 1.0);
         let mut al_source = 0;
         unsafe {
             al::alGenSources(1, &mut al_source);
-            al::alSourcef(al_source, al::AL_MAX_GAIN, host_object.volume);
+            al::alSourcef(al_source, al::AL_MAX_GAIN, volume);
             assert!(al::alGetError() == 0);
         };
         host_object.al_source = Some(al_source);
