@@ -132,7 +132,7 @@ pub struct State {
     sockets: HashMap<i32, SocketHostObject>,
 }
 impl State {
-    fn get(env: &mut Environment) -> &Self {
+    fn get(env: &Environment) -> &Self {
         &env.libc_state.socket
     }
     fn get_mut(env: &mut Environment) -> &mut Self {
