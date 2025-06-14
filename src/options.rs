@@ -37,6 +37,7 @@ pub struct Options {
     pub initial_orientation: DeviceOrientation,
     pub scale_hack: NonZeroU32,
     pub deadzone: f32,
+    pub analog_stick_tilt_controls: bool,
     pub x_tilt_range: f32,
     pub y_tilt_range: f32,
     pub x_tilt_offset: f32,
@@ -61,6 +62,7 @@ impl Default for Options {
             fullscreen: false,
             initial_orientation: DeviceOrientation::Portrait,
             scale_hack: NonZeroU32::new(1).unwrap(),
+            analog_stick_tilt_controls: true,
             deadzone: 0.1,
             x_tilt_range: 60.0,
             y_tilt_range: 60.0,
@@ -107,6 +109,8 @@ impl Options {
             self.scale_hack = value
                 .parse()
                 .map_err(|_| "Invalid scale hack factor".to_string())?;
+        } else if arg == "--disable-analog-stick-tilt-controls" {
+            self.analog_stick_tilt_controls = false;
         } else if let Some(value) = arg.strip_prefix("--deadzone=") {
             self.deadzone = parse_degrees(value, "deadzone")?;
         } else if let Some(value) = arg.strip_prefix("--x-tilt-range=") {

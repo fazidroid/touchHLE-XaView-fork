@@ -712,26 +712,32 @@ impl Window {
         let controller = self.controllers.remove(idx);
         log!("Warning: Controller disconnected: {}", controller.name());
     }
-    pub fn print_accelerometer_notice(&self) {
+    pub fn print_accelerometer_notice(&self, options: &Options) {
         log!("This app uses the accelerometer.");
-        if !self.controllers.is_empty() {
+
+        if !self.controllers.is_empty() && options.analog_stick_tilt_controls {
             log!("Your connected controller's left analog stick will be used for accelerometer simulation.");
             if self.accelerometer.is_some() {
                 log!("Disconnect the controller if you want to use your device's accelerometer.");
             }
         } else if self.accelerometer.is_some() {
             log!("Your device's accelerometer will be used for accelerometer simulation.");
-            log!("Connect a controller if you would prefer to use an analog stick.");
-        } else if self.controllers.is_empty() {
+            if options.analog_stick_tilt_controls {
+                log!("Connect a controller if you would prefer to use an analog stick.");
+            }
+        } else if self.controllers.is_empty() && options.analog_stick_tilt_controls {
             log!("Connect a controller to get accelerometer simulation.");
         }
-        log!("You can also hold right click and move the cursor to simulate the accelerometer.");
+
+        if self.accelerometer.is_none() {
+            log!("You can {}hold right click and move the cursor to simulate the accelerometer.", if options.analog_stick_tilt_controls { "also " } else { "" });
+        }
     }
 
     /// Get the real or simulated accelerometer output.
     /// See also [crate::frameworks::uikit::ui_accelerometer].
     pub fn get_acceleration(&self, options: &Options) -> (f32, f32, f32) {
-        if self.controllers.is_empty() {
+        if self.controllers.is_empty() || !options.analog_stick_tilt_controls {
             if let Some(ref accelerometer) = self.accelerometer {
                 let data = accelerometer.get_data().unwrap();
                 let sdl2::sensor::SensorData::Accel(data) = data else {

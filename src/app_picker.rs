@@ -148,6 +148,7 @@ struct AppPickerDelegateHostObject {
     orientation_default: bool,
     orientation_landscape_left: bool,
     orientation_landscape_right: bool,
+    analog_stick_tilt_controls: Option<bool>,
     network: Option<bool>,
     fullscreen: Option<bool>,
 }
@@ -212,6 +213,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (())orientationLandscapeRight {
     env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).orientation_landscape_right = true;
+}
+- (())analogStickTiltControls:(id)switch { // UISwitch*
+    let switch_state: bool = msg![env; switch isOn];
+    env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).analog_stick_tilt_controls = Some(switch_state);
 }
 - (())network:(id)switch { // UISwitch*
     let switch_state: bool = msg![env; switch isOn];
@@ -505,6 +510,7 @@ fn show_app_picker_gui(
     let mut quick_options_scale_hack: Option<NonZeroU32> = None;
     let mut quick_options_fullscreen: Option<()> = None;
     let mut quick_options_orientation: Option<DeviceOrientation> = None;
+    let mut quick_options_analog_stick_tilt_controls = true;
     let mut quick_options_network = false;
 
     fn update_quick_option_buttons(env: &mut Environment, buttons: &[id], selected_idx: usize) {
@@ -674,6 +680,8 @@ fn show_app_picker_gui(
                 &quick_options_stuff.orientation_buttons,
                 quick_options_orientation,
             );
+        } else if let Some(enabled) = std::mem::take(&mut host_obj.analog_stick_tilt_controls) {
+            quick_options_analog_stick_tilt_controls = enabled;
         } else if let Some(enabled) = std::mem::take(&mut host_obj.network) {
             quick_options_network = enabled;
         } else if let Some(fullscreen) = std::mem::take(&mut host_obj.fullscreen) {
@@ -700,6 +708,9 @@ fn show_app_picker_gui(
     }
     if let Some(()) = quick_options_fullscreen {
         option_args.push("--fullscreen".to_string());
+    }
+    if !quick_options_analog_stick_tilt_controls {
+        option_args.push("--disable-analog-stick-tilt-controls".to_string());
     }
     if quick_options_network {
         option_args.push("--allow-network-access".to_string());
@@ -1277,7 +1288,7 @@ fn setup_quick_options(
     enum RowKind {
         Label(&'static str),
         Buttons(&'static [(&'static str, &'static str)]),
-        Switch(&'static str),
+        Switch(&'static str, bool),
     }
     let rows = [
         RowKind::Label("Scale hack"),
@@ -1295,10 +1306,12 @@ fn setup_quick_options(
             ("→", "orientationLandscapeRight"),
         ]),
         RowKind::Label("Network access"),
-        RowKind::Switch("network:"),
+        RowKind::Switch("network:", false),
+        RowKind::Label("Use analog sticks for tilt controls"),
+        RowKind::Switch("analogStickTiltControls:", true),
         // ---- (divider for stuff skipped below)
         RowKind::Label("Fullscreen (override)"),
-        RowKind::Switch("fullscreen:"),
+        RowKind::Switch("fullscreen:", false),
     ];
     let rows_len_full = rows.len();
     let rows = if crate::window::Window::rotatable_fullscreen() {
@@ -1345,7 +1358,7 @@ fn setup_quick_options(
                     /* font_size: */ None,
                 ));
             }
-            RowKind::Switch(selector) => {
+            RowKind::Switch(selector, default_state) => {
                 let switch_frame = CGRect {
                     origin: CGPoint {
                         x: main_frame.size.width / 2.0 - 94.0 / 2.0,
@@ -1356,6 +1369,7 @@ fn setup_quick_options(
 
                 let switch: id = msg_class![env; UISwitch alloc];
                 let switch: id = msg![env; switch initWithFrame:switch_frame];
+                () = msg![env; switch setOn:default_state];
                 let selector = env.objc.lookup_selector(selector).unwrap();
                 () = msg![env; switch addTarget:delegate
                                          action:selector

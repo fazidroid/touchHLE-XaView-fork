@@ -40,13 +40,29 @@ Game controller options:
 
         This is a floating-point (decimal) number between 0 and 1.
 
+    --disable-analog-stick-tilt-controls
+        Disables mapping of analog stick input to simulated rotation of the
+        device.
+
+        By default, if touchHLE detects a game controller, its analog sticks
+        will be used for simulated accelerometer tilt controls. When this
+        happens, the real accelerometer (e.g. on an Android phone), if present,
+        is ignored. By setting this option, the real accelerometer can be used
+        even if a game controller is detected. This may be useful on a device
+        that integrates both an accelerometer and a game controller, or if you
+        do not want to disconnect your game controller.
+
+        Note that touchHLE does not currently support accelerometers contained
+        within game controllers.
+
     --x-tilt-range=...
     --y-tilt-range=...
         Set the simulated rotation range of the device axis mapped to the analog
-        stick X or Y axis.
+        stick X or Y axis, or to the mouse cursor's X or Y position within the
+        window (when the right mouse button is held).
 
-        Positive X on the analog stick is mapped to tilting the device rightward
-        and positive Y is mapped to tilting the device forward.
+        Positive X and Y are mapped to tilting the device rightward and forward
+        respectively.
 
         By default, an analog stick's axis is mapped to a rotation range of 60°
         (30° in either direction). If you wanted a range of 90° on the X axis,
@@ -61,10 +77,11 @@ Game controller options:
     --x-tilt-offset=...
     --y-tilt-offset=...
         Offset the simulated angle of the device axis mapped to the analog stick
-        X or Y axis.
+        X or Y axis, or to the mouse cursor's X or Y position within the window
+        (when the right mouse button is held).
 
-        Positive X on the analog stick is mapped to tilting the device rightward
-        and positive Y is mapped to tilting the device forward.
+        Positive X and Y are mapped to tilting the device rightward and forward
+        respectively.
 
         By default, the device is simulated as being level with the ground when
         the stick is in the center/neutral position. This option is intended for

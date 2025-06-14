@@ -73,7 +73,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         env.framework_state.uikit.ui_accelerometer.delegate = None;
     } else {
         env.framework_state.uikit.ui_accelerometer.delegate = Some(delegate);
-        env.window().print_accelerometer_notice();
+        env.window().print_accelerometer_notice(&env.options);
     }
 }
 
