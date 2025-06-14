@@ -730,7 +730,14 @@ impl Window {
         }
 
         if self.accelerometer.is_none() {
-            log!("You can {}hold right click and move the cursor to simulate the accelerometer.", if options.analog_stick_tilt_controls { "also " } else { "" });
+            log!(
+                "You can {}hold right click and move the cursor to simulate the accelerometer.",
+                if options.analog_stick_tilt_controls {
+                    "also "
+                } else {
+                    ""
+                }
+            );
         }
     }
 
