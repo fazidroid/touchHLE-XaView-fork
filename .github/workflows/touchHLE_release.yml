@@ -124,13 +124,13 @@ jobs:
       uses: actions/cache@v3
       with:
         path: gradle
-        key: gradle-7.3
+        key: gradle-8.11.1
     - if: ${{ steps.cache-gradle.outputs.cache-hit != 'true' }}
       name: Download Gradle
-      run: curl -L -o gradle-7.3-bin.zip "https://services.gradle.org/distributions/gradle-7.3-bin.zip"
+      run: curl -L -o gradle-8.11.1-bin.zip "https://services.gradle.org/distributions/gradle-8.11.1-bin.zip"
     - if: ${{ steps.cache-gradle.outputs.cache-hit != 'true' }}
       name: Extract Gradle
-      run: 7z -ogradle x gradle-7.3-bin.zip
+      run: 7z -ogradle x gradle-8.11.1-bin.zip
     # We need to install the correct version of Android NDK manually
     - name: Try to get a cached copy of Android NDK
       id: cache-android-ndk
@@ -159,7 +159,7 @@ jobs:
         CMAKE: ${{ github.workspace }}/vendor/cmake/bin/cmake
     # Don't attempt to run tests (can't run on Android).
     - name: Build for Android
-      run: cd android && ../gradle/gradle-7.3/bin/gradle assembleRelease && mv app/build/outputs/apk/release/app-release.apk ../touchHLE.apk
+      run: cd android && ../gradle/gradle-8.11.1/bin/gradle assembleRelease && mv app/build/outputs/apk/release/app-release.apk ../touchHLE.apk
       env:
         # The version should match the ndkVersion defined in `android\app\build.gradle`
         ANDROID_NDK_ROOT: '/usr/local/lib/android/sdk/ndk/25.2.9519653'

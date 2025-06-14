@@ -34,6 +34,14 @@ android {
             }
         }
     }
+    // The target JVM version must be the same for Java and Kotlin.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
     buildTypes {
         release {
             signingConfig signingConfigs.debug
@@ -68,6 +76,7 @@ android {
     lintOptions {
         abortOnError false
     }
+    namespace 'org.touchhle.android'
 }
 
 cargoNdk {

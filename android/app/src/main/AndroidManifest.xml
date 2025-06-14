@@ -10,7 +10,6 @@
      com.gamemaker.game
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.touchhle.android"
     android:installLocation="auto"
     android:versionCode="1"
     android:versionName="android">
