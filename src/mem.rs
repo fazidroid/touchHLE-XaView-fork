@@ -205,6 +205,9 @@ impl<T: SafeRead> SafeWrite for T {}
 
 type Bytes = [u8; 1 << 32];
 
+pub const PAGE_SIZE: GuestUSize = 4096;
+pub const PAGE_SIZE_ALIGN_MASK: GuestUSize = 0xfff;
+
 /// The type that owns the guest memory and provides accessors for it.
 pub struct Mem {
     /// This array is 4GiB in size so that it can cover the entire 32-bit
@@ -274,6 +277,9 @@ impl Mem {
     pub fn new() -> Mem {
         // This will hopefully get the host OS to lazily allocate the memory.
         let layout = std::alloc::Layout::new::<Bytes>();
+        // TODO: align memory to guest page size
+        // Right now, if aligned, will cause OOM on low end Android devices.
+        // See relevant [Github's issue](https://github.com/touchHLE/touchHLE/issues/498)
         let bytes = unsafe { std::alloc::alloc_zeroed(layout) as *mut Bytes };
 
         let allocator = allocator::Allocator::new();
