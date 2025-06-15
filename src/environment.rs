@@ -98,6 +98,9 @@ pub struct Environment {
     pub options: options::Options,
     gdb_server: Option<gdb::GdbServer>,
     pub env_vars: HashMap<Vec<u8>, MutPtr<u8>>,
+    /// Set to [true] when created using [Environment::new_without_app].
+    /// In practice, this means we are in the app picker.
+    pub is_fake: bool,
 }
 
 /// What to do next when executing this thread.
@@ -380,6 +383,7 @@ impl Environment {
             options,
             gdb_server: None,
             env_vars: Default::default(),
+            is_fake: false,
         };
 
         env.set_up_initial_env_vars();
@@ -540,6 +544,7 @@ impl Environment {
             options,
             gdb_server: None,
             env_vars: Default::default(),
+            is_fake: true,
         };
 
         env.set_up_initial_env_vars();
