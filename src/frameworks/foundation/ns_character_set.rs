@@ -11,6 +11,17 @@ use crate::objc::{
 };
 use std::collections::HashSet;
 
+// Unicode General Category Zs and CHARACTER TABULATION (U+0009).
+const WHITESPACE_CHARACTERS: [char; 18] = [
+    '\u{0020}', '\u{00A0}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}', '\u{2004}',
+    '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200A}', '\u{202F}', '\u{205F}',
+    '\u{3000}', '\u{0009}',
+];
+// The newline characters (U+000A - U+000D, U+0085, U+2028, and U+2029).
+const NEWLINE_CHARACTERS: [char; 7] = [
+    '\u{000A}', '\u{000B}', '\u{000C}', '\u{000D}', '\u{0085}', '\u{2028}', '\u{2029}',
+];
+
 /// Belongs to _touchHLE_NSCharacterSet
 struct CharacterSetHostObject {
     set: HashSet<unichar>,
@@ -47,14 +58,28 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)newlineCharacterSet {
+    let set = HashSet::from(NEWLINE_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
+
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
+
+    autorelease(env, new)
+}
+
 + (id)whitespaceCharacterSet {
-    // Unicode General Category Zs and CHARACTER TABULATION (U+0009).
-    let chars = [
-        '\u{0020}', '\u{00A0}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}',
-        '\u{2004}', '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200A}',
-        '\u{202F}', '\u{205F}', '\u{3000}', '\u{0009}',
-    ];
-    let set = HashSet::from(chars.map(|c| unichar::try_from(c).unwrap()));
+    let set = HashSet::from(WHITESPACE_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
+
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
+
+    autorelease(env, new)
+}
+
++ (id)whitespaceAndNewlineCharacterSet {
+    let set1 = HashSet::from(NEWLINE_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
+    let set2 = HashSet::from(WHITESPACE_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
+    let set = set1.union(&set2).copied().collect();
 
     let new: id = msg![env; this alloc];
     env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
