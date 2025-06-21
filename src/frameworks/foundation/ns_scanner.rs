@@ -157,6 +157,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let left: id = msg![env; string substringFromIndex:pos];
     let range: NSRange = msg![env; left rangeOfString:stop_string];
     if range.location == 0 {
+        *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
         return false;
     }
 
@@ -188,6 +189,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let left: id = msg![env; string substringFromIndex:pos];
     let same_prefix: bool = msg![env; left hasPrefix:scan_string];
     if !same_prefix {
+        *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
         return false;
     }
 
@@ -209,6 +211,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let NSScannerHostObject { to_be_skipped, string, len, pos } = std::mem::take(env.objc.borrow_mut::<NSScannerHostObject>(this));
     let left: id = msg![env; string substringFromIndex:pos];
     if left == nil {
+        *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
         return false;
     }
 
@@ -221,7 +224,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
     if cutoff == 0 {
-        log_dbg!("scanInt: now valid int found for '{}'", st);
+        log_dbg!("scanInt: no valid int found for '{}'", st);
+        *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
         return false;
     }
 
