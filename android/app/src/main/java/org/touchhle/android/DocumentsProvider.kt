@@ -23,10 +23,6 @@ import android.webkit.MimeTypeMap
 //import emu.skyline.getPublicFilesDir
 import java.io.*
 
-fun getBaseDirectory() : File {
-    return touchHLEApplication.getContext().getExternalFilesDir(null)!!
-}
-
 class DocumentsProvider : DocumentsProvider() {
     //private val baseDirectory = File(SkylineApplication.instance.getPublicFilesDir().canonicalPath)
     //private val baseDirectory = Environment.getExternalStorageDirectory()
@@ -56,6 +52,10 @@ class DocumentsProvider : DocumentsProvider() {
         )
 
         const val ROOT_ID : String = "root"
+    }
+
+    private fun getBaseDirectory() : File {
+        return context!!.getExternalFilesDir(null)!!
     }
 
     override fun onCreate() : Boolean {
