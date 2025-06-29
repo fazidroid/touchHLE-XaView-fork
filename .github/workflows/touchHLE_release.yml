@@ -68,7 +68,7 @@ jobs:
         env:
           CMAKE: ${{ github.workspace }}/vendor/cmake/bin/cmake
       - name: Create .app bundle
-        run: cd dev-scripts && ./make-macos-bundle.sh ../target/x86_64-apple-darwin/release/touchHLE && mkdir touchHLE-dmg-src && mv touchHLE.app touchHLE-dmg-src/ && hdiutil create -volname touchHLE -srcfolder touchHLE-dmg-src touchHLE.dmg && mv touchHLE.dmg ..
+        run: cd dev-scripts && ./make-macos-bundle.sh ../target/x86_64-apple-darwin/release/touchHLE "`cargo run --package touchHLE_version`" "`cargo run --package touchHLE_version -- --branding`" && mkdir touchHLE-dmg-src && mv *.app touchHLE-dmg-src/ && hdiutil create -volname touchHLE -srcfolder touchHLE-dmg-src touchHLE.dmg && mv touchHLE.dmg ..
       - uses: actions/upload-artifact@v4
         with:
           name: touchHLE_macOS_x86_64

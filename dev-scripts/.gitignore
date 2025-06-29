@@ -1,3 +1,5 @@
 /new_release
-/touchHLE.app
+/*.app
 /touchHLE_windows_bundle
+/*.icns
+/*.iconset
