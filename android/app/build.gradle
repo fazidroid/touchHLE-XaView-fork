@@ -12,11 +12,41 @@ apply plugin: 'com.android.application'
 apply plugin: "com.github.willir.rust.cargo-ndk-android"
 apply plugin: 'org.jetbrains.kotlin.android'
 
+static def runTouchHLEVersionTool(boolean wantBranding) {
+    return ('cargo run --package touchHLE_version' + (wantBranding ? ' -- --branding' : '')).execute().text.trim()
+}
+
+static def getTouchHLEBranding() {
+    return runTouchHLEVersionTool(/* wantBranding: */ true)
+}
+
+static def getTouchHLEVersionName() {
+    return runTouchHLEVersionTool(/* wantBranding: */ false)
+}
+
+static def join(String prefix, String separator, String branding) {
+    if (branding.isEmpty()) {
+        return prefix
+    } else {
+        return prefix + separator + branding
+    }
+}
+
 android {
     ndkVersion "25.2.9519653"
     compileSdkVersion 31
     defaultConfig {
-        applicationId "org.touchhle.android"
+        def branding = getTouchHLEBranding()
+        applicationId 'org.touchhle.android'
+        applicationIdSuffix(branding.isEmpty() ? null : branding.toLowerCase())
+        resValue 'string', 'app_name', join('touchHLE', ' ', branding)
+        buildConfigField 'String', 'APP_NAME', ('"' + join('touchHLE', ' ', branding) + '"')
+        manifestPlaceholders = [
+                icon: join('@drawable/icon', '_', branding.toLowerCase())
+        ]
+        buildConfigField 'int', 'APP_ICON', join('R.drawable.icon', '_', branding.toLowerCase())
+        versionName join(getTouchHLEVersionName(), ' ', branding)
+
         minSdkVersion 21 // first version with AArch64
         targetSdkVersion 31
         externalNativeBuild {
@@ -96,14 +126,14 @@ cargoNdk {
         if (!clangXXPath.toFile().exists()) {
             throw new GradleException("NDK clang++ compiler not found at expected location: $clangXXPath")
         }
-        
+
         extraCargoEnv.putAll([
-            "CC": clangPath.toString(),
-            "CXX": clangXXPath.toString(),
-            // The default generator on Windows (Visual Studio) does not respect 
-            // the CC and CXX environment variables. Using Ninja ensures that 
-            // the specified compilers are used
-            "CMAKE_GENERATOR": "Ninja"
+                "CC"             : clangPath.toString(),
+                "CXX"            : clangXXPath.toString(),
+                // The default generator on Windows (Visual Studio) does not respect
+                // the CC and CXX environment variables. Using Ninja ensures that
+                // the specified compilers are used
+                "CMAKE_GENERATOR": "Ninja"
         ])
     }
     // The default feature, "static", makes us use static linking for SDL2 and OpenAL Soft.
