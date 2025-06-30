@@ -115,6 +115,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this readDataOfLength:length]
 }
 
+- (id)availableData {
+    // TODO: support non-files too
+    msg![env; this readDataToEndOfFile]
+}
+
 - (())writeData:(id)data { // NSData *
     let fd = env.objc.borrow::<NSFileHandleHostObject>(this).fd;
     let bytes: ConstVoidPtr = msg![env; data bytes];
