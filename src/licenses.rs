@@ -191,7 +191,7 @@ fn print(out: &mut String, resources_are_external_files: bool) -> Result<(), std
     divider(out)?;
     #[cfg(target_os = "android")]
     {
-        writeln!(out, "{}", SKYLINE)?;
+        writeln!(out, "{SKYLINE}")?;
         divider(out)?;
     }
     writeln!(out, "{RUST_DESCRIPTION}")?;
