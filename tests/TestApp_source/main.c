@@ -536,7 +536,7 @@ int test_sscanf() {
   short c, d;
   float f;
   double lf;
-  char str[4];
+  char str[4], str1[4];
   int matched = sscanf("1.23", "%d.%d", &a, &b);
   if (!(matched == 2 && a == 1 && b == 23))
     return -1;
@@ -609,6 +609,15 @@ int test_sscanf() {
   matched = sscanf("Var_123 =", "%[A-Za-z0-9_]", str);
   if (!(matched == 1 && strcmp(str, "Var_123") == 0))
     return -25;
+  matched = sscanf("NAME", "%s", str);
+  if (!(matched == 1 && strcmp(str, "NAME") == 0))
+    return -26;
+  matched = sscanf("   NAME", "%s", str);
+  if (!(matched == 1 && strcmp(str, "NAME") == 0))
+    return -27;
+  matched = sscanf("A B", "%s %s", str, str1);
+  if (!(matched == 2 && strcmp(str, "A") == 0 && strcmp(str1, "B") == 0))
+    return -28;
   return 0;
 }
 
