@@ -71,6 +71,7 @@ pub const FUNCTION_LISTS: &[super::FunctionExports] = &[
     core_foundation::cf_socket::FUNCTIONS,
     core_foundation::cf_data::FUNCTIONS,
     core_foundation::cf_locale::FUNCTIONS,
+    core_foundation::cf_number::FUNCTIONS,
     core_foundation::cf_preferences::FUNCTIONS,
     core_foundation::cf_run_loop::FUNCTIONS,
     core_foundation::cf_run_loop_timer::FUNCTIONS,
