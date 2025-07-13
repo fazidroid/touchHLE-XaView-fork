@@ -13,6 +13,9 @@ use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use super::{ns_array, ns_keyed_unarchiver, ns_string, ns_url, NSUInteger};
 use crate::abi::{CallFromHost, GuestFunction, VaList};
 use crate::frameworks::core_foundation::{CFHashCode, CFIndex};
+use crate::frameworks::foundation::ns_enumerator::{
+    fast_enumeration_helper, NSFastEnumerationState,
+};
 use crate::frameworks::foundation::ns_file_manager::{NSFileModificationDate, NSFileSize};
 use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, Ptr, SafeRead};
@@ -568,6 +571,23 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)allKeys {
     all_keys_common(env, this)
+}
+
+// NSFastEnumeration implementation
+- (NSUInteger)countByEnumeratingWithState:(MutPtr<NSFastEnumerationState>)state
+                                  objects:(MutPtr<id>)stackbuf
+                                    count:(NSUInteger)len {
+    // We assume that order in which objects are reported is consistent
+    // between calls!
+    let objects: id = msg![env; this allKeys];
+    let count: NSUInteger = msg![env; objects count];
+    fast_enumeration_helper(env, this, |env, idx| {
+        if idx < count {
+            msg![env; objects objectAtIndex:idx]
+        } else {
+            nil
+        }
+    }, state, stackbuf, len)
 }
 
 // NSCopying implementation
