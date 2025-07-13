@@ -27,6 +27,8 @@ macro_rules! impl_AsValue {
                 NSNumberHostObject::LongLong(x) => *x as _,
                 NSNumberHostObject::Float(x) => *x as _,
                 NSNumberHostObject::Double(x) => *x as _,
+                NSNumberHostObject::Short(x) => *x as _,
+                NSNumberHostObject::Char(x) => *x as _,
             }
         }
     };
@@ -41,6 +43,8 @@ pub(super) enum NSNumberHostObject {
     LongLong(i64),
     Float(f32),
     Double(f64),
+    Short(i16),
+    Char(i8),
 }
 impl HostObject for NSNumberHostObject {}
 
@@ -54,6 +58,8 @@ impl NSNumberHostObject {
             NSNumberHostObject::LongLong(x) => *x != 0,
             NSNumberHostObject::Float(x) => *x != 0.0,
             NSNumberHostObject::Double(x) => *x != 0.0,
+            NSNumberHostObject::Short(x) => *x != 0,
+            NSNumberHostObject::Char(x) => *x != 0,
         }
     }
     impl_AsValue!(as_int, i32);
@@ -62,6 +68,8 @@ impl NSNumberHostObject {
     impl_AsValue!(as_unsigned_int, u32);
     impl_AsValue!(as_float, f32);
     impl_AsValue!(as_double, f64);
+    impl_AsValue!(as_short, i16);
+    impl_AsValue!(as_char, i8);
 }
 
 pub const CLASSES: ClassExports = objc_classes! {
@@ -165,6 +173,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)numberWithShort:(i16)value {
+    // TODO: for greater efficiency we could return a static-lifetime value
+
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithShort:value];
+    autorelease(env, new)
+}
+
++ (id)numberWithChar:(i8)value {
+    // TODO: for greater efficiency we could return a static-lifetime value
+
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithChar:value];
+    autorelease(env, new)
+}
+
 // TODO: types other than booleans and long longs
 
 - (id)initWithBool:(bool)value {
@@ -207,6 +231,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)initWithShort:(i16)value {
+    *env.objc.borrow_mut(this) = NSNumberHostObject::Short(value);
+    this
+}
+
+- (id)initWithChar:(i8)value {
+    *env.objc.borrow_mut(this) = NSNumberHostObject::Char(value);
+    this
+}
 
 - (bool)boolValue {
     env.objc.borrow::<NSNumberHostObject>(this).as_bool()
@@ -244,6 +277,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<NSNumberHostObject>(this).as_unsigned_int()
 }
 
+- (i16)shortValue {
+    env.objc.borrow::<NSNumberHostObject>(this).as_short()
+}
+
+- (i8)charValue {
+    env.objc.borrow::<NSNumberHostObject>(this).as_char()
+}
+
 - (id)description {
     let desc = match env.objc.borrow(this) {
         NSNumberHostObject::Bool(value) => from_rust_string(env, (*value as i32).to_string()),
@@ -252,7 +293,9 @@ pub const CLASSES: ClassExports = objc_classes! {
         NSNumberHostObject::Int(value) => from_rust_string(env, value.to_string()),
         NSNumberHostObject::LongLong(value) => from_rust_string(env, value.to_string()),
         NSNumberHostObject::Float(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::Double(value) => from_rust_string(env, value.to_string())
+        NSNumberHostObject::Double(value) => from_rust_string(env, value.to_string()),
+        NSNumberHostObject::Short(value) => from_rust_string(env, value.to_string()),
+        NSNumberHostObject::Char(value) => from_rust_string(env, value.to_string()),
     };
     autorelease(env, desc)
 }
@@ -270,6 +313,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         NSNumberHostObject::LongLong(value) => *value as u64,
         NSNumberHostObject::Float(value) => value.to_bits() as u64,
         NSNumberHostObject::Double(value) => value.to_bits(),
+        NSNumberHostObject::Short(value) => *value as u64,
+        NSNumberHostObject::Char(value) => *value as u64,
     };
     super::hash_helper(&value)
 }
