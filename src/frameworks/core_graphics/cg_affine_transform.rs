@@ -91,8 +91,9 @@ pub const CGAffineTransformIdentity: CGAffineTransform = CGAffineTransform {
 
 pub const CONSTANTS: ConstantExports = &[(
     "_CGAffineTransformIdentity",
-    HostConstant::Custom(|mem, _| {
-        mem.alloc_and_write(CGAffineTransformIdentity)
+    HostConstant::Custom(|env| {
+        env.mem
+            .alloc_and_write(CGAffineTransformIdentity)
             .cast()
             .cast_const()
     }),

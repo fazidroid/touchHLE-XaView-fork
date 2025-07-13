@@ -190,14 +190,14 @@ pub const FUNCTIONS: FunctionExports = &[
 pub const CONSTANTS: ConstantExports = &[
     (
         "_CGSizeZero",
-        HostConstant::Custom(|mem, _| mem.alloc_and_write(CGSizeZero).cast().cast_const()),
+        HostConstant::Custom(|env| env.mem.alloc_and_write(CGSizeZero).cast().cast_const()),
     ),
     (
         "_CGPointZero",
-        HostConstant::Custom(|mem, _| mem.alloc_and_write(CGPointZero).cast().cast_const()),
+        HostConstant::Custom(|env| env.mem.alloc_and_write(CGPointZero).cast().cast_const()),
     ),
     (
         "_CGRectZero",
-        HostConstant::Custom(|mem, _| mem.alloc_and_write(CGRectZero).cast().cast_const()),
+        HostConstant::Custom(|env| env.mem.alloc_and_write(CGRectZero).cast().cast_const()),
     ),
 ];

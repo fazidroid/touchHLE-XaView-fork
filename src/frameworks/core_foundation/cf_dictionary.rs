@@ -222,8 +222,8 @@ fn create_default_callback_functions(mem: &mut Mem, dyld: &mut Dyld) -> DefaultC
 pub const CONSTANTS: ConstantExports = &[
     (
         "_kCFTypeDictionaryKeyCallBacks",
-        HostConstant::Custom(|mem, dyld| {
-            let common = create_default_callback_functions(mem, dyld);
+        HostConstant::Custom(|env| {
+            let common = create_default_callback_functions(&mut env.mem, &mut env.dyld);
             let callbacks = CFDictionaryKeyCallBacks {
                 version: 0, // always 0
                 retain: common.retain,
@@ -232,18 +232,18 @@ pub const CONSTANTS: ConstantExports = &[
                 equal: common.equal,
                 hash: common.hash,
             };
-            mem.alloc_and_write(callbacks).cast_void().cast_const()
+            env.mem.alloc_and_write(callbacks).cast_void().cast_const()
         }),
     ),
     (
         "_kCFTypeDictionaryValueCallBacks",
-        HostConstant::Custom(|mem, dyld| {
+        HostConstant::Custom(|env| {
             // All the functions here (except `hash` one)
             // are the same as for `kCFTypeDictionaryKeyCallBacks`,
             // but we still re-create guest functions for the sake
             // of the (current) code simplicity
             // TODO: create related guest functions only once, not twice
-            let common = create_default_callback_functions(mem, dyld);
+            let common = create_default_callback_functions(&mut env.mem, &mut env.dyld);
             let callbacks = CFDictionaryValueCallBacks {
                 version: 0, // always 0
                 retain: common.retain,
@@ -251,7 +251,7 @@ pub const CONSTANTS: ConstantExports = &[
                 copy_desc: common.copy_desc,
                 equal: common.equal,
             };
-            mem.alloc_and_write(callbacks).cast_void().cast_const()
+            env.mem.alloc_and_write(callbacks).cast_void().cast_const()
         }),
     ),
 ];

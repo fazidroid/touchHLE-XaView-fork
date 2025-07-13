@@ -17,10 +17,15 @@ pub const MACH_TASK_SELF: mach_port_t = 0x7461736b;
 pub const CONSTANTS: ConstantExports = &[
     (
         "_mach_task_self_",
-        HostConstant::Custom(|mem, _| mem.alloc_and_write(MACH_TASK_SELF).cast_void().cast_const()),
+        HostConstant::Custom(|env| {
+            env.mem
+                .alloc_and_write(MACH_TASK_SELF)
+                .cast_void()
+                .cast_const()
+        }),
     ),
     (
         "_vm_page_size",
-        HostConstant::Custom(|mem, _| mem.alloc_and_write(PAGE_SIZE).cast_void().cast_const()),
+        HostConstant::Custom(|env| env.mem.alloc_and_write(PAGE_SIZE).cast_void().cast_const()),
     ),
 ];
