@@ -191,6 +191,10 @@ fn CFStringFind(
     }
 }
 
+fn CFStringHasSuffix(env: &mut Environment, the_string: CFStringRef, suffix: CFStringRef) -> bool {
+    msg![env; the_string hasSuffix:suffix]
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringAppendFormat(_, _, _, _)),
     export_c_func!(CFStringConvertEncodingToNSStringEncoding(_)),
@@ -205,4 +209,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringGetCString(_, _, _, _)),
     export_c_func!(CFStringGetLength(_)),
     export_c_func!(CFStringFind(_, _, _)),
+    export_c_func!(CFStringHasSuffix(_, _)),
 ];
