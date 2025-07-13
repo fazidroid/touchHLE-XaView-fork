@@ -15,11 +15,13 @@ use crate::frameworks::foundation::ns_string;
 use crate::objc::{id, msg, msg_class};
 use crate::Environment;
 
+type CFPropertyListRef = CFTypeRef;
+
 fn CFPreferencesCopyAppValue(
     env: &mut Environment,
     key: CFStringRef,
     app_id: CFStringRef,
-) -> CFTypeRef {
+) -> CFPropertyListRef {
     let current_app = ns_string::get_static_str(env, kCFPreferencesCurrentApplication);
     // TODO: handle other ids
     assert!(msg![env; app_id isEqualToString:current_app]);
@@ -31,7 +33,7 @@ fn CFPreferencesCopyAppValue(
 fn CFPreferencesSetAppValue(
     env: &mut Environment,
     key: CFStringRef,
-    value: CFTypeRef,
+    value: CFPropertyListRef,
     app_id: CFStringRef,
 ) {
     assert!(!value.is_null()); // TODO
