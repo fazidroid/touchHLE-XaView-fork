@@ -49,12 +49,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-+ (id)setWithObjects:(id)first_obj, ...args {
-    let new: id = msg![env; this alloc];
-    env.objc.borrow_mut::<SetHostObject>(new).dict = set_from_objects(env, first_obj, args);
-    autorelease(env, new)
-}
-
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
     retain(env, this)
@@ -93,6 +87,12 @@ pub const CLASSES: ClassExports = objc_classes! {
         dict: Default::default(),
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
++ (id)setWithObjects:(id)first_obj, ...args {
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<SetHostObject>(new).dict = set_from_objects(env, first_obj, args);
+    autorelease(env, new)
 }
 
 - (id)initWithObject:(id)object {
@@ -169,6 +169,12 @@ pub const CLASSES: ClassExports = objc_classes! {
         dict: Default::default(),
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
++ (id)setWithObjects:(id)first_obj, ...args {
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<SetHostObject>(new).dict = set_from_objects(env, first_obj, args);
+    autorelease(env, new)
 }
 
 - (id)initWithObject:(id)object {
