@@ -10,9 +10,9 @@
 
 use super::cf_allocator::{kCFAllocatorDefault, CFAllocatorRef};
 use super::{CFIndex, CFTypeRef};
-use crate::dyld::{export_c_func, FunctionExports};
+use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant};
 use crate::mem::ConstVoidPtr;
-use crate::objc::{msg, msg_class};
+use crate::objc::{id, msg, msg_class};
 use crate::Environment;
 
 type CFNumberType = CFIndex;
@@ -53,5 +53,24 @@ fn CFNumberCreate(
         _ => unimplemented!("type {}", type_),
     }
 }
+
+pub const CONSTANTS: ConstantExports = &[
+    (
+        "_kCFBooleanFalse",
+        HostConstant::Custom(|env| {
+            let num = msg_class![env; NSNumber alloc];
+            let num: id = msg![env; num initWithBool:false];
+            num.cast().cast_const()
+        }),
+    ),
+    (
+        "_kCFBooleanTrue",
+        HostConstant::Custom(|env| {
+            let num = msg_class![env; NSNumber alloc];
+            let num: id = msg![env; num initWithBool:true];
+            num.cast().cast_const()
+        }),
+    ),
+];
 
 pub const FUNCTIONS: FunctionExports = &[export_c_func!(CFNumberCreate(_, _, _))];
