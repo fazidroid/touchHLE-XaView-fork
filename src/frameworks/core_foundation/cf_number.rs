@@ -60,7 +60,8 @@ pub const CONSTANTS: ConstantExports = &[
         HostConstant::Custom(|env| {
             let num = msg_class![env; NSNumber alloc];
             let num: id = msg![env; num initWithBool:false];
-            num.cast().cast_const()
+            // Apparently, it's a pointer to pointer
+            env.mem.alloc_and_write(num).cast_void().cast_const()
         }),
     ),
     (
@@ -68,7 +69,8 @@ pub const CONSTANTS: ConstantExports = &[
         HostConstant::Custom(|env| {
             let num = msg_class![env; NSNumber alloc];
             let num: id = msg![env; num initWithBool:true];
-            num.cast().cast_const()
+            // Apparently, it's a pointer to pointer
+            env.mem.alloc_and_write(num).cast_void().cast_const()
         }),
     ),
 ];
