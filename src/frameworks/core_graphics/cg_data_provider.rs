@@ -10,8 +10,12 @@ use crate::abi::{CallFromHost, GuestFunction};
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::frameworks::core_foundation::cf_allocator::kCFAllocatorDefault;
-use crate::frameworks::core_foundation::cf_data::{CFDataCreate, CFDataRef};
+use crate::frameworks::core_foundation::cf_data::{
+    CFDataCreate, CFDataGetBytePtr, CFDataGetLength, CFDataRef,
+};
+use crate::frameworks::core_foundation::cf_url::CFURLRef;
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
+use crate::frameworks::foundation::ns_string::to_rust_string;
 use crate::frameworks::foundation::NSUInteger;
 use crate::mem::{ConstVoidPtr, GuestUSize, MutVoidPtr};
 use crate::objc::{id, msg, msg_class, objc_classes, ClassExports, HostObject};
@@ -37,6 +41,7 @@ enum CGDataProviderHostObject {
     // TODO: Maybe we should store image data in guest memory so we don't
     // need a special variant for this.
     CGImage(CGImageRef),
+    CFData(CFDataRef),
 }
 impl HostObject for CGDataProviderHostObject {}
 
@@ -57,7 +62,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             size,
             release_callback,
         } => {
-            if release_callback.addr_with_thumb_bit() != 0 {
+            if !release_callback.to_ptr().is_null() {
                 let args: (MutVoidPtr, ConstVoidPtr, GuestUSize) = (info, data, size);
                 log_dbg!(
                     "Freeing {:?}, calling release callback {:?} with {:?}",
@@ -69,6 +74,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             }
         },
         CGDataProviderHostObject::CGImage(cg_image) => CGImageRelease(env, cg_image),
+        CGDataProviderHostObject::CFData(cf_data) => CFRelease(env, cf_data),
     }
     env.objc.dealloc_object(this, &mut env.mem)
 }
@@ -127,13 +133,18 @@ pub(super) fn from_cg_image(env: &mut Environment, cg_image: CGImageRef) -> CGDa
 }
 
 /// Generic interface for host code.
-pub(super) fn borrow_bytes(env: &Environment, provider: CGDataProviderRef) -> &[u8] {
+pub(super) fn borrow_bytes(env: &mut Environment, provider: CGDataProviderRef) -> &[u8] {
     match *env.objc.borrow(provider) {
         CGDataProviderHostObject::DataWithSize { data, size, .. } => {
             env.mem.bytes_at(data.cast(), size)
         }
         CGDataProviderHostObject::CGImage(cg_image) => {
             cg_image::borrow_image(&env.objc, cg_image).pixels()
+        }
+        CGDataProviderHostObject::CFData(cf_data) => {
+            let data = CFDataGetBytePtr(env, cf_data);
+            let size = CFDataGetLength(env, cf_data);
+            env.mem.bytes_at(data, size.try_into().unwrap())
         }
     }
 }
@@ -160,7 +171,35 @@ fn CGDataProviderCopyData(env: &mut Environment, provider: CGDataProviderRef) ->
             let ns_data: id = msg_class![env; NSData alloc];
             msg![env; ns_data initWithBytesNoCopy:alloc length:len]
         }
+        CGDataProviderHostObject::CFData(cf_data) => {
+            let data = CFDataGetBytePtr(env, cf_data);
+            let size = CFDataGetLength(env, cf_data);
+            CFDataCreate(env, kCFAllocatorDefault, data.cast(), size)
+        }
     }
+}
+
+fn CGDataProviderCreateWithURL(env: &mut Environment, url: CFURLRef) -> CGDataProviderRef {
+    assert!(msg![env; url isFileURL]); // TODO
+    let path: id = msg![env; url path];
+    log_dbg!(
+        "CGDataProviderCreateWithURL url path {}",
+        to_rust_string(env, path)
+    );
+    let data: id = msg_class![env; NSData dataWithContentsOfFile:path];
+    CGDataProviderCreateWithCFData(env, data)
+}
+
+fn CGDataProviderCreateWithCFData(env: &mut Environment, data: CFDataRef) -> CGDataProviderRef {
+    CFRetain(env, data);
+    let class = env
+        .objc
+        .get_known_class("_touchHLE_CGDataProvider", &mut env.mem);
+    env.objc.alloc_object(
+        class,
+        Box::new(CGDataProviderHostObject::CFData(data)),
+        &mut env.mem,
+    )
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -168,4 +207,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGDataProviderRelease(_)),
     export_c_func!(CGDataProviderCreateWithData(_, _, _, _)),
     export_c_func!(CGDataProviderCopyData(_)),
+    export_c_func!(CGDataProviderCreateWithURL(_)),
+    export_c_func!(CGDataProviderCreateWithCFData(_)),
 ];

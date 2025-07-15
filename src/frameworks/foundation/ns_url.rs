@@ -104,6 +104,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (bool)isFileURL {
+    match env.objc.borrow(this) {
+        NSURLHostObject::FileURL { .. } => true,
+        NSURLHostObject::OtherURL { .. } => false,
+    }
+}
+
 - (id)description {
     match env.objc.borrow(this) {
         NSURLHostObject::FileURL { ns_string, working_directory } => {

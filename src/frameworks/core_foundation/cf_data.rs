@@ -32,12 +32,12 @@ pub fn CFDataCreate(
     msg![env; new initWithBytes:bytes length:length]
 }
 
-fn CFDataGetLength(env: &mut Environment, data: CFDataRef) -> CFIndex {
+pub fn CFDataGetLength(env: &mut Environment, data: CFDataRef) -> CFIndex {
     let len: NSUInteger = msg![env; data length];
     len.try_into().unwrap()
 }
 
-fn CFDataGetBytePtr(env: &mut Environment, data: CFDataRef) -> ConstPtr<u8> {
+pub fn CFDataGetBytePtr(env: &mut Environment, data: CFDataRef) -> ConstPtr<u8> {
     let ptr: ConstVoidPtr = msg![env; data bytes];
     ptr.cast()
 }
