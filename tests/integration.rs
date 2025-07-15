@@ -69,6 +69,8 @@ fn build_test_app(tests_dir: &Path, test_app_path: &Path) -> Result<(), Box<dyn 
         // references, falling back to dynamic linking instead. This is needed
         // because we have no system libraries/frameworks for it to link to.
         .arg("-Wl,-e,_main,-undefined,dynamic_lookup")
+        // Avoid warnings about "magnitude of floating-point constant too large"
+        .arg("-Wno-literal-range")
         // Input
         .arg(tests_dir.join("TestApp_source").join("main.c"))
         // Write the output to the bundle.
