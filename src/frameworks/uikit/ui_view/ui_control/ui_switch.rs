@@ -18,7 +18,7 @@ use crate::objc::{
     ClassExports, NSZonePtr,
 };
 
-// TODO: rendering: round corners, shadows, gradients. etc.
+// TODO: rendering: shadows, gradients. etc.
 // TODO: animation
 // TODO: drag-to-flip
 
@@ -26,6 +26,7 @@ use crate::objc::{
 // but just chosen to look nice ;)
 const BACK_INSET: f32 = 1.0;
 const THUMB_INSET: f32 = 1.0;
+const CORNER_RADIUS: f32 = 5.0;
 const THUMB_WIDTH: f32 = 42.0;
 // Those correspond to debugDescription output of UISwitch
 const TOTAL_WIDTH: f32 = 94.0;
@@ -267,6 +268,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     () = msg![env; thumb setFrame:thumb_rect];
     () = msg![env; label_on setFrame:label_on_rect];
     () = msg![env; label_off setFrame:label_off_rect];
+
+    let this_layer: id = msg![env; this layer];
+    () = msg![env; this_layer setCornerRadius:(CORNER_RADIUS as CGFloat)];
+    let back_layer: id = msg![env; back layer];
+    () = msg![env; back_layer setCornerRadius:((CORNER_RADIUS - BACK_INSET) as CGFloat)];
+    let thumb_layer: id = msg![env; thumb layer];
+    () = msg![env; thumb_layer setCornerRadius:((CORNER_RADIUS - BACK_INSET - THUMB_INSET) as CGFloat)];
 }
 
 - (())dealloc {

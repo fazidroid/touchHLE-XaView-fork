@@ -279,7 +279,10 @@ fn show_app_picker_gui(
         };
         let mut image = Image::from_bytes(bytes).unwrap();
         // should match Bundle::load_icon()
-        image.round_corners((10.0 / 57.0) * (image.dimensions().0 as f32));
+        image.round_corners(
+            (10.0 / 57.0) * (image.dimensions().0 as f32),
+            /* four_corners: */ true,
+        );
         image
     };
 
@@ -894,8 +897,10 @@ fn make_icon_from_glyph(
 
     let cg_image = CGBitmapContextCreateImage(env, context);
     // This radius should match the one in src/bundle.rs.
-    cg_image::borrow_image_mut(&mut env.objc, cg_image)
-        .round_corners((10.0 / 57.0) * ICON_SIZE.width);
+    cg_image::borrow_image_mut(&mut env.objc, cg_image).round_corners(
+        (10.0 / 57.0) * ICON_SIZE.width,
+        /* four_corners: */ true,
+    );
     CGContextRelease(env, context);
 
     let ui_image: id = msg_class![env; UIImage imageWithCGImage:cg_image];

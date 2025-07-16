@@ -17,7 +17,7 @@ use crate::frameworks::core_graphics::cg_context::{
 use crate::frameworks::core_graphics::cg_image::{
     kCGImageAlphaPremultipliedLast, kCGImageByteOrder32Big,
 };
-use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};
+use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::ns_string;
 use crate::mem::{GuestUSize, Ptr};
 use crate::objc::{id, msg, nil, objc_classes, release, retain, ClassExports, HostObject, ObjC};
@@ -37,6 +37,7 @@ pub(super) struct CALayerHostObject {
     pub(super) opaque: bool,
     pub(super) opacity: f32,
     pub(super) background_color: CGColorRef,
+    pub(super) corner_radius: CGFloat,
     pub(super) needs_display: bool,
     /// `CGImageRef*`
     pub(super) contents: id,
@@ -90,6 +91,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         opaque: false,
         opacity: 1.0,
         background_color: nil, // transparency
+        corner_radius: 0.0,
         needs_display: true,
         contents: nil,
         drawable_properties: nil,
@@ -268,6 +270,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     let old_color = std::mem::replace(&mut host_obj.background_color, new_color);
     CGColorRetain(env, new_color);
     CGColorRelease(env, old_color);
+}
+
+- (CGFloat)cornerRadius {
+    env.objc.borrow::<CALayerHostObject>(this).corner_radius
+}
+- (())setCornerRadius:(CGFloat)corner_radius {
+    env.objc.borrow_mut::<CALayerHostObject>(this).corner_radius = corner_radius;
 }
 
 - (bool)needsDisplay {

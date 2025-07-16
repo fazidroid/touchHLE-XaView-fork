@@ -154,7 +154,7 @@ impl Bundle {
         // UIPrerenderedIcon). If the icon is larger for some reason,
         // let's scale to match.
         let corner_radius = (10.0 / 57.0) * (image.dimensions().0 as f32);
-        image.round_corners(corner_radius);
+        image.round_corners(corner_radius, /* four_corners: */ true);
         Ok(image)
     }
 

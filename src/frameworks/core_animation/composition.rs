@@ -18,6 +18,7 @@ use crate::gles::gles11_raw as gles11; // constants only
 use crate::gles::gles11_raw::types::*;
 use crate::gles::present::{present_frame, FpsCounter};
 use crate::gles::GLES;
+use crate::image::Image;
 use crate::matrix::Matrix;
 use crate::mem::Mem;
 use crate::objc::{id, msg, msg_class, nil, ObjC};
@@ -29,6 +30,7 @@ pub(super) struct State {
     texture_framebuffer: Option<(GLuint, GLuint)>,
     recomposite_next: Option<Instant>,
     fps_counter: Option<FpsCounter>,
+    rounded_corner_texture: Option<GLuint>,
 }
 
 unsafe fn load_matrix(gles: &mut dyn GLES, matrix: Matrix<4>) {
@@ -199,18 +201,57 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
         texture
     };
 
+    // Create texture containing a single rounded corner, used to render all
+    // rounded-corner layer backgrounds.
+    let rounded_corner_texture = *env
+        .framework_state
+        .core_animation
+        .composition
+        .rounded_corner_texture
+        .get_or_insert_with(|| {
+            let dimension = 512usize; // way larger than any reasonable corner
+            let mut image = Image::from_pixel_vec(
+                vec![255u8; dimension * dimension * 4],
+                (dimension as _, dimension as _),
+            );
+            image.round_corners(dimension as _, /* four_corners: */ false);
+
+            let mut texture = 0;
+            unsafe {
+                gles.GenTextures(1, &mut texture);
+                gles.BindTexture(gles11::TEXTURE_2D, texture);
+                // GENERATE_MIPMAP must be set before the texture upload.
+                gles.TexParameteri(
+                    gles11::TEXTURE_2D,
+                    gles11::GENERATE_MIPMAP,
+                    gles11::TRUE as _,
+                );
+                upload_rgba8_pixels(gles, image.pixels(), (dimension as _, dimension as _));
+                gles.TexParameteri(
+                    gles11::TEXTURE_2D,
+                    gles11::TEXTURE_MIN_FILTER,
+                    gles11::LINEAR_MIPMAP_LINEAR as _,
+                );
+                gles.TexParameteri(
+                    gles11::TEXTURE_2D,
+                    gles11::TEXTURE_WRAP_S,
+                    gles11::CLAMP_TO_EDGE as _,
+                );
+                gles.TexParameteri(
+                    gles11::TEXTURE_2D,
+                    gles11::TEXTURE_WRAP_T,
+                    gles11::CLAMP_TO_EDGE as _,
+                );
+            }
+            texture
+        });
+
     // Clear the framebuffer and set up state to prepare for rendering
     unsafe {
         gles.Viewport(0, 0, fb_width as _, fb_height as _);
         gles.ClearColor(0.0, 0.0, 0.0, 1.0);
         gles.Clear(gles11::COLOR_BUFFER_BIT);
         gles.Color4f(1.0, 1.0, 1.0, 1.0);
-
-        // Everything drawn later will be this same unit-square quad.
-        gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
-        let vertices: [f32; 12] = [0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
-        gles.EnableClientState(gles11::VERTEX_ARRAY);
-        gles.VertexPointer(2, gles11::FLOAT, 0, vertices.as_ptr() as *const GLvoid);
 
         gles.MatrixMode(gles11::PROJECTION);
         // Scale down screen-space to normalized device co-ordinates, shift the
@@ -232,7 +273,15 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
 
     // Here's where the actual drawing happens
     unsafe {
-        composite_layer_recursive(gles, &mut env.objc, &env.mem, root_layer, origin, opacity);
+        composite_layer_recursive(
+            gles,
+            &mut env.objc,
+            &env.mem,
+            root_layer,
+            origin,
+            opacity,
+            rounded_corner_texture,
+        );
     }
 
     // Clean up some GL state
@@ -298,6 +347,7 @@ unsafe fn composite_layer_recursive(
     layer: id,
     origin: CGPoint,
     opacity: CGFloat,
+    rounded_corner_texture: GLuint,
 ) {
     // TODO: this can't handle zPosition, non-AABB layer transforms, rounded
     // corners, and many other things, but none of these are supported yet :)
@@ -344,12 +394,61 @@ unsafe fn composite_layer_recursive(
     let have_background = if host_obj.background_color == nil {
         false
     } else {
+        let mut vertices_rounded = [0.0f32; BASIC_SQUARE_POINTS.len() * 3 * 3];
+        let mut tex_coords_rounded = [0.0f32; BASIC_SQUARE_POINTS.len() * 3 * 3];
+
+        let radius = host_obj.corner_radius;
+        let vertices: &[f32] = if radius == 0.0 {
+            gles.Disable(gles11::TEXTURE_2D);
+
+            &BASIC_SQUARE_POINTS
+        } else {
+            make_9patch(
+                &mut vertices_rounded,
+                [
+                    0.0,
+                    (radius / host_obj.bounds.size.width).min(0.5),
+                    (1.0 - radius / host_obj.bounds.size.width).max(0.5),
+                    1.0,
+                ],
+                [
+                    0.0,
+                    (radius / host_obj.bounds.size.height).min(0.5),
+                    (1.0 - radius / host_obj.bounds.size.height).max(0.5),
+                    1.0,
+                ],
+            );
+            make_9patch(
+                &mut tex_coords_rounded,
+                [0.0, 1.0, 1.0, 0.0],
+                [0.0, 1.0, 1.0, 0.0],
+            );
+
+            gles.Enable(gles11::TEXTURE_2D);
+            gles.BindTexture(gles11::TEXTURE_2D, rounded_corner_texture);
+            gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
+            gles.TexCoordPointer(
+                2,
+                gles11::FLOAT,
+                0,
+                tex_coords_rounded.as_ptr() as *const GLvoid,
+            );
+
+            &vertices_rounded
+        };
+
+        gles.EnableClientState(gles11::VERTEX_ARRAY);
+        gles.VertexPointer(2, gles11::FLOAT, 0, vertices.as_ptr() as *const GLvoid);
+
         let (r, g, b, a) = cg_color::to_rgba(objc, host_obj.background_color);
         gles.Color4f(r * opacity, g * opacity, b * opacity, a * opacity);
         gles.Enable(gles11::BLEND);
         gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
-        gles.Disable(gles11::TEXTURE_2D);
-        gles.DrawArrays(gles11::TRIANGLES, 0, 6);
+        gles.DrawArrays(
+            gles11::TRIANGLES,
+            0,
+            (vertices.len() / FLOATS_PER_POINT) as _,
+        );
         true
     };
 
@@ -429,9 +528,13 @@ unsafe fn composite_layer_recursive(
             gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
         }
 
+        let vertices: &[f32] = &BASIC_SQUARE_POINTS;
+        gles.EnableClientState(gles11::VERTEX_ARRAY);
+        gles.VertexPointer(2, gles11::FLOAT, 0, vertices.as_ptr() as *const GLvoid);
+
         // Normal images will have top-to-bottom row order, but OpenGL ES
         // expects bottom-to-top, so flip the UVs in that case.
-        let tex_coords: [f32; 12] = if host_obj.contents != nil {
+        let tex_coords: [f32; BASIC_SQUARE_POINTS.len()] = if host_obj.contents != nil {
             [0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0]
         } else {
             [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]
@@ -439,7 +542,11 @@ unsafe fn composite_layer_recursive(
         gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
         gles.TexCoordPointer(2, gles11::FLOAT, 0, tex_coords.as_ptr() as *const GLvoid);
         gles.Enable(gles11::TEXTURE_2D);
-        gles.DrawArrays(gles11::TRIANGLES, 0, 6);
+        gles.DrawArrays(
+            gles11::TRIANGLES,
+            0,
+            (vertices.len() / FLOATS_PER_POINT) as _,
+        );
     }
 
     // avoid holding mutable borrow while recursing
@@ -453,9 +560,37 @@ unsafe fn composite_layer_recursive(
             child_layer,
             /* origin: */ next_origin,
             opacity,
+            rounded_corner_texture,
         )
     }
     objc.borrow_mut::<CALayerHostObject>(layer).sublayers = sublayers;
+}
+
+const FLOATS_PER_POINT: usize = 2;
+const BASIC_SQUARE_POINTS: [f32; 6 * FLOATS_PER_POINT] =
+    [0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
+
+fn make_9patch(
+    out_points: &mut [f32; BASIC_SQUARE_POINTS.len() * 3 * 3],
+    x_edges: [f32; 4],
+    y_edges: [f32; 4],
+) {
+    for (i, out_points_chunk) in out_points
+        .chunks_exact_mut(BASIC_SQUARE_POINTS.len())
+        .enumerate()
+    {
+        let (x, y) = (i % 3, i / 3);
+
+        for (dst_xy, src_xy) in out_points_chunk
+            .chunks_exact_mut(2)
+            .zip(BASIC_SQUARE_POINTS.chunks_exact(2))
+        {
+            let (x1, x2) = (x_edges[x], x_edges[x + 1]);
+            let (y1, y2) = (y_edges[y], y_edges[y + 1]);
+            dst_xy[0] = x1 + src_xy[0] * (x2 - x1);
+            dst_xy[1] = y1 + src_xy[1] * (y2 - y1);
+        }
+    }
 }
 
 unsafe fn upload_rgba8_pixels(gles: &mut dyn GLES, pixels: &[u8], dimensions: (u32, u32)) {

@@ -149,10 +149,13 @@ impl Image {
 
     // TODO: Eventually this should be in Core Animation instead?
     /// Modify the image to mask it with anti-aliased rounded corners.
-    pub fn round_corners(&mut self, radius: f32) {
+    pub fn round_corners(&mut self, radius: f32, four_corners: bool) {
         let (width, height) = self.dimensions();
-        let right_corners_begin = width as f32 - 1.0 - radius;
-        let bottom_corners_begin = height as f32 - 1.0 - radius;
+        let (right_corners_begin, bottom_corners_begin) = if four_corners {
+            (width as f32 - 1.0 - radius, height as f32 - 1.0 - radius)
+        } else {
+            (f32::INFINITY, f32::INFINITY)
+        };
         for y in 0..height {
             for x in 0..width {
                 let corner_x = (radius - x as f32).max(x as f32 - right_corners_begin);
