@@ -152,23 +152,29 @@ impl Image {
     /// corners, and add sheen if desired.
     pub fn round_corners(&mut self, radius: f32, four_corners: bool, add_sheen: bool) {
         let (width, height) = self.dimensions();
+        let (w_usize, h_usize) = (width as usize, height as usize);
+        let (w, h) = (width as f32, height as f32);
+
         let (right_corners_begin, bottom_corners_begin) = if four_corners {
-            (width as f32 - 1.0 - radius, height as f32 - 1.0 - radius)
+            (w - radius - 1.0, h - radius - 1.0)
         } else {
             (f32::INFINITY, f32::INFINITY)
         };
         let (sheen_center_x, sheen_center_y, sheen_radius) = if add_sheen {
-            (width as f32 / 2.0, -(height as f32 / 2.0), height as f32)
+            (w / 2.0, -(h / 2.0), h)
         } else {
             (f32::INFINITY, f32::INFINITY, 0.0)
         };
-        for y in 0..height {
-            for x in 0..width {
-                let corner_x = (radius - x as f32).max(x as f32 - right_corners_begin);
-                let corner_y = (radius - y as f32).max(y as f32 - bottom_corners_begin);
+        for y_usize in 0..h_usize {
+            for x_usize in 0..w_usize {
+                let x = x_usize as f32;
+                let y = y_usize as f32;
+
+                let corner_x = (radius - x).max(x - right_corners_begin);
+                let corner_y = (radius - y).max(y - bottom_corners_begin);
                 let corner_circle_distance = corner_x.hypot(corner_y);
-                let x_edge_distance = (x as f32).min(width as f32 - x as f32);
-                let y_edge_distance = (y as f32).min(height as f32 - y as f32);
+                let x_edge_distance = (x).min(w - x - 1.0);
+                let y_edge_distance = (y).min(h - y - 1.0);
                 let actual_corner_distance = x_edge_distance.hypot(y_edge_distance);
                 let rounded_edge_distance = x_edge_distance
                     .min(y_edge_distance)
@@ -182,21 +188,19 @@ impl Image {
                     1.0
                 };
                 let sheen_opacity = {
-                    let distance = (x as f32 - sheen_center_x).hypot(y as f32 - sheen_center_y);
+                    let distance = (x - sheen_center_x).hypot(y - sheen_center_y);
                     // Bad approximation of the pixel coverage of a filled arc.
                     let distance = (distance - sheen_radius).clamp(0.0, 1.0);
                     let area = distance * distance;
                     // The sheen is stronger at the top and close to edges.
                     let taper = (1.0
-                        - ((y as f32 / height as f32).sqrt() / 2.0)
-                        - (rounded_edge_distance / (height as f32).hypot(width as f32)).sqrt()
-                            / 2.0)
+                        - ((y / h).sqrt() / 2.0)
+                        - (rounded_edge_distance / (h).hypot(w)).sqrt() / 2.0)
                         * 0.75;
                     // There is also extra shinyness around the rim.
                     (1.0 - area) * taper
                 };
-                let rgba =
-                    &mut self.pixels_mut()[y as usize * width as usize * 4 + x as usize * 4..][..4];
+                let rgba = &mut self.pixels_mut()[y_usize * w_usize * 4 + x_usize * 4..][..4];
                 for channel in rgba.iter_mut() {
                     *channel = (*channel as f32 * icon_opacity * (1.0 - sheen_opacity)
                         + 255.0 * icon_opacity * sheen_opacity)
