@@ -774,10 +774,12 @@ fn make_icon_grid(
         let col = i % num_cols;
         let row = i / num_cols;
 
+        // Rounding is needed here to avoid a blurry or offset image.
         let icon_frame = CGRect {
             origin: CGPoint {
-                x: icon_grid_origin.x + (col as CGFloat) * (ICON_SIZE.width + icon_gap_x),
-                y: icon_grid_origin.y + (row as CGFloat) * (ICON_SIZE.height + icon_gap_y),
+                x: (icon_grid_origin.x + (col as CGFloat) * (ICON_SIZE.width + icon_gap_x)).round(),
+                y: (icon_grid_origin.y + (row as CGFloat) * (ICON_SIZE.height + icon_gap_y))
+                    .round(),
             },
             size: ICON_SIZE,
         };
@@ -791,10 +793,11 @@ fn make_icon_grid(
                             forControlEvents:UIControlEventTouchUpInside];
         () = msg![env; main_view addSubview:icon_button];
 
+        // Rounding is needed here to avoid blurry text.
         let label_frame = CGRect {
             origin: CGPoint {
-                x: icon_frame.origin.x - (label_size.width - ICON_SIZE.width) / 2.0,
-                y: icon_frame.origin.y + ICON_SIZE.height + 4.0,
+                x: (icon_frame.origin.x - (label_size.width - ICON_SIZE.width) / 2.0).round(),
+                y: (icon_frame.origin.y + ICON_SIZE.height + 4.0).round(),
             },
             size: label_size,
         };

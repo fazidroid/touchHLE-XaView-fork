@@ -76,6 +76,7 @@ Quality:
 - Fixed an issue on some Android phones where the accelerometer was not usable. (@Oscar1640)
 - Fixed multi-touch in some games. (@ciciplusplus)
 - App icons are now displayed with a glossy sheen where required. (@hikari-no-yume)
+- The app icons and labels in the app picker are now displayed at integer pixel offsets, making them sharper and more symmetrical. (@hikari-no-yume)
 
 Other:
 
