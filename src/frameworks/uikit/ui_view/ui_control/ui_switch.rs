@@ -207,6 +207,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     } = env.objc.borrow_mut(this);
 
     let bounds: CGRect = msg![env; this bounds];
+    let radius = CORNER_RADIUS;
 
     let back_rect: CGRect = CGRect {
         origin: CGPoint {
@@ -218,6 +219,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             height: bounds.size.height - 2.0 * BACK_INSET,
         }
     };
+    let back_radius = radius - BACK_INSET;
     // Below rects are all defined in reference to back_rect, not whole bounds,
     // in order to accommodate for the border
     let thumb_rect: CGRect = if is_on {
@@ -243,6 +245,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             }
         }
     };
+    let thumb_radius = back_radius - THUMB_INSET;
     let label_on_rect: CGRect = CGRect {
         origin: CGPoint {
             x: back_rect.origin.x,
@@ -253,6 +256,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             height: back_rect.size.height
         }
     };
+    let label_on_radius = back_radius;
     let label_off_rect: CGRect = CGRect {
         origin: CGPoint {
             x: back_rect.origin.x + THUMB_WIDTH,
@@ -263,18 +267,22 @@ pub const CLASSES: ClassExports = objc_classes! {
             height: back_rect.size.height
         }
     };
+    let label_off_radius = back_radius;
 
     () = msg![env; back setFrame:back_rect];
     () = msg![env; thumb setFrame:thumb_rect];
     () = msg![env; label_on setFrame:label_on_rect];
     () = msg![env; label_off setFrame:label_off_rect];
 
-    let this_layer: id = msg![env; this layer];
-    () = msg![env; this_layer setCornerRadius:(CORNER_RADIUS as CGFloat)];
-    let back_layer: id = msg![env; back layer];
-    () = msg![env; back_layer setCornerRadius:((CORNER_RADIUS - BACK_INSET) as CGFloat)];
-    let thumb_layer: id = msg![env; thumb layer];
-    () = msg![env; thumb_layer setCornerRadius:((CORNER_RADIUS - BACK_INSET - THUMB_INSET) as CGFloat)];
+    fn set_radius(env: &mut Environment, view: id, radius: CGFloat) {
+        let layer: id = msg![env; view layer];
+        () = msg![env; layer setCornerRadius:radius];
+    }
+    set_radius(env, this, radius);
+    set_radius(env, back, back_radius);
+    set_radius(env, label_on, label_on_radius);
+    set_radius(env, label_off, label_off_radius);
+    set_radius(env, thumb, thumb_radius);
 }
 
 - (())dealloc {
