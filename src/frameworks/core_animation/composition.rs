@@ -21,7 +21,7 @@ use crate::gles::present::{present_frame, FpsCounter};
 use crate::gles::GLES;
 use crate::image::Image;
 use crate::matrix::Matrix;
-use crate::mem::Mem;
+use crate::mem::{Mem, SafeWrite};
 use crate::objc::{id, msg, msg_class, nil, ObjC};
 use crate::Environment;
 use std::time::{Duration, Instant};
@@ -48,6 +48,8 @@ struct MiscGlObjects {
     /// 9-patch rounded corner vertex co-ords (varies with ratio of corner
     /// radius to overall rectangle size).
     rounded_tex_coord_buffer: GLuint,
+    /// Index buffer for 9-patch (first 6 elements can be used for square).
+    index_buffer: GLuint,
 }
 
 unsafe fn load_matrix(gles: &mut dyn GLES, matrix: Matrix<4>) {
@@ -260,26 +262,32 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                 );
             }
 
-            let [basic_square_buffer, flipped_square_buffer, rounded_vertex_buffer, rounded_tex_coord_buffer] = unsafe {
-                let mut array_buffers = [0; 4];
-                gles.GenBuffers(4, array_buffers.as_mut_ptr());
+            let [basic_square_buffer, flipped_square_buffer, rounded_vertex_buffer, rounded_tex_coord_buffer, index_buffer] = unsafe {
+                let mut array_buffers = [0; 5];
+                gles.GenBuffers(5, array_buffers.as_mut_ptr());
                 array_buffers
             };
             unsafe {
                 gles.BindBuffer(gles11::ARRAY_BUFFER, basic_square_buffer);
-                upload_points(gles, &BASIC_SQUARE_POINTS, gles11::STATIC_DRAW);
+                upload_slice(gles, gles11::ARRAY_BUFFER, &BASIC_SQUARE_POINTS, gles11::STATIC_DRAW);
                 gles.BindBuffer(gles11::ARRAY_BUFFER, flipped_square_buffer);
-                upload_points(gles, &FLIPPED_SQUARE_POINTS, gles11::STATIC_DRAW);
+                upload_slice(gles, gles11::ARRAY_BUFFER, &FLIPPED_SQUARE_POINTS, gles11::STATIC_DRAW);
                 gles.BindBuffer(gles11::ARRAY_BUFFER, rounded_vertex_buffer);
-                upload_points(gles, &[0.0; FLOATS_PER_9PATCH], gles11::DYNAMIC_DRAW);
+                upload_slice(gles, gles11::ARRAY_BUFFER, &[0f32; FLOATS_PER_9PATCH], gles11::DYNAMIC_DRAW);
                 gles.BindBuffer(gles11::ARRAY_BUFFER, rounded_tex_coord_buffer);
-                upload_points(
+                upload_slice(
                     gles,
-                    &make_9patch([0.0, 1.0, 1.0, 0.0], [0.0, 1.0, 1.0, 0.0]),
+                    gles11::ARRAY_BUFFER,
+                    &make_9patch_coords([0.0, 1.0, 1.0, 0.0], [0.0, 1.0, 1.0, 0.0]),
                     gles11::STATIC_DRAW,
                 );
                 // Prevent accidental subsequent use.
                 gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
+
+                gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, index_buffer);
+                upload_slice(gles, gles11::ELEMENT_ARRAY_BUFFER, &make_9patch_indices(), gles11::STATIC_DRAW);
+                // Prevent accidental subsequent use.
+                gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
             }
 
             MiscGlObjects {
@@ -288,6 +296,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                 flipped_square_buffer,
                 rounded_vertex_buffer,
                 rounded_tex_coord_buffer,
+                index_buffer,
             }
         });
 
@@ -314,6 +323,9 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
         );
         gles.MatrixMode(gles11::MODELVIEW);
         gles.LoadIdentity();
+
+        // One index buffer to rule them all
+        gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, misc_gl_objects.index_buffer);
     }
 
     // Here's where the actual drawing happens
@@ -339,6 +351,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
         gles.MatrixMode(gles11::MODELVIEW);
         gles.LoadIdentity();
         gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
+        gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
         assert_eq!(gles.GetError(), 0);
     }
 
@@ -454,10 +467,11 @@ unsafe fn composite_layer_recursive(
             gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
             gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
 
-            gles.DrawArrays(
+            gles.DrawElements(
                 gles11::TRIANGLES,
-                0,
-                (BASIC_SQUARE_POINTS.len() / FLOATS_PER_POINT) as _,
+                SQUARE_INDICES.len() as _,
+                gles11::UNSIGNED_BYTE,
+                0 as *const GLvoid,
             );
         } else {
             gles.Enable(gles11::TEXTURE_2D);
@@ -468,9 +482,10 @@ unsafe fn composite_layer_recursive(
 
             gles.EnableClientState(gles11::VERTEX_ARRAY);
             gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_vertex_buffer);
-            upload_points(
+            upload_slice(
                 gles,
-                &make_9patch(
+                gles11::ARRAY_BUFFER,
+                &make_9patch_coords(
                     [
                         0.0,
                         (radius / host_obj.bounds.size.width).min(0.5),
@@ -488,10 +503,11 @@ unsafe fn composite_layer_recursive(
             );
             gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
 
-            gles.DrawArrays(
+            gles.DrawElements(
                 gles11::TRIANGLES,
-                0,
-                (FLOATS_PER_9PATCH / FLOATS_PER_POINT) as _,
+                INDICES_PER_9PATCH as _,
+                gles11::UNSIGNED_BYTE,
+                0 as *const GLvoid,
             );
         };
 
@@ -574,7 +590,6 @@ unsafe fn composite_layer_recursive(
             gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
         }
 
-        let vertices: &[f32] = &BASIC_SQUARE_POINTS;
         gles.EnableClientState(gles11::VERTEX_ARRAY);
         gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
         gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
@@ -592,10 +607,11 @@ unsafe fn composite_layer_recursive(
         );
         gles.TexCoordPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
         gles.Enable(gles11::TEXTURE_2D);
-        gles.DrawArrays(
+        gles.DrawElements(
             gles11::TRIANGLES,
-            0,
-            (vertices.len() / FLOATS_PER_POINT) as _,
+            SQUARE_INDICES.len() as _,
+            gles11::UNSIGNED_BYTE,
+            0 as *const GLvoid,
         );
     }
 
@@ -617,13 +633,13 @@ unsafe fn composite_layer_recursive(
 }
 
 const FLOATS_PER_POINT: usize = 2;
-const BASIC_SQUARE_POINTS: [f32; 6 * FLOATS_PER_POINT] =
-    [0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
-const FLIPPED_SQUARE_POINTS: [f32; 6 * FLOATS_PER_POINT] =
-    [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
+const BASIC_SQUARE_POINTS: [f32; 4 * FLOATS_PER_POINT] = [0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0];
+const SQUARE_INDICES: [u8; 6] = [0, 1, 2, 2, 1, 3];
+const FLIPPED_SQUARE_POINTS: [f32; 4 * FLOATS_PER_POINT] = [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0];
 const FLOATS_PER_9PATCH: usize = BASIC_SQUARE_POINTS.len() * 3 * 3;
+const INDICES_PER_9PATCH: usize = SQUARE_INDICES.len() * 3 * 3;
 
-fn make_9patch(x_edges: [f32; 4], y_edges: [f32; 4]) -> [f32; FLOATS_PER_9PATCH] {
+fn make_9patch_coords(x_edges: [f32; 4], y_edges: [f32; 4]) -> [f32; FLOATS_PER_9PATCH] {
     let mut out_points = [0.0; FLOATS_PER_9PATCH];
     for (i, out_points_chunk) in out_points
         .chunks_exact_mut(BASIC_SQUARE_POINTS.len())
@@ -644,9 +660,30 @@ fn make_9patch(x_edges: [f32; 4], y_edges: [f32; 4]) -> [f32; FLOATS_PER_9PATCH]
     out_points
 }
 
-unsafe fn upload_points(gles: &mut dyn GLES, data: &[f32], usage: GLenum) {
+fn make_9patch_indices() -> [u8; INDICES_PER_9PATCH] {
+    let mut out_indices = [0; SQUARE_INDICES.len() * 3 * 3];
+    for (i, out_indices_chunk) in out_indices
+        .chunks_exact_mut(SQUARE_INDICES.len())
+        .enumerate()
+    {
+        for (out_index, in_index) in out_indices_chunk
+            .iter_mut()
+            .zip(SQUARE_INDICES.iter().copied())
+        {
+            *out_index = in_index + i as u8 * (BASIC_SQUARE_POINTS.len() / FLOATS_PER_POINT) as u8;
+        }
+    }
+    out_indices
+}
+
+unsafe fn upload_slice<T: SafeWrite>(
+    gles: &mut dyn GLES,
+    target: GLenum,
+    data: &[T],
+    usage: GLenum,
+) {
     gles.BufferData(
-        gles11::ARRAY_BUFFER,
+        target,
         std::mem::size_of_val(data) as _,
         data.as_ptr() as *const _,
         usage,
