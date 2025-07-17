@@ -142,19 +142,27 @@ impl Bundle {
         }
     }
 
-    /// Load icon and round off its corners for display.
+    /// Load icon and round off its corners (and add sheen if needed) for
+    /// display.
     pub fn load_icon(&self, fs: &Fs) -> Result<Image, String> {
         let bytes = fs
             .read(self.icon_path())
             .map_err(|_| "Could not read icon file".to_string())?;
         let mut image =
             Image::from_bytes(&bytes).map_err(|e| format!("Could not parse icon image: {e}"))?;
+        // UIPrerenderedIcon is used to avoid iOS applying a sheen effect,
+        // otherwise iOS adds one (default value is false).
+        let add_sheen = !self
+            .plist
+            .get("UIPrerenderedIcon")
+            .and_then(|v| v.as_boolean())
+            .unwrap_or_default();
         // iPhone OS icons are 57px by 57px and the OS always applies a
         // 10px radius rounded corner (see e.g. documentation of
         // UIPrerenderedIcon). If the icon is larger for some reason,
         // let's scale to match.
         let corner_radius = (10.0 / 57.0) * (image.dimensions().0 as f32);
-        image.round_corners(corner_radius, /* four_corners: */ true);
+        image.round_corners(corner_radius, /* four_corners: */ true, add_sheen);
         Ok(image)
     }
 

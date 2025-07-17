@@ -232,7 +232,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                 vec![255u8; dimension * dimension * 4],
                 (dimension as _, dimension as _),
             );
-            image.round_corners(dimension as _, /* four_corners: */ false);
+            image.round_corners(dimension as _, /* four_corners: */ false, /* add_sheen: */ false);
 
             let mut rounded_corner_texture = 0;
             unsafe {
