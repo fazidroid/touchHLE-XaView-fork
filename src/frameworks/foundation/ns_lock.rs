@@ -45,6 +45,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     if !env.mutex_state.mutex_is_locked(host_object.mutex_id) {
         echo!("*** -[NSLock unlock]: lock (<NSLock: {:?}> '{:?}') unlocked when not locked", this, host_object.name);
     }
+    env.unlock_mutex(host_object.mutex_id).unwrap();
 }
 
 - (())setName:(id)name { // NSString *
@@ -85,6 +86,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     if !env.mutex_state.mutex_is_locked(host_object.mutex_id) {
         echo!("*** -[NSRecursiveLock unlock]: lock (<NSRecursiveLock: {:?}> '{:?}') unlocked when not locked", this, host_object.name);
     }
+    env.unlock_mutex(host_object.mutex_id).unwrap();
 }
 
 - (())setName:(id)name { // NSString *
