@@ -140,10 +140,16 @@ pub fn CFBundleCopyPreferredLocalizationsFromArray(
         }
     }
 
-    // Add the first element as fallback
-    let first_loc: id = msg![env; loc_array objectAtIndex: (0 as NSUInteger)];
-    result.push(first_loc);
-    retain(env, first_loc);
+    if loc_count > 0 {
+        // Add the first element as fallback
+        let first_loc: id = msg![env; loc_array objectAtIndex:(0 as NSUInteger)];
+        result.push(first_loc);
+        retain(env, first_loc);
+    } else {
+        // Behaviour was verified on macOS
+        let en_loc = ns_string::get_static_str(env, "en");
+        result.push(en_loc);
+    };
 
     let result = ns_array::from_vec(env, result);
     log_dbg!(
