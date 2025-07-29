@@ -8,7 +8,7 @@
 use super::{close, off_t, open_direct, FileDescriptor};
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::fs::{FsError, GuestFile, GuestPath};
-use crate::libc::errno::{set_errno, EEXIST};
+use crate::libc::errno::{set_errno, EBADF, EEXIST};
 use crate::libc::time::timespec;
 use crate::mem::{ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
@@ -92,8 +92,10 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
 
 /// Helper for [stat()] and [fstat()] that fills the data in the stat struct
 fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
-    // TODO: error handling for unknown fd?
-    let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        set_errno(env, EBADF);
+        return -1;
+    };
 
     // FIXME: This implementation is highly incomplete. fstat() returns a huge
     // struct with many kinds of data in it. This code is assuming the caller
