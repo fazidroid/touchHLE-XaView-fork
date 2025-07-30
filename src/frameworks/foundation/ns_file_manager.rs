@@ -207,7 +207,6 @@ pub const CLASSES: ClassExports = objc_classes! {
                    attributes:(id)attributes // NSDictionary*
                         error:(MutPtr<id>)error { // NSError**
     assert_eq!(attributes, nil); // TODO
-    assert!(error.is_null());
 
     let path_str = ns_string::to_rust_string(env, path); // TODO: avoid copy
     let res = if with_intermediates {
@@ -221,6 +220,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             true
         }
         Err(err) => {
+            assert!(error.is_null()); // TODO
             log!(
                 "Warning: createDirectoryAtPath {} failed with {:?}, returning false",
                 path_str,
@@ -314,15 +314,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (bool)copyItemAtPath:(id)src // NSString*
                 toPath:(id)dst // NSString*
-                 error:(MutPtr<id>)_error { // NSError**
+                 error:(MutPtr<id>)error { // NSError**
     let src = ns_string::to_rust_string(env, src);
     let dst = ns_string::to_rust_string(env, dst);
     let data = match env.fs.read(GuestPath::new(src.as_ref())) {
         Ok(d) => d,
-        Err(_) => todo!()
+        Err(_) => {
+            assert!(error.is_null()); // TODO
+            return false;
+        }
     };
     if env.fs.write(GuestPath::new(dst.as_ref()), &data).is_err() {
-        todo!();
+        assert!(error.is_null()); // TODO
+        return false;
     }
     true
 }
