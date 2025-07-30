@@ -117,7 +117,7 @@ jobs:
     - name: Install AArch64 Android Rust toolchain
       run: rustup target add aarch64-linux-android
     - name: Install cargo-ndk
-      run: cargo install cargo-ndk
+      run: cargo install cargo-ndk@3.5.4
     # Gradle version compatibility is a nightmare and we refuse to use gradlew.
     - name: Try to get a cached copy of Gradle
       id: cache-gradle
