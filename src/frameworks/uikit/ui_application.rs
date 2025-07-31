@@ -146,14 +146,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)keyWindow {
-    // TODO: handle nil
-    let key_window = env
+    let Some(key_window) = env
         .framework_state
         .uikit
         .ui_view
         .ui_window
-        .key_window
-        .unwrap();
+        .key_window else {
+        return nil;
+    };
     assert!(env
         .framework_state
         .uikit
