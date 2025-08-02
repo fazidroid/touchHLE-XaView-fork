@@ -89,18 +89,18 @@ fn atexit(
     0 // success
 }
 
-fn skip_whitespace(env: &mut Environment, s: ConstPtr<u8>) -> ConstPtr<u8> {
-    let mut start = s;
+fn count_whitespace(env: &mut Environment, s: ConstPtr<u8>) -> GuestUSize {
+    let mut count: GuestUSize = 0;
     loop {
-        let c = env.mem.read(start);
+        let c = env.mem.read(s + count);
         // Rust's definition of whitespace excludes vertical tab, unlike C's
         if c.is_ascii_whitespace() || c == b'\x0b' {
-            start += 1;
+            count += 1;
         } else {
             break;
         }
     }
-    start
+    count
 }
 
 fn atoi(env: &mut Environment, s: ConstPtr<u8>) -> i32 {
@@ -288,8 +288,8 @@ pub fn strtoul(
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let start = skip_whitespace(env, str);
-    let whitespace_len = Ptr::to_bits(start) - Ptr::to_bits(str);
+    let whitespace_len = count_whitespace(env, str);
+    let start = str + whitespace_len;
 
     let s = env.mem.cstr_at_utf8(start).unwrap();
     log_dbg!("strtoul({:?} ({}), {:?}, {})", str, s, endptr, base);
@@ -453,8 +453,8 @@ pub fn atof_inner(
 ) -> Result<(f64, u32), <f64 as FromStr>::Err> {
     // atof() is similar to atoi().
     // FIXME: no C99 hexfloat, INF, NAN support
-    let start = skip_whitespace(env, s);
-    let whitespace_len = Ptr::to_bits(start) - Ptr::to_bits(s);
+    let whitespace_len = count_whitespace(env, s);
+    let start = s + whitespace_len;
     let mut len = 0;
     let maybe_sign = env.mem.read(start + len);
     if maybe_sign == b'+' || maybe_sign == b'-' || maybe_sign.is_ascii_digit() {
@@ -495,8 +495,8 @@ pub fn strtol_inner(
     // strtol() doesn't work with a null-terminated string, instead it stops
     // once it hits something that's not a digit, so we have to do some parsing
     // ourselves.
-    let start = skip_whitespace(env, str);
-    let whitespace_len = Ptr::to_bits(start) - Ptr::to_bits(str);
+    let whitespace_len = count_whitespace(env, str);
+    let start = str + whitespace_len;
     let mut len = 0;
     let maybe_sign = env.mem.read(start + len);
     let mut sign = None;
