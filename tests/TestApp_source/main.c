@@ -537,7 +537,7 @@ int test_sscanf() {
   short c, d;
   float f;
   double lf;
-  char str[4], str1[4];
+  char str[256], str1[4];
   int matched = sscanf("1.23", "%d.%d", &a, &b);
   if (!(matched == 2 && a == 1 && b == 23))
     return -1;
@@ -619,6 +619,16 @@ int test_sscanf() {
   matched = sscanf("A B", "%s %s", str, str1);
   if (!(matched == 2 && strcmp(str, "A") == 0 && strcmp(str1, "B") == 0))
     return -28;
+  matched = sscanf("numJoints 110\n", " numJoints %d", &a);
+  if (!(matched == 1 && a == 110))
+    return -29;
+  float f1, f2, f3, f4, f5, f6;
+  matched = sscanf(
+      "	\"origin\"	-1 ( 0 0 0 ) ( -0.7071067095 0 0 )		// ",
+      "%s %d ( %f %f %f ) ( %f %f %f )", str, &a, &f1, &f2, &f3, &f4, &f5, &f6);
+  if (!(matched == 8 && strcmp(str, "\"origin\"") == 0 && a == -1 && f1 == 0 &&
+        fabs(f4 + 0.7071067095) < 1e-10 && f6 == 0))
+    return -30;
   return 0;
 }
 

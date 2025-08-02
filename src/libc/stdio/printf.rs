@@ -723,7 +723,10 @@ fn sscanf_common(
             break;
         }
         if c != b'%' {
-            if isspace(env, format + format_char_idx - 1) && isspace(env, src_ptr.cast_const()) {
+            if isspace(env, format + format_char_idx - 1) {
+                // "any single whitespace character in the format string
+                // consumes all available consecutive whitespace characters
+                // from the input"
                 while isspace(env, src_ptr.cast_const()) {
                     src_ptr += 1;
                 }
