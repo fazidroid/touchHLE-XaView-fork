@@ -12,7 +12,7 @@ use crate::libc::clocale::{setlocale, LC_CTYPE};
 use crate::libc::errno::set_errno;
 use crate::libc::posix_io::{STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
 use crate::libc::stdio::{fwrite, getc, ungetc, EOF, FILE};
-use crate::libc::stdlib::{atof_inner, strtol_inner, strtoul};
+use crate::libc::stdlib::{atof_inner, strtol_inner, strtol_inner_generic, strtoul};
 use crate::libc::string::{strlen, strncpy};
 use crate::libc::wchar::wchar_t;
 use crate::mem::{ConstPtr, GuestUSize, Mem, MutPtr, MutVoidPtr, Ptr};
@@ -1119,46 +1119,63 @@ fn fscanf(
 
         match specifier {
             b'd' | b'i' => {
-                if specifier == b'i' {
-                    // TODO: hexs and octals
-                    let cc = getc(env, stream);
-                    assert_ne!(cc as u8, b'0');
-                    assert_eq!(cc, ungetc(env, cc, stream));
-                }
+                let base: u32 = if specifier == b'd' {
+                    10
+                } else {
+                    // automatic base detection in strtol
+                    0
+                };
 
                 match length_modifier {
                     Some(lm) => {
                         match lm {
                             "h" => {
                                 // signed short* or unsigned short*
-                                let mut val: i16 = 0;
-                                while let c @ b'0'..=b'9' = getc(env, stream).try_into().unwrap() {
-                                    val = val * 10 + (c - b'0') as i16;
+                                let res = strtol_inner_generic(
+                                    env,
+                                    |env, file, _idx| {
+                                        <i32 as TryInto<u8>>::try_into(getc(env, file)).unwrap()
+                                    },
+                                    |env, file, c| {
+                                        assert_eq!(c as i32, ungetc(env, c as i32, file));
+                                    },
+                                    stream,
+                                    base,
+                                );
+                                match res {
+                                    Ok((val, len)) => {
+                                        if max_width > 0 {
+                                            assert_eq!(max_width, len);
+                                        }
+                                        let c_int_ptr: ConstPtr<i16> = args.next(env);
+                                        env.mem
+                                            .write(c_int_ptr.cast_mut(), val.try_into().unwrap());
+                                    }
+                                    Err(_) => break,
                                 }
-                                let c_short_ptr: ConstPtr<i16> = args.next(env);
-                                env.mem.write(c_short_ptr.cast_mut(), val);
                             }
                             _ => unimplemented!(),
                         }
                     }
                     _ => {
-                        let mut val: i32 = 0;
-                        let mut sign = 1;
-                        {
-                            let c = getc(env, stream);
-                            if c == b'-' as i32 {
-                                sign = -1;
-                            } else {
-                                ungetc(env, c, stream);
+                        let res = strtol_inner_generic(
+                            env,
+                            |env, file, _idx| {
+                                <i32 as TryInto<u8>>::try_into(getc(env, file)).unwrap()
+                            },
+                            |env, file, c| {
+                                assert_eq!(c as i32, ungetc(env, c as i32, file));
+                            },
+                            stream,
+                            base,
+                        );
+                        match res {
+                            Ok((val, _)) => {
+                                let c_int_ptr: ConstPtr<i32> = args.next(env);
+                                env.mem.write(c_int_ptr.cast_mut(), val);
                             }
+                            Err(_) => break,
                         }
-                        while let c @ b'0'..=b'9' = getc(env, stream).try_into().unwrap() {
-                            val = val * 10 + (c - b'0') as i32;
-                        }
-                        val *= sign;
-                        log_dbg!("fscanf i32 '{}'", val);
-                        let c_int_ptr: ConstPtr<i32> = args.next(env);
-                        env.mem.write(c_int_ptr.cast_mut(), val);
                     }
                 }
             }

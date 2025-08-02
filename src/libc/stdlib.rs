@@ -90,13 +90,36 @@ fn atexit(
 }
 
 fn count_whitespace(env: &mut Environment, s: ConstPtr<u8>) -> GuestUSize {
+    count_whitespace_generic(
+        env,
+        |env, s, idx| env.mem.read(s + idx),
+        |_, _, _| (),
+        s.cast_mut(),
+    )
+}
+
+fn count_whitespace_generic<
+    T,
+    U,
+    F1: Fn(&mut Environment, MutPtr<U>, GuestUSize) -> T,
+    F2: Fn(&mut Environment, MutPtr<U>, u8), // TODO: make last param genric too?
+>(
+    env: &mut Environment,
+    getc_fn: F1,
+    ungetc_fn: F2,
+    subject: MutPtr<U>,
+) -> GuestUSize
+where
+    u8: From<T>,
+{
     let mut count: GuestUSize = 0;
     loop {
-        let c = env.mem.read(s + count);
+        let c: u8 = getc_fn(env, subject, count).into();
         // Rust's definition of whitespace excludes vertical tab, unlike C's
         if c.is_ascii_whitespace() || c == b'\x0b' {
             count += 1;
         } else {
+            ungetc_fn(env, subject, c);
             break;
         }
     }
@@ -486,59 +509,100 @@ pub fn atof_inner(
 
 /// Returns a tuple containing the parsed number in the given base and
 /// the length of the number in the string.
-/// Base is mutable because in case if base 0 we need to auto-detect it.
-pub fn strtol_inner(
+pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(i32, u32), ()> {
+    strtol_inner_generic(
+        env,
+        |env, s, idx| env.mem.read(s + idx),
+        |_, _, _| (),
+        str.cast_mut(),
+        base,
+    )
+}
+
+/// Base is mutable because in case of base 0 we need to auto-detect it.
+pub fn strtol_inner_generic<
+    T,
+    U,
+    F1: Fn(&mut Environment, MutPtr<U>, GuestUSize) -> T,
+    F2: Fn(&mut Environment, MutPtr<U>, u8), // TODO: make last param genric too?
+>(
     env: &mut Environment,
-    str: ConstPtr<u8>,
+    getc_fn: F1,
+    ungetc_fn: F2,
+    subject: MutPtr<U>,
     mut base: u32,
-) -> Result<(i32, u32), ()> {
+) -> Result<(i32, u32), ()>
+where
+    u8: From<T>,
+{
     // strtol() doesn't work with a null-terminated string, instead it stops
     // once it hits something that's not a digit, so we have to do some parsing
     // ourselves.
-    let whitespace_len = count_whitespace(env, str);
-    let start = str + whitespace_len;
+    let whitespace_len = count_whitespace_generic(env, &getc_fn, &ungetc_fn, subject);
     let mut len = 0;
-    let maybe_sign = env.mem.read(start + len);
+    let maybe_sign: u8 = getc_fn(env, subject, whitespace_len + len).into();
     let mut sign = None;
     let mut prefix_length = 0;
     if maybe_sign == b'+' || maybe_sign == b'-' {
         sign = Some(maybe_sign);
         prefix_length += 1;
         len += 1;
+    } else {
+        ungetc_fn(env, subject, maybe_sign);
     }
     // We need to do base detection before we can start counting
     // the number length, but after we maybe skipped the sign
+    // TODO: detect base and skip prefix in one pass
     if base == 0 {
-        base = if env.mem.read(start + len) == b'0' {
-            let next = env.mem.read(start + len + 1);
+        let curr: u8 = getc_fn(env, subject, whitespace_len + len).into();
+        base = if curr == b'0' {
+            let next: u8 = getc_fn(env, subject, whitespace_len + len + 1).into();
+            ungetc_fn(env, subject, next);
+            ungetc_fn(env, subject, curr);
             if next == b'x' || next == b'X' {
                 16
             } else {
                 8
             }
         } else {
+            ungetc_fn(env, subject, curr);
             10
         }
     }
     // Skipping prefix if needed
-    if (base == 8 || base == 16) && env.mem.read(start + len) == b'0' {
-        len += 1;
-        prefix_length += 1;
-        if base == 16 {
-            let next = env.mem.read(start + len);
-            if next == b'x' || next == b'X' {
-                len += 1;
-                prefix_length += 1;
+    if base == 8 || base == 16 {
+        let curr: u8 = getc_fn(env, subject, whitespace_len + len).into();
+        if curr == b'0' {
+            len += 1;
+            prefix_length += 1;
+            if base == 16 {
+                let next: u8 = getc_fn(env, subject, whitespace_len + len + 1).into();
+                if next == b'x' || next == b'X' {
+                    len += 1;
+                    prefix_length += 1;
+                } else {
+                    ungetc_fn(env, subject, next);
+                }
+            } else {
+                ungetc_fn(env, subject, curr);
             }
+        } else {
+            ungetc_fn(env, subject, curr);
         }
     }
-    while (env.mem.read(start + len) as char).is_digit(base) {
+    let mut curr: u8 = getc_fn(env, subject, whitespace_len + len).into();
+    let mut chars = Vec::new();
+    while (curr as char).is_digit(base) {
+        chars.push(curr);
         len += 1;
+        curr = getc_fn(env, subject, whitespace_len + len).into();
     }
+    ungetc_fn(env, subject, curr);
 
-    let s =
-        std::str::from_utf8(env.mem.bytes_at(start + prefix_length, len - prefix_length)).unwrap();
-    log_dbg!("strtol_inner({:?} ({}), {})", str, s, base);
+    assert_eq!(chars.len() as u32, len - prefix_length);
+    let s = std::str::from_utf8(&chars).unwrap();
+
+    log_dbg!("strtol_inner('{}', {})", s, base);
     assert!((2..=36).contains(&base));
     let magnitude_len = len - prefix_length;
     let res = if magnitude_len > 0 {
