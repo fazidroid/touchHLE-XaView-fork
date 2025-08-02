@@ -494,6 +494,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     if this == other {
         return true;
     }
+    if other == nil {
+        return false;
+    }
     // TODO: avoid copying
     to_rust_string(env, this) == to_rust_string(env, other)
 }
