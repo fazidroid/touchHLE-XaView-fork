@@ -39,6 +39,7 @@ typedef struct FILE FILE;
 FILE *fopen(const char *, const char *);
 int fclose(FILE *);
 int sscanf(const char *, const char *, ...);
+int fscanf(FILE *, const char *, ...);
 int printf(const char *, ...);
 int vsnprintf(char *, size_t, const char *, va_list);
 int swprintf(wchar_t *, size_t, const wchar_t *, ...);
@@ -1349,6 +1350,32 @@ int test_ungetc() {
   return 0;
 }
 
+int test_fscanf() {
+  char str[256];
+  int a;
+  FILE *file = fopen("test_fscanf", "r");
+  if (file == NULL) {
+    return -1;
+  }
+  int matched = fscanf(file, "%s", str);
+  if (!(matched == 1 && strcmp(str, "no_spaces_line") == 0)) {
+    return -2;
+  }
+  matched = fscanf(file, "%s %d", str, &a);
+  if (!(matched == 2 && strcmp(str, "one") == 0 && a == -100)) {
+    return -3;
+  }
+  matched = fscanf(file, "%s", str);
+  if (!(matched == 1 && strcmp(str, "string") == 0)) {
+    return -4;
+  }
+  matched = fscanf(file, "%s", str);
+  if (matched != -1) { // EOF
+    return -5;
+  }
+  return 0;
+}
+
 int test_CFStringFind() {
   CFStringRef a =
       CFStringCreateWithCString(NULL, "/a/b/c/b", kCFStringEncodingASCII);
@@ -2617,6 +2644,7 @@ struct {
     FUNC_DEF(test_swprintf),
     FUNC_DEF(test_realpath),
     FUNC_DEF(test_ungetc),
+    FUNC_DEF(test_fscanf),
     FUNC_DEF(test_CFStringFind),
     FUNC_DEF(test_strcspn),
     FUNC_DEF(test_mbstowcs),

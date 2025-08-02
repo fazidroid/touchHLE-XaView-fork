@@ -11,7 +11,7 @@ use crate::frameworks::foundation::{ns_string, unichar};
 use crate::libc::clocale::{setlocale, LC_CTYPE};
 use crate::libc::errno::set_errno;
 use crate::libc::posix_io::{STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
-use crate::libc::stdio::{fwrite, FILE};
+use crate::libc::stdio::{fwrite, getc, ungetc, EOF, FILE};
 use crate::libc::stdlib::{atof_inner, strtol_inner, strtoul};
 use crate::libc::string::{strlen, strncpy};
 use crate::libc::wchar::wchar_t;
@@ -1008,6 +1008,192 @@ fn vsscanf(env: &mut Environment, src: ConstPtr<u8>, format: ConstPtr<u8>, arg: 
     sscanf_common(env, src, format, arg)
 }
 
+// TODO: unify with sscanf_common
+fn fscanf(
+    env: &mut Environment,
+    stream: MutPtr<FILE>,
+    format: ConstPtr<u8>,
+    args: DotDotDot,
+) -> i32 {
+    // TODO: handle errno properly
+    set_errno(env, 0);
+
+    log_dbg!(
+        "fscanf({:?}, {:?} ({:?}), ...)",
+        stream,
+        format,
+        env.mem.cstr_at_utf8(format)
+    );
+
+    let cc = getc(env, stream);
+    if cc == EOF {
+        return EOF;
+    } else {
+        assert_eq!(cc, ungetc(env, cc, stream));
+    }
+
+    let mut args = args.start();
+
+    let mut format_char_idx = 0;
+
+    let mut matched_args = 0;
+
+    'outer: loop {
+        let c = env.mem.read(format + format_char_idx);
+        format_char_idx += 1;
+
+        if c == b'\0' {
+            break;
+        }
+        if c != b'%' {
+            let mut cc: u8 = getc(env, stream).try_into().unwrap(); // TODO: EOF
+            if isspace_inner(c) {
+                while isspace_inner(cc) {
+                    cc = getc(env, stream).try_into().unwrap(); // TODO: EOF
+                }
+                // backtrack one
+                assert_eq!(cc as i32, ungetc(env, cc as i32, stream));
+                continue;
+            }
+            if c != cc {
+                return matched_args;
+            }
+            continue;
+        }
+
+        let mut max_width: u32 = 0;
+        while let c @ b'0'..=b'9' = env.mem.read(format + format_char_idx) {
+            max_width = max_width * 10 + (c - b'0') as u32;
+            format_char_idx += 1;
+        }
+
+        let length_modifier = match env.mem.read(format + format_char_idx) {
+            b'h' => {
+                format_char_idx += 1;
+                if env.mem.read(format + format_char_idx) == b'h' {
+                    format_char_idx += 1;
+                    Some("hh")
+                } else {
+                    Some("h")
+                }
+            }
+            b'l' => {
+                format_char_idx += 1;
+                if env.mem.read(format + format_char_idx) == b'l' {
+                    format_char_idx += 1;
+                    Some("ll")
+                } else {
+                    Some("l")
+                }
+            }
+            // q seems to be an equivalent of 'll'
+            // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
+            b'q' => {
+                format_char_idx += 1;
+                Some("ll")
+            }
+
+            _ => None,
+        };
+
+        let specifier = env.mem.read(format + format_char_idx);
+        format_char_idx += 1;
+
+        if ![b'[', b'c', b'n'].contains(&specifier) {
+            // skip whitespaces
+            let x = getc(env, stream); // TODO: EOF
+            if x == EOF {
+                break 'outer;
+            }
+            let mut cc: u8 = x.try_into().unwrap();
+            while isspace_inner(cc) {
+                let x = getc(env, stream); // TODO: EOF
+                if x == EOF {
+                    break 'outer;
+                }
+                cc = x.try_into().unwrap();
+            }
+            // backtrack one
+            assert_eq!(cc as i32, ungetc(env, cc as i32, stream));
+        }
+
+        match specifier {
+            b'd' | b'i' => {
+                if specifier == b'i' {
+                    // TODO: hexs and octals
+                    let cc = getc(env, stream);
+                    assert_ne!(cc as u8, b'0');
+                    assert_eq!(cc, ungetc(env, cc, stream));
+                }
+
+                match length_modifier {
+                    Some(lm) => {
+                        match lm {
+                            "h" => {
+                                // signed short* or unsigned short*
+                                let mut val: i16 = 0;
+                                while let c @ b'0'..=b'9' = getc(env, stream).try_into().unwrap() {
+                                    val = val * 10 + (c - b'0') as i16;
+                                }
+                                let c_short_ptr: ConstPtr<i16> = args.next(env);
+                                env.mem.write(c_short_ptr.cast_mut(), val);
+                            }
+                            _ => unimplemented!(),
+                        }
+                    }
+                    _ => {
+                        let mut val: i32 = 0;
+                        let mut sign = 1;
+                        {
+                            let c = getc(env, stream);
+                            if c == b'-' as i32 {
+                                sign = -1;
+                            } else {
+                                ungetc(env, c, stream);
+                            }
+                        }
+                        while let c @ b'0'..=b'9' = getc(env, stream).try_into().unwrap() {
+                            val = val * 10 + (c - b'0') as i32;
+                        }
+                        val *= sign;
+                        log_dbg!("fscanf i32 '{}'", val);
+                        let c_int_ptr: ConstPtr<i32> = args.next(env);
+                        env.mem.write(c_int_ptr.cast_mut(), val);
+                    }
+                }
+            }
+            b's' => {
+                assert_eq!(max_width, 0);
+                assert!(length_modifier.is_none());
+                let orig_dst_ptr: MutPtr<u8> = args.next(env);
+                let mut dst_ptr: MutPtr<u8> = orig_dst_ptr;
+                loop {
+                    let x = getc(env, stream); // TODO: EOF
+                    if x == EOF {
+                        break;
+                    }
+                    let cc: u8 = x.try_into().unwrap();
+                    if !isspace_inner(cc) {
+                        env.mem.write(dst_ptr, cc);
+                        dst_ptr += 1;
+                    } else {
+                        assert_eq!(cc as i32, ungetc(env, cc as i32, stream));
+                        break;
+                    }
+                }
+                env.mem.write(dst_ptr, b'\0');
+                log_dbg!("fscanf read %s '{:?}'", env.mem.cstr_at_utf8(orig_dst_ptr));
+            }
+            // TODO: more specifiers
+            _ => unimplemented!("Format character '{}'", specifier as char),
+        }
+
+        matched_args += 1;
+    }
+
+    matched_args
+}
+
 fn fprintf(
     env: &mut Environment,
     stream: MutPtr<FILE>,
@@ -1059,6 +1245,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sscanf(_, _, _)),
     export_c_func!(swscanf(_, _, _)),
     export_c_func!(vsscanf(_, _, _)),
+    export_c_func!(fscanf(_, _, _)),
     export_c_func!(snprintf(_, _, _, _)),
     export_c_func!(vprintf(_, _)),
     export_c_func!(vsnprintf(_, _, _, _)),
@@ -1076,6 +1263,9 @@ pub const FUNCTIONS: FunctionExports = &[
 // TODO: write proper libc's isspace()
 pub fn isspace(env: &mut Environment, src: ConstPtr<u8>) -> bool {
     let c = env.mem.read(src);
+    isspace_inner(c)
+}
+fn isspace_inner(c: u8) -> bool {
     // Rust's definition of whitespace excludes vertical tab, unlike C's
     c.is_ascii_whitespace() || c == b'\x0b'
 }
