@@ -712,7 +712,7 @@ fn sscanf_common(
     format: ConstPtr<u8>,
     mut args: VaList,
 ) -> i32 {
-    let mut src_ptr = src.cast_mut();
+    let mut src_char_idx = 0;
     let mut format_char_idx = 0;
 
     let mut matched_args = 0;
@@ -729,16 +729,16 @@ fn sscanf_common(
                 // "any single whitespace character in the format string
                 // consumes all available consecutive whitespace characters
                 // from the input"
-                while isspace(env, src_ptr.cast_const()) {
-                    src_ptr += 1;
+                while isspace(env, src + src_char_idx) {
+                    src_char_idx += 1;
                 }
                 continue;
             }
-            let cc = env.mem.read(src_ptr);
+            let cc = env.mem.read(src + src_char_idx);
             if c != cc {
                 return matched_args;
             }
-            src_ptr += 1;
+            src_char_idx += 1;
             continue;
         }
 
@@ -782,8 +782,8 @@ fn sscanf_common(
 
         if ![b'[', b'c', b'n'].contains(&specifier) {
             // skip whitespaces
-            while isspace(env, src_ptr.cast_const()) {
-                src_ptr += 1;
+            while isspace(env, src + src_char_idx) {
+                src_char_idx += 1;
             }
         }
 
@@ -801,12 +801,12 @@ fn sscanf_common(
                         match lm {
                             "h" => {
                                 // signed short* or unsigned short*
-                                match strtol_inner(env, src_ptr.cast_const(), base) {
+                                match strtol_inner(env, src + src_char_idx, base) {
                                     Ok((val, len)) => {
                                         if max_width > 0 {
                                             assert_eq!(max_width, len);
                                         }
-                                        src_ptr += len;
+                                        src_char_idx += len;
                                         let c_int_ptr: ConstPtr<i16> = args.next(env);
                                         env.mem
                                             .write(c_int_ptr.cast_mut(), val.try_into().unwrap());
@@ -817,9 +817,9 @@ fn sscanf_common(
                             _ => unimplemented!(),
                         }
                     }
-                    _ => match strtol_inner(env, src_ptr.cast_const(), base) {
+                    _ => match strtol_inner(env, src + src_char_idx, base) {
                         Ok((val, len)) => {
-                            src_ptr += len;
+                            src_char_idx += len;
                             let c_int_ptr: ConstPtr<i32> = args.next(env);
                             env.mem.write(c_int_ptr.cast_mut(), val);
                         }
@@ -829,9 +829,9 @@ fn sscanf_common(
             }
             b'f' => {
                 assert_eq!(max_width, 0);
-                let val = match atof_inner(env, src_ptr.cast_const()) {
+                let val = match atof_inner(env, src + src_char_idx) {
                     Ok((val, len)) => {
-                        src_ptr += len;
+                        src_char_idx += len;
                         val
                     }
                     Err(_) => break,
@@ -853,19 +853,19 @@ fn sscanf_common(
             b'x' | b'X' => {
                 assert!(length_modifier.is_none());
                 // TODO: avoid scanning string upfront
-                let c_len: GuestUSize = strlen(env, src_ptr.cast_const());
+                let c_len: GuestUSize = strlen(env, src + src_char_idx);
                 let (val, len) = if max_width != 0 && max_width < c_len {
                     assert!(max_width > 0);
                     // TODO: avoid tmp string allocation
                     let tmp: MutPtr<u8> = env.mem.alloc(max_width + 1).cast();
-                    _ = strncpy(env, tmp, src_ptr.cast_const(), max_width);
+                    _ = strncpy(env, tmp, src + src_char_idx, max_width);
                     let val: u32 = strtoul(env, tmp.cast_const(), Ptr::null(), 16);
                     env.mem.free(tmp.cast());
                     (val, max_width)
                 } else {
-                    (strtoul(env, src_ptr.cast_const(), Ptr::null(), 16), c_len)
+                    (strtoul(env, src + src_char_idx, Ptr::null(), 16), c_len)
                 };
-                src_ptr += len;
+                src_char_idx += len;
                 let c_u32_ptr: ConstPtr<u32> = args.next(env);
                 env.mem.write(c_u32_ptr.cast_mut(), val);
             }
@@ -903,17 +903,17 @@ fn sscanf_common(
                 let mut dst_ptr: MutPtr<u8> = args.next(env);
                 let mut matched = false;
                 // Consume `src` while chars are not in the set
-                let mut cc = env.mem.read(src_ptr);
-                src_ptr += 1;
+                let mut cc = env.mem.read(src + src_char_idx);
+                src_char_idx += 1;
                 while set.contains(&cc) ^ inverted && cc != b'\0' {
                     matched = true;
                     env.mem.write(dst_ptr, cc);
                     dst_ptr += 1;
-                    cc = env.mem.read(src_ptr);
-                    src_ptr += 1;
+                    cc = env.mem.read(src + src_char_idx);
+                    src_char_idx += 1;
                 }
                 // we need to backtrack one position
-                src_ptr -= 1;
+                src_char_idx -= 1;
                 if matched {
                     env.mem.write(dst_ptr, b'\0');
                 } else {
@@ -925,13 +925,13 @@ fn sscanf_common(
                 assert!(length_modifier.is_none());
                 let mut dst_ptr: MutPtr<u8> = args.next(env);
                 loop {
-                    if !isspace(env, src_ptr.cast_const()) {
-                        let next = env.mem.read(src_ptr);
+                    if !isspace(env, src + src_char_idx) {
+                        let next = env.mem.read(src + src_char_idx);
                         if next == b'\0' {
                             break;
                         }
                         env.mem.write(dst_ptr, next);
-                        src_ptr += 1;
+                        src_char_idx += 1;
                         dst_ptr += 1;
                     } else {
                         break;
