@@ -95,6 +95,7 @@ fn count_whitespace(env: &mut Environment, s: ConstPtr<u8>) -> GuestUSize {
         |env, s, idx| Ok(env.mem.read(s + idx)),
         |_, _, _| (),
         s.cast_mut(),
+        0,
     )
     .unwrap()
 }
@@ -109,14 +110,15 @@ fn count_whitespace_generic<
     getc_fn: F1,
     ungetc_fn: F2,
     subject: MutPtr<U>,
+    offset: GuestUSize,
 ) -> Result<GuestUSize, GuestUSize>
 where
     u8: From<T>,
 {
-    let mut count: GuestUSize = 0;
+    let mut count: GuestUSize = offset;
     loop {
         let Ok(c) = getc_fn(env, subject, count) else {
-            return Err(count);
+            return Err(count - offset);
         };
         let c: u8 = c.into();
         // Rust's definition of whitespace excludes vertical tab, unlike C's
@@ -127,7 +129,7 @@ where
             break;
         }
     }
-    Ok(count)
+    Ok(count - offset)
 }
 
 fn atoi(env: &mut Environment, s: ConstPtr<u8>) -> i32 {
@@ -483,6 +485,7 @@ pub fn atof_inner(
         |env, s, idx| Ok(env.mem.read(s + idx)),
         |_, _, _| (),
         s.cast_mut(),
+        0,
     )
 }
 
@@ -496,6 +499,7 @@ pub fn atof_inner_generic<
     getc_fn: F1,
     ungetc_fn: F2,
     subject: MutPtr<U>,
+    offset: GuestUSize,
 ) -> Result<(f64, u32), <f64 as FromStr>::Err>
 where
     u8: From<T>,
@@ -511,7 +515,7 @@ where
     let _ = || -> Result<(), ()> {
         // atof() is similar to atoi().
         // FIXME: no C99 hexfloat, INF, NAN support
-        match count_whitespace_generic(env, &getc_fn, &ungetc_fn, subject) {
+        match count_whitespace_generic(env, &getc_fn, &ungetc_fn, subject, offset) {
             Ok(count) => {
                 whitespace_len = count;
             }
@@ -521,7 +525,7 @@ where
             }
         }
 
-        let maybe_sign: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+        let maybe_sign: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
         if maybe_sign == b'+' || maybe_sign == b'-' || maybe_sign.is_ascii_digit() {
             chars.push(maybe_sign);
             len += 1;
@@ -529,22 +533,22 @@ where
             ungetc_fn(env, subject, maybe_sign);
         }
 
-        let mut curr: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+        let mut curr: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
         while (curr as char).is_ascii_digit() {
             chars.push(curr);
             len += 1;
-            curr = getc_fn(env, subject, whitespace_len + len)?.into();
+            curr = getc_fn(env, subject, offset + whitespace_len + len)?.into();
         }
 
         // TODO: assert C locale
         if curr == b'.' {
             chars.push(curr);
             len += 1;
-            curr = getc_fn(env, subject, whitespace_len + len)?.into();
+            curr = getc_fn(env, subject, offset + whitespace_len + len)?.into();
             while (curr as char).is_ascii_digit() {
                 chars.push(curr);
                 len += 1;
-                curr = getc_fn(env, subject, whitespace_len + len)?.into();
+                curr = getc_fn(env, subject, offset + whitespace_len + len)?.into();
             }
         }
 
@@ -552,7 +556,7 @@ where
             chars.push(curr);
             len += 1;
 
-            let maybe_sign: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+            let maybe_sign: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
             if maybe_sign == b'+' || maybe_sign == b'-' || maybe_sign.is_ascii_digit() {
                 chars.push(maybe_sign);
                 len += 1;
@@ -560,11 +564,11 @@ where
                 ungetc_fn(env, subject, maybe_sign);
             }
 
-            curr = getc_fn(env, subject, whitespace_len + len)?.into();
+            curr = getc_fn(env, subject, offset + whitespace_len + len)?.into();
             while (curr as char).is_ascii_digit() {
                 chars.push(curr);
                 len += 1;
-                curr = getc_fn(env, subject, whitespace_len + len)?.into();
+                curr = getc_fn(env, subject, offset + whitespace_len + len)?.into();
             }
         }
         ungetc_fn(env, subject, curr);
@@ -586,6 +590,7 @@ pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Resu
         |env, s, idx| Ok(env.mem.read(s + idx)),
         |_, _, _| (),
         str.cast_mut(),
+        0,
         base,
         u32::MAX,
     )
@@ -602,6 +607,7 @@ pub fn strtol_inner_generic<
     getc_fn: F1,
     ungetc_fn: F2,
     subject: MutPtr<U>,
+    offset: GuestUSize,
     mut base: u32,
     max_length: GuestUSize,
 ) -> Result<(i32, u32), ()>
@@ -622,7 +628,7 @@ where
         // strtol() doesn't work with a null-terminated string,
         // instead it stops once it hits something that's not a digit,
         // so we have to do some parsing ourselves.
-        match count_whitespace_generic(env, &getc_fn, &ungetc_fn, subject) {
+        match count_whitespace_generic(env, &getc_fn, &ungetc_fn, subject, offset) {
             Ok(count) => {
                 whitespace_len = count;
             }
@@ -632,7 +638,7 @@ where
             }
         }
 
-        let maybe_sign: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+        let maybe_sign: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
         if maybe_sign == b'+' || maybe_sign == b'-' {
             sign = Some(maybe_sign);
             prefix_length += 1;
@@ -647,9 +653,9 @@ where
         // the number length, but after we maybe skipped the sign
         // TODO: detect base and skip prefix in one pass
         if base == 0 {
-            let curr: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+            let curr: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
             base = if curr == b'0' {
-                let next: u8 = getc_fn(env, subject, whitespace_len + len + 1)?.into();
+                let next: u8 = getc_fn(env, subject, offset + whitespace_len + len + 1)?.into();
                 ungetc_fn(env, subject, next);
                 ungetc_fn(env, subject, curr);
                 if next == b'x' || next == b'X' {
@@ -664,7 +670,7 @@ where
         }
         // Skipping prefix if needed
         if base == 8 || base == 16 {
-            let curr: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+            let curr: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
             if curr == b'0' {
                 len += 1;
                 if len == max_length {
@@ -672,7 +678,7 @@ where
                 }
                 prefix_length += 1;
                 if base == 16 {
-                    let next: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+                    let next: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
                     if next == b'x' || next == b'X' {
                         len += 1;
                         if len == max_length {
@@ -689,14 +695,14 @@ where
                 ungetc_fn(env, subject, curr);
             }
         }
-        let mut curr: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
+        let mut curr: u8 = getc_fn(env, subject, offset + whitespace_len + len)?.into();
         while (curr as char).is_digit(base) {
             chars.push(curr);
             len += 1;
             if len == max_length {
                 return Ok(());
             }
-            curr = getc_fn(env, subject, whitespace_len + len)?.into();
+            curr = getc_fn(env, subject, offset + whitespace_len + len)?.into();
         }
         ungetc_fn(env, subject, curr);
         assert_eq!(chars.len() as u32, len - prefix_length);
