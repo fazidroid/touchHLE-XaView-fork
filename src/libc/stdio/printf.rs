@@ -12,7 +12,9 @@ use crate::libc::clocale::{setlocale, LC_CTYPE};
 use crate::libc::errno::set_errno;
 use crate::libc::posix_io::{STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
 use crate::libc::stdio::{fwrite, getc, ungetc, EOF, FILE};
-use crate::libc::stdlib::{atof_inner, strtol_inner, strtol_inner_generic, strtoul};
+use crate::libc::stdlib::{
+    atof_inner, atof_inner_generic, strtol_inner, strtol_inner_generic, strtoul,
+};
 use crate::libc::string::{strlen, strncpy};
 use crate::libc::wchar::wchar_t;
 use crate::mem::{ConstPtr, GuestUSize, Mem, MutPtr, MutVoidPtr, Ptr};
@@ -903,7 +905,7 @@ fn sscanf_common(
                 // Consume `src` while chars are not in the set
                 let mut cc = env.mem.read(src_ptr);
                 src_ptr += 1;
-                while set.contains(&cc) ^ inverted && env.mem.read(src_ptr - 1) != b'\0' {
+                while set.contains(&cc) ^ inverted && cc != b'\0' {
                     matched = true;
                     env.mem.write(dst_ptr, cc);
                     dst_ptr += 1;
@@ -1134,7 +1136,12 @@ fn fscanf(
                                 let res = strtol_inner_generic(
                                     env,
                                     |env, file, _idx| {
-                                        <i32 as TryInto<u8>>::try_into(getc(env, file)).unwrap()
+                                        let c = getc(env, file);
+                                        if c == EOF {
+                                            Err::<u8, ()>(())
+                                        } else {
+                                            Ok(<i32 as TryInto<u8>>::try_into(c).unwrap())
+                                        }
                                     },
                                     |env, file, c| {
                                         assert_eq!(c as i32, ungetc(env, c as i32, file));
@@ -1161,7 +1168,12 @@ fn fscanf(
                         let res = strtol_inner_generic(
                             env,
                             |env, file, _idx| {
-                                <i32 as TryInto<u8>>::try_into(getc(env, file)).unwrap()
+                                let c = getc(env, file);
+                                if c == EOF {
+                                    Err::<u8, ()>(())
+                                } else {
+                                    Ok(<i32 as TryInto<u8>>::try_into(c).unwrap())
+                                }
                             },
                             |env, file, c| {
                                 assert_eq!(c as i32, ungetc(env, c as i32, file));
@@ -1176,6 +1188,41 @@ fn fscanf(
                             }
                             Err(_) => break,
                         }
+                    }
+                }
+            }
+            b'f' => {
+                assert_eq!(max_width, 0);
+                let res = atof_inner_generic(
+                    env,
+                    |env, file, _idx| {
+                        let c = getc(env, file);
+                        if c == EOF {
+                            Err::<u8, ()>(())
+                        } else {
+                            Ok(<i32 as TryInto<u8>>::try_into(c).unwrap())
+                        }
+                    },
+                    |env, file, c| {
+                        assert_eq!(c as i32, ungetc(env, c as i32, file));
+                    },
+                    stream,
+                );
+                let val = match res {
+                    Ok((val, _)) => val,
+                    Err(_) => break,
+                };
+                match length_modifier {
+                    None => {
+                        let c_int_ptr: ConstPtr<f32> = args.next(env);
+                        env.mem.write(c_int_ptr.cast_mut(), val as f32);
+                    }
+                    Some("l") => {
+                        let c_int_ptr: ConstPtr<f64> = args.next(env);
+                        env.mem.write(c_int_ptr.cast_mut(), val);
+                    }
+                    Some(modifier) => {
+                        unimplemented!("Length formater '{}' for f", modifier)
                     }
                 }
             }

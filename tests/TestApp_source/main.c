@@ -1206,6 +1206,12 @@ int test_setlocale() {
     return 3;
   }
 
+  // Set C locale back for numeric
+  locale = setlocale(LC_NUMERIC, "C");
+  if (strcmp(locale, "C") != 0) {
+    return 4;
+  }
+
   return 0;
 }
 
@@ -1353,6 +1359,7 @@ int test_ungetc() {
 int test_fscanf() {
   char str[256];
   int a;
+  float f;
   FILE *file = fopen("test_fscanf", "r");
   if (file == NULL) {
     return -1;
@@ -1369,10 +1376,15 @@ int test_fscanf() {
   if (!(matched == 1 && strcmp(str, "string") == 0)) {
     return -4;
   }
-  matched = fscanf(file, "%s", str);
-  if (matched != -1) { // EOF
+  matched = fscanf(file, "%f", &f);
+  if (!(matched == 1 && fabs(f - 3.14) < 0.001)) {
     return -5;
   }
+  matched = fscanf(file, "%s", str);
+  if (matched != -1) { // EOF
+    return -6;
+  }
+  fclose(file);
   return 0;
 }
 
