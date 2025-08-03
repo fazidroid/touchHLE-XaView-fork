@@ -40,6 +40,7 @@ FILE *fopen(const char *, const char *);
 int fclose(FILE *);
 int sscanf(const char *, const char *, ...);
 int fscanf(FILE *, const char *, ...);
+int fgetc(FILE *);
 int printf(const char *, ...);
 int vsnprintf(char *, size_t, const char *, va_list);
 int swprintf(wchar_t *, size_t, const wchar_t *, ...);
@@ -1388,6 +1389,178 @@ int test_fscanf() {
   return 0;
 }
 
+// Below tests are on par with test_sscanf(),
+// but reading data from a file instead.
+// Please update those as well if you add new
+// test cases to test_sscanf()
+int test_fscanf_new() {
+  FILE *file = fopen("test_fscanf_new", "r");
+  if (!file)
+    return -1;
+
+#define SKIP_LINE(f)                                                           \
+  do {                                                                         \
+    int ch;                                                                    \
+    while ((ch = fgetc(f)) != '\n' && ch != -1)                                \
+      ;                                                                        \
+  } while (0)
+
+  int a, b, matched;
+  short c, d;
+  float f, f1, f2, f3, f4, f5, f6;
+  double lf;
+  char str[256], str1[4];
+
+  matched = fscanf(file, "%d.%d", &a, &b);
+  if (!(matched == 2 && a == 1 && b == 23))
+    return -2;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "abc%d.%d", &a, &b);
+  if (!(matched == 2 && a == 111 && b == 42))
+    return -3;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%d.%d", &a, &b);
+  if (matched != 0)
+    return -4;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%[^,],%d", str, &b);
+  if (!(matched == 2 && strcmp(str, "abc") == 0 && b == 8))
+    return -5;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%hi,%i", &c, &a);
+  if (!(matched == 2 && c == 9 && a == 10))
+    return -6;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%d", &a);
+  if (matched != 0)
+    return -7;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%d %d", &a, &b);
+  if (!(matched == 2 && a == 10 && b == -10))
+    return -8;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%hd %hd", &c, &d);
+  if (!(matched == 2 && c == 10 && d == -10))
+    return -9;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%d %d", &a, &b);
+  if (!(matched == 1 && a == 3000))
+    return -10;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%08x", &a);
+  if (!(matched == 1 && a == 16711680))
+    return -11;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%s %f", str, &f);
+  if (!(matched == 2 && strcmp(str, "ABC") == 0 && f == 1.0f))
+    return -12;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%s\t%f", str, &f);
+  if (!(matched == 2 && strcmp(str, "ABC") == 0 && f == 1.0f))
+    return -13;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%s %f", str, &f);
+  if (!(matched == 2 && strcmp(str, "MAX") == 0 && f == 48.0f))
+    return -14;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%i", &a);
+  if (!(matched == 1 && a == 9))
+    return -15;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%i", &a);
+  if (!(matched == 1 && a == 0))
+    return -16;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%2x%2x", &a, &b);
+  if (!(matched == 2 && a == 0xFF && b == 0x00))
+    return -17;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%10x", &a);
+  if (!(matched == 1 && a == 0xAA))
+    return -18;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%lf", &lf);
+  if (!(matched == 1 && lf == 3.14159265359))
+    return -19;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%[a-z]", str);
+  if (!(matched == 1 && strcmp(str, "hello") == 0))
+    return -20;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%[^0-9]", str);
+  if (!(matched == 1 && strcmp(str, "abc") == 0))
+    return -21;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%[-0-9]", str);
+  if (!(matched == 1 && strcmp(str, "-123") == 0))
+    return -22;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%[a-z-]", str);
+  if (!(matched == 1 && strcmp(str, "a-b") == 0))
+    return -23;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%[^0-9]", str);
+  if (matched != 0)
+    return -24;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%[A-Za-z0-9_]", str);
+  if (!(matched == 1 && strcmp(str, "Var_123") == 0))
+    return -25;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%s", str);
+  if (!(matched == 1 && strcmp(str, "NAME") == 0))
+    return -26;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%s", str);
+  if (!(matched == 1 && strcmp(str, "NAME") == 0))
+    return -27;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, "%s %s", str, str1);
+  if (!(matched == 2 && strcmp(str, "A") == 0 && strcmp(str1, "B") == 0))
+    return -28;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, " numJoints %d", &a);
+  if (!(matched == 1 && a == 110))
+    return -29;
+  SKIP_LINE(file);
+
+  matched = fscanf(file, " %s %d ( %f %f %f ) ( %f %f %f )", str, &a, &f1, &f2,
+                   &f3, &f4, &f5, &f6);
+  if (!(matched == 8 && strcmp(str, "\"origin\"") == 0 && a == -1 &&
+        f1 == 0.0f && fabs(f4 + 0.7071067095f) < 1e-10f && f6 == 0.0f))
+    return -30;
+
+  fclose(file);
+  return 0;
+}
+
 int test_CFStringFind() {
   CFStringRef a =
       CFStringCreateWithCString(NULL, "/a/b/c/b", kCFStringEncodingASCII);
@@ -2657,6 +2830,7 @@ struct {
     FUNC_DEF(test_realpath),
     FUNC_DEF(test_ungetc),
     FUNC_DEF(test_fscanf),
+    FUNC_DEF(test_fscanf_new),
     FUNC_DEF(test_CFStringFind),
     FUNC_DEF(test_strcspn),
     FUNC_DEF(test_mbstowcs),

@@ -587,6 +587,7 @@ pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Resu
         |_, _, _| (),
         str.cast_mut(),
         base,
+        u32::MAX,
     )
 }
 
@@ -602,6 +603,7 @@ pub fn strtol_inner_generic<
     ungetc_fn: F2,
     subject: MutPtr<U>,
     mut base: u32,
+    max_length: GuestUSize,
 ) -> Result<(i32, u32), ()>
 where
     u8: From<T>,
@@ -635,6 +637,9 @@ where
             sign = Some(maybe_sign);
             prefix_length += 1;
             len += 1;
+            if len == max_length {
+                return Ok(());
+            }
         } else {
             ungetc_fn(env, subject, maybe_sign);
         }
@@ -662,11 +667,17 @@ where
             let curr: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
             if curr == b'0' {
                 len += 1;
+                if len == max_length {
+                    return Ok(());
+                }
                 prefix_length += 1;
                 if base == 16 {
                     let next: u8 = getc_fn(env, subject, whitespace_len + len)?.into();
                     if next == b'x' || next == b'X' {
                         len += 1;
+                        if len == max_length {
+                            return Ok(());
+                        }
                         prefix_length += 1;
                     } else {
                         ungetc_fn(env, subject, next);
@@ -682,6 +693,9 @@ where
         while (curr as char).is_digit(base) {
             chars.push(curr);
             len += 1;
+            if len == max_length {
+                return Ok(());
+            }
             curr = getc_fn(env, subject, whitespace_len + len)?.into();
         }
         ungetc_fn(env, subject, curr);

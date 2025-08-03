@@ -1148,6 +1148,7 @@ fn fscanf(
                                     },
                                     stream,
                                     base,
+                                    if max_width > 0 { max_width } else { u32::MAX },
                                 );
                                 match res {
                                     Ok((val, len)) => {
@@ -1180,6 +1181,7 @@ fn fscanf(
                             },
                             stream,
                             base,
+                            if max_width > 0 { max_width } else { u32::MAX },
                         );
                         match res {
                             Ok((val, _)) => {
@@ -1224,6 +1226,83 @@ fn fscanf(
                     Some(modifier) => {
                         unimplemented!("Length formater '{}' for f", modifier)
                     }
+                }
+            }
+            b'x' | b'X' => {
+                assert!(length_modifier.is_none());
+                // TODO: use strtoul
+                let res = strtol_inner_generic(
+                    env,
+                    |env, file, _idx| {
+                        let c = getc(env, file);
+                        if c == EOF {
+                            Err::<u8, ()>(())
+                        } else {
+                            Ok(<i32 as TryInto<u8>>::try_into(c).unwrap())
+                        }
+                    },
+                    |env, file, c| {
+                        assert_eq!(c as i32, ungetc(env, c as i32, file));
+                    },
+                    stream,
+                    16,
+                    if max_width > 0 { max_width } else { u32::MAX },
+                );
+                match res {
+                    Ok((val, _)) => {
+                        let c_u32_ptr: ConstPtr<u32> = args.next(env);
+                        env.mem.write(c_u32_ptr.cast_mut(), val.try_into().unwrap());
+                    }
+                    Err(_) => break,
+                }
+            }
+            b'[' => {
+                assert_eq!(max_width, 0);
+                assert!(length_modifier.is_none());
+                // [set] case
+                assert_ne!(env.mem.read(format + format_char_idx), b']');
+                let mut c: u8;
+                let inverted = if env.mem.read(format + format_char_idx) == b'^' {
+                    format_char_idx += 1;
+                    assert_ne!(env.mem.read(format + format_char_idx), b']');
+                    true
+                } else {
+                    false
+                };
+                // Build set
+                let mut set: HashSet<u8> = HashSet::new();
+                c = env.mem.read(format + format_char_idx);
+                format_char_idx += 1;
+                while c != b']' {
+                    if env.mem.read(format + format_char_idx) == b'-' {
+                        assert_ne!(env.mem.read(format + format_char_idx + 1), b']');
+                        let cc = env.mem.read(format + format_char_idx + 1);
+                        for x in c..=cc {
+                            set.insert(x);
+                        }
+                        format_char_idx += 2;
+                    } else {
+                        set.insert(c);
+                    }
+                    c = env.mem.read(format + format_char_idx);
+                    format_char_idx += 1;
+                }
+                let mut dst_ptr: MutPtr<u8> = args.next(env);
+                let mut matched = false;
+                // Consume `src` while chars are not in the set
+                let mut cc = getc(env, stream).try_into().unwrap();
+                while set.contains(&cc) ^ inverted && cc != b'\0' {
+                    matched = true;
+                    env.mem.write(dst_ptr, cc);
+                    dst_ptr += 1;
+                    cc = getc(env, stream).try_into().unwrap();
+                }
+                // we need to backtrack one position
+                assert_eq!(cc as i32, ungetc(env, cc as i32, stream));
+                if matched {
+                    env.mem.write(dst_ptr, b'\0');
+                } else {
+                    matched_args -= 1;
                 }
             }
             b's' => {
