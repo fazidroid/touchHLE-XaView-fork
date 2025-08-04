@@ -89,6 +89,7 @@ fn atexit(
     0 // success
 }
 
+/// A simple wrapper around [count_whitespace_generic] for the case of C string.
 fn count_whitespace(env: &mut Environment, s: ConstPtr<u8>) -> GuestUSize {
     count_whitespace_generic(
         env,
@@ -100,6 +101,26 @@ fn count_whitespace(env: &mut Environment, s: ConstPtr<u8>) -> GuestUSize {
     .unwrap()
 }
 
+#[allow(rustdoc::broken_intra_doc_links)] // https://github.com/rust-lang/rust/issues/83049
+/// Counts whitespaces in `subject` starting from `offset`.
+///
+/// `getc_fn` is a callback to get next character from `subject`.
+/// 3rd parameter in this callback is a index which is safe to ignore
+/// (for example, in case of a file stream).
+/// Error signifies an abnormal stop of input,
+/// such as [crate::libc::stdio::EOF] in the file stream.
+/// Note: `'\0'` does not necessary expect to produce an error!
+///
+/// `ungetc_fn` is a callback to un-get character from `subject`.
+/// Could be ignored entirely (for example, in case of a string).
+///
+/// `subject` is either C string or file stream (for now).
+///
+/// `offset` defines an offset in `subject` from which conversion starts.
+/// Could be ignored entirely (for example, in case of a file stream).
+///
+/// Returns count of whitespaces. Error returned from `getc_fn` is propagated
+/// but count is retuned too.
 fn count_whitespace_generic<
     T,
     U,
@@ -474,8 +495,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(wcstombs(_, _, _)),
 ];
 
-/// Returns a tuple containing the parsed number and the length of the number in
-/// the string
+/// A simple wrapper around [atof_inner_generic] for the case of C string.
 pub fn atof_inner(
     env: &mut Environment,
     s: ConstPtr<u8>,
@@ -489,6 +509,28 @@ pub fn atof_inner(
     )
 }
 
+#[allow(rustdoc::broken_intra_doc_links)] // https://github.com/rust-lang/rust/issues/83049
+/// Generic implementation of a conversion helper to `double`.
+///
+/// `getc_fn` is a callback to get next character from `subject`.
+/// 3rd parameter in this callback is a index which is safe to ignore
+/// (for example, in case of a file stream).
+/// Error signifies an abnormal stop of input,
+/// such as [crate::libc::stdio::EOF] in the file stream.
+/// Note: `'\0'` does not necessary expect to produce an error!
+///
+/// `ungetc_fn` is a callback to un-get character from `subject`.
+/// Could be ignored entirely (for example, in case of a string).
+///
+/// `subject` is either C string or file stream (for now).
+///
+/// `offset` defines an offset in `subject` from which conversion starts.
+/// Could be ignored entirely (for example, in case of a file stream).
+///
+/// Returns a tuple containing the parsed number and the length of the number in
+/// the string.
+///
+/// See also a TODO comment in [strtol_inner_generic].
 pub fn atof_inner_generic<
     T,
     U,
@@ -582,21 +624,53 @@ where
     s.parse().map(|result| (result, whitespace_len + len))
 }
 
-/// Returns a tuple containing the parsed number in the given base and
-/// the length of the number in the string.
+/// A simple wrapper around [strtol_inner_generic] for the case of C string.
 pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(i32, u32), ()> {
     strtol_inner_generic(
         env,
         |env, s, idx| Ok(env.mem.read(s + idx)),
-        |_, _, _| (),
+        |_, _, _| (), // could be ignored
         str.cast_mut(),
-        0,
+        0, // starting offset
         base,
-        u32::MAX,
+        u32::MAX, // max_length
     )
 }
 
-/// Base is mutable because in case of base 0 we need to auto-detect it.
+#[allow(rustdoc::broken_intra_doc_links)] // https://github.com/rust-lang/rust/issues/83049
+/// Generic implementation of a conversion helper to `long`.
+///
+/// `getc_fn` is a callback to get next character from `subject`.
+/// 3rd parameter in this callback is a index which is safe to ignore
+/// (for example, in case of a file stream).
+/// Error signifies an abnormal stop of input,
+/// such as [crate::libc::stdio::EOF] in the file stream.
+/// Note: `'\0'` does not necessary expect to produce an error!
+///
+/// `ungetc_fn` is a callback to un-get character from `subject`.
+/// Could be ignored entirely (for example, in case of a string).
+///
+/// `subject` is either C string or file stream (for now).
+///
+/// `offset` defines an offset in `subject` from which conversion starts.
+/// Could be ignored entirely (for example, in case of a file stream).
+///
+/// `base` of conversion.
+/// Is mutable because in case of base 0 we need to auto-detect it.
+///
+/// `max_length` a limit for number of chars to consume for conversion.
+///
+/// Returns a tuple containing the parsed number in the given base and
+/// the length of the number in the string.
+///
+/// Right now this function is a bit of the mess... We bridge together the
+/// worlds of string indexing and file stream processing with questionable
+/// results. We have fair amount of integration tests for `strtoul`
+/// and `sscanf`/`fscanf`, but some of corner cases are definitely not covered.
+/// One idea for cleaning that would be to fully embrace `getc`/`ungetc`
+/// approach and get rid of indexing.
+/// (Like, let caller to deal with indexing and override `offset` somehow?)
+/// TODO: find a more powerful abstraction for generalization
 pub fn strtol_inner_generic<
     T,
     U,

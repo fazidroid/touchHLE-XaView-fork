@@ -704,6 +704,7 @@ fn printf(env: &mut Environment, format: ConstPtr<u8>, args: DotDotDot) -> i32 {
 
 // TODO: more printf variants
 
+/// A simple wrapper around [sscanf_common_generic] for the case of C string.
 fn sscanf_common(
     env: &mut Environment,
     src: ConstPtr<u8>,
@@ -720,6 +721,23 @@ fn sscanf_common(
     )
 }
 
+/// Formatted scan implementation for `sscanf` family.
+///
+/// `getc_fn` is a callback to get next character from `subject`.
+/// 3rd parameter in this callback is a index which is safe to ignore
+/// (for example, in case of a file stream).
+/// Error signifies an abnormal stop of input,
+/// such as [crate::libc::stdio::EOF] in the file stream.
+/// Note: `'\0'` does not necessary expect to produce an error!
+///
+/// `ungetc_fn` is a callback to un-get character from `subject`.
+/// Could be ignored entirely (for example, in case of a string).
+///
+/// `subject` is either C string or file stream (for now).
+///
+/// `args` is the list of arguments to store produced outputs.
+///
+/// TODO: instead of `u8: From<T>` constraint, implement a conversion callback
 fn sscanf_common_generic<
     T,
     U,
