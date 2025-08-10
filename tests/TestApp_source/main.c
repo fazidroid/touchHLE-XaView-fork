@@ -67,7 +67,11 @@ size_t wcstombs(char *, const wchar_t *, size_t);
 
 // <string.h>
 void *memset(void *, int, size_t);
+void memset_pattern4(void *, const void *, size_t);
+void memset_pattern8(void *, const void *, size_t);
+void memset_pattern16(void *, const void *, size_t);
 int memcmp(const void *, const void *, size_t);
+void *memcpy(void *, const void *, size_t);
 void *memmove(void *, const void *, size_t);
 int strcmp(const char *, const char *);
 char *strncpy(char *, const char *, size_t);
@@ -3094,6 +3098,74 @@ int test_CFNumberCompare_extended(void) {
   return 0;
 }
 
+int test_memset_pattern() {
+  char buf[64];
+  // memset_pattern4
+  memset_pattern4(buf, "1234", sizeof(buf));
+  if (strncmp(buf, "1234123412", 10) != 0) {
+    return -1;
+  }
+  memset(buf, 0, sizeof(buf));
+  memset_pattern4(buf, "abcd", 8);
+  if (memcmp(buf, "abcdabcd", 8) != 0) {
+    return -2;
+  }
+  memset(buf, 0, sizeof(buf));
+  memset_pattern4(buf, "XYZW", 3);
+  if (memcmp(buf, "XYZ", 3) != 0) {
+    return -3;
+  }
+  char original_buf[sizeof(buf)];
+  memset(buf, 0xAA, sizeof(buf)); // Fill buffer with a known value
+  memcpy(original_buf, buf, sizeof(buf));
+  memset_pattern4(buf, "1234", 0);
+  if (memcmp(buf, original_buf, sizeof(buf)) != 0) {
+    return -4;
+  }
+  memset(buf, 0, sizeof(buf));
+  char pattern4_null[] = {'A', '\0', 'B', 'C'};
+  char expected4_null[] = {'A', '\0', 'B', 'C', 'A', '\0', 'B'};
+  memset_pattern4(buf, pattern4_null, 7);
+  if (memcmp(buf, expected4_null, 7) != 0) {
+    return -5;
+  }
+  // memset_pattern8
+  unsigned long long pattern8 = 0x0102030405060708;
+  char expected8_full[] = "\x08\x07\x06\x05\x04\x03\x02\x01";
+  memset(buf, 0, sizeof(buf));
+  memset_pattern8(buf, &pattern8, 10);
+  if (memcmp(buf, expected8_full, 8) != 0 ||
+      memcmp(buf + 8, expected8_full, 2) != 0) {
+    return -6;
+  }
+  memset(buf, 0, sizeof(buf));
+  memset_pattern8(buf, &pattern8, 16);
+  if (memcmp(buf, expected8_full, 8) != 0 ||
+      memcmp(buf + 8, expected8_full, 8) != 0) {
+    return -7;
+  }
+  memset(buf, 0, sizeof(buf));
+  memset_pattern8(buf, &pattern8, 5);
+  if (memcmp(buf, expected8_full, 5) != 0) {
+    return -8;
+  }
+  // memset_pattern16
+  const char *pattern16 = "0123456789ABCDEF";
+  memset(buf, 0, sizeof(buf));
+  memset_pattern16(buf, pattern16, 20);
+  char expected16_trunc[] = "0123456789ABCDEF0123";
+  if (memcmp(buf, expected16_trunc, 20) != 0) {
+    return -9;
+  }
+  memset(buf, 0, sizeof(buf));
+  memset_pattern16(buf, pattern16, 32);
+  char expected16_exact[] = "0123456789ABCDEF0123456789ABCDEF";
+  if (memcmp(buf, expected16_exact, 32) != 0) {
+    return -10;
+  }
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -3150,6 +3222,7 @@ struct {
     FUNC_DEF(test_CFURL),
     FUNC_DEF(test_CFNumberCompare_simple),
     FUNC_DEF(test_CFNumberCompare_extended),
+    FUNC_DEF(test_memset_pattern),
 };
 // clang-format on
 

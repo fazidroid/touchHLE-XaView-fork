@@ -79,6 +79,42 @@ fn __memset_chk(
 ) -> MutVoidPtr {
     GenericChar::<u8>::memset(env, dest.cast(), ch as u8, count, dest_count).cast()
 }
+fn memset_pattern4(env: &mut Environment, b: MutVoidPtr, pattern4: ConstVoidPtr, len: GuestUSize) {
+    memset_pattern_inner(env, b, pattern4, len, 4)
+}
+fn memset_pattern8(env: &mut Environment, b: MutVoidPtr, pattern8: ConstVoidPtr, len: GuestUSize) {
+    memset_pattern_inner(env, b, pattern8, len, 8)
+}
+fn memset_pattern16(
+    env: &mut Environment,
+    b: MutVoidPtr,
+    pattern16: ConstVoidPtr,
+    len: GuestUSize,
+) {
+    memset_pattern_inner(env, b, pattern16, len, 16)
+}
+fn memset_pattern_inner(
+    env: &mut Environment,
+    b: MutVoidPtr,
+    pattern: ConstVoidPtr,
+    len: GuestUSize,
+    pattern_len: GuestUSize,
+) {
+    assert!(matches!(pattern_len, 4 | 8 | 16));
+    let mut tmp = [0; 16];
+    tmp[..pattern_len as usize].copy_from_slice(env.mem.bytes_at(pattern.cast(), pattern_len));
+    let mut target: MutPtr<u8> = b.cast();
+    for _ in 0..(len / pattern_len) {
+        env.mem
+            .bytes_at_mut(target, pattern_len)
+            .copy_from_slice(&tmp[..pattern_len as usize]);
+        target += pattern_len;
+    }
+    for i in 0..(len % pattern_len) {
+        env.mem.write(target, env.mem.read(pattern.cast() + i));
+        target += 1;
+    }
+}
 fn memcpy(
     env: &mut Environment,
     dest: MutVoidPtr,
@@ -249,6 +285,9 @@ pub const FUNCTIONS: FunctionExports = &[
     // Functions shared with wchar.rs
     export_c_func!(memset(_, _, _)),
     export_c_func!(__memset_chk(_, _, _, _)),
+    export_c_func!(memset_pattern4(_, _, _)),
+    export_c_func!(memset_pattern8(_, _, _)),
+    export_c_func!(memset_pattern16(_, _, _)),
     export_c_func!(memcpy(_, _, _)),
     export_c_func!(memmove(_, _, _)),
     export_c_func!(memchr(_, _, _)),
