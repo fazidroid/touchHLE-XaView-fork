@@ -20,11 +20,18 @@ type CFLocaleRef = CFTypeRef;
 type CFLocaleKey = CFStringRef;
 
 pub const kCFLocaleCountryCode: &str = "kCFLocaleCountryCodeKey";
+pub const kCFLocaleLanguageCode: &str = "kCFLocaleLanguageCode";
 
-pub const CONSTANTS: ConstantExports = &[(
-    "_kCFLocaleCountryCode",
-    HostConstant::NSString(kCFLocaleCountryCode),
-)];
+pub const CONSTANTS: ConstantExports = &[
+    (
+        "_kCFLocaleCountryCode",
+        HostConstant::NSString(kCFLocaleCountryCode),
+    ),
+    (
+        "_kCFLocaleLanguageCode",
+        HostConstant::NSString(kCFLocaleLanguageCode),
+    ),
+];
 
 fn CFLocaleCopyCurrent(env: &mut Environment) -> CFLocaleRef {
     let locale: id = msg_class![env; NSLocale currentLocale];
