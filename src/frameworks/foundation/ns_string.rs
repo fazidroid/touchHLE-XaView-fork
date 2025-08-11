@@ -191,7 +191,7 @@ impl StringHostObject {
         (utf16, converted)
     }
     /// Iterate over the string as UTF-16 code units.
-    fn iter_code_units(&self) -> CodeUnitIterator {
+    fn iter_code_units(&self) -> CodeUnitIterator<'_> {
         match self {
             StringHostObject::Utf8(utf8) => CodeUnitIterator::Utf8(utf8.encode_utf16()),
             StringHostObject::Utf16(utf16) => CodeUnitIterator::Utf16(utf16.iter()),

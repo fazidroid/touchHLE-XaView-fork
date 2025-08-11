@@ -23,6 +23,7 @@ pub fn main() {
     let version = if version.is_ok() && version.as_ref().unwrap().status.success() {
         rerun_if_changed(&workspace_root.join(".git/HEAD"));
         rerun_if_changed(&workspace_root.join(".git/refs"));
+        #[allow(clippy::unnecessary_unwrap)]
         let git_version = std::str::from_utf8(&version.unwrap().stdout)
             .unwrap()
             .trim_end()

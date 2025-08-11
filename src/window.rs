@@ -122,7 +122,7 @@ pub enum GLVersion {
 
 pub struct GLContext(sdl2::video::GLContext);
 
-fn surface_from_image(image: &Image) -> Surface {
+fn surface_from_image(image: &Image) -> Surface<'_> {
     let src_pixels = image.pixels();
     let (width, height) = image.dimensions();
 
