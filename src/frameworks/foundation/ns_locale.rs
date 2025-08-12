@@ -110,8 +110,10 @@ fn get_preferred_countries() -> Vec<String> {
 }
 
 struct NSLocaleHostObject {
-    /// `NSString*`
+    /// `NSString *`
     country_code: id,
+    /// `NSString *`
+    language_code: id,
 }
 impl HostObject for NSLocaleHostObject {}
 
@@ -120,6 +122,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 (env, this, _cmd);
 
 @implementation NSLocale: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::new(NSLocaleHostObject {
+        country_code: nil,
+        language_code: nil,
+    });
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
 
 // The documentation isn't clear about what the format of the strings should be,
 // but Super Monkey Ball does `isEqualToString:` against "fr", "es", "de", "it"
@@ -143,8 +153,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         let countries = get_preferred_countries();
         let country_code = ns_string::from_rust_string(env, countries[0].clone());
+        let languages = get_preferred_languages(&env.options);
+        let language_code = ns_string::from_rust_string(env, languages[0].clone());
         let host_object = NSLocaleHostObject {
-            country_code
+            country_code,
+            language_code,
         };
         let new_locale = env.objc.alloc_object(
             this,
@@ -163,6 +176,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         let host_object = NSLocaleHostObject {
             // Was confirmed on the iOS Simulator
             country_code: nil,
+            language_code: nil,
         };
         let new_locale = env.objc.alloc_object(
             this,
@@ -176,9 +190,24 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // TODO: constructors, more accessors
 
+- (id)initWithLocaleIdentifier:(id)string { // NSString *
+    let str = ns_string::to_rust_string(env, string);
+    log_dbg!("[(NSLocale *){:?} initWithLocaleIdentifier:'{}']", this, str);
+    retain(env, string);
+    // Loosely assume 2-char lang code here
+    // TODO: locale identifier parsing
+    assert_eq!(2, str.len());
+    assert!(str.to_lowercase().eq(&str));
+    assert!(!str.contains('_') && !str.contains('-'));
+    assert!(env.objc.borrow::<NSLocaleHostObject>(this).language_code == nil);
+    env.objc.borrow_mut::<NSLocaleHostObject>(this).language_code = string;
+    this
+}
+
 - (())dealloc {
-    let host_obj = env.objc.borrow::<NSLocaleHostObject>(this);
-    release(env, host_obj.country_code);
+    let &NSLocaleHostObject { country_code, language_code } = env.objc.borrow::<NSLocaleHostObject>(this);
+    release(env, country_code);
+    release(env, language_code);
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
@@ -194,7 +223,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         // But it does work on the iOS Simulator
         // TODO: Define NSLocaleCountryCode _as_ kCFLocaleCountryCode
         NSLocaleCountryCode | kCFLocaleCountryCode => {
-            let &NSLocaleHostObject { country_code } = env.objc.borrow(this);
+            let &NSLocaleHostObject { country_code, .. } = env.objc.borrow(this);
             country_code
         },
         _ => unimplemented!()
