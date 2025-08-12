@@ -48,6 +48,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.unlock_mutex(host_object.mutex_id).unwrap();
 }
 
+- (bool)tryLock {
+    let host_object = env.objc.borrow::<NSLockHostObject>(this);
+    if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
+        false
+    } else {
+        env.lock_mutex(host_object.mutex_id).is_ok()
+    }
+}
+
 - (())setName:(id)name { // NSString *
     // @property(copy), name has to be copied
     env.objc.borrow_mut::<NSLockHostObject>(this).name = msg![env; name copy];
@@ -87,6 +96,15 @@ pub const CLASSES: ClassExports = objc_classes! {
         echo!("*** -[NSRecursiveLock unlock]: lock (<NSRecursiveLock: {:?}> '{:?}') unlocked when not locked", this, host_object.name);
     }
     env.unlock_mutex(host_object.mutex_id).unwrap();
+}
+
+- (bool)tryLock {
+    let host_object = env.objc.borrow::<NSLockHostObject>(this);
+    if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
+        false
+    } else {
+        env.lock_mutex(host_object.mutex_id).is_ok()
+    }
 }
 
 - (())setName:(id)name { // NSString *
