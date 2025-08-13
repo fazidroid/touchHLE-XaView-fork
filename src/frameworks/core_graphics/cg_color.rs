@@ -67,10 +67,21 @@ fn CGColorCreate(
     from_rgba(env, (r, g, b, a))
 }
 
+fn CGColorCreateGenericRGB(
+    env: &mut Environment,
+    r: CGFloat,
+    g: CGFloat,
+    b: CGFloat,
+    a: CGFloat,
+) -> CGColorRef {
+    from_rgba(env, (r, g, b, a))
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGColorRetain(_)),
     export_c_func!(CGColorRelease(_)),
     export_c_func!(CGColorCreate(_, _)),
+    export_c_func!(CGColorCreateGenericRGB(_, _, _, _)),
 ];
 
 /// Shortcut for use by `UIColor`: directly construct a `CGColor` instance from
