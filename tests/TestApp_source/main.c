@@ -333,13 +333,15 @@ CGFloat CGRectGetMinY(CGRect);
 CGFloat CGRectGetMaxY(CGRect);
 CGFloat CGRectGetHeight(CGRect);
 CGFloat CGRectGetWidth(CGRect);
-CGRect CGRectMake(CGFloat, CGFloat, CGFloat, CGFloat);
 
 // === Main code ===
 
-int test_CGGeometry(void) {
-  // x, y, width, height
-  CGRect testRect = CGRectMake(2.0, 3.0, 100.0, 200.0);
+int test_CGGeometry() {
+  CGRect testRect;
+  testRect.origin.x = 2.0;
+  testRect.origin.y = 3.0;
+  testRect.size.width = 100.0;
+  testRect.size.height = 200.0;
 
   if (!(CGRectGetMinX(testRect) == testRect.origin.x &&
         CGRectGetMinX(testRect) == 2.0))
