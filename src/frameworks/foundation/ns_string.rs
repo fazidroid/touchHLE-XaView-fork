@@ -10,7 +10,7 @@
 
 mod path_algorithms;
 
-use super::{ns_array, unichar};
+use super::{ns_array, unichar, NSInteger};
 use super::{
     NSComparisonResult, NSNotFound, NSOrderedAscending, NSOrderedDescending, NSOrderedSame,
     NSRange, NSUInteger,
@@ -1108,6 +1108,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     float_value_common(env, this)
 }
 
+- (NSInteger)integerValue {
+    msg![env; this intValue]
+}
 - (i32)intValue {
     let st = to_rust_string(env, this);
     let st = st.trim_start();
