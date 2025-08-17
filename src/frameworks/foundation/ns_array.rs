@@ -390,7 +390,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     for &object in &array {
         retain(env, object);
     }
-    env.objc.borrow_mut::<ArrayHostObject>(this).array = array;
+    env.objc.borrow_mut::<ArrayHostObject>(mut_arr).array = array;
     mut_arr
 }
 
