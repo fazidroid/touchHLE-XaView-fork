@@ -24,8 +24,8 @@ use crate::fs::GuestPath;
 use crate::mach_o::MachO;
 use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, Mem, MutPtr, Ptr, SafeRead};
 use crate::objc::{
-    autorelease, id, msg, msg_class, nil, objc_classes, retain, Class, ClassExports, HostObject,
-    NSZonePtr, ObjC,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports,
+    HostObject, NSZonePtr, ObjC,
 };
 use crate::{fs, Environment};
 use encoding_rs::SHIFT_JIS;
@@ -1010,6 +1010,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("[(NSString *){:?} stringByStandardizingPath] {} -> {}", this, to_rust_string(env, this), new_path_str);
     let new_string = from_rust_string(env, new_path_str);
     autorelease(env, new_string)
+}
+
+- (id)stringsByAppendingPaths:(id)paths {
+    let count: NSUInteger = msg![env; paths count];
+    let mut_arr: id = msg_class![env; NSMutableArray new];
+    for i in 0..count {
+        let path: id = msg![env; paths objectAtIndex:i];
+        let new: id = msg![env; this stringByAppendingPathComponent:path];
+        () = msg![env; mut_arr addObject:new];
+    }
+    let arr = msg![env; mut_arr copy];
+    release(env, mut_arr);
+    autorelease(env, arr)
 }
 
 // These come from a category in UIKit (UIStringDrawing).
