@@ -214,11 +214,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 
-// NSCopying implementation
-- (id)copyWithZone:(NSZonePtr)_zone {
-    todo!(); // TODO: this should produce an immutable copy
-}
-
 @end
 
 // Our private subclass that is the single implementation of NSArray for the
@@ -381,6 +376,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     assert!(host_object.array.is_empty());
     host_object.array = objects; // objects are already retained
     this
+}
+
+// NSCopying implementation
+- (id)copyWithZone:(NSZonePtr)_zone {
+    let arr: id = msg_class![env; NSArray alloc];
+    let array = env.objc.borrow::<ArrayHostObject>(this).array.clone();
+    for &object in &array {
+        retain(env, object);
+    }
+    env.objc.borrow_mut::<ArrayHostObject>(arr).array = array;
+    arr
 }
 
 // NSMutableCopying implementation
