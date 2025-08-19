@@ -7,7 +7,7 @@
 
 use super::ns_enumerator::{fast_enumeration_helper, NSFastEnumerationState};
 use super::ns_property_list_serialization::deserialize_plist_from_file;
-use super::{ns_keyed_unarchiver, ns_string, ns_url, NSInteger, NSNotFound, NSUInteger};
+use super::{ns_keyed_unarchiver, ns_string, ns_url, NSInteger, NSNotFound, NSRange, NSUInteger};
 use crate::abi::{CallFromHost, GuestFunction};
 use crate::fs::GuestPath;
 use crate::mem::{MutPtr, MutVoidPtr};
@@ -324,6 +324,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)description {
     build_description(env, this)
+}
+
+- (id)subarrayWithRange:(NSRange)range {
+    let mut tmp = Vec::new();
+    tmp.extend_from_slice(
+        &env.objc.borrow::<ArrayHostObject>(this).array[range.location as usize..(range.location + range.length) as usize]
+    );
+    for &obj in &tmp {
+        retain(env, obj);
+    }
+    let res = from_vec(env, tmp);
+    autorelease(env, res)
 }
 
 @end
