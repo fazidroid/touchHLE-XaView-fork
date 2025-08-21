@@ -127,6 +127,23 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, dict)
 }
 
+- (id)valueForKey:(id)key { // NSString*
+    // This is not documented, but apparently this method
+    // is overridden for NSUserDefaults.
+    // Behaviour was confirmed on macOS.
+    // TODO: should we call `valueForKey:` on the app_domain_dict instead?
+    msg![env; this objectForKey:key]
+}
+- (())setValue:(id)val
+        forKey:(id)key { // NSString*
+    // This is not documented, but apparently this method
+    // is overridden for NSUserDefaults.
+    // Behaviour was confirmed on macOS.
+    // Only app domain gets affected here (this part wasn't verified).
+    let dict = env.objc.borrow::<NSUserDefaultsHostObject>(this).app_domain_dict;
+    msg![env; dict setValue:val forKey:key]
+}
+
 - (id)objectForKey:(id)key { // NSString*
     // TODO: check if order of searching is correct
     let app_domain_dict = env.objc.borrow::<NSUserDefaultsHostObject>(this).app_domain_dict;
