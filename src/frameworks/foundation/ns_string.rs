@@ -994,7 +994,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         //  "~/Documents"  -> "/Documents"
         //  "~foo/bar"     -> "/bar"
         //  "~~foo/bar"    -> "/bar"
-        let within_home_dir = new_path.splitn(2, '/').nth(1).unwrap_or("");
+        let within_home_dir = new_path.split_once('/').map(|x| x.1).unwrap_or("");
+
         let guest_path = env.fs.home_directory().join(within_home_dir);
         let resolved = fs::resolve_path(&guest_path, None);
         format!("/{}", resolved.join("/"))
