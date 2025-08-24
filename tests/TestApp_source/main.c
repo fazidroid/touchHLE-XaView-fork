@@ -883,7 +883,50 @@ int test_strtoul() {
   }
   text = "   +42abc";
   if (strtoul(text, &endptr, 10) != 42UL || endptr != text + 6) {
-    return -6;
+    return -7;
+  }
+#ifndef DEFINE_ME_WHEN_BUILDING_ON_MACOS
+  // Test for overflow. "4294967296" is ULONG_MAX + 1 on a 32-bit system.
+  text = "4294967296";
+  if (strtoul(text, &endptr, 10) != 4294967295 || endptr != text + 10) {
+    return -8;
+  }
+#endif
+  text = "4294967295";
+  if (strtoul(text, &endptr, 10) != 4294967295 || endptr != text + 10) {
+    return -9;
+  }
+  text = "15";
+  if (strtoul(text, &endptr, 0) != 15UL || endptr != text + 2) {
+    return -10;
+  }
+  text = "017"; // octal: 1*8 + 7 = 15
+  if (strtoul(text, &endptr, 0) != 15UL || endptr != text + 3) {
+    return -11;
+  }
+  text = "0x0F";
+  if (strtoul(text, &endptr, 0) != 15UL || endptr != text + 4) {
+    return -12;
+  }
+  text = "";
+  if (strtoul(text, &endptr, 10) != 0UL || endptr != text) {
+    return -13;
+  }
+  text = "   ";
+  if (strtoul(text, &endptr, 10) != 0UL || endptr != text) {
+    return -14;
+  }
+  text = "1101"; // binary: 8 + 4 + 1 = 13
+  if (strtoul(text, &endptr, 2) != 13UL || endptr != text + 4) {
+    return -15;
+  }
+  text = "zZ"; // base 36: 35*36 + 35 = 1295
+  if (strtoul(text, &endptr, 36) != 1295UL || endptr != text + 2) {
+    return -16;
+  }
+  text = "77"; // octal: 7*8 + 7 = 63
+  if (strtoul(text, &endptr, 8) != 63UL || endptr != text + 2) {
+    return -17;
   }
   return 0;
 }

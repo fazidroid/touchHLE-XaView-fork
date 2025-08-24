@@ -868,6 +868,7 @@ where
                                     if max_width > 0 { max_width } else { u32::MAX },
                                     i16::MIN.into(),
                                     i16::MAX.into(),
+                                    false,
                                 );
                                 match res {
                                     Ok((val, len)) => {
@@ -893,6 +894,7 @@ where
                             if max_width > 0 { max_width } else { u32::MAX },
                             i32::MIN.into(),
                             i32::MAX.into(),
+                            false,
                         );
                         match res {
                             Ok((val, len)) => {
@@ -941,12 +943,13 @@ where
                     if max_width > 0 { max_width } else { u32::MAX },
                     u32::MIN.into(),
                     u32::MAX.into(),
+                    true,
                 );
                 match res {
                     Ok((val, len)) => {
                         src_char_idx += len;
                         let c_u32_ptr: ConstPtr<u32> = args.next(env);
-                        env.mem.write(c_u32_ptr.cast_mut(), val.try_into().unwrap());
+                        env.mem.write(c_u32_ptr.cast_mut(), val as u32);
                     }
                     Err(_) => break,
                 }

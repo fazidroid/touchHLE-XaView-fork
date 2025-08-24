@@ -89,18 +89,6 @@ fn atexit(
     0 // success
 }
 
-/// A simple wrapper around [count_whitespace_generic] for the case of C string.
-fn count_whitespace(env: &mut Environment, s: ConstPtr<u8>) -> GuestUSize {
-    count_whitespace_generic(
-        env,
-        |env, s, idx| Ok(env.mem.read(s + idx)),
-        |_, _, _| (),
-        s.cast_mut(),
-        0,
-    )
-    .unwrap()
-}
-
 #[allow(rustdoc::broken_intra_doc_links)] // https://github.com/rust-lang/rust/issues/83049
 /// Counts whitespaces in `subject` starting from `offset`.
 ///
@@ -196,7 +184,6 @@ fn prng(state: u32) -> u32 {
 }
 
 const RAND_MAX: i32 = i32::MAX;
-const ULONG_MAX: u32 = u32::MAX;
 
 fn srand(env: &mut Environment, seed: u32) {
     env.libc_state.stdlib.rand = seed;
@@ -326,7 +313,6 @@ fn strtof(env: &mut Environment, nptr: ConstPtr<u8>, endptr: MutPtr<ConstPtr<u8>
     number as f32
 }
 
-// TODO: fix same issues as for strtol()
 pub fn strtoul(
     env: &mut Environment,
     str: ConstPtr<u8>,
@@ -336,32 +322,20 @@ pub fn strtoul(
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let whitespace_len = count_whitespace(env, str);
-    let start = str + whitespace_len;
-
-    let s = env.mem.cstr_at_utf8(start).unwrap();
-    log_dbg!("strtoul({:?} ({}), {:?}, {})", str, s, endptr, base);
-    let (trimmed, len) = if base == 16 {
-        // We need to count prefix in the length
-        (
-            s.trim_start_matches("0x"),
-            s.len() + whitespace_len as usize,
-        )
-    } else {
-        assert_eq!(base, 10);
-        let trimmed = s.trim_end_matches(|c: char| !char::is_ascii_digit(&c));
-        (trimmed, trimmed.len() + whitespace_len as usize)
-    };
-    let res = if trimmed.is_empty() {
-        0
-    } else {
-        u32::from_str_radix(trimmed, base as u32).unwrap_or(ULONG_MAX)
-    };
-    if !endptr.is_null() {
-        let len: GuestUSize = len.try_into().unwrap();
-        env.mem.write(endptr, (str + len).cast_mut());
+    match strtoul_inner(env, str, base as u32) {
+        Ok((res, len)) => {
+            if !endptr.is_null() {
+                env.mem.write(endptr, (str + len).cast_mut());
+            }
+            res
+        }
+        Err(_) => {
+            if !endptr.is_null() {
+                env.mem.write(endptr, str.cast_mut());
+            }
+            0
+        }
     }
-    res
 }
 
 fn strtol(env: &mut Environment, str: ConstPtr<u8>, endptr: MutPtr<MutPtr<u8>>, base: i32) -> i32 {
@@ -623,8 +597,8 @@ where
 }
 
 /// A simple wrapper around [str_to_i128_inner_generic]
-/// for the case of C string.
-pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(i32, u32), ()> {
+/// for the case of C string and i32.
+fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(i32, u32), ()> {
     str_to_i128_inner_generic(
         env,
         |env, s, idx| Ok(env.mem.read(s + idx)),
@@ -635,12 +609,32 @@ pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Resu
         u32::MAX,        // max_length
         i32::MIN.into(), // range_min
         i32::MAX.into(), // range_max
+        false,           // is_unsigned
     )
     .map(|(val, len)| (val.try_into().unwrap(), len))
+}
+/// A simple wrapper around [str_to_i128_inner_generic]
+/// for the case of C string and u32.
+fn strtoul_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(u32, u32), ()> {
+    str_to_i128_inner_generic(
+        env,
+        |env, s, idx| Ok(env.mem.read(s + idx)),
+        |_, _, _| (), // could be ignored
+        str.cast_mut(),
+        0, // starting offset
+        base,
+        u32::MAX,        // max_length
+        u32::MIN.into(), // range_min
+        u32::MAX.into(), // range_max
+        true,            // is_unsigned
+    )
+    .map(|(val, len)| (val as u32, len))
 }
 
 #[allow(rustdoc::broken_intra_doc_links)] // https://github.com/rust-lang/rust/issues/83049
 /// Generic implementation of a conversion helper to `i128`.
+/// This is a responsibility of a caller to interpret results
+/// as a desired type (e.g. unsigned int should be converted with `as`).
 ///
 /// `getc_fn` is a callback to get next character from `subject`.
 /// 3rd parameter in this callback is a index which is safe to ignore
@@ -664,6 +658,8 @@ pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Resu
 ///
 /// `range_min` and `range_max` define clamp range for desired resulting
 /// int type (for example, for i32 it will be [i32::MIN, i32::MAX]).
+///
+/// `is_unsigned` specifies how '-' is treated.
 ///
 /// Returns a tuple containing the parsed number in the given base and
 /// the length of the number in the string.
@@ -692,6 +688,7 @@ pub fn str_to_i128_inner_generic<
     max_length: GuestUSize,
     range_min: i128,
     range_max: i128,
+    is_unsigned: bool,
 ) -> Result<(i128, u32), ()>
 where
     u8: From<T>,
@@ -799,10 +796,18 @@ where
     let res = if magnitude_len > 0 {
         let mut res = i128::from_str_radix(s, base).unwrap();
         if sign == Some(b'-') {
-            res = res.checked_mul(-1).unwrap();
+            if is_unsigned {
+                assert_eq!(range_min, 0);
+                // two's compliment
+                res = (!(res as u128) + 1) as i128;
+            } else {
+                res = res.checked_mul(-1).unwrap();
+                // TODO: set errno on range errors
+                res = res.clamp(range_min, range_max)
+            }
         }
         // TODO: set errno on range errors
-        res.clamp(range_min, range_max)
+        res.min(range_max)
     } else {
         // Special case - prefix of invalid octal number is a valid number 0
         if base == 8 && prefix_length > 0 {
