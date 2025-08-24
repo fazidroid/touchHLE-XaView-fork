@@ -196,8 +196,6 @@ fn prng(state: u32) -> u32 {
 }
 
 const RAND_MAX: i32 = i32::MAX;
-const LONG_MIN: i32 = i32::MIN;
-const LONG_MAX: i32 = i32::MAX;
 const ULONG_MAX: u32 = u32::MAX;
 
 fn srand(env: &mut Environment, seed: u32) {
@@ -530,7 +528,7 @@ pub fn atof_inner(
 /// Returns a tuple containing the parsed number and the length of the number in
 /// the string.
 ///
-/// See also a TODO comment in [strtol_inner_generic].
+/// See also a TODO comment in [str_to_i128_inner_generic].
 pub fn atof_inner_generic<
     T,
     U,
@@ -624,21 +622,25 @@ where
     s.parse().map(|result| (result, whitespace_len + len))
 }
 
-/// A simple wrapper around [strtol_inner_generic] for the case of C string.
+/// A simple wrapper around [str_to_i128_inner_generic]
+/// for the case of C string.
 pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(i32, u32), ()> {
-    strtol_inner_generic(
+    str_to_i128_inner_generic(
         env,
         |env, s, idx| Ok(env.mem.read(s + idx)),
         |_, _, _| (), // could be ignored
         str.cast_mut(),
         0, // starting offset
         base,
-        u32::MAX, // max_length
+        u32::MAX,        // max_length
+        i32::MIN.into(), // range_min
+        i32::MAX.into(), // range_max
     )
+    .map(|(val, len)| (val.try_into().unwrap(), len))
 }
 
 #[allow(rustdoc::broken_intra_doc_links)] // https://github.com/rust-lang/rust/issues/83049
-/// Generic implementation of a conversion helper to `long`.
+/// Generic implementation of a conversion helper to `i128`.
 ///
 /// `getc_fn` is a callback to get next character from `subject`.
 /// 3rd parameter in this callback is a index which is safe to ignore
@@ -660,6 +662,9 @@ pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Resu
 ///
 /// `max_length` a limit for number of chars to consume for conversion.
 ///
+/// `range_min` and `range_max` define clamp range for desired resulting
+/// int type (for example, for i32 it will be [i32::MIN, i32::MAX]).
+///
 /// Returns a tuple containing the parsed number in the given base and
 /// the length of the number in the string.
 ///
@@ -671,7 +676,8 @@ pub fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Resu
 /// approach and get rid of indexing.
 /// (Like, let caller to deal with indexing and override `offset` somehow?)
 /// TODO: find a more powerful abstraction for generalization
-pub fn strtol_inner_generic<
+#[allow(clippy::too_many_arguments)]
+pub fn str_to_i128_inner_generic<
     T,
     U,
     F1: Fn(&mut Environment, MutPtr<U>, GuestUSize) -> Result<T, ()>,
@@ -684,7 +690,9 @@ pub fn strtol_inner_generic<
     offset: GuestUSize,
     mut base: u32,
     max_length: GuestUSize,
-) -> Result<(i32, u32), ()>
+    range_min: i128,
+    range_max: i128,
+) -> Result<(i128, u32), ()>
 where
     u8: From<T>,
 {
@@ -789,12 +797,12 @@ where
     assert!((2..=36).contains(&base));
     let magnitude_len = len - prefix_length;
     let res = if magnitude_len > 0 {
-        // TODO: set errno on range errors
-        let mut res = i32::from_str_radix(s, base).unwrap_or(LONG_MAX);
+        let mut res = i128::from_str_radix(s, base).unwrap();
         if sign == Some(b'-') {
-            res = res.checked_mul(-1).unwrap_or(LONG_MIN);
+            res = res.checked_mul(-1).unwrap();
         }
-        res
+        // TODO: set errno on range errors
+        res.clamp(range_min, range_max)
     } else {
         // Special case - prefix of invalid octal number is a valid number 0
         if base == 8 && prefix_length > 0 {

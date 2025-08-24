@@ -12,7 +12,7 @@ use crate::libc::clocale::{setlocale, LC_CTYPE};
 use crate::libc::errno::set_errno;
 use crate::libc::posix_io::{STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
 use crate::libc::stdio::{fwrite, getc, ungetc, EOF, FILE};
-use crate::libc::stdlib::{atof_inner_generic, strtol_inner_generic};
+use crate::libc::stdlib::{atof_inner_generic, str_to_i128_inner_generic};
 use crate::libc::string::strlen;
 use crate::libc::wchar::wchar_t;
 use crate::mem::{ConstPtr, GuestUSize, Mem, MutPtr, MutVoidPtr, Ptr};
@@ -858,7 +858,7 @@ where
                         match lm {
                             "h" => {
                                 // signed short* or unsigned short*
-                                let res = strtol_inner_generic(
+                                let res = str_to_i128_inner_generic(
                                     env,
                                     &getc_fn,
                                     &ungetc_fn,
@@ -866,6 +866,8 @@ where
                                     src_char_idx,
                                     base,
                                     if max_width > 0 { max_width } else { u32::MAX },
+                                    i16::MIN.into(),
+                                    i16::MAX.into(),
                                 );
                                 match res {
                                     Ok((val, len)) => {
@@ -881,7 +883,7 @@ where
                         }
                     }
                     _ => {
-                        let res = strtol_inner_generic(
+                        let res = str_to_i128_inner_generic(
                             env,
                             &getc_fn,
                             &ungetc_fn,
@@ -889,12 +891,14 @@ where
                             src_char_idx,
                             base,
                             if max_width > 0 { max_width } else { u32::MAX },
+                            i32::MIN.into(),
+                            i32::MAX.into(),
                         );
                         match res {
                             Ok((val, len)) => {
                                 src_char_idx += len;
                                 let c_int_ptr: ConstPtr<i32> = args.next(env);
-                                env.mem.write(c_int_ptr.cast_mut(), val);
+                                env.mem.write(c_int_ptr.cast_mut(), val.try_into().unwrap());
                             }
                             Err(_) => break,
                         }
@@ -927,8 +931,7 @@ where
             }
             b'x' | b'X' => {
                 assert!(length_modifier.is_none());
-                // TODO: use strtoul
-                let res = strtol_inner_generic(
+                let res = str_to_i128_inner_generic(
                     env,
                     &getc_fn,
                     &ungetc_fn,
@@ -936,6 +939,8 @@ where
                     src_char_idx,
                     16,
                     if max_width > 0 { max_width } else { u32::MAX },
+                    u32::MIN.into(),
+                    u32::MAX.into(),
                 );
                 match res {
                     Ok((val, len)) => {
