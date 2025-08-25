@@ -12,7 +12,7 @@ use crate::libc::clocale::{setlocale, LC_CTYPE};
 use crate::libc::errno::set_errno;
 use crate::libc::posix_io::{STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
 use crate::libc::stdio::{fwrite, getc, ungetc, EOF, FILE};
-use crate::libc::stdlib::{atof_inner_generic, str_to_i128_inner_generic};
+use crate::libc::stdlib::{atof_inner_generic, str_to_int_inner_generic};
 use crate::libc::string::strlen;
 use crate::libc::wchar::wchar_t;
 use crate::mem::{ConstPtr, GuestUSize, Mem, MutPtr, MutVoidPtr, Ptr};
@@ -857,8 +857,8 @@ where
                     Some(lm) => {
                         match lm {
                             "h" => {
-                                // signed short* or unsigned short*
-                                let res = str_to_i128_inner_generic(
+                                // signed short*
+                                let res = str_to_int_inner_generic(
                                     env,
                                     &getc_fn,
                                     &ungetc_fn,
@@ -866,16 +866,14 @@ where
                                     src_char_idx,
                                     base,
                                     if max_width > 0 { max_width } else { u32::MAX },
-                                    i16::MIN.into(),
-                                    i16::MAX.into(),
-                                    false,
+                                    |s, base| i16::from_str_radix(s, base).unwrap_or(i16::MAX),
+                                    |num| num.checked_mul(-1).unwrap_or(i16::MIN),
                                 );
                                 match res {
                                     Ok((val, len)) => {
                                         src_char_idx += len;
                                         let c_int_ptr: ConstPtr<i16> = args.next(env);
-                                        env.mem
-                                            .write(c_int_ptr.cast_mut(), val.try_into().unwrap());
+                                        env.mem.write(c_int_ptr.cast_mut(), val);
                                     }
                                     Err(_) => break,
                                 }
@@ -884,7 +882,7 @@ where
                         }
                     }
                     _ => {
-                        let res = str_to_i128_inner_generic(
+                        let res = str_to_int_inner_generic(
                             env,
                             &getc_fn,
                             &ungetc_fn,
@@ -892,15 +890,14 @@ where
                             src_char_idx,
                             base,
                             if max_width > 0 { max_width } else { u32::MAX },
-                            i32::MIN.into(),
-                            i32::MAX.into(),
-                            false,
+                            |s, base| i32::from_str_radix(s, base).unwrap_or(i32::MAX),
+                            |num| num.checked_mul(-1).unwrap_or(i32::MIN),
                         );
                         match res {
                             Ok((val, len)) => {
                                 src_char_idx += len;
                                 let c_int_ptr: ConstPtr<i32> = args.next(env);
-                                env.mem.write(c_int_ptr.cast_mut(), val.try_into().unwrap());
+                                env.mem.write(c_int_ptr.cast_mut(), val);
                             }
                             Err(_) => break,
                         }
@@ -938,7 +935,7 @@ where
                     b'u' => 10,
                     _ => unreachable!(),
                 };
-                let res = str_to_i128_inner_generic(
+                let res = str_to_int_inner_generic(
                     env,
                     &getc_fn,
                     &ungetc_fn,
@@ -946,15 +943,14 @@ where
                     src_char_idx,
                     base,
                     if max_width > 0 { max_width } else { u32::MAX },
-                    u32::MIN.into(),
-                    u32::MAX.into(),
-                    true,
+                    |s, base| u32::from_str_radix(s, base).unwrap_or(u32::MAX),
+                    |num| num.wrapping_neg(),
                 );
                 match res {
                     Ok((val, len)) => {
                         src_char_idx += len;
                         let c_u32_ptr: ConstPtr<u32> = args.next(env);
-                        env.mem.write(c_u32_ptr.cast_mut(), val as u32);
+                        env.mem.write(c_u32_ptr.cast_mut(), val);
                     }
                     Err(_) => break,
                 }

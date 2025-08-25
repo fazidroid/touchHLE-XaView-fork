@@ -502,7 +502,7 @@ pub fn atof_inner(
 /// Returns a tuple containing the parsed number and the length of the number in
 /// the string.
 ///
-/// See also a TODO comment in [str_to_i128_inner_generic].
+/// See also a TODO comment in [str_to_int_inner_generic].
 pub fn atof_inner_generic<
     T,
     U,
@@ -596,45 +596,39 @@ where
     s.parse().map(|result| (result, whitespace_len + len))
 }
 
-/// A simple wrapper around [str_to_i128_inner_generic]
+/// A simple wrapper around [str_to_int_inner_generic]
 /// for the case of C string and i32.
 fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(i32, u32), ()> {
-    str_to_i128_inner_generic(
+    str_to_int_inner_generic(
         env,
         |env, s, idx| Ok(env.mem.read(s + idx)),
         |_, _, _| (), // could be ignored
         str.cast_mut(),
         0, // starting offset
         base,
-        u32::MAX,        // max_length
-        i32::MIN.into(), // range_min
-        i32::MAX.into(), // range_max
-        false,           // is_unsigned
+        u32::MAX, // max_length
+        |s, base| i32::from_str_radix(s, base).unwrap_or(i32::MAX),
+        |num| num.checked_mul(-1).unwrap_or(i32::MIN),
     )
-    .map(|(val, len)| (val.try_into().unwrap(), len))
 }
-/// A simple wrapper around [str_to_i128_inner_generic]
+/// A simple wrapper around [str_to_int_inner_generic]
 /// for the case of C string and u32.
 fn strtoul_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(u32, u32), ()> {
-    str_to_i128_inner_generic(
+    str_to_int_inner_generic(
         env,
         |env, s, idx| Ok(env.mem.read(s + idx)),
         |_, _, _| (), // could be ignored
         str.cast_mut(),
         0, // starting offset
         base,
-        u32::MAX,        // max_length
-        u32::MIN.into(), // range_min
-        u32::MAX.into(), // range_max
-        true,            // is_unsigned
+        u32::MAX, // max_length
+        |s, base| u32::from_str_radix(s, base).unwrap_or(u32::MAX),
+        |num| num.wrapping_neg(),
     )
-    .map(|(val, len)| (val as u32, len))
 }
 
 #[allow(rustdoc::broken_intra_doc_links)] // https://github.com/rust-lang/rust/issues/83049
-/// Generic implementation of a conversion helper to `i128`.
-/// This is a responsibility of a caller to interpret results
-/// as a desired type (e.g. unsigned int should be converted with `as`).
+/// Generic implementation of a conversion helper from string to an integer.
 ///
 /// `getc_fn` is a callback to get next character from `subject`.
 /// 3rd parameter in this callback is a index which is safe to ignore
@@ -654,12 +648,10 @@ fn strtoul_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<
 /// `base` of conversion.
 /// Is mutable because in case of base 0 we need to auto-detect it.
 ///
-/// `max_length` a limit for number of chars to consume for conversion.
+/// `from_str_radix_fn` is a callback to actually convert accumulated string
+/// to the number.
 ///
-/// `range_min` and `range_max` define clamp range for desired resulting
-/// int type (for example, for i32 it will be [i32::MIN, i32::MAX]).
-///
-/// `is_unsigned` specifies how '-' is treated.
+/// `negation_fn` is a callback which specifies how '-' is treated.
 ///
 /// Returns a tuple containing the parsed number in the given base and
 /// the length of the number in the string.
@@ -673,11 +665,14 @@ fn strtoul_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<
 /// (Like, let caller to deal with indexing and override `offset` somehow?)
 /// TODO: find a more powerful abstraction for generalization
 #[allow(clippy::too_many_arguments)]
-pub fn str_to_i128_inner_generic<
+pub fn str_to_int_inner_generic<
     T,
     U,
+    Q,
     F1: Fn(&mut Environment, MutPtr<U>, GuestUSize) -> Result<T, ()>,
     F2: Fn(&mut Environment, MutPtr<U>, u8), // TODO: make last param generic too?
+    F3: Fn(&str, u32) -> Q,
+    F4: Fn(Q) -> Q,
 >(
     env: &mut Environment,
     getc_fn: F1,
@@ -686,12 +681,12 @@ pub fn str_to_i128_inner_generic<
     offset: GuestUSize,
     mut base: u32,
     max_length: GuestUSize,
-    range_min: i128,
-    range_max: i128,
-    is_unsigned: bool,
-) -> Result<(i128, u32), ()>
+    from_str_radix_fn: F3,
+    negation_fn: F4,
+) -> Result<(Q, u32), ()>
 where
     u8: From<T>,
+    Q: Default,
 {
     let mut whitespace_len = 0;
     let mut len = 0;
@@ -794,24 +789,16 @@ where
     assert!((2..=36).contains(&base));
     let magnitude_len = len - prefix_length;
     let res = if magnitude_len > 0 {
-        let mut res = i128::from_str_radix(s, base).unwrap();
-        if sign == Some(b'-') {
-            if is_unsigned {
-                assert_eq!(range_min, 0);
-                // two's compliment
-                res = (!(res as u128) + 1) as i128;
-            } else {
-                res = res.checked_mul(-1).unwrap();
-                // TODO: set errno on range errors
-                res = res.clamp(range_min, range_max)
-            }
-        }
         // TODO: set errno on range errors
-        res.min(range_max)
+        let mut res = from_str_radix_fn(s, base);
+        if sign == Some(b'-') {
+            res = negation_fn(res);
+        }
+        res
     } else {
         // Special case - prefix of invalid octal number is a valid number 0
         if base == 8 && prefix_length > 0 {
-            return Ok((0, whitespace_len + prefix_length));
+            return Ok((Q::default(), whitespace_len + prefix_length));
         }
         return Err(());
     };
