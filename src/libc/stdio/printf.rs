@@ -931,15 +931,20 @@ where
                     }
                 }
             }
-            b'x' | b'X' => {
+            b'x' | b'X' | b'u' => {
                 assert!(length_modifier.is_none());
+                let base: u32 = match specifier {
+                    b'x' | b'X' => 16,
+                    b'u' => 10,
+                    _ => unreachable!(),
+                };
                 let res = str_to_i128_inner_generic(
                     env,
                     &getc_fn,
                     &ungetc_fn,
                     subject,
                     src_char_idx,
-                    16,
+                    base,
                     if max_width > 0 { max_width } else { u32::MAX },
                     u32::MIN.into(),
                     u32::MAX.into(),
