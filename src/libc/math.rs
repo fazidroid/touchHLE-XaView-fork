@@ -10,6 +10,16 @@ use crate::libc::errno::set_errno;
 use crate::mem::MutPtr;
 use crate::Environment;
 
+// TODO: move to `fenv.h`
+type FERoundingDirection = i32;
+const FE_TONEAREST: FERoundingDirection = 0x000000;
+const FE_TOWARDZERO: FERoundingDirection = 0xc00000;
+
+#[derive(Default)]
+pub struct State {
+    rounding_direction: FERoundingDirection,
+}
+
 // The sections in this file are organized to match the C standard.
 
 // FIXME: Many functions in this file should theoretically set errno or affect
@@ -396,15 +406,29 @@ fn lrint(env: &mut Environment, arg: f64) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    // As tested on both macOS and iOS Simulator, by default it
-    // rounds to the nearest integer with ties on even
-    // TODO: support other rounding modes
-    arg.max(i32::MIN as f64)
-        .min(i32::MAX as f64)
-        .round_ties_even() as i32
+    let clamped = arg.clamp(i32::MIN as f64, i32::MAX as f64);
+    match env.libc_state.math.rounding_direction {
+        FE_TONEAREST => {
+            // As tested on both macOS and iOS Simulator, by default it
+            // rounds to the nearest integer with ties on even
+            clamped.round_ties_even() as i32
+        }
+        FE_TOWARDZERO => clamped.trunc() as i32,
+        _ => unimplemented!(),
+    }
 }
 fn lrintf(env: &mut Environment, arg: f32) -> i32 {
     lrint(env, arg.into())
+}
+
+// Rounding direction
+fn fegetround(env: &mut Environment) -> i32 {
+    env.libc_state.math.rounding_direction
+}
+fn fesetround(env: &mut Environment, round: i32) -> i32 {
+    assert!(round == FE_TONEAREST || round == FE_TOWARDZERO); // TODO
+    env.libc_state.math.rounding_direction = round;
+    0 // Success
 }
 
 // Remainder functions
@@ -505,6 +529,9 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(modff(_, _)),
     export_c_func!(lrint(_)),
     export_c_func!(lrintf(_)),
+    // Rounding direction
+    export_c_func!(fegetround()),
+    export_c_func!(fesetround(_)),
     // Remainder functions
     export_c_func!(fmod(_, _)),
     export_c_func!(fmodf(_, _)),

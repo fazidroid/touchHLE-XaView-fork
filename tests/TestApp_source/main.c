@@ -202,6 +202,12 @@ float frexpf(float, int *);
 double frexp(double, int *);
 double fabs(double);
 
+// <fenv.h>
+#define FE_TONEAREST 0x00000000
+#define FE_TOWARDZERO 0x00C00000
+int fegetround(void);
+int fesetround(int);
+
 // <inet.h>
 typedef unsigned int socklen_t;
 typedef unsigned int in_addr_t;
@@ -2546,6 +2552,28 @@ int test_lrint() {
   return 0;
 }
 
+int test_fesetround() {
+  int default_rounding = fegetround();
+  if (default_rounding != FE_TONEAREST) {
+    return -1;
+  }
+  if (lrint(+11.5) != +12.0 || lrint(+12.5) != +12.0 || lrint(-11.5) != -12.0) {
+    return -2;
+  }
+  int res = fesetround(FE_TOWARDZERO);
+  if (res != 0) {
+    return -3;
+  }
+  if (lrint(+11.5) != +11.0 || lrint(+12.5) != +12.0 || lrint(-11.5) != -11.0) {
+    return -4;
+  }
+  res = fesetround(default_rounding);
+  if (res != 0) {
+    return -5;
+  }
+  return 0;
+}
+
 int test_ldexp() {
   struct {
     double x;
@@ -3294,6 +3322,7 @@ struct {
     FUNC_DEF(test_CFMutableDictionary_CustomCallbacks_PrimitiveTypes),
     FUNC_DEF(test_CFMutableDictionary_CustomCallbacks_CFTypes),
     FUNC_DEF(test_lrint),
+    FUNC_DEF(test_fesetround),
     FUNC_DEF(test_ldexp),
     FUNC_DEF(test_maskrune),
     FUNC_DEF(test_frexpf),
