@@ -24,6 +24,7 @@ use std::time::Duration;
 
 #[derive(Default)]
 pub struct State {
+    is_multi_threaded: bool,
     ns_threads: HashMap<pthread_t, id>,
 }
 impl State {
@@ -59,6 +60,13 @@ pub const CLASSES: ClassExports = objc_classes! {
         finished: false,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
++ (bool)isMultiThreaded {
+    // Note: this doesn't account for non-Cocoa APIs,
+    // only for `detachNewThreadSelector:toTarget:withObject:` and
+    // `start` methods (according to the docs)
+    env.framework_state.foundation.ns_thread.is_multi_threaded
 }
 
 + (f64)threadPriority {
@@ -106,6 +114,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     // We own this thread and need to release it after it's finished
     env.objc.borrow_mut::<NSThreadHostObject>(new).owned = true;
 
+    // redundant with `start`, but we do it for the sake of completeness
+    env.framework_state.foundation.ns_thread.is_multi_threaded = true;
+
     msg![env; new start]
 }
 
@@ -140,6 +151,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     assert!(!State::get(env).ns_threads.contains_key(&pthread));
     State::get(env).ns_threads.insert(pthread, this);
 
+    env.framework_state.foundation.ns_thread.is_multi_threaded = true;
     // TODO: post NSWillBecomeMultiThreadedNotification
 }
 
