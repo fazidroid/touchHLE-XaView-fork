@@ -31,12 +31,14 @@ const kAudioSessionProperty_PreferredHardwareIOBufferDuration: AudioSessionPrope
 const kAudioSessionProperty_PreferredHardwareSampleRate: AudioSessionPropertyID = fourcc(b"hwsr");
 
 const kAudioSessionCategory_SoloAmbientSound: u32 = fourcc(b"solo");
+const kAudioSessionProperty_CurrentHardwareIOBufferDuration: u32 = fourcc(b"chbd");
 
 pub struct State {
     audio_session_category: u32,
     pub current_hardware_sample_rate: f64,
     pub current_hardware_output_number_channels: u32,
     current_hardware_output_volume: f32,
+    current_hardware_io_buffer_duration: f32,
 }
 impl Default for State {
     fn default() -> Self {
@@ -48,6 +50,8 @@ impl Default for State {
             current_hardware_sample_rate: 44100.0,
             current_hardware_output_number_channels: 2,
             current_hardware_output_volume: 1.0,
+            // Value was checked on both iOS Simulator and iPhone 3GS
+            current_hardware_io_buffer_duration: 0.023220,
         }
     }
 }
@@ -114,6 +118,10 @@ fn AudioSessionGetProperty(
         }
         kAudioSessionProperty_CurrentHardwareOutputVolume => {
             let value: f32 = state.current_hardware_output_volume;
+            env.mem.write(out_data.cast(), value);
+        }
+        kAudioSessionProperty_CurrentHardwareIOBufferDuration => {
+            let value: f32 = state.current_hardware_io_buffer_duration;
             env.mem.write(out_data.cast(), value);
         }
         _ => unreachable!(),
@@ -205,6 +213,7 @@ fn get_audio_session_property_size(in_ID: AudioSessionPropertyID) -> GuestUSize 
         kAudioSessionProperty_CurrentHardwareSampleRate => guest_size_of::<f64>(),
         kAudioSessionProperty_CurrentHardwareOutputNumberChannels => guest_size_of::<u32>(),
         kAudioSessionProperty_CurrentHardwareOutputVolume => guest_size_of::<f32>(),
+        kAudioSessionProperty_CurrentHardwareIOBufferDuration => guest_size_of::<f32>(),
         _ => unimplemented!("Unimplemented property ID: {}", debug_fourcc(in_ID)),
     }
 }
