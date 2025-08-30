@@ -485,6 +485,15 @@ fn wcstombs(
     len
 }
 
+fn system(env: &mut Environment, cmd: ConstPtr<u8>) -> i32 {
+    if cmd.is_null() {
+        log!("TODO: App checked for sh availability with system(NULL), returning 0");
+        return 0; // sh is not available!
+    }
+    log!("system({:?})", env.mem.cstr_at_utf8(cmd));
+    todo!()
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(malloc(_)),
     export_c_func!(malloc_size(_)),
@@ -513,6 +522,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func_aliased!("realpath$DARWIN_EXTSN", realpath(_, _)),
     export_c_func!(mbstowcs(_, _, _)),
     export_c_func!(wcstombs(_, _, _)),
+    export_c_func!(system(_)),
 ];
 
 /// A simple wrapper around [atof_inner_generic] for the case of C string.
