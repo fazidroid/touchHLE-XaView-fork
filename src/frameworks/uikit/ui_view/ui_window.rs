@@ -8,6 +8,7 @@
 use super::UIViewHostObject;
 use crate::dyld::{ConstantExports, HostConstant};
 use crate::frameworks::core_graphics::CGRect;
+use crate::frameworks::foundation::ns_string;
 use crate::objc::{id, msg, msg_class, msg_super, nil, objc_classes, ClassExports};
 
 #[derive(Default)]
@@ -100,13 +101,23 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 
+- (())makeKeyWindow {
+    // TODO: post UIWindowDidResignKeyNotification for previous key window
+    env.framework_state.uikit.ui_view.ui_window.key_window = Some(this);
+
+    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+    let notif_name = ns_string::get_static_str(env, UIWindowDidBecomeKeyNotification);
+    () = msg![env; center postNotificationName:notif_name object:this userInfo:nil];
+}
+
 - (())makeKeyAndVisible {
     // TODO: We don't currently have send any non-touch events to windows,
     // so there's no meaning in it yet.
 
-    env.framework_state.uikit.ui_view.ui_window.key_window = Some(this);
+    () = msg![env; this makeKeyWindow];
 
-    msg![env; this setHidden:false]
+    // TODO: post UIWindowDidBecomeVisibleNotification
+    () = msg![env; this setHidden:false];
 }
 
 // UIResponder implementation
@@ -143,7 +154,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
-// TODO: more keyboard notifications
+/// Window life-cycle notifications
+/// TODO: more notifications
+const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
+/// Keyboard notifications
+/// TODO: more keyboard notifications
 pub const UIKeyboardWillShowNotification: &str = "UIKeyboardWillShowNotification";
 pub const UIKeyboardDidShowNotification: &str = "UIKeyboardDidShowNotification";
 pub const UIKeyboardWillHideNotification: &str = "UIKeyboardWillHideNotification";
@@ -151,6 +166,10 @@ pub const UIKeyboardDidHideNotification: &str = "UIKeyboardDidHideNotification";
 pub const UIKeyboardBoundsUserInfoKey: &str = "UIKeyboardBoundsUserInfoKey";
 
 pub const CONSTANTS: ConstantExports = &[
+    (
+        "_UIWindowDidBecomeKeyNotification",
+        HostConstant::NSString(UIWindowDidBecomeKeyNotification),
+    ),
     (
         "_UIKeyboardWillShowNotification",
         HostConstant::NSString(UIKeyboardWillShowNotification),
