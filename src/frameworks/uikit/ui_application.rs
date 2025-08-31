@@ -185,6 +185,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: ignoring registerForRemoteNotificationTypes:{}", types);
 }
 
+- (NSInteger)applicationIconBadgeNumber {
+    0 // default value
+}
 - (())setApplicationIconBadgeNumber:(NSInteger)bn {
     log!("TODO: ignoring setApplicationIconBadgeNumber:{}", bn);
 }
