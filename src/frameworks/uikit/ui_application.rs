@@ -309,6 +309,11 @@ pub(super) fn UIApplicationMain(
             () = msg![env; delegate applicationDidFinishLaunching:ui_application];
         }
 
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+        let notif_name = get_static_str(env, UIApplicationDidFinishLaunchingNotification);
+        // TODO: launch options in `userInfo` if it'll ever become a concern
+        () = msg![env; center postNotificationName:notif_name object:ui_application userInfo:nil];
+
         let _: () = msg![env; pool drain];
     }
 
@@ -330,11 +335,15 @@ pub(super) fn UIApplicationMain(
         {
             () = msg![env; delegate applicationDidBecomeActive:ui_application];
         }
+
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+        let notif_name = get_static_str(env, UIApplicationDidBecomeActiveNotification);
+        () = msg![env; center postNotificationName:notif_name object:ui_application userInfo:nil];
+
         let _: () = msg![env; pool drain];
     }
 
     // FIXME: There are more messages we should send.
-    // TODO: Send UIApplicationDidFinishLaunchingNotification?
 
     // TODO: It might be nicer to return from this function (even though it's
     // conceptually noreturn) and set some global flag that changes how the
@@ -349,7 +358,7 @@ pub(super) fn UIApplicationMain(
 pub(super) fn exit(env: &mut Environment) {
     let ui_application: id = msg_class![env; UIApplication sharedApplication];
 
-    // TODO: send notifications also
+    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
 
     {
         let pool: id = msg_class![env; NSAutoreleasePool new];
@@ -373,6 +382,9 @@ pub(super) fn exit(env: &mut Environment) {
             () = msg![env; delegate applicationWillResignActive:ui_application];
         }
 
+        let notif_name = get_static_str(env, UIApplicationWillResignActiveNotification);
+        () = msg![env; center postNotificationName:notif_name object:ui_application userInfo:nil];
+
         let _: () = msg![env; pool drain];
     };
 
@@ -385,22 +397,59 @@ pub(super) fn exit(env: &mut Environment) {
         {
             () = msg![env; delegate applicationWillTerminate:ui_application];
         }
+
+        let notif_name = get_static_str(env, UIApplicationWillTerminateNotification);
+        () = msg![env; center postNotificationName:notif_name object:ui_application userInfo:nil];
+
         let _: () = msg![env; pool drain];
     };
 
     std::process::exit(0);
 }
 
-pub const UIApplicationDidReceiveMemoryWarningNotification: &str =
-    "UIApplicationDidReceiveMemoryWarningNotification";
-pub const UIApplicationLaunchOptionsRemoteNotificationKey: &str =
-    "UIApplicationLaunchOptionsRemoteNotificationKey";
-pub const UIApplicationDidEnterBackgroundNotification: &str =
+/// App life-cycle notifications
+const UIApplicationDidFinishLaunchingNotification: &str =
+    "UIApplicationDidFinishLaunchingNotification";
+const UIApplicationDidBecomeActiveNotification: &str = "UIApplicationDidBecomeActiveNotification";
+const UIApplicationDidEnterBackgroundNotification: &str =
     "UIApplicationDidEnterBackgroundNotification";
+const UIApplicationWillEnterForegroundNotification: &str =
+    "UIApplicationWillEnterForegroundNotification";
+const UIApplicationWillResignActiveNotification: &str = "UIApplicationWillResignActiveNotification";
+const UIApplicationWillTerminateNotification: &str = "UIApplicationWillTerminateNotification";
+/// Other app notifications
+const UIApplicationLaunchOptionsRemoteNotificationKey: &str =
+    "UIApplicationLaunchOptionsRemoteNotificationKey";
+const UIApplicationDidReceiveMemoryWarningNotification: &str =
+    "UIApplicationDidReceiveMemoryWarningNotification";
 
 /// `UIApplicationLaunchOptionsKey` and `NSNotificationName` values.
 /// (Both types are strings)
 pub const CONSTANTS: ConstantExports = &[
+    (
+        "_UIApplicationDidFinishLaunchingNotification",
+        HostConstant::NSString(UIApplicationDidFinishLaunchingNotification),
+    ),
+    (
+        "_UIApplicationDidBecomeActiveNotification",
+        HostConstant::NSString(UIApplicationDidBecomeActiveNotification),
+    ),
+    (
+        "_UIApplicationDidEnterBackgroundNotification",
+        HostConstant::NSString(UIApplicationDidEnterBackgroundNotification),
+    ),
+    (
+        "_UIApplicationWillEnterForegroundNotification",
+        HostConstant::NSString(UIApplicationWillEnterForegroundNotification),
+    ),
+    (
+        "_UIApplicationWillResignActiveNotification",
+        HostConstant::NSString(UIApplicationWillResignActiveNotification),
+    ),
+    (
+        "_UIApplicationWillTerminateNotification",
+        HostConstant::NSString(UIApplicationWillTerminateNotification),
+    ),
     (
         "_UIApplicationDidReceiveMemoryWarningNotification",
         HostConstant::NSString(UIApplicationDidReceiveMemoryWarningNotification),
@@ -408,10 +457,6 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_UIApplicationLaunchOptionsRemoteNotificationKey",
         HostConstant::NSString(UIApplicationLaunchOptionsRemoteNotificationKey),
-    ),
-    (
-        "_UIApplicationDidEnterBackgroundNotification",
-        HostConstant::NSString(UIApplicationDidEnterBackgroundNotification),
     ),
 ];
 
