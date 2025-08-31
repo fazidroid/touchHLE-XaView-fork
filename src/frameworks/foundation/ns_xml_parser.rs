@@ -72,6 +72,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setShouldResolveExternalEntities:(bool)should {
     log_dbg!("TODO: setShouldResolveExternalEntities:{}", should);
 }
+- (())setShouldProcessNamespaces:(bool)should {
+    log_dbg!("TODO: setShouldProcessNamespaces:{}", should);
+    assert!(!should);
+}
+- (())setShouldReportNamespacePrefixes:(bool)should {
+    log_dbg!("TODO: setShouldReportNamespacePrefixes:{}", should);
+    assert!(!should);
+}
 
 - (bool)parse {
     let data = env.objc.borrow::<NSXMLParserHostObject>(this).data;
@@ -224,6 +232,13 @@ pub const CLASSES: ClassExports = objc_classes! {
                     let comment = autorelease(env, comment);
                     () = msg![env; delegate parser:this foundComment:comment];
                 }
+            }
+            Event::Decl(_) => {
+                let sel: SEL = env
+                    .objc
+                    .register_host_selector("parser:foundElementDeclarationWithName:model:".to_string(), &mut env.mem);
+                let responds: bool = msg![env; delegate respondsToSelector:sel];
+                assert!(!responds); // TODO
             }
             e => unimplemented!("{:?}", e)
         }
