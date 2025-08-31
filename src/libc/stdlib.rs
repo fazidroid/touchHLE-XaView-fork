@@ -322,7 +322,54 @@ pub fn strtoul(
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    match strtoul_inner(env, str, base as u32) {
+    let parse_res = str_to_int_inner_generic(
+        env,
+        |env, s, idx| Ok(env.mem.read(s + idx)),
+        |_, _, _| (), // could be ignored
+        str.cast_mut(),
+        0, // starting offset
+        base.try_into().unwrap(),
+        u32::MAX, // max_length
+        |s, base| u32::from_str_radix(s, base).unwrap_or(u32::MAX),
+        |num| num.wrapping_neg(),
+    );
+    match parse_res {
+        Ok((res, len)) => {
+            if !endptr.is_null() {
+                env.mem.write(endptr, (str + len).cast_mut());
+            }
+            res
+        }
+        Err(_) => {
+            if !endptr.is_null() {
+                env.mem.write(endptr, str.cast_mut());
+            }
+            0
+        }
+    }
+}
+
+fn strtoull(
+    env: &mut Environment,
+    str: ConstPtr<u8>,
+    endptr: MutPtr<MutPtr<u8>>,
+    base: i32,
+) -> u64 {
+    // TODO: handle errno properly
+    set_errno(env, 0);
+
+    let parse_res = str_to_int_inner_generic(
+        env,
+        |env, s, idx| Ok(env.mem.read(s + idx)),
+        |_, _, _| (), // could be ignored
+        str.cast_mut(),
+        0, // starting offset
+        base.try_into().unwrap(),
+        u32::MAX, // max_length
+        |s, base| u64::from_str_radix(s, base).unwrap_or(u64::MAX),
+        |num| num.wrapping_neg(),
+    );
+    match parse_res {
         Ok((res, len)) => {
             if !endptr.is_null() {
                 env.mem.write(endptr, (str + len).cast_mut());
@@ -460,6 +507,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(bsearch(_, _, _, _, _)),
     export_c_func!(strtof(_, _)),
     export_c_func!(strtoul(_, _, _)),
+    export_c_func!(strtoull(_, _, _)),
     export_c_func!(strtol(_, _, _)),
     export_c_func!(realpath(_, _)),
     export_c_func_aliased!("realpath$DARWIN_EXTSN", realpath(_, _)),
@@ -609,21 +657,6 @@ fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(
         u32::MAX, // max_length
         |s, base| i32::from_str_radix(s, base).unwrap_or(i32::MAX),
         |num| num.checked_mul(-1).unwrap_or(i32::MIN),
-    )
-}
-/// A simple wrapper around [str_to_int_inner_generic]
-/// for the case of C string and u32.
-fn strtoul_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(u32, u32), ()> {
-    str_to_int_inner_generic(
-        env,
-        |env, s, idx| Ok(env.mem.read(s + idx)),
-        |_, _, _| (), // could be ignored
-        str.cast_mut(),
-        0, // starting offset
-        base,
-        u32::MAX, // max_length
-        |s, base| u32::from_str_radix(s, base).unwrap_or(u32::MAX),
-        |num| num.wrapping_neg(),
     )
 }
 
