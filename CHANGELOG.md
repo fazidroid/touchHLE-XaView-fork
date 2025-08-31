@@ -53,6 +53,7 @@ Compatibility:
   - [Dark Nebula](https://appdb.touchhle.org/apps/910) (@ciciplusplus)
   - [FIFA 10](https://appdb.touchhle.org/apps/496) (@ciciplusplus)
   - [Crash Bandicoot Nitro Kart 2](https://appdb.touchhle.org/apps/670) (@ciciplusplus)
+  - [Driver](https://appdb.touchhle.org/apps/247) (@ciciplusplus)
 - API support improvements:
   - Various small contributions. (@hikari-no-yume, @alborrajo, @ciciplusplus, @atasro2, @abnormalmaps, @hujerhoe, @acieslewicz, @WhatAmISupposedToPutHere, @JaGoTu, @apexad, @chyyran, @mistydemeo)
   - UITextField now supports real text input with a keyboard. On Windows/macOS physical keyboard is used, on Android it's done via a system soft keyboard. (@ciciplusplus)
