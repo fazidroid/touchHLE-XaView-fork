@@ -7,9 +7,8 @@
 
 use crate::dyld::ConstantExports;
 use crate::dyld::HostConstant;
-use crate::frameworks::foundation::ns_string;
-use crate::frameworks::foundation::NSInteger;
-use crate::objc::{id, objc_classes, ClassExports, TrivialHostObject};
+use crate::frameworks::foundation::{ns_string, NSInteger};
+use crate::objc::{id, msg, objc_classes, ClassExports, TrivialHostObject};
 use crate::window::{get_battery_status, BatteryState, DeviceOrientation};
 
 pub const UIDeviceOrientationDidChangeNotification: &str =
@@ -70,9 +69,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())endGeneratingDeviceOrientationNotifications {
     log!("TODO: endGeneratingDeviceOrientationNotifications");
 }
+
 - (id)model {
     // TODO: Hardcoded to iPhone for now
     ns_string::get_static_str(env, "iPhone")
+}
+- (id)localizedModel {
+    // TODO: localization
+    msg![env; this model]
 }
 
 - (id)name {
