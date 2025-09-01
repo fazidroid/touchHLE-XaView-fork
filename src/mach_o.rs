@@ -22,9 +22,9 @@ use crate::abi::GuestFunction;
 use crate::fs::{Fs, GuestPath};
 use crate::mem::{GuestUSize, Mem, Ptr};
 use mach_object::{
-    cpu_subtype_t, vm_prot_t, Bind, BindSymbolType, DyLib, LoadCommand, MachCommand, OFile, Symbol,
-    SymbolIter, ThreadState, N_ARM_THUMB_DEF, S_LAZY_SYMBOL_POINTERS, S_MOD_INIT_FUNC_POINTERS,
-    S_NON_LAZY_SYMBOL_POINTERS, S_SYMBOL_STUBS,
+    cpu_subtype_t, vm_prot_t, Bind, BindSymbolType, DyLib, LoadCommand, MachCommand, OFile, Rebase,
+    Symbol, SymbolIter, ThreadState, N_ARM_THUMB_DEF, S_LAZY_SYMBOL_POINTERS,
+    S_MOD_INIT_FUNC_POINTERS, S_NON_LAZY_SYMBOL_POINTERS, S_SYMBOL_STUBS,
 };
 use std::collections::HashMap;
 use std::io::{Cursor, Seek, SeekFrom};
@@ -557,9 +557,38 @@ impl MachO {
                     bind_size,
                     ..
                 } => {
-                    // TODO: Implement rebasing once sliding support is added
-                    assert_eq!(rebase_off, 0);
-                    assert_eq!(rebase_size, 0);
+                    // TODO: Implement sliding and handle properly here
+                    let slide = 0;
+                    if rebase_size != 0 {
+                        log!("Warning: Binary \"{}\" requests rebasing, skipping!", name);
+                    }
+
+                    let rebase_opcodes = Rebase::parse(
+                        &bytes[rebase_off as usize..][..rebase_size as usize],
+                        size_of::<GuestUSize>(),
+                    );
+
+                    for symb in rebase_opcodes {
+                        match symb.symbol_type {
+                            BindSymbolType::Pointer => {
+                                let addr =
+                                    segment_offsets[symb.segment_index] + symb.symbol_offset as u32;
+                                let original_location = Ptr::from_bits(addr);
+                                let old: u32 = into_mem.read(original_location);
+                                log_dbg!(
+                                    "Pointer rebase at {:#x} from {:#x} to {:#x}",
+                                    addr,
+                                    old,
+                                    old + slide
+                                );
+                                into_mem.write(original_location, old + slide);
+                            }
+                            _ => unimplemented!(
+                                "Unhandled DyldInfo rebase symbol type: {:?}",
+                                symb.symbol_type
+                            ),
+                        }
+                    }
 
                     let bind_opcodes = Bind::parse(
                         &bytes[bind_off as usize..][..bind_size as usize],
