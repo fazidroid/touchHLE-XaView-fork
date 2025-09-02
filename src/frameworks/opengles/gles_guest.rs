@@ -200,6 +200,13 @@ fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
                     mem.write(params + idx as GuestUSize, format as _);
                 }
             }
+            // MAX_COLOR_ATTACHMENTS_EXT or MAX_COLOR_ATTACHMENTS_OES
+            0x8cdf => {
+                // According to [OES_framebuffer_object](https://registry.khronos.org/OpenGL/extensions/OES/OES_framebuffer_object.txt),
+                // MAX_COLOR_ATTACHMENTS_OES is not supported in the extension,
+                // but we return 1 to match the real device.
+                mem.write(params, 1 as _);
+            }
             _ => {
                 let params = mem.ptr_at_mut(params, 16 /* upper bound */);
                 unsafe { gles.GetIntegerv(pname, params) };
