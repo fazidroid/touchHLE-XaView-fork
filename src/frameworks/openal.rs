@@ -21,8 +21,8 @@ use crate::Environment;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use touchHLE_openal_soft_wrapper::{
-    ALC_DEVICE_SPECIFIER, ALC_FREQUENCY, ALC_MONO_SOURCES, ALC_STEREO_SOURCES, AL_EXTENSIONS,
-    AL_RENDERER, AL_VENDOR, AL_VERSION,
+    ALC_DEVICE_SPECIFIER, ALC_FREQUENCY, ALC_MONO_SOURCES, ALC_REFRESH, ALC_STEREO_SOURCES,
+    ALC_SYNC, AL_EXTENSIONS, AL_RENDERER, AL_VENDOR, AL_VERSION,
 };
 
 #[derive(Default)]
@@ -110,8 +110,13 @@ fn alcGetString(
     env.mem.alloc_and_write_cstr(s.to_bytes()).cast_const()
 }
 
-const ALLOWED_CONTEXT_ATTRIBUTES: [ALCint; 3] =
-    [ALC_FREQUENCY, ALC_MONO_SOURCES, ALC_STEREO_SOURCES];
+const ALLOWED_CONTEXT_ATTRIBUTES: [ALCint; 5] = [
+    ALC_FREQUENCY,
+    ALC_REFRESH,
+    ALC_SYNC,
+    ALC_MONO_SOURCES,
+    ALC_STEREO_SOURCES,
+];
 
 fn alcCreateContext(
     env: &mut Environment,
