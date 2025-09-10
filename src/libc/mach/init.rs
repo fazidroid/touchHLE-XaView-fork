@@ -8,7 +8,7 @@
 //! There's not much documentation available for these.
 
 use crate::dyld::{ConstantExports, HostConstant};
-use crate::libc::mach_thread_info::mach_port_t;
+use crate::libc::mach::thread_info::mach_port_t;
 use crate::mem::PAGE_SIZE;
 
 // Unique mock value so we can assert against itself
