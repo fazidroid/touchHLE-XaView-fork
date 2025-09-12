@@ -57,6 +57,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.dealloc_object(this, &mut env.mem);
 }
 
+- (NSInteger)code {
+    env.objc.borrow::<ErrorHostObject>(this).code
+}
 
 @end
 
