@@ -6,7 +6,7 @@
 //! The `NSValue` class cluster, including `NSNumber`.
 
 use super::ns_string::{from_rust_ordering, from_rust_string};
-use super::{NSComparisonResult, NSOrderedSame, NSUInteger};
+use super::{NSComparisonResult, NSOrderedSame, NSUInteger, _nib_archive_decoder};
 use crate::frameworks::core_foundation::cf_number::{
     kCFNumberCharType, kCFNumberFloat32Type, kCFNumberFloatType, kCFNumberIntType,
     kCFNumberSInt16Type, kCFNumberSInt32Type, kCFNumberSInt8Type, kCFNumberShortType, CFNumberType,
@@ -15,8 +15,8 @@ use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::NSInteger;
 use crate::mem::{ConstVoidPtr, MutVoidPtr};
 use crate::objc::{
-    autorelease, id, msg, msg_class, objc_classes, retain, Class, ClassExports, HostObject,
-    NSZonePtr,
+    autorelease, id, msg, msg_class, objc_classes, release, retain, Class, ClassExports,
+    HostObject, NSZonePtr,
 };
 use crate::Environment;
 use std::cmp::Ordering;
@@ -261,6 +261,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 // TODO: types other than booleans and long longs
+
+// NSCoding implementation
+- (id)initWithCoder:(id)coder {
+    let class: Class = msg![env; coder class];
+    let nib_archive_class: Class = msg_class![env; _touchHLE_NIBArchiveDecoder class];
+    let new_num = if env.objc.class_is_subclass_of(class, nib_archive_class) {
+        _nib_archive_decoder::decode_current_number(env, coder)
+    } else {
+        unimplemented!();
+    };
+    release(env, this);
+    new_num
+}
 
 - (id)initWithBool:(bool)value {
     *env.objc.borrow_mut(this) = NSNumberHostObject::Bool(value);

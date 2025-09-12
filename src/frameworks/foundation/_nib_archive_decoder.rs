@@ -11,11 +11,12 @@
 
 use crate::environment::Environment;
 use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};
-use crate::frameworks::foundation::ns_string::to_rust_string;
-use crate::frameworks::foundation::{ns_string, NSInteger, NSUInteger};
+use crate::frameworks::foundation::ns_string::{from_rust_string, get_static_str, to_rust_string};
+use crate::frameworks::foundation::{NSInteger, NSUInteger};
 use crate::mem::ConstVoidPtr;
 use crate::objc::{
-    autorelease, id, msg, nil, objc_classes, release, retain, ClassExports, HostObject, NSZonePtr,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
+    NSZonePtr,
 };
 use nibarchive::{NIBArchive, Value, ValueVariant};
 
@@ -148,6 +149,9 @@ pub const CLASSES: ClassExports = objc_classes! {
             }
         }
     )
+}
+- (i32)decodeIntForKey:(id)key { // NSString *
+    msg![env; this decodeIntegerForKey:key]
 }
 
 
@@ -309,6 +313,20 @@ pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
     array
 }
 
+pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id)> {
+    // Trick: dict is an array of key-value-key-value sequence
+    let array = decode_current_array(env, unarchiver);
+    // Note: we need to release as `dict_from_keys_and_objects`
+    // would retain them later
+    for &obj in &array {
+        release(env, obj);
+    }
+    array
+        .chunks_exact(2)
+        .map(|chunks| (chunks[0], chunks[1]))
+        .collect()
+}
+
 pub fn decode_current_string(env: &mut Environment, unarchiver: id) -> id {
     let host_obj = borrow_host_obj(env, unarchiver);
     let current_idx = host_obj.current_object_idx.unwrap();
@@ -331,5 +349,33 @@ pub fn decode_current_string(env: &mut Environment, unarchiver: id) -> id {
     };
 
     let str = String::from_utf8(inner_data.clone()).unwrap();
-    ns_string::from_rust_string(env, str)
+    log_dbg!("decode_current_string {str}");
+    from_rust_string(env, str)
+}
+
+pub fn decode_current_number(env: &mut Environment, unarchiver: id) -> id {
+    let host_obj = borrow_host_obj(env, unarchiver);
+    let current_idx = host_obj.current_object_idx.unwrap();
+
+    let object = host_obj
+        .archive
+        .objects()
+        .get(current_idx as usize)
+        .unwrap();
+    let values: &[Value] = object.values(host_obj.archive.values());
+    assert_eq!(1, values.len());
+
+    let value = &values[0];
+    let key = value.key(host_obj.archive.keys());
+
+    match key.as_str() {
+        "NS.intval" => {
+            let ns_key: id = get_static_str(env, "NS.intval");
+            let int: NSInteger = msg![env; unarchiver decodeIntegerForKey:ns_key];
+            release(env, ns_key);
+            let num = msg_class![env; NSNumber alloc];
+            msg![env; num initWithInteger:int]
+        }
+        _ => unimplemented!("decode_current_number: {key}"),
+    }
 }
