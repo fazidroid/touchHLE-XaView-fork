@@ -7,13 +7,15 @@
 
 use super::ns_enumerator::{fast_enumeration_helper, NSFastEnumerationState};
 use super::ns_property_list_serialization::deserialize_plist_from_file;
-use super::{ns_keyed_unarchiver, ns_string, ns_url, NSInteger, NSNotFound, NSRange, NSUInteger};
+use super::{
+    ns_keyed_unarchiver, ns_string, ns_url, NSComparisonResult, NSNotFound, NSRange, NSUInteger,
+};
 use crate::abi::{CallFromHost, GuestFunction};
 use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, MutVoidPtr};
 use crate::objc::{
-    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
-    NSZonePtr, SEL,
+    autorelease, id, msg, msg_class, msg_send, nil, objc_classes, release, retain, ClassExports,
+    HostObject, NSZonePtr, SEL,
 };
 use crate::Environment;
 
@@ -382,6 +384,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, res)
 }
 
+- (id)sortedArrayUsingSelector:(SEL)comparator {
+    let new = msg![env; this mutableCopy];
+    () = msg![env; new sortUsingSelector:comparator];
+    autorelease(env, new)
+}
+
 @end
 
 // Special variant for use by CFArray with NULL callbacks: objects aren't
@@ -481,7 +489,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_object: &mut ArrayHostObject = env.objc.borrow_mut(this);
     let mut array = std::mem::take(&mut host_object.array);
     array.sort_by(|&a, &b| {
-        let res: NSInteger = comparator.call_from_host(env, (a, b, context));
+        let res: NSComparisonResult = comparator.call_from_host(env, (a, b, context));
+        res.cmp(&0)
+    });
+
+    env.objc.borrow_mut::<ArrayHostObject>(this).array = array;
+}
+- (())sortUsingSelector:(SEL)comparator {
+    let host_object: &mut ArrayHostObject = env.objc.borrow_mut(this);
+    let mut array = std::mem::take(&mut host_object.array);
+    array.sort_by(|&a, &b| {
+        let res: NSComparisonResult = msg_send(env, (a, comparator, b));
         res.cmp(&0)
     });
 
