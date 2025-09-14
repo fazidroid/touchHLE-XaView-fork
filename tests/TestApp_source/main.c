@@ -1726,14 +1726,14 @@ int test_CGImage_JPEG() {
     return -6;
   }
   CFDataRef rawData = CGDataProviderCopyData(CGImageGetDataProvider(imageRef));
-  unsigned char *bytes = CFDataGetBytePtr(rawData);
-  unsigned char r = bytes[0];
-  unsigned char g = bytes[1];
-  unsigned char b = bytes[2];
-  // Check that pixel is indeed a black one
-  if (!(r == 0 && g == 0 && b == 0)) {
+  const unsigned char *bytes = CFDataGetBytePtr(rawData);
+  // Check that pixel is indeed a RGB black one
+  if (!(bytes[0] == 0 && bytes[1] == 0 && bytes[2] == 0)) {
     return -7;
   }
+  CFRelease(rawData);
+  CFRelease(imageRef);
+  CFRelease(dataProvider);
   return 0;
 }
 
