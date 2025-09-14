@@ -247,6 +247,13 @@ enum {
   kCFCompareGreaterThan = 1
 };
 
+// `CFData.h`
+
+typedef const struct _CFData *CFDataRef;
+
+CFDataRef CFDataCreate(CFAllocatorRef, const char *, CFIndex);
+const unsigned char *CFDataGetBytePtr(CFDataRef);
+
 // `CFString.h`
 
 enum { kCFStringEncodingASCII = 0x600 };
@@ -335,6 +342,13 @@ typedef int CFNumberType;
 CFNumberRef CFNumberCreate(CFAllocatorRef, CFNumberType, const void *);
 CFComparisonResult CFNumberCompare(CFNumberRef, CFNumberRef, void *);
 
+// `CGDataProvider.h`
+
+typedef struct _CGDataProvider *CGDataProviderRef;
+
+CGDataProviderRef CGDataProviderCreateWithCFData(CFDataRef);
+CFDataRef CGDataProviderCopyData(CGDataProviderRef);
+
 // `CGGeometry.h`
 
 CGFloat CGRectGetMinX(CGRect);
@@ -343,6 +357,16 @@ CGFloat CGRectGetMinY(CGRect);
 CGFloat CGRectGetMaxY(CGRect);
 CGFloat CGRectGetHeight(CGRect);
 CGFloat CGRectGetWidth(CGRect);
+
+// `CGImage.h`
+
+typedef struct _CGImage *CGImageRef;
+
+CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef, const CGFloat *,
+                                             bool, int);
+size_t CGImageGetWidth(CGImageRef);
+size_t CGImageGetHeight(CGImageRef);
+CGDataProviderRef CGImageGetDataProvider(CGImageRef);
 
 // === Main code ===
 
@@ -1668,6 +1692,48 @@ int test_fscanf_new() {
     return -30;
 
   fclose(file);
+  return 0;
+}
+
+int test_CGImage_JPEG() {
+  FILE *file = fopen("test_1x1_black_pixel.jpg", "r");
+  if (file == NULL) {
+    return -1;
+  }
+  char buf[720];
+  memset(buf, '\0', 720);
+  size_t read = fread(buf, 1, 720, file);
+  fclose(file);
+  if (read != 720) {
+    return -2;
+  }
+  CFDataRef dataRef = CFDataCreate(NULL, buf, sizeof(buf));
+  if (dataRef == NULL) {
+    return -3;
+  }
+  CGDataProviderRef dataProvider = CGDataProviderCreateWithCFData(dataRef);
+  if (dataRef == NULL) {
+    return -4;
+  }
+  CGImageRef imageRef = CGImageCreateWithJPEGDataProvider(
+      dataProvider, NULL, 1 /* true */, 0 /* kCGRenderingIntentDefault */);
+  if (imageRef == NULL) {
+    return -5;
+  }
+  size_t width = CGImageGetWidth(imageRef);
+  size_t height = CGImageGetHeight(imageRef);
+  if (!(width == 1 && height == 1)) {
+    return -6;
+  }
+  CFDataRef rawData = CGDataProviderCopyData(CGImageGetDataProvider(imageRef));
+  unsigned char *bytes = CFDataGetBytePtr(rawData);
+  unsigned char r = bytes[0];
+  unsigned char g = bytes[1];
+  unsigned char b = bytes[2];
+  // Check that pixel is indeed a black one
+  if (!(r == 0 && g == 0 && b == 0)) {
+    return -7;
+  }
   return 0;
 }
 
@@ -3379,6 +3445,7 @@ struct {
     FUNC_DEF(test_memset_pattern),
     FUNC_DEF(test_CGGeometry),
     FUNC_DEF(test_CFURLHasDirectoryPath),
+    FUNC_DEF(test_CGImage_JPEG),
 };
 // clang-format on
 
