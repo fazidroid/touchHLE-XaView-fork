@@ -324,6 +324,10 @@ CFURLRef CFURLCreateCopyAppendingPathComponent(CFAllocatorRef allocator,
 CFURLRef CFURLCreateCopyDeletingLastPathComponent(CFAllocatorRef allocator,
                                                   CFURLRef url);
 
+CFURLRef CFURLCreateWithBytes(CFAllocatorRef, const char *, CFIndex,
+                              CFStringEncoding, CFURLRef);
+Boolean CFURLHasDirectoryPath(CFURLRef url);
+
 // `CFNumber.h`
 
 typedef const struct _CFNumber *CFNumberRef;
@@ -3277,6 +3281,44 @@ int test_memset_pattern() {
   return 0;
 }
 
+bool test_case_CFURLHasDirectoryPath(const char *str) {
+  CFURLRef url = CFURLCreateWithBytes(NULL, str, strlen(str),
+                                      kCFStringEncodingASCII, NULL);
+  Boolean res = CFURLHasDirectoryPath(url);
+  CFRelease(url);
+  return res;
+}
+
+int test_CFURLHasDirectoryPath() {
+  if (test_case_CFURLHasDirectoryPath("/a/b"))
+    return -1;
+  if (!test_case_CFURLHasDirectoryPath("/a/b/"))
+    return -2;
+  if (!test_case_CFURLHasDirectoryPath("/"))
+    return -3;
+  if (test_case_CFURLHasDirectoryPath("//"))
+    return -4;
+  if (test_case_CFURLHasDirectoryPath("//a"))
+    return -5;
+  if (!test_case_CFURLHasDirectoryPath("//a/"))
+    return -6;
+  if (!test_case_CFURLHasDirectoryPath("///"))
+    return -7;
+  if (!test_case_CFURLHasDirectoryPath("////"))
+    return -8;
+  if (!test_case_CFURLHasDirectoryPath("."))
+    return -9;
+  if (!test_case_CFURLHasDirectoryPath(".."))
+    return -10;
+  if (test_case_CFURLHasDirectoryPath("..."))
+    return -11;
+  if (!test_case_CFURLHasDirectoryPath("/.."))
+    return -12;
+  if (test_case_CFURLHasDirectoryPath(""))
+    return -13;
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -3336,6 +3378,7 @@ struct {
     FUNC_DEF(test_CFNumberCompare_extended),
     FUNC_DEF(test_memset_pattern),
     FUNC_DEF(test_CGGeometry),
+    FUNC_DEF(test_CFURLHasDirectoryPath),
 };
 // clang-format on
 
