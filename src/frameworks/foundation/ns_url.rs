@@ -84,6 +84,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initFileURLWithPath:(id)path // NSString*
               isDirectory:(bool)_is_dir {
+    // FIXME: this does not resolve relative paths to be absolute!
     // TODO: this does not strip the file:/// prefix!
     assert!(!to_rust_string(env, path).starts_with("file:"));
     let path = msg![env; path stringByExpandingTildeInPath];
