@@ -37,8 +37,9 @@
 
 // Declare test functions from other files.
 
-int test_AutoreleasePool(void);   // AutoReleasePoolTest.m
-int test_CGAffineTransform(void); // CGAffineTransform.c
+int test_AutoreleasePool(void);    // AutoReleasePoolTest.m
+int test_CGAffineTransform(void);  // CGAffineTransform.c
+int test_RespondsToSelector(void); // RespondsToSelector.m
 
 // === Main code ===
 
@@ -3330,6 +3331,7 @@ struct {
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
     FUNC_DEF(test_strptime),
     FUNC_DEF(test_strftime),
+    FUNC_DEF(test_RespondsToSelector),
 };
 // clang-format on
 
