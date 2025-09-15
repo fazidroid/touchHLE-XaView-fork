@@ -5,7 +5,9 @@
  */
 //! `CGImage.h`
 
-use super::cg_color_space::{kCGColorSpaceGenericRGB, CGColorSpaceCreateWithName, CGColorSpaceRef};
+use super::cg_color_space::{
+    kCGColorSpaceGenericRGB, CGColorSpaceCreateWithName, CGColorSpaceGetModel, CGColorSpaceRef,
+};
 use super::cg_data_provider::{self, CGDataProviderRef};
 use super::CGFloat;
 use crate::dyld::{export_c_func, FunctionExports};
@@ -94,6 +96,21 @@ pub fn borrow_image_mut(objc: &mut ObjC, image: CGImageRef) -> &mut Image {
 }
 
 // TODO: More create methods.
+
+fn CGImageCreateCopyWithColorSpace(
+    env: &mut Environment,
+    image: CGImageRef,
+    color_space: CGColorSpaceRef,
+) -> CGImageRef {
+    let image_color_space = CGImageGetColorSpace(env, image);
+    assert_eq!(
+        CGColorSpaceGetModel(env, image_color_space),
+        CGColorSpaceGetModel(env, color_space)
+    );
+    // If color space matches, we could just create a copy.
+    let new_image = env.objc.borrow::<CGImageHostObject>(image).image.clone();
+    from_image(env, new_image)
+}
 
 fn CGImageCreateWithPNGDataProvider(
     env: &mut Environment,
@@ -193,6 +210,7 @@ fn CGImageGetBitsPerComponent(_: &mut Environment, _: CGImageRef) -> GuestUSize 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGImageRelease(_)),
     export_c_func!(CGImageRetain(_)),
+    export_c_func!(CGImageCreateCopyWithColorSpace(_, _)),
     export_c_func!(CGImageCreateWithPNGDataProvider(_, _, _, _)),
     export_c_func!(CGImageCreateWithJPEGDataProvider(_, _, _, _)),
     export_c_func!(CGImageGetAlphaInfo(_)),

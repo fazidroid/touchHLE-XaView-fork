@@ -213,6 +213,14 @@ impl Image {
     }
 }
 
+impl Clone for Image {
+    fn clone(&self) -> Image {
+        // Note: implicitly converts pixel storage from StbImage to Vec
+        // (if needed)
+        Image::from_pixel_vec(self.pixels().to_vec(), self.dimensions)
+    }
+}
+
 impl Drop for Image {
     fn drop(&mut self) {
         match self.pixels {
