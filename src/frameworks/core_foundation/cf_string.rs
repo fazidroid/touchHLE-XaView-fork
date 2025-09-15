@@ -290,6 +290,52 @@ fn CFStringUppercase(env: &mut Environment, string: CFStringRef, _locale: CFLoca
     msg![env; string setString:uppercase]
 }
 
+type ConstStr255Param = ConstPtr<u8>;
+type StringPtr = MutPtr<u8>;
+
+fn CFStringCreateWithPascalString(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    p_str: ConstStr255Param,
+    encoding: CFStringEncoding,
+) -> CFStringRef {
+    let len: CFIndex = env.mem.read(p_str).into();
+    let res = CFStringCreateWithBytes(env, allocator, p_str + 1, len, encoding, false);
+    assert_eq!(len, CFStringGetLength(env, res));
+    log_dbg!(
+        "CFStringCreateWithPascalString('{}')",
+        ns_string::to_rust_string(env, res)
+    );
+    res
+}
+
+fn CFStringGetPascalString(
+    env: &mut Environment,
+    the_string: CFStringRef,
+    buffer: StringPtr,
+    buffer_size: CFIndex,
+    encoding: CFStringEncoding,
+) -> bool {
+    log_dbg!(
+        "CFStringGetPascalString('{}')",
+        ns_string::to_rust_string(env, the_string)
+    );
+    let len = CFStringGetLength(env, the_string);
+    // first byte of Pascal string is length
+    assert!((len + 1) <= buffer_size);
+    let len_char: u8 = len.try_into().unwrap();
+    env.mem.write(buffer, len_char);
+    let encoding = CFStringConvertEncodingToNSStringEncoding(env, encoding);
+    ns_string::get_bytes_buffer_inner(
+        env,
+        the_string,
+        buffer + 1,
+        len_char.into(),
+        encoding,
+        false,
+    )
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringAppend(_, _)),
     export_c_func!(CFStringAppendCString(_, _, _)),
@@ -315,4 +361,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringFind(_, _, _)),
     export_c_func!(CFStringHasSuffix(_, _)),
     export_c_func!(CFStringUppercase(_, _)),
+    export_c_func!(CFStringCreateWithPascalString(_, _, _)),
+    export_c_func!(CFStringGetPascalString(_, _, _, _)),
 ];

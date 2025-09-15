@@ -638,25 +638,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (bool)getCString:(MutPtr<u8>)buffer
          maxLength:(NSUInteger)buffer_size
           encoding:(NSStringEncoding)encoding {
-    // TODO: other encodings
-    assert!(encoding == NSUTF8StringEncoding || encoding == NSASCIIStringEncoding || encoding == NSMacOSRomanStringEncoding);
-
-    let src = to_rust_string(env, this);
-    if encoding == NSASCIIStringEncoding || encoding == NSMacOSRomanStringEncoding {
-        // TODO: properly support Mac OS Roman encoding.
-        // The first 128 characters are identical to the ASCII
-        assert!(src.as_bytes().iter().all(|byte| byte.is_ascii()));
-    }
-    let dest = env.mem.bytes_at_mut(buffer, buffer_size);
-    if dest.len() < src.len() + 1 { // include null terminator
-        return false;
-    }
-
-    for (i, &byte) in src.as_bytes().iter().chain(b"\0".iter()).enumerate() {
-        dest[i] = byte;
-    }
-
-    true
+    get_bytes_buffer_inner(env, this, buffer, buffer_size, encoding, true)
 }
 - (())getCString:(MutPtr<u8>)buffer {
     let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
@@ -1835,4 +1817,57 @@ mod ns_string_tests {
         assert!(line_range_helper(&str5, range(6, 1), true, true) == (5, 7, 6));
         assert!(line_range_helper(&str5, range(4, 1), true, true) == (0, 5, 4));
     }
+}
+
+/// Helper function to get bytes of a string in the specified NSStringEncoding.
+///
+/// `include_null_terminator` flag controls if NULL-terminator should be
+/// included or not.
+/// Return value specify if provided buffer was ok or too small.
+/// (TODO: indicate error on conversion too)
+/// In case of small buffer no data is written.
+///
+/// Right now this helper is used for `NSString getCString:maxLength:encoding:`
+/// method and `CFStringGetPascalString` function.
+pub fn get_bytes_buffer_inner(
+    env: &mut Environment,
+    str: id, // NSString *
+    buffer: MutPtr<u8>,
+    buffer_size: NSUInteger,
+    encoding: NSStringEncoding,
+    include_null_terminator: bool,
+) -> bool {
+    // TODO: other encodings
+    assert!(
+        encoding == NSUTF8StringEncoding
+            || encoding == NSASCIIStringEncoding
+            || encoding == NSMacOSRomanStringEncoding
+    );
+
+    let src = to_rust_string(env, str);
+    if encoding == NSASCIIStringEncoding || encoding == NSMacOSRomanStringEncoding {
+        // TODO: properly support Mac OS Roman encoding.
+        // The first 128 characters are identical to the ASCII
+        assert!(src.as_bytes().iter().all(|byte| byte.is_ascii()));
+    }
+    let dest = env.mem.bytes_at_mut(buffer, buffer_size);
+    let src_len = if include_null_terminator {
+        src.len() + 1
+    } else {
+        src.len()
+    };
+    if dest.len() < src_len {
+        return false;
+    }
+
+    let iter: Box<dyn Iterator<Item = &u8>> = if include_null_terminator {
+        Box::new(src.as_bytes().iter().chain(b"\0".iter()))
+    } else {
+        Box::new(src.as_bytes().iter())
+    };
+    for (i, &byte) in iter.enumerate() {
+        dest[i] = byte;
+    }
+
+    true
 }
