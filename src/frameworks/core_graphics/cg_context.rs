@@ -10,6 +10,10 @@ use super::cg_image::CGImageRef;
 use super::{cg_bitmap_context, CGFloat, CGRect};
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
+use crate::frameworks::core_graphics::cg_bitmap_context::{
+    CGBitmapContextGetHeight, CGBitmapContextGetWidth,
+};
+use crate::frameworks::core_graphics::cg_geometry::CGPointZero;
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
@@ -101,6 +105,22 @@ pub fn CGContextClearRect(env: &mut Environment, context: CGContextRef, rect: CG
     cg_bitmap_context::fill_rect(env, context, rect, /* clear: */ true);
 }
 
+fn CGContextClipToRect(env: &mut Environment, context: CGContextRef, rect: CGRect) {
+    if rect.origin == CGPointZero
+        && rect.size.height == CGBitmapContextGetHeight(env, context) as f32
+        && rect.size.width == CGBitmapContextGetWidth(env, context) as f32
+    {
+        assert!(env
+            .objc
+            .borrow_mut::<CGContextHostObject>(context)
+            .transform
+            .is_identity());
+        // All good, clipping is not needed!
+        return;
+    }
+    todo!();
+}
+
 pub fn CGContextConcatCTM(
     env: &mut Environment,
     context: CGContextRef,
@@ -178,6 +198,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextSetGrayFillColor(_, _, _)),
     export_c_func!(CGContextFillRect(_, _)),
     export_c_func!(CGContextClearRect(_, _)),
+    export_c_func!(CGContextClipToRect(_, _)),
     export_c_func!(CGContextConcatCTM(_, _)),
     export_c_func!(CGContextGetCTM(_)),
     export_c_func!(CGContextRotateCTM(_, _)),
