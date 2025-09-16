@@ -165,3 +165,9 @@ com.ea.fifa10wc.inc: --landscape-left
 
 # Real Racing
 com.firemint.realracing: --landscape-left
+
+# Cro-Mag Rally
+com.pangea.cromag: --ignore-gl-errors
+
+# Nanosaur 2
+com.pangea.nano2: --ignore-gl-errors
