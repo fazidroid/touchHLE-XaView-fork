@@ -221,3 +221,9 @@ Other options:
 
     --allow-network-access
         Allow apps running in touchHLE to access the Internet and the local network.
+
+    --ignore-gl-errors
+        Ignore host OpenGL errors as queried by glGetError function.
+        This only affects return value of glGetError as seen by the guest
+        and nothing else. Should be enabled only for apps which really
+        need this behaviour.

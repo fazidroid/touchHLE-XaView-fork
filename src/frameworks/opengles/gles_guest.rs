@@ -139,9 +139,16 @@ fn panic_on_gl_errors(gles: &mut dyn GLES) {
 
 // Generic state manipulation
 fn glGetError(env: &mut Environment) -> GLenum {
+    let ignore_gl_errors = env.options.ignore_gl_errors;
     with_ctx_and_mem(env, |gles, _mem| {
         let err = unsafe { gles.GetError() };
         if err != 0 {
+            if ignore_gl_errors {
+                log_once!(
+                    "Warning: Guest error reporting is ignored for glGetError(), returning 0."
+                );
+                return 0;
+            }
             log!("Warning: glGetError() returned {:#x}", err);
         }
         err
