@@ -99,7 +99,7 @@ See the `CONTRIBUTING.md` file in the git repo if you want to contribute. If you
 
 # License
 
-touchHLE © 2023–2024 touchHLE project contributors.
+touchHLE © 2023–2025 touchHLE project contributors.
 
 The source code of touchHLE itself (not its dependencies) is licensed under the Mozilla Public License, version 2.0.
 
