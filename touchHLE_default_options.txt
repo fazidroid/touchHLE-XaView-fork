@@ -171,3 +171,6 @@ com.pangea.cromag: --ignore-gl-errors
 
 # Nanosaur 2
 com.pangea.nano2: --ignore-gl-errors
+
+# Bugdom 2
+com.pangea.bug2: --ignore-gl-errors
