@@ -154,6 +154,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     () = msg![env; this setNeedsDisplay];
 }
 
+- (bool)adjustsFontSizeToFitWidth {
+    false // default value
+}
+- (())setAdjustsFontSizeToFitWidth:(bool)adjusts {
+    assert!(!adjusts); // TODO
+}
+
 - (id)textColor {
     env.objc.borrow::<UILabelHostObject>(this).text_color
 }
