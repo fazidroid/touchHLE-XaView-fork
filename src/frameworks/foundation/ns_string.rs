@@ -1525,7 +1525,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
-/// This helper is used in initWithFormat: on our private subclasses
+/// This helper is used in `initWithFormat:` on our private subclasses
 /// _touchHLE_NSString and _touchHLE_NSMutableString
 fn init_with_format_inner(env: &mut Environment, this: id, format: id, args: VaList) -> id {
     let res = with_format(env, format, args);
@@ -1533,8 +1533,8 @@ fn init_with_format_inner(env: &mut Environment, this: id, format: id, args: VaL
     this
 }
 
-/// This helper is used in dataUsingEncoding: on our private subclasses
-/// _touchHLE_NSString and _touchHLE_NSMutableString
+/// This helper is used in `dataUsingEncoding:allowLossyConversion:` on our
+/// private subclasses _touchHLE_NSString and _touchHLE_NSMutableString
 fn data_using_encoding_lossy_inner(
     env: &mut Environment,
     this: id,
@@ -1550,6 +1550,9 @@ fn data_using_encoding_lossy_inner(
     assert!(encoding == NSUTF8StringEncoding || encoding == NSASCIIStringEncoding);
 
     let string = to_rust_string(env, this);
+    if encoding == NSASCIIStringEncoding {
+        assert!(string.as_bytes().iter().all(|byte| byte.is_ascii()));
+    }
     let c_string = env.mem.alloc_and_write_cstr(string.as_bytes());
     let length: NSUInteger = (string.len() + 1).try_into().unwrap();
 
