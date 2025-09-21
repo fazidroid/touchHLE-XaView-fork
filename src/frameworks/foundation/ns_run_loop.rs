@@ -126,13 +126,17 @@ pub fn add_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) {
 }
 
 /// For use by Audio Toolbox.
-pub fn remove_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) {
+pub fn remove_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) -> Result<(), ()> {
     let units = &mut env
         .objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
         .audio_units;
-    let unit_idx = units.iter().position(|&item| item == unit).unwrap();
-    units.remove(unit_idx);
+    if let Some(unit_idx) = units.iter().position(|&item| item == unit) {
+        units.remove(unit_idx);
+        Ok(())
+    } else {
+        Err(())
+    }
 }
 
 /// For use by Audio Toolbox.

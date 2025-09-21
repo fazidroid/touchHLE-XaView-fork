@@ -24,7 +24,7 @@ use crate::frameworks::audio_toolbox::audio_components;
 use crate::frameworks::audio_toolbox::audio_queue::{
     is_supported_audio_format, log_if_broken_audio_format,
 };
-use crate::frameworks::carbon_core::OSStatus;
+use crate::frameworks::carbon_core::{paramErr, OSStatus};
 use crate::frameworks::core_audio_types::AudioStreamBasicDescription;
 use crate::frameworks::core_foundation::cf_run_loop::CFRunLoopGetMain;
 use crate::frameworks::foundation::ns_run_loop;
@@ -75,8 +75,10 @@ fn AudioUnitInitialize(env: &mut Environment, in_unit: AudioUnit) -> OSStatus {
 
 fn AudioUnitUninitialize(env: &mut Environment, in_unit: AudioUnit) -> OSStatus {
     let run_loop = CFRunLoopGetMain(env);
-    ns_run_loop::remove_audio_unit(env, run_loop, in_unit);
-    0 // success
+    match ns_run_loop::remove_audio_unit(env, run_loop, in_unit) {
+        Ok(_) => 0,
+        Err(_) => paramErr, // TODO: handle different errors
+    }
 }
 
 fn AudioUnitSetProperty(
