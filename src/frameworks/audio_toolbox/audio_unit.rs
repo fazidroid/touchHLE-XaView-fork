@@ -60,6 +60,7 @@ const kAudioUnitScope_Global: AudioUnitScope = 0;
 const kAudioUnitScope_Input: AudioUnitScope = 1;
 const kAudioUnitScope_Output: AudioUnitScope = 2;
 
+const kAudioUnitProperty_SampleRate: AudioUnitPropertyID = 2;
 const kAudioUnitProperty_SetRenderCallback: AudioUnitPropertyID = 23;
 const kAudioUnitProperty_MaximumFramesPerSlice: AudioUnitPropertyID = 14;
 const kAudioUnitProperty_StreamFormat: AudioUnitPropertyID = 8;
@@ -172,7 +173,28 @@ fn AudioUnitGetProperty(
                 guest_size_of::<AudioStreamBasicDescription>(),
             );
         }
-        _ => unimplemented!(),
+        kAudioUnitProperty_SampleRate => {
+            assert_eq!(env.mem.read(io_data_size), guest_size_of::<f64>());
+            let sample_rate = match in_scope {
+                kAudioUnitScope_Global => host_object.global_stream_format.sample_rate,
+                kAudioUnitScope_Output => {
+                    host_object
+                        .output_stream_format
+                        .unwrap_or(host_object.global_stream_format)
+                        .sample_rate
+                }
+                kAudioUnitScope_Input => {
+                    host_object
+                        .input_stream_format
+                        .unwrap_or(host_object.global_stream_format)
+                        .sample_rate
+                }
+                _ => unimplemented!(),
+            };
+            env.mem.write(out_data.cast(), sample_rate);
+            env.mem.write(io_data_size.cast(), guest_size_of::<f64>());
+        }
+        _ => unimplemented!("in_id {}", in_id),
     };
     0 // success
 }
