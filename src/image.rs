@@ -3,7 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-//! Image decoding. Currently only supports PNG files (treated as 8-bit sRGB).
+//! Image decoding.
+//!
+//! Currently, supports PNG (treated as 8-bit sRGB), JPEG, BMP and GIF files.
 //!
 //! Implemented as a wrapper around the C library stb_image, since it supports
 //! "CgBI" PNG files (an Apple proprietary extension used in iPhone OS apps).
@@ -11,6 +13,9 @@
 //! This module also exposes decompression for Imagination Technologies' PVRTC
 //! format, implementing as a wrapper around their decoder from the PowerVR
 //! SDK.
+//!
+//! References:
+//! - "Supported Image Formats" in [Loading Images](https://developer.apple.com/library/archive/documentation/2DDrawing/Conceptual/DrawingPrintingiOS/LoadingImages/LoadingImages.html)
 
 use std::ffi::{c_int, c_uchar, CStr};
 
