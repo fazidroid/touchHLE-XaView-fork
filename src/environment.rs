@@ -687,7 +687,7 @@ impl Environment {
     ) -> ThreadId {
         let stack_alloc = self.mem.alloc(stack_size);
         let stack_high_addr = stack_alloc.to_bits() + stack_size;
-        assert!(stack_high_addr % 4 == 0);
+        assert!(stack_high_addr.is_multiple_of(4));
 
         self.threads.push(Thread {
             active: true,

@@ -528,7 +528,7 @@ fn show_app_picker_gui(
         }
     }
     fn update_scale_hack_buttons(env: &mut Environment, buttons: &[id], value: Option<NonZeroU32>) {
-        update_quick_option_buttons(env, buttons, value.map_or(0, |v| (v.get() as usize)));
+        update_quick_option_buttons(env, buttons, value.map_or(0, |v| v.get() as usize));
     }
     fn update_orientation_buttons(
         env: &mut Environment,
