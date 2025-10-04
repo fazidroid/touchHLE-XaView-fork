@@ -18,6 +18,7 @@ pub mod ctype;
 pub mod cxxabi;
 pub mod dirent;
 pub mod dlfcn;
+pub mod dns_sd;
 pub mod errno;
 pub mod ifaddrs;
 pub mod keymgr;

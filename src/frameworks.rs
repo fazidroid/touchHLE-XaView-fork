@@ -21,14 +21,13 @@
 #![allow(clippy::too_many_arguments)] // It's not our fault!
 
 pub mod audio_toolbox;
-pub mod av_audio;
+pub mod avfoundation;
 pub mod carbon_core;
 pub mod core_animation;
 pub mod core_audio_types;
 pub mod core_foundation;
 pub mod core_graphics;
 pub mod core_location;
-pub mod dnssd;
 pub mod foundation;
 pub mod game_kit;
 pub mod media_player;
