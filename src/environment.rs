@@ -321,28 +321,22 @@ impl Environment {
 
         let mut dylibs = Vec::new();
         for dylib in &executable.dynamic_libraries {
-            if dylib == "/usr/lib/libSystem.B.dylib" || dylib == "/usr/lib/libobjc.A.dylib" {
-                // We have host implementations of these
-                continue;
-            }
-
             // There are some Free Software libraries bundled with touchHLE and
             // exposed via the guest file system (see Fs::new()).
             if fs.is_file(fs::GuestPath::new(dylib)) {
                 let dylib = mach_o::MachO::load_from_file(fs::GuestPath::new(dylib), &fs, &mut mem)
                     .map_err(|e| format!("Could not load bundled dylib: {e}"))?;
                 dylibs.push(dylib);
-            } else {
-                // System frameworks will have host implementations.
-                // TODO: warn about unimplemented frameworks?
-                if !dylib.starts_with("/System/Library/Frameworks/") {
-                    log!(
-                        "Warning: app binary depends on unexpected dylib \"{}\"",
-                        dylib
-                    );
-                }
-                continue;
-            };
+            // Otherwise, look for it in our host implementations.
+            } else if !crate::dyld::DYLIB_LIST
+                .iter()
+                .any(|d| d.path == dylib || d.aliases.contains(&dylib.as_str()))
+            {
+                log!(
+                    "Warning: app binary depends on unimplemented or missing dylib \"{}\"",
+                    dylib
+                );
+            }
         }
 
         let entry_point_addr = executable.entry_point_pc.ok_or_else(|| {

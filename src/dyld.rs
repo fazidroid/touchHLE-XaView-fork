@@ -55,9 +55,7 @@ pub use dylib_list::DYLIB_LIST;
 /// libraries that have several symlinked paths, non-canonical alternate
 /// paths can be listed under `aliases`, for example `"/usr/lib/libobjc.dylib"`.
 pub struct HostDylib {
-    #[allow(unused)]
     pub path: &'static str,
-    #[allow(unused)]
     pub aliases: &'static [&'static str],
     pub class_exports: &'static [ClassExports],
     pub constant_exports: &'static [ConstantExports],
