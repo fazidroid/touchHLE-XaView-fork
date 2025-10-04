@@ -54,6 +54,63 @@ pub mod ns_user_defaults;
 pub mod ns_value;
 pub mod ns_xml_parser;
 
+pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
+    path: "/System/Library/Frameworks/Foundation.framework/Foundation",
+    aliases: &[],
+    class_exports: &[
+        ns_array::CLASSES,
+        ns_autorelease_pool::CLASSES,
+        ns_bundle::CLASSES,
+        ns_character_set::CLASSES,
+        ns_coder::CLASSES,
+        ns_data::CLASSES,
+        ns_date::CLASSES,
+        ns_date_formatter::CLASSES,
+        ns_dictionary::CLASSES,
+        ns_enumerator::CLASSES,
+        ns_error::CLASSES,
+        ns_file_handle::CLASSES,
+        ns_file_manager::CLASSES,
+        ns_keyed_unarchiver::CLASSES,
+        ns_locale::CLASSES,
+        ns_lock::CLASSES,
+        ns_notification::CLASSES,
+        ns_notification_center::CLASSES,
+        ns_null::CLASSES,
+        ns_object::CLASSES,
+        ns_process_info::CLASSES,
+        ns_property_list_serialization::CLASSES,
+        ns_run_loop::CLASSES,
+        ns_scanner::CLASSES,
+        ns_set::CLASSES,
+        ns_string::CLASSES,
+        ns_thread::CLASSES,
+        ns_timer::CLASSES,
+        ns_time_zone::CLASSES,
+        ns_url::CLASSES,
+        ns_url_connection::CLASSES,
+        ns_url_request::CLASSES,
+        ns_user_defaults::CLASSES,
+        ns_value::CLASSES,
+        ns_xml_parser::CLASSES,
+    ],
+    constant_exports: &[
+        ns_error::CONSTANTS,
+        ns_exception::CONSTANTS,
+        ns_file_manager::CONSTANTS,
+        ns_keyed_unarchiver::CONSTANTS,
+        ns_locale::CONSTANTS,
+        ns_run_loop::CONSTANTS,
+    ],
+    function_exports: &[
+        FUNCTIONS,
+        ns_exception::FUNCTIONS,
+        ns_file_manager::FUNCTIONS,
+        ns_log::FUNCTIONS,
+        ns_objc_runtime::FUNCTIONS,
+    ],
+};
+
 #[derive(Default)]
 pub struct State {
     ns_autorelease_pool: ns_autorelease_pool::State,
@@ -130,4 +187,4 @@ fn hash_helper<T: std::hash::Hash>(hashable: &T) -> NSUInteger {
     (hash_u64 as u32) ^ ((hash_u64 >> 32) as u32)
 }
 
-pub const FUNCTIONS: FunctionExports = &[export_c_func!(NSStringFromRange(_))];
+const FUNCTIONS: FunctionExports = &[export_c_func!(NSStringFromRange(_))];

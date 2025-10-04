@@ -154,10 +154,20 @@ struct AppPickerDelegateHostObject {
 }
 impl HostObject for AppPickerDelegateHostObject {}
 
+pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
+    // Not a real iOS dylib obviously. This shouldn't really be in the list of
+    // dylibs if we can avoid it somehow (TODO?).
+    path: "/.touchHLE/AppPickerHelpers.dylib",
+    aliases: &[],
+    class_exports: &[CLASSES],
+    constant_exports: &[],
+    function_exports: &[],
+};
+
 /// Be careful! These classes go in the normal class list, just like everything
 /// else, so an app could try to instantiate them. Don't give them special
 /// powers that could be exploited!
-pub const CLASSES: ClassExports = objc_classes! {
+const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 

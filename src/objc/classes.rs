@@ -10,9 +10,6 @@
 //! Resources:
 //! - [[objc explain]: Classes and metaclasses](http://www.sealiesoftware.com/blog/archive/2009/04/14/objc_explain_Classes_and_metaclasses.html), especially [the PDF diagram](http://www.sealiesoftware.com/blog/class%20diagram.pdf)
 
-mod class_lists;
-pub(super) use class_lists::CLASS_LISTS;
-
 use super::{
     id, ivar_list_t, method_list_t, nil, objc_object, AnyHostObject, HostIMP, HostObject, ObjC,
     IMP, SEL,
@@ -136,6 +133,9 @@ pub struct ClassTemplate {
 ///
 /// Each module that wants to expose functions to guest code should export a
 /// constant using this type. See [objc_classes] for an example.
+///
+/// All the constants like this can then be collected into a
+/// [crate::dyld::HostDylib].
 ///
 /// The strings are the class names.
 ///
@@ -477,7 +477,8 @@ impl ObjC {
     }
 
     fn find_template(name: &str) -> Option<&'static ClassTemplate> {
-        crate::dyld::search_lists(CLASS_LISTS, name).map(|&(_name, ref template)| template)
+        crate::dyld::search_host_dylibs(|dylib| dylib.class_exports, name)
+            .map(|&(_name, ref template)| template)
     }
 
     /// For use by [crate::dyld]: get the class or metaclass referenced by an
@@ -838,7 +839,12 @@ impl ObjC {
 
     pub fn dump_host_class_symbols(file: &mut std::fs::File) -> Result<(), std::io::Error> {
         use std::io::Write;
-        for (class, _) in CLASS_LISTS.iter().flat_map(|class| class.iter()) {
+        for (class, _) in crate::dyld::DYLIB_LIST
+            .iter()
+            .flat_map(|dylib| dylib.class_exports)
+            .copied()
+            .flatten()
+        {
             writeln!(file, "_OBJC_CLASS_$_{class}")?;
             writeln!(file, "_OBJC_METACLASS_$_{class}")?;
         }

@@ -16,6 +16,26 @@ pub mod ca_media_timing_function;
 mod composition;
 pub use composition::recomposite_if_necessary;
 
+pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
+    // Core Animation is considered its own framework, but it technically lives
+    // in a binary called QuartzCore, which does not contain anything else of
+    // interest in iPhone OS 2 and 3. (iOS 5 adds Core Image to QuartzCore.)
+    path: "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+    aliases: &[],
+    class_exports: &[
+        ca_animation::CLASSES,
+        ca_eagl_layer::CLASSES,
+        ca_layer::CLASSES,
+        ca_media_timing_function::CLASSES,
+    ],
+    constant_exports: &[
+        ca_animation::CONSTANTS,
+        ca_layer::CONSTANTS,
+        ca_media_timing_function::CONSTANTS,
+    ],
+    function_exports: &[],
+};
+
 #[derive(Default)]
 pub struct State {
     composition: composition::State,

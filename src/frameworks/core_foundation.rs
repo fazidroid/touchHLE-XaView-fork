@@ -32,6 +32,39 @@ pub mod cf_type;
 pub mod cf_url;
 pub mod time;
 
+pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
+    path: "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
+    aliases: &[],
+    class_exports: &[
+        cf_run_loop_timer::CLASSES, // Special internal classes.
+    ],
+    constant_exports: &[
+        cf_allocator::CONSTANTS,
+        cf_bundle::CONSTANTS,
+        cf_dictionary::CONSTANTS,
+        cf_locale::CONSTANTS,
+        cf_number::CONSTANTS,
+        cf_preferences::CONSTANTS,
+        cf_run_loop::CONSTANTS,
+    ],
+    function_exports: &[
+        cf_array::FUNCTIONS,
+        cf_dictionary::FUNCTIONS,
+        cf_bundle::FUNCTIONS,
+        cf_socket::FUNCTIONS,
+        cf_data::FUNCTIONS,
+        cf_locale::FUNCTIONS,
+        cf_number::FUNCTIONS,
+        cf_preferences::FUNCTIONS,
+        cf_run_loop::FUNCTIONS,
+        cf_run_loop_timer::FUNCTIONS,
+        cf_string::FUNCTIONS,
+        cf_type::FUNCTIONS,
+        cf_url::FUNCTIONS,
+        time::FUNCTIONS,
+    ],
+};
+
 pub use cf_type::{CFRelease, CFRetain, CFTypeRef};
 
 pub type CFHashCode = u32;

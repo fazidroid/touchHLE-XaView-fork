@@ -96,16 +96,19 @@ impl ObjC {
     /// [ObjC::register_bin_selectors], so that selector strings in the app
     /// binary can be re-used. [crate::dyld] calls both of these.
     pub fn register_host_selectors(&mut self, mem: &mut Mem) {
-        for &class_list in super::CLASS_LISTS {
-            for (_name, template) in class_list {
-                for method_list in [template.class_methods, template.instance_methods] {
-                    for &(name, _imp) in method_list {
-                        if self.selectors.contains_key(name) {
-                            continue;
-                        }
-                        let sel = SEL(mem.alloc_and_write_cstr(name.as_bytes()).cast_const());
-                        self.selectors.insert(name.to_string(), sel);
+        for (_name, template) in crate::dyld::DYLIB_LIST
+            .iter()
+            .flat_map(|dylib| dylib.class_exports)
+            .copied()
+            .flatten()
+        {
+            for method_list in [template.class_methods, template.instance_methods] {
+                for &(name, _imp) in method_list {
+                    if self.selectors.contains_key(name) {
+                        continue;
                     }
+                    let sel = SEL(mem.alloc_and_write_cstr(name.as_bytes()).cast_const());
+                    self.selectors.insert(name.to_string(), sel);
                 }
             }
         }
@@ -207,23 +210,26 @@ impl ObjC {
 
         // Also check unlinked host classes: just because the binary doesn't
         // link them in directly doesn't mean that it won't use it!
-        for &class_list in super::CLASS_LISTS {
-            for (class_name, template) in class_list {
-                if self.classes.contains_key(*class_name) {
-                    continue;
-                }
+        for (class_name, template) in crate::dyld::DYLIB_LIST
+            .iter()
+            .flat_map(|dylib| dylib.class_exports)
+            .copied()
+            .flatten()
+        {
+            if self.classes.contains_key(*class_name) {
+                continue;
+            }
 
-                for &(sel_name, _) in template.instance_methods {
-                    let sel = self.lookup_selector(sel_name).unwrap();
-                    let entry = impl_selectors.entry(sel);
-                    entry.or_default().0.push(class_name);
-                }
+            for &(sel_name, _) in template.instance_methods {
+                let sel = self.lookup_selector(sel_name).unwrap();
+                let entry = impl_selectors.entry(sel);
+                entry.or_default().0.push(class_name);
+            }
 
-                for &(sel_name, _) in template.class_methods {
-                    let sel = self.lookup_selector(sel_name).unwrap();
-                    let entry = impl_selectors.entry(sel);
-                    entry.or_default().1.push(class_name);
-                }
+            for &(sel_name, _) in template.class_methods {
+                let sel = self.lookup_selector(sel_name).unwrap();
+                let entry = impl_selectors.entry(sel);
+                entry.or_default().1.push(class_name);
             }
         }
 

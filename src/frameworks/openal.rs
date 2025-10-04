@@ -14,7 +14,7 @@
 use crate::audio::openal as al;
 use crate::audio::openal::al_types::*;
 use crate::audio::openal::alc_types::*;
-use crate::dyld::{export_c_func, FunctionExports};
+use crate::dyld::{export_c_func, FunctionExports, HostDylib};
 use crate::libc::string::strcmp;
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, Ptr, SafeWrite};
 use crate::Environment;
@@ -23,6 +23,14 @@ use std::ffi::{CStr, CString};
 use touchHLE_openal_soft_wrapper::{
     ALC_DEVICE_SPECIFIER, ALC_FREQUENCY, ALC_MONO_SOURCES, ALC_REFRESH, ALC_STEREO_SOURCES,
     ALC_SYNC, AL_EXTENSIONS, AL_RENDERER, AL_VENDOR, AL_VERSION,
+};
+
+pub const DYLIB: HostDylib = HostDylib {
+    path: "/System/Library/Frameworks/OpenAL.framework/OpenAL",
+    aliases: &[],
+    class_exports: &[],
+    constant_exports: &[],
+    function_exports: &[FUNCTIONS],
 };
 
 #[derive(Default)]

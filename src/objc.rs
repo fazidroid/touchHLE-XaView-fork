@@ -18,7 +18,7 @@
 //! classes that are both (considering Objective-C's support for inheritance,
 //! categories and dynamic class editing).
 
-use crate::dyld::{export_c_func, FunctionExports};
+use crate::dyld::{export_c_func, FunctionExports, HostDylib};
 use crate::MutexId;
 use std::collections::HashMap;
 
@@ -42,7 +42,7 @@ pub use selectors::{selector, SEL};
 
 use crate::mem::ConstVoidPtr;
 use crate::Environment;
-use classes::{ClassHostObject, FakeClass, UnimplementedClass, CLASS_LISTS};
+use classes::{ClassHostObject, FakeClass, UnimplementedClass};
 use messages::{
     objc_msgSend, objc_msgSendSuper2, objc_msgSend_stret, MsgSendSignature, MsgSendSuperSignature,
 };
@@ -94,6 +94,14 @@ impl ObjC {
     }
 }
 
+pub const DYLIB: HostDylib = HostDylib {
+    path: "/usr/lib/libobjc.A.dylib",
+    aliases: &["/usr/lib/libobjc.dylib"],
+    class_exports: &[],
+    constant_exports: &[],
+    function_exports: &[FUNCTIONS],
+};
+
 /// Block support is iOS 4+, but it seems like Block Runtime Helpers
 /// could still be called on even if minimal iOS version is set to 3.x?
 ///
@@ -109,7 +117,7 @@ fn _Block_object_dispose(_env: &mut Environment, object: ConstVoidPtr, flags: i3
     );
 }
 
-pub const FUNCTIONS: FunctionExports = &[
+const FUNCTIONS: FunctionExports = &[
     export_c_func!(objc_msgSend(_, _)),
     export_c_func!(objc_msgSend_stret(_, _, _)),
     export_c_func!(objc_msgSendSuper2(_, _)),
