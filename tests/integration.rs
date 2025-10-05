@@ -176,21 +176,27 @@ fn run_test_app(
 fn test_app() -> Result<(), Box<dyn Error>> {
     let tests_dir = current_dir()?.join("tests");
     let stubs_dir = tests_dir.join("stubs");
+    let stubs_src_dir = stubs_dir.join("src");
+    let stubs_lib_dir = stubs_dir.join("lib");
+    let stubs_frameworks_dir = stubs_dir.join("Frameworks");
 
-    // Wipe and recreate the stubs dir to ensure it is clean.
+    // Wipe the stubs dir to ensure it is clean.
     let _ = std::fs::remove_dir_all(&stubs_dir);
+    // Create the stubs dir and its src/ subdirectory (the rest come later)
     std::fs::create_dir(&stubs_dir).unwrap();
 
-    let sdk_libs_dir_arg =
+    let bundled_libs_search_arg =
         "-L".to_owned() + current_dir()?.join("touchHLE_dylibs").to_str().unwrap();
-    let stubs_dir_arg = "-L".to_owned() + stubs_dir.to_str().unwrap();
+    let stubs_lib_search_arg = "-L".to_owned() + stubs_lib_dir.to_str().unwrap();
+    let stubs_frameworks_search_arg = "-F".to_owned() + stubs_frameworks_dir.to_str().unwrap();
     let mut extra_linker_args = Vec::<String>::new();
     let mut extra_compile_args = vec![
         "-mlinker-version=253",
         "-Wno-expansion-to-defined",
         "-Wno-literal-range",
-        sdk_libs_dir_arg.as_str(),
-        stubs_dir_arg.as_str(),
+        bundled_libs_search_arg.as_str(),
+        stubs_lib_search_arg.as_str(),
+        stubs_frameworks_search_arg.as_str(),
         "-ObjC",
         "-fno-objc-exceptions",
         // ARC is not available until IOS 5, so it can't be used.
@@ -198,7 +204,8 @@ fn test_app() -> Result<(), Box<dyn Error>> {
         "-fno-objc-arc-exceptions",
     ];
 
-    // Generate symbols.
+    // Generate symbol stubs.
+
     let symbols_path = stubs_dir.join("SYMBOLS.txt");
     let dump_file_option = format!("--dump-file={}", symbols_path.to_str().unwrap());
     let dump_run_args = ["--dump=symbols", dump_file_option.as_str(), "--headless"];
@@ -211,6 +218,9 @@ fn test_app() -> Result<(), Box<dyn Error>> {
         .expect("failed to execute touchHLE process");
     assert!(output.status.success());
 
+    // Split SYMBOLS.txt into individual source files.
+
+    std::fs::create_dir_all(&stubs_src_dir).unwrap();
     let mut files_to_compile = Vec::<(String, PathBuf)>::new();
     {
         let mut in_body = false;
@@ -222,7 +232,7 @@ fn test_app() -> Result<(), Box<dyn Error>> {
                 // comment in the file: this is the canonical name of the dylib.
                 if in_body || current_file.is_none() {
                     let dylib_name = dylib_path.rsplit_once("/").unwrap().1;
-                    let stub_src_path = stubs_dir.join(format!("{}.m", dylib_name));
+                    let stub_src_path = stubs_src_dir.join(format!("{}.m", dylib_name));
                     current_file = Some(BufWriter::new(File::create(&stub_src_path).unwrap()));
                     files_to_compile.push((dylib_path.to_string(), stub_src_path));
                     in_body = false;
@@ -236,6 +246,8 @@ fn test_app() -> Result<(), Box<dyn Error>> {
         // current_file dropping out of scope here flushes it.
     }
 
+    // Build the stub libraries and ensure TestApp will link to them.
+
     for (dylib_path, stub_src_path) in files_to_compile {
         if dylib_path.starts_with("/.touchHLE") {
             // skip the fake app picker library
@@ -248,35 +260,36 @@ fn test_app() -> Result<(), Box<dyn Error>> {
             &format!("-Wl,-install_name,{}", dylib_path),
             "-Wno-objc-root-class", // silence clang warning about inheritance
             "-Wl,-dylib",
-            stubs_dir_arg.as_str(),
+            stubs_lib_search_arg.as_str(),
             "-lobjc.A",
         ];
         let dylib_name = dylib_path.rsplit_once("/").unwrap().1;
-        // World's most horrible heuristic:
-        // - if the name begins with 'lib' (libSystem, libobjc) then it should
-        //   not link against libobjc, and it will (hopefully) be compiled
-        //   before any normal Objective-C code. We need to strip the 'lib' and
-        //   '.dylib' parts of its filename to get something we can pass to '-l'
-        //   (i.e. 'libobjc.A.dylib' -> '-lobjc.A')
-        // - if the name does not begin with 'lib', then it's probably a
-        //   framework, and we need to ensure the test app links against it with
-        //   '-l', and to that end we need to add the 'lib' and '.dylib' parts
-        //   to its filename, again so that that '-l' will find it
-        //   (i.e. 'FooBarKit' -> 'libFooBarKit.dylib')
-        let (compile_args, out_path) = if let Some(bare_name) = dylib_name.strip_prefix("lib") {
-            extra_linker_args.push(format!("-l{}", bare_name.strip_suffix(".dylib").unwrap()));
-            (
-                // skip "-Ltests/stubs/" and "-lobjc.A"
-                &compile_args[..compile_args.len() - 2],
-                stubs_dir.join(dylib_name),
-            )
-        } else {
-            extra_linker_args.push(format!("-l{dylib_name}"));
-            (
-                &compile_args[..],
-                stubs_dir.join(format!("lib{dylib_name}.dylib")),
-            )
-        };
+        // - The only non-framework libs should be libSystem and libobjc, which
+        //   we expect to appear in the list before all the frameworks, and need
+        //   to be compiled first.
+        // - The frameworks have bare filenames, and usually need libobjc.
+        let (compile_args, out_path) =
+            if let Some(framework_path) = dylib_path.strip_prefix("/System/Library/Frameworks/") {
+                extra_linker_args.push(format!("-framework"));
+                extra_linker_args.push(dylib_name.to_string());
+                (&compile_args[..], stubs_frameworks_dir.join(framework_path))
+            } else {
+                extra_linker_args.push(format!(
+                    "-l{}",
+                    dylib_name
+                        .strip_prefix("lib")
+                        .unwrap()
+                        .strip_suffix(".dylib")
+                        .unwrap()
+                ));
+                (
+                    // skip "-Ltests/stubs/lib/" and "-lobjc.A"
+                    &compile_args[..compile_args.len() - 2],
+                    stubs_lib_dir.join(dylib_name),
+                )
+            };
+        // Ensure that stubs/Frameworks/FooBarKit/ or stubs/lib/ exists
+        std::fs::create_dir_all(out_path.parent().unwrap()).unwrap();
         build_object(&tests_dir, &out_path, [stub_src_path].iter(), &compile_args).unwrap();
     }
 
@@ -284,6 +297,8 @@ fn test_app() -> Result<(), Box<dyn Error>> {
     for arg in &extra_linker_args {
         extra_compile_args.push(&arg);
     }
+
+    // Finally, build TestApp itself.
 
     let sources = ["main.m", "SyncTester.m"].map(|file| Path::new(file));
     run_test_app(&tests_dir, "TestApp", &sources, &extra_compile_args, &[])
