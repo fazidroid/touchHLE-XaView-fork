@@ -18,7 +18,7 @@
 //! classes that are both (considering Objective-C's support for inheritance,
 //! categories and dynamic class editing).
 
-use crate::dyld::{export_c_func, FunctionExports, HostDylib};
+use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant, HostDylib};
 use crate::MutexId;
 use std::collections::HashMap;
 
@@ -98,9 +98,17 @@ pub const DYLIB: HostDylib = HostDylib {
     path: "/usr/lib/libobjc.A.dylib",
     aliases: &["/usr/lib/libobjc.dylib"],
     class_exports: &[],
-    constant_exports: &[],
+    constant_exports: &[CONSTANTS],
     function_exports: &[FUNCTIONS],
 };
+
+const CONSTANTS: ConstantExports = &[
+    // We don't use these in our Objective-C runtime, but exporting useless
+    // symbols for these silences the warning about the unhandled relocation,
+    // and avoids a linker error for the integration tests.
+    ("__objc_empty_vtable", HostConstant::NullPtr),
+    ("__objc_empty_cache", HostConstant::NullPtr),
+];
 
 /// Block support is iOS 4+, but it seems like Block Runtime Helpers
 /// could still be called on even if minimal iOS version is set to 3.x?

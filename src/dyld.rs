@@ -361,23 +361,34 @@ impl Dyld {
     }
 
     /// Dumps all non-objc symbols provided by touchHLE.
-    pub fn dump_dyld_host_symbols(file: &mut std::fs::File) -> Result<(), std::io::Error> {
+    ///
+    /// The dump format is Objective-C code (with meaningless types) that can be
+    /// compiled to generate stub libraries that can be linked against, with
+    /// comments providing the paths each library would be installed to.
+    /// This is used for building the integration tests.
+    pub fn dump_host_symbols(file: &mut std::fs::File) -> Result<(), std::io::Error> {
         use std::io::Write;
-        for (symbol, _) in DYLIB_LIST
-            .iter()
-            .flat_map(|dylib| dylib.function_exports)
-            .copied()
-            .flatten()
-        {
-            writeln!(file, "{symbol}")?;
-        }
-        for (symbol, _) in DYLIB_LIST
-            .iter()
-            .flat_map(|dylib| dylib.constant_exports)
-            .copied()
-            .flatten()
-        {
-            writeln!(file, "{symbol}")?;
+        for dylib in DYLIB_LIST {
+            writeln!(file, "// {}", dylib.path)?;
+            for alias in dylib.aliases {
+                writeln!(file, "// {alias}")?;
+            }
+            for (class_name, _) in dylib.class_exports.iter().copied().flatten() {
+                writeln!(file, "@interface {class_name}")?;
+                writeln!(file, "@end")?;
+                writeln!(file, "@implementation {class_name}")?;
+                writeln!(file, "@end")?;
+            }
+            for (constant_symbol, _) in dylib.constant_exports.iter().copied().flatten() {
+                writeln!(file, "int {};", constant_symbol.strip_prefix("_").unwrap())?;
+            }
+            for (function_symbol, _) in dylib.function_exports.iter().copied().flatten() {
+                writeln!(
+                    file,
+                    "void {}() {{}}",
+                    function_symbol.strip_prefix("_").unwrap()
+                )?;
+            }
         }
         Ok(())
     }
@@ -478,9 +489,6 @@ impl Dyld {
             } else if name == "___CFConstantStringClassReference" {
                 // See ns_string::register_constant_strings
                 nil.cast().cast_const()
-            } else if name == "__objc_empty_vtable" || name == "__objc_empty_cache" {
-                // Our Objective-C runtime doesn't use these
-                Ptr::null()
             } else if let Some(&external_addr) = bins
                 .iter()
                 .flat_map(|other_bin| other_bin.exported_symbols.get(name))

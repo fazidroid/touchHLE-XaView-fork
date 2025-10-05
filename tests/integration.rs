@@ -63,23 +63,6 @@ fn make_path_and_check(
     buf
 }
 
-fn generate_libc_stub<'a, F: std::io::Write, S: AsRef<str>, I: Iterator<Item = S>>(
-    output: &mut F,
-    symbols: &mut I,
-) -> Result<(), Box<dyn Error>> {
-    for symbol in symbols {
-        // Need to strip off leading underscore
-        let symbol = &symbol.as_ref().trim();
-        assert!(
-            symbol.chars().nth(0).unwrap() == '_',
-            "symbol {} does not start with '_'",
-            symbol
-        );
-        writeln!(output, "void {}() {{}}", &symbol[1..])?;
-    }
-    Ok(())
-}
-
 fn build_object<I: Iterator<Item = P>, P: AsRef<OsStr>>(
     tests_dir: &Path,
     output_name: &Path,
@@ -192,14 +175,22 @@ fn run_test_app(
 #[test]
 fn test_app() -> Result<(), Box<dyn Error>> {
     let tests_dir = current_dir()?.join("tests");
-    let sdk_libs_dir = "-L".to_owned() + current_dir()?.join("touchHLE_dylibs").to_str().unwrap();
-    let libc_stub_dir = "-L".to_owned() + tests_dir.join("libc_stub").to_str().unwrap();
-    let extra_compile_args = [
+    let stubs_dir = tests_dir.join("stubs");
+
+    // Wipe and recreate the stubs dir to ensure it is clean.
+    let _ = std::fs::remove_dir_all(&stubs_dir);
+    std::fs::create_dir(&stubs_dir).unwrap();
+
+    let sdk_libs_dir_arg =
+        "-L".to_owned() + current_dir()?.join("touchHLE_dylibs").to_str().unwrap();
+    let stubs_dir_arg = "-L".to_owned() + stubs_dir.to_str().unwrap();
+    let mut extra_linker_args = Vec::<String>::new();
+    let mut extra_compile_args = vec![
         "-mlinker-version=253",
         "-Wno-expansion-to-defined",
         "-Wno-literal-range",
-        sdk_libs_dir.as_str(),
-        libc_stub_dir.as_str(),
+        sdk_libs_dir_arg.as_str(),
+        stubs_dir_arg.as_str(),
         "-ObjC",
         "-fno-objc-exceptions",
         // ARC is not available until IOS 5, so it can't be used.
@@ -208,7 +199,7 @@ fn test_app() -> Result<(), Box<dyn Error>> {
     ];
 
     // Generate symbols.
-    let symbols_path = tests_dir.join("SYMBOLS.txt");
+    let symbols_path = stubs_dir.join("SYMBOLS.txt");
     let dump_file_option = format!("--dump-file={}", symbols_path.to_str().unwrap());
     let dump_run_args = ["--dump=symbols", dump_file_option.as_str(), "--headless"];
     let binary_name = "touchHLE";
@@ -220,37 +211,77 @@ fn test_app() -> Result<(), Box<dyn Error>> {
         .expect("failed to execute touchHLE process");
     assert!(output.status.success());
 
-    let symbols_file = BufReader::new(File::open(symbols_path).unwrap());
-    let mut output_file =
-        BufWriter::new(File::create(tests_dir.join("libc_stub").join("libc_stub.c")).unwrap());
-    generate_libc_stub(
-        &mut output_file,
-        &mut symbols_file.lines().map(|s| s.unwrap()),
-    )
-    .unwrap();
-    // Close the file so it gets flushed
-    std::mem::drop(output_file);
-    let libc_compile_args = [
-        "-mlinker-version=253",
-        "-fno-builtin",
-        "-nostdlib",
-        &format!(
-            "-Wl,-install_name,{}",
-            Path::new("usr")
-                .join("lib")
-                .join("libSystem.B.dylib")
-                .to_str()
-                .unwrap()
-        ),
-        "-Wl,-dylib",
-    ];
-    build_object(
-        &tests_dir,
-        &tests_dir.join("libc_stub").join("libSystem.dylib"),
-        [tests_dir.join("libc_stub").join("libc_stub.c")].iter(),
-        &libc_compile_args,
-    )
-    .unwrap();
+    let mut files_to_compile = Vec::<(String, PathBuf)>::new();
+    {
+        let mut in_body = false;
+        let mut current_file = None::<BufWriter<File>>;
+        for line in BufReader::new(File::open(symbols_path).unwrap()).lines() {
+            let line = line.unwrap();
+            if let Some(dylib_path) = line.strip_prefix("// ") {
+                // First comment after a series of non-comment lines, or first
+                // comment in the file: this is the canonical name of the dylib.
+                if in_body || current_file.is_none() {
+                    let dylib_name = dylib_path.rsplit_once("/").unwrap().1;
+                    let stub_src_path = stubs_dir.join(format!("{}.m", dylib_name));
+                    current_file = Some(BufWriter::new(File::create(&stub_src_path).unwrap()));
+                    files_to_compile.push((dylib_path.to_string(), stub_src_path));
+                    in_body = false;
+                }
+                // Ignore the non-canonical dylib names for now.
+            } else if let Some(ref mut current_file) = current_file {
+                in_body = true;
+                writeln!(current_file, "{}", line).unwrap();
+            }
+        }
+        // current_file dropping out of scope here flushes it.
+    }
+
+    for (dylib_path, stub_src_path) in files_to_compile {
+        if dylib_path.starts_with("/.touchHLE") {
+            // skip the fake app picker library
+            continue;
+        }
+        let compile_args = [
+            "-mlinker-version=253",
+            "-fno-builtin",
+            "-nostdlib",
+            &format!("-Wl,-install_name,{}", dylib_path),
+            "-Wno-objc-root-class", // silence clang warning about inheritance
+            "-Wl,-dylib",
+            "-lobjc",
+        ];
+        let dylib_name = dylib_path.rsplit_once("/").unwrap().1;
+        // World's most horrible heuristic:
+        // - if the name begins with 'lib' (libSystem, libobjc) then it should
+        //   not link against libobjc, and it will (hopefully) be compiled
+        //   before any normal Objective-C code. We need to strip the 'lib' and
+        //   '.dylib' parts of its filename to get something we can pass to '-l'
+        //   (i.e. 'libobjc.dylib' -> '-lobjc')
+        // - if the name does not begin with 'lib', then it's probably a
+        //   framework, and we need to ensure the test app links against it with
+        //   '-l', and to that end we need to add the 'lib' and '.dylib' parts
+        //   to its filename, again so that that '-l' will find it
+        //   (i.e. 'FooBarKit' -> 'libFooBarKit.dylib')
+        let (compile_args, out_path) = if let Some(bare_name) = dylib_name.strip_prefix("lib") {
+            extra_linker_args.push(format!("-l{}", bare_name.strip_suffix(".dylib").unwrap()));
+            (
+                &compile_args[..compile_args.len() - 1], // skip "-lobjc"
+                stubs_dir.join(dylib_name),
+            )
+        } else {
+            extra_linker_args.push(format!("-l{dylib_name}"));
+            (
+                &compile_args[..], // include "-lobjc"
+                stubs_dir.join(format!("lib{dylib_name}.dylib")),
+            )
+        };
+        build_object(&tests_dir, &out_path, [stub_src_path].iter(), &compile_args).unwrap();
+    }
+
+    // Vec<String> -> &[&str] ownership shenanigans
+    for arg in &extra_linker_args {
+        extra_compile_args.push(&arg);
+    }
 
     let sources = ["main.m", "SyncTester.m"].map(|file| Path::new(file));
     run_test_app(&tests_dir, "TestApp", &sources, &extra_compile_args, &[])

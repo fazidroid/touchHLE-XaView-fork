@@ -3,6 +3,8 @@ Integration tests
 
 This directory contains integration tests written in Objective-C. They're compiled to an ARMv6 Mach-O binary and packaged into a bundle (`TestApp.app`) so that they can be run in the emulator like a normal iPhone OS app. The code in `integration.rs` lets them be run by `cargo test` (which also runs unit tests written in Rust).
 
+The resulting `TestApp.app` binary can also be run on a real iOS device, if it is jailbroken (to bypass the normal signature checks). The `./make-ipa.sh` script can turn the app into an IPA file to simplify installation. The app doesn't fully work on iOS yet: when tested 2025-10-05 on a 3rd-gen iPod touch running iOS 5.1.1, it segfaulted after around a dozen tests had been executed.
+
 Building
 --------
 
@@ -38,5 +40,6 @@ The overall structure of the tests directory should look like the following:
         - lipo(.exe)
   - TestApp_source
   - TestApp.app
-  - libc_stub
+  - stubs
+  - make-ipa.sh
 ```
