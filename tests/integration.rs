@@ -182,7 +182,7 @@ fn test_app() -> Result<(), Box<dyn Error>> {
 
     // Wipe the stubs dir to ensure it is clean.
     let _ = std::fs::remove_dir_all(&stubs_dir);
-    // Create the stubs dir and its src/ subdirectory (the rest come later)
+    // Create the stubs dir
     std::fs::create_dir(&stubs_dir).unwrap();
 
     let bundled_libs_search_arg =
@@ -220,7 +220,7 @@ fn test_app() -> Result<(), Box<dyn Error>> {
 
     // Split SYMBOLS.txt into individual source files.
 
-    std::fs::create_dir_all(&stubs_src_dir).unwrap();
+    std::fs::create_dir(&stubs_src_dir).unwrap();
     let mut files_to_compile = Vec::<(String, PathBuf)>::new();
     {
         let mut in_body = false;
