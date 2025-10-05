@@ -248,7 +248,8 @@ fn test_app() -> Result<(), Box<dyn Error>> {
             &format!("-Wl,-install_name,{}", dylib_path),
             "-Wno-objc-root-class", // silence clang warning about inheritance
             "-Wl,-dylib",
-            "-lobjc",
+            stubs_dir_arg.as_str(),
+            "-lobjc.A",
         ];
         let dylib_name = dylib_path.rsplit_once("/").unwrap().1;
         // World's most horrible heuristic:
@@ -256,7 +257,7 @@ fn test_app() -> Result<(), Box<dyn Error>> {
         //   not link against libobjc, and it will (hopefully) be compiled
         //   before any normal Objective-C code. We need to strip the 'lib' and
         //   '.dylib' parts of its filename to get something we can pass to '-l'
-        //   (i.e. 'libobjc.dylib' -> '-lobjc')
+        //   (i.e. 'libobjc.A.dylib' -> '-lobjc.A')
         // - if the name does not begin with 'lib', then it's probably a
         //   framework, and we need to ensure the test app links against it with
         //   '-l', and to that end we need to add the 'lib' and '.dylib' parts
@@ -265,13 +266,14 @@ fn test_app() -> Result<(), Box<dyn Error>> {
         let (compile_args, out_path) = if let Some(bare_name) = dylib_name.strip_prefix("lib") {
             extra_linker_args.push(format!("-l{}", bare_name.strip_suffix(".dylib").unwrap()));
             (
-                &compile_args[..compile_args.len() - 1], // skip "-lobjc"
+                // skip "-Ltests/stubs/" and "-lobjc.A"
+                &compile_args[..compile_args.len() - 2],
                 stubs_dir.join(dylib_name),
             )
         } else {
             extra_linker_args.push(format!("-l{dylib_name}"));
             (
-                &compile_args[..], // include "-lobjc"
+                &compile_args[..],
                 stubs_dir.join(format!("lib{dylib_name}.dylib")),
             )
         };
