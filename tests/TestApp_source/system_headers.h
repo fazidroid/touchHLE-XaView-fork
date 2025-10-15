@@ -79,7 +79,7 @@ bool CGRectEqualToRect(CGRect, CGRect);
 typedef struct {
   CGFloat a, b, c, d, tx, ty;
 } CGAffineTransform;
-// extern const CGAffineTransform CGAffineTransformIdentity;
+extern const CGAffineTransform CGAffineTransformIdentity;
 bool CGAffineTransformIsIdentity(CGAffineTransform);
 bool CGAffineTransformEqualToTransform(CGAffineTransform, CGAffineTransform);
 CGAffineTransform CGAffineTransformMake(CGFloat, CGFloat, CGFloat, CGFloat,

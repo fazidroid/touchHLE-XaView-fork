@@ -30,11 +30,8 @@ void dump_transform(CGAffineTransform t) {
 int test_CGAffineTransform(void) {
   bool success = 1;
 
-  // TODO: test CGAffineTransformIdentity. It seems like non-lazy symbols (i.e.
-  // non-function symbols) are not linked correctly, probably due to one of the
-  // cursed things done to build TestApp, so it can't be tested right now.
-  /*CGAffineTransform identity_from_constant = CGAffineTransformIdentity;
-  success = success && CGAffineTransformIsIdentity(identity_from_constant);*/
+  CGAffineTransform identity_from_constant = CGAffineTransformIdentity;
+  success = success && CGAffineTransformIsIdentity(identity_from_constant);
 
   CGAffineTransform identity_from_initializer = {
       .a = 1.0,
