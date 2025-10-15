@@ -127,21 +127,28 @@ fn build_object<I: Iterator<Item = P>, P: AsRef<OsStr>>(
 fn run_test_app(
     tests_dir: &Path,
     test_app_name: &str,
-    sources: &[&Path],
     extra_compile_args: &[&str],
     extra_run_args: &[&str],
 ) -> Result<(), Box<dyn Error>> {
     let test_app_path = tests_dir.join(format!("{}.app", test_app_name));
+
+    let source_path = tests_dir.join(format!("{}_source", test_app_name));
+    let sources = std::fs::read_dir(&source_path)
+        .unwrap()
+        .map(|entry| PathBuf::from(entry.unwrap().file_name()))
+        .filter(|filename| {
+            filename
+                .extension()
+                .is_some_and(|ext| ext == "m" || ext == "c")
+        })
+        .map(|entry| source_path.join(entry));
+
     build_object(
         &tests_dir,
         &tests_dir
             .join(format!("{}.app", test_app_name))
             .join(test_app_name),
-        sources.iter().map(|file| {
-            tests_dir
-                .join(format!("{}_source", test_app_name))
-                .join(file)
-        }),
+        sources,
         extra_compile_args,
     )?;
     let binary_name = "touchHLE";
@@ -331,8 +338,5 @@ fn test_app() -> Result<(), Box<dyn Error>> {
     }
 
     // Finally, build TestApp itself.
-
-    let sources =
-        ["main.c", "cli_tests.m", "gui_tests.m", "SyncTester.m"].map(|file| Path::new(file));
-    run_test_app(&tests_dir, "TestApp", &sources, &extra_compile_args, &[])
+    run_test_app(&tests_dir, "TestApp", &extra_compile_args, &[])
 }

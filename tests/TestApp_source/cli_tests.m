@@ -7,19 +7,6 @@
 // This file contains the command-line automated tests. tests/integration.rs
 // runs these automatically.
 
-// === Includes ===
-
-// For convenience, let's just include the other source files.
-
-#include "AutoReleasePoolTest.m"
-#include "CGAffineTransform.c"
-#import "SyncTester.h"
-
-// === Declarations ===
-
-// We do not have complete system headers for iPhone OS, so we must declare some
-// things ourselves rather than #include'ing.
-
 #include <CoreFoundation/CFBase.h>
 #include <CoreFoundation/CFDictionary.h>
 #include <CoreFoundation/CFNumber.h>
@@ -42,6 +29,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <wchar.h>
+
+#import "SyncTester.h"
+
+// Declare test functions from other files.
+
+int test_AutoreleasePool(void);   // AutoReleasePoolTest.m
+int test_CGAffineTransform(void); // CGAffineTransform.c
 
 // === Main code ===
 
