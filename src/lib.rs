@@ -98,7 +98,9 @@ pub extern "C" fn SDL_main(
 
 const USAGE: &str = "\
 Usage:
-    touchHLE path/to/some.app
+    touchHLE [PATH] [OPTIONS]
+
+PATH should be a path to a .app bundle or .ipa file.
 
 If no app path or special option is specified, a GUI app picker is displayed.
 
@@ -143,11 +145,15 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
     let mut bundle_path: Option<PathBuf> = None;
     let mut just_info = false;
     let mut option_args = Vec::new();
-
     let mut options = options::Options::default();
+    let mut app_args = None::<Vec<String>>;
 
     for arg in args {
-        if arg == "--help" {
+        if let Some(ref mut app_args) = app_args {
+            app_args.push(arg);
+        } else if arg == "--args" {
+            app_args = Some(Vec::new());
+        } else if arg == "--help" {
             echo!("{}", USAGE);
             echo!("{}", options::OPTIONS_HELP);
             return Ok(());
@@ -305,7 +311,13 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
     }
 
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        Environment::new(bundle, fs, options.clone(), env_for_salvage)
+        Environment::new(
+            bundle,
+            fs,
+            options.clone(),
+            app_args.unwrap_or_default(),
+            env_for_salvage,
+        )
     }));
     let mut env = match res {
         Ok(ret) => match ret {

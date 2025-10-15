@@ -4,9 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-// This is a main file for the TestApp which is used for integration testing.
-// See also tests/README.md and tests/integration.rs for the details of how it
-// is compiled and run.
+// This file contains the command-line automated tests. tests/integration.rs
+// runs these automatically.
 
 // === Includes ===
 
@@ -18,8 +17,8 @@
 
 // === Declarations ===
 
-// We don't have any system headers for iPhone OS, so we must declare everything
-// ourselves rather than #include'ing.
+// We do not have complete system headers for iPhone OS, so we must declare some
+// things ourselves rather than #include'ing.
 
 #include <CoreFoundation/CFBase.h>
 #include <CoreFoundation/CFDictionary.h>
@@ -3163,7 +3162,7 @@ struct {
 };
 // clang-format on
 
-int main() {
+int TestApp_cli_tests_main(void) {
   int tests_run = 0;
   int tests_passed = 0;
 
@@ -3182,5 +3181,5 @@ int main() {
   }
 
   printf("Passed %d out of %d tests\n", tests_passed, tests_run);
-  exit(tests_run == tests_passed ? 0 : 1);
+  return tests_run == tests_passed ? 0 : 1;
 }

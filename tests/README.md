@@ -1,9 +1,16 @@
 Integration tests
 =================
 
-This directory contains integration tests written in Objective-C. They're compiled to an ARMv6 Mach-O binary and packaged into a bundle (`TestApp.app`) so that they can be run in the emulator like a normal iPhone OS app. The code in `integration.rs` lets them be run by `cargo test` (which also runs unit tests written in Rust).
+This directory contains integration tests written in Objective-C. They're compiled to an ARMv7 Mach-O binary and packaged into a bundle (`TestApp.app`) so that they can be run in the emulator like a normal iPhone OS app.
 
-The resulting `TestApp.app` binary can also be run on a real iOS device, if it is jailbroken (to bypass the normal signature checks). The `./make-ipa.sh` script can turn the app into an IPA file to simplify installation. The app doesn't fully work on iOS yet: when tested 2025-10-05 on a 3rd-gen iPod touch running iOS 5.1.1, it segfaulted after around a dozen tests had been executed.
+`TestApp.app` is effectively two completely different apps:
+
+- When launched normally, it is a UIKit app that allows us to do manual testing of various UI-related things.
+- When launched with the `--cli-tests` command-line argument, it is a command-line app that runs a suite of automated tests.
+
+The code in `integration.rs` builds `TestApp.app` and runs the CLI tests in touchHLE. Running `cargo test` will run both these CLI tests and the unit tests written in Rust.
+
+The resulting `TestApp.app` binary can also be run on a real iOS device, if it is jailbroken (to bypass the normal signature checks). The `./make-ipa.sh` script can turn the app into an IPA file to simplify installation. The app doesn't fully work on iOS yet: when tested 2025-10-05 on a 3rd-gen iPod touch running iOS 5.1.1, the CLI tests segfaulted after around a dozen tests had been executed.
 
 Building
 --------

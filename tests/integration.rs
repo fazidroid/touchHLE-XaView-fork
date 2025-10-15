@@ -153,6 +153,9 @@ fn run_test_app(
         // testing, and works in CI.
         .arg("--headless")
         .args(extra_run_args)
+        // Run the automated CLI tests, rather than the manual UIKit tests.
+        .arg("--args")
+        .arg("--cli-tests")
         .output()
         .expect("failed to execute touchHLE process");
     std::io::stdout().write_all(&output.stdout).unwrap();
@@ -329,6 +332,7 @@ fn test_app() -> Result<(), Box<dyn Error>> {
 
     // Finally, build TestApp itself.
 
-    let sources = ["main.m", "SyncTester.m"].map(|file| Path::new(file));
+    let sources =
+        ["main.c", "cli_tests.m", "gui_tests.m", "SyncTester.m"].map(|file| Path::new(file));
     run_test_app(&tests_dir, "TestApp", &sources, &extra_compile_args, &[])
 }

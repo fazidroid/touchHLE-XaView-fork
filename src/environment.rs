@@ -245,6 +245,7 @@ impl Environment {
         bundle: bundle::Bundle,
         fs: fs::Fs,
         options: options::Options,
+        app_args: Vec<String>,
         env_for_salvage: Option<Environment>,
     ) -> Result<Environment, String> {
         let startup_time = Instant::now();
@@ -422,10 +423,12 @@ impl Environment {
 
             let bin_path_apple_key = format!("executable_path={}", bin_path.as_str());
 
-            let argv = &[bin_path.as_str()];
+            let argv = Vec::from_iter(
+                std::iter::once(bin_path.as_str()).chain(app_args.iter().map(|s| s.as_str())),
+            );
             let envp = envp_ref_list.as_slice();
             let apple = &[bin_path_apple_key.as_str()];
-            stack::prep_stack_for_start(&mut env.mem, &mut env.cpu, argv, envp, apple);
+            stack::prep_stack_for_start(&mut env.mem, &mut env.cpu, &argv, envp, apple);
         }
 
         env.cpu.set_cpsr(cpu::Cpu::CPSR_USER_MODE);

@@ -195,6 +195,11 @@ Other options:
         be no graphical output and no input. Only useful for command-line apps.
         Implies --no-error-popup.
 
+    --args
+        All arguments following this option will be passed to the app (via C's
+        argc/argv) rather than processed by touchHLE. This option can't be used
+        via touchHLE_options.txt or touchHLE_default_options.txt.
+
     --print-fps
         Logs the current framerate (FPS) to the console once per second.
 

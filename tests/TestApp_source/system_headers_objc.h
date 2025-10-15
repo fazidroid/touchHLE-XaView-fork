@@ -9,6 +9,7 @@
 // Objective-C base:
 typedef signed char BOOL;
 typedef unsigned long NSUInteger;
+typedef signed long NSInteger;
 #define false 0
 #define true 1
 typedef struct objc_selector *SEL;
@@ -20,11 +21,13 @@ id objc_msgSend(id, SEL, ...);
 @interface NSObject {
   Class isa;
 }
-+ (id)new;
-- (id)init;
-- (id)retain;
++ (Class)class;
++ (instancetype)alloc;
++ (instancetype)new;
+- (instancetype)init;
+- (instancetype)retain;
 - (void)release;
-- (id)autorelease;
+- (instancetype)autorelease;
 - (void)dealloc;
 - (NSUInteger)retainCount;
 @end
