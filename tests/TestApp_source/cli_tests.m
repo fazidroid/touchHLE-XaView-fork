@@ -43,32 +43,6 @@
 #include <unistd.h>
 #include <wchar.h>
 
-// `CGDataProvider.h`
-
-typedef struct _CGDataProvider *CGDataProviderRef;
-
-CGDataProviderRef CGDataProviderCreateWithCFData(CFDataRef);
-CFDataRef CGDataProviderCopyData(CGDataProviderRef);
-
-// `CGGeometry.h`
-
-CGFloat CGRectGetMinX(CGRect);
-CGFloat CGRectGetMaxX(CGRect);
-CGFloat CGRectGetMinY(CGRect);
-CGFloat CGRectGetMaxY(CGRect);
-CGFloat CGRectGetHeight(CGRect);
-CGFloat CGRectGetWidth(CGRect);
-
-// `CGImage.h`
-
-typedef struct _CGImage *CGImageRef;
-
-CGImageRef CGImageCreateWithJPEGDataProvider(CGDataProviderRef, const CGFloat *,
-                                             bool, int);
-size_t CGImageGetWidth(CGImageRef);
-size_t CGImageGetHeight(CGImageRef);
-CGDataProviderRef CGImageGetDataProvider(CGImageRef);
-
 // === Main code ===
 
 int test_CGGeometry() {

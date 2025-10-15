@@ -1,4 +1,4 @@
-#include "system_headers_objc.h"
+#include "system_headers.h"
 static int dealloc_counter = 0;
 @implementation DeallocDetection : NSObject
 - (void)dealloc {

@@ -4,51 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-// We do not have complete system headers for iPhone OS, so we must declare some
-// things ourselves rather than #include'ing.
-#include "system_headers_objc.h"
+#include "system_headers.h"
 #include <stdio.h>
-
-typedef float CGFloat;
-typedef struct {
-  CGFloat x, y;
-} CGPoint;
-typedef struct {
-  CGFloat width, height;
-} CGSize;
-typedef struct {
-  CGPoint origin;
-  CGSize size;
-} CGRect;
-
-typedef enum {
-  UITextAlignmentLeft = 0,
-  UITextAlignmentCenter = 1,
-  UITextAlignmentRight = 2,
-} UITextAlignment;
-
-@interface NSString : NSObject
-+ (instancetype)stringWithUTF8String:(const char *)string;
-@end
-@interface UIScreen : NSObject
-+ (instancetype)mainScreen;
-- (CGRect)applicationFrame;
-@end
-@interface UIView : NSObject
-- (instancetype)initWithFrame:(CGRect)frame;
-- (CGRect)bounds;
-- (void)addSubview:(UIView *)view;
-@end
-@interface UIWindow : UIView
-- (void)makeKeyAndVisible;
-@end
-@interface UILabel : UIView
-- (void)setText:(NSString *)text;
-- (void)setTextAlignment:(UITextAlignment)alignment;
-@end
-
-NSString *NSStringFromClass(Class);
-int UIApplicationMain(int, char **, NSString *, NSString *);
 
 @interface TestAppDelegate : NSObject
 @end
