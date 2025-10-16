@@ -17,11 +17,13 @@
 // Objective-C runtime
 
 typedef signed char BOOL;
-#define YES 0
-#define NO 1
+#define YES 1
+#define NO 0
 
 typedef unsigned long NSUInteger;
 typedef signed long NSInteger;
+
+#define nil ((id)0)
 
 // id objc_msgSend(id, SEL, ...);
 
@@ -53,6 +55,21 @@ typedef signed long NSInteger;
 
 NSString *NSStringFromClass(Class);
 
+typedef double NSTimeInterval;
+
+@interface NSTimer : NSObject
++ (instancetype)timerWithTimeInterval:(NSTimeInterval)interval
+                               target:(id)target
+                             selector:(SEL)selector
+                             userInfo:(id)user_info
+                              repeats:(BOOL)repeats;
++ (instancetype)scheduledTimerWithTimeInterval:(NSTimeInterval)interval
+                                        target:(id)target
+                                      selector:(SEL)selector
+                                      userInfo:(id)user_info
+                                       repeats:(BOOL)repeats;
+@end
+
 // Core Graphics
 
 // (See CGAffineTransform.c for where this define comes from.)
@@ -66,15 +83,25 @@ typedef struct {
   CGFloat x, y;
 } CGPoint;
 bool CGPointEqualToPoint(CGPoint, CGPoint);
+static inline CGPoint CGPointMake(CGFloat x, CGFloat y) {
+  return (CGPoint){x, y};
+}
 typedef struct {
   CGFloat width, height;
 } CGSize;
 bool CGSizeEqualToSize(CGSize, CGSize);
+static inline CGSize CGSizeMake(CGFloat width, CGFloat height) {
+  return (CGSize){width, height};
+}
 typedef struct {
   CGPoint origin;
   CGSize size;
 } CGRect;
 bool CGRectEqualToRect(CGRect, CGRect);
+static inline CGRect CGRectMake(CGFloat x, CGFloat y, CGFloat width,
+                                CGFloat height) {
+  return (CGRect){CGPointMake(x, y), CGSizeMake(width, height)};
+}
 
 typedef struct {
   CGFloat a, b, c, d, tx, ty;
@@ -135,10 +162,35 @@ typedef enum {
 + (instancetype)mainScreen;
 - (CGRect)applicationFrame;
 @end
+@interface UIColor : NSObject
++ (instancetype)colorWithRed:(CGFloat)r
+                       green:(CGFloat)g
+                        blue:(CGFloat)b
+                       alpha:(CGFloat)a;
++ (instancetype)colorWithWhite:(CGFloat)w alpha:(CGFloat)a;
++ (instancetype)clearColor;
++ (instancetype)blackColor;
++ (instancetype)whiteColor;
++ (instancetype)darkGrayColor;
++ (instancetype)grayColor;
++ (instancetype)lightGrayColor;
++ (instancetype)blueColor;
++ (instancetype)brownColor;
++ (instancetype)cyanColor;
++ (instancetype)greenColor;
++ (instancetype)magentaColor;
++ (instancetype)orangeColor;
++ (instancetype)purpleColor;
++ (instancetype)redColor;
++ (instancetype)yellowColor;
+@end
 @interface UIView : NSObject
 - (instancetype)initWithFrame:(CGRect)frame;
 - (CGRect)bounds;
+- (CGRect)frame;
+- (void)setFrame:(CGRect)frame;
 - (void)addSubview:(UIView *)view;
+- (void)setBackgroundColor:(UIColor *)color;
 @end
 @interface UIWindow : UIView
 - (void)makeKeyAndVisible;
