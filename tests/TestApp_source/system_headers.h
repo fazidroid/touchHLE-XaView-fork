@@ -150,6 +150,12 @@ size_t CGImageGetWidth(CGImageRef);
 size_t CGImageGetHeight(CGImageRef);
 CGDataProviderRef CGImageGetDataProvider(CGImageRef);
 
+// Core Animation
+
+@interface CALayer : NSObject
+- (void)setCornerRadius:(CGFloat)radius;
+@end
+
 // UIKit
 
 typedef enum {
@@ -186,6 +192,7 @@ typedef enum {
 @end
 @interface UIView : NSObject
 - (instancetype)initWithFrame:(CGRect)frame;
+- (CALayer *)layer;
 - (CGRect)bounds;
 - (CGRect)frame;
 - (void)setFrame:(CGRect)frame;

@@ -22,6 +22,7 @@ CGFloat ballYVelocity;
   label.textAlignment = UITextAlignmentCenter;
   [window addSubview:label];
   ball = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 20, 20)];
+  ball.layer.cornerRadius = ball.frame.size.width / 2;
   ball.backgroundColor = [UIColor redColor];
   [window addSubview:ball];
   [window makeKeyAndVisible];
