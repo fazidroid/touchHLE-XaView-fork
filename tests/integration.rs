@@ -97,11 +97,13 @@ fn build_object<I: Iterator<Item = P>, P: AsRef<OsStr>>(
         // Target iPhone OS 2
         .arg("--target=arm-apple-ios")
         .arg("-miphoneos-version-min=2.0")
-        .args(["-arch", "armv7"])
+        .args(["-arch", "armv6", "-arch", "armv7"])
         // If enabled, the stack protection causes a null pointer crash in some
         // functions. This is probably because ___stack_chk_guard isn't linked.
         .arg("-fno-stack-protector")
         .arg("-DPRODUCT_iPhone")
+        // This prevents clang from attempting to link clang_rt on macOS.
+        .arg("-nodefaultlibs")
         .arg(linker_arg)
         .arg(sdk_arg)
         .args(extra_compile_args)
