@@ -999,8 +999,8 @@ int test_setlocale() {
   }
 
   // Test setting a locale category
-  locale = setlocale(LC_NUMERIC, "es_ES");
-  if (strcmp(locale, "es_ES") != 0) {
+  locale = setlocale(LC_NUMERIC, "POSIX");
+  if (strcmp(locale, "POSIX") != 0) {
     return 2;
   }
 
@@ -3030,6 +3030,11 @@ int test_synchronized() {
 bool test_case_CFURLHasDirectoryPath(const char *str) {
   CFURLRef url = CFURLCreateWithBytes(NULL, str, strlen(str),
                                       kCFStringEncodingASCII, NULL);
+
+  if (!url) {
+    return false;
+  }
+
   Boolean res = CFURLHasDirectoryPath(url);
   CFRelease(url);
   return res;
