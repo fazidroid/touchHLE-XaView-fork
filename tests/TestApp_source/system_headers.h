@@ -68,6 +68,7 @@ typedef double NSTimeInterval;
                                       selector:(SEL)selector
                                       userInfo:(id)user_info
                                        repeats:(BOOL)repeats;
+- (void)invalidate;
 @end
 
 // Core Graphics
@@ -164,6 +165,22 @@ typedef enum {
   UITextAlignmentRight = 2,
 } UITextAlignment;
 
+typedef enum {
+  UIButtonTypeRoundedRect = 1,
+} UIButtonType;
+
+typedef enum {
+  UIControlStateNormal = 0,
+} UIControlState;
+
+typedef enum {
+  UIControlEventTouchUpInside = 1 << 6,
+} UIControlEvents;
+
+@interface UIApplication : NSObject
++ (instancetype)sharedApplication;
+- (id)delegate;
+@end
 @interface UIScreen : NSObject
 + (instancetype)mainScreen;
 - (CGRect)applicationFrame;
@@ -197,6 +214,7 @@ typedef enum {
 - (CGRect)frame;
 - (void)setFrame:(CGRect)frame;
 - (void)addSubview:(UIView *)view;
+- (void)removeFromSuperview;
 - (void)setBackgroundColor:(UIColor *)color;
 @end
 @interface UIWindow : UIView
@@ -205,6 +223,15 @@ typedef enum {
 @interface UILabel : UIView
 - (void)setText:(NSString *)text;
 - (void)setTextAlignment:(UITextAlignment)alignment;
+@end
+@interface UIControl : UIView
+- (void)addTarget:(id)target
+              action:(SEL)action
+    forControlEvents:(UIControlEvents)events;
+@end
+@interface UIButton : UIControl
++ (instancetype)buttonWithType:(UIButtonType)type;
+- (void)setTitle:(NSString *)title forState:(UIControlState)state;
 @end
 
 int UIApplicationMain(int, char **, NSString *, NSString *);
