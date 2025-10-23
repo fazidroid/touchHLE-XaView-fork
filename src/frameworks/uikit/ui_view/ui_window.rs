@@ -7,7 +7,7 @@
 
 use super::UIViewHostObject;
 use crate::dyld::{ConstantExports, HostConstant};
-use crate::frameworks::core_graphics::CGRect;
+use crate::frameworks::core_graphics::{CGPoint, CGRect};
 use crate::frameworks::foundation::ns_string;
 use crate::objc::{id, msg, msg_class, msg_super, nil, objc_classes, ClassExports};
 
@@ -148,6 +148,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     () = msg![env; vc viewWillAppear:false];
     () = msg_super![env; this addSubview:view];
     () = msg![env; vc viewDidAppear:false];
+}
+
+- (CGPoint)convertPoint:(CGPoint)point
+             fromWindow:(id)other { // UIWindow*
+    let this_layer: id = msg![env; this layer];
+    // Resolves to nil if other is nil.
+    let other_layer: id = msg![env; other layer];
+    msg![env; this_layer convertPoint:point fromLayer:other_layer]
+}
+- (CGPoint)convertPoint:(CGPoint)point
+               toWindow:(id)other { // UIWindow*
+    let this_layer: id = msg![env; this layer];
+    // Resolves to nil if other is nil.
+    let other_layer: id = msg![env; other layer];
+    msg![env; this_layer convertPoint:point toLayer:other_layer]
 }
 
 @end

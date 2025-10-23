@@ -162,6 +162,10 @@ CGDataProviderRef CGImageGetDataProvider(CGImageRef);
 - (void)setAnchorPoint:(CGPoint)point;
 - (void)setCornerRadius:(CGFloat)radius;
 - (void)setPosition:(CGPoint)position;
+- (CGPoint)convertPoint:(CGPoint)point fromLayer:(CALayer *)layer;
+- (CGPoint)convertPoint:(CGPoint)point toLayer:(CALayer *)layer;
+- (CGRect)convertRect:(CGRect)point fromLayer:(CALayer *)layer;
+- (CGRect)convertRect:(CGRect)point toLayer:(CALayer *)layer;
 @end
 
 // UIKit
@@ -214,12 +218,18 @@ typedef enum {
 + (instancetype)redColor;
 + (instancetype)yellowColor;
 @end
+@class UIWindow;
 @interface UIView : NSObject
 - (instancetype)initWithFrame:(CGRect)frame;
 - (CALayer *)layer;
 - (CGRect)bounds;
 - (CGRect)frame;
 - (void)setFrame:(CGRect)frame;
+- (CGPoint)convertPoint:(CGPoint)point fromView:(UIView *)view;
+- (CGPoint)convertPoint:(CGPoint)point toView:(UIView *)view;
+- (CGRect)convertRect:(CGRect)point fromView:(UIView *)view;
+- (CGRect)convertRect:(CGRect)point toView:(UIView *)view;
+- (UIWindow *)window;
 - (void)addSubview:(UIView *)view;
 - (void)removeFromSuperview;
 - (void)layoutSubviews;
@@ -227,10 +237,15 @@ typedef enum {
 @end
 @interface UIWindow : UIView
 - (void)makeKeyAndVisible;
+- (CGPoint)convertPoint:(CGPoint)point fromWindow:(UIWindow *)window;
+- (CGPoint)convertPoint:(CGPoint)point toWindow:(UIWindow *)window;
+- (CGRect)convertRect:(CGRect)point fromWindow:(UIWindow *)window;
+- (CGRect)convertRect:(CGRect)point toWindow:(UIWindow *)window;
 @end
 @interface UILabel : UIView
 - (void)setText:(NSString *)text;
 - (void)setTextAlignment:(UITextAlignment)alignment;
+- (void)setTextColor:(UIColor *)color;
 @end
 @interface UIControl : UIView
 - (void)addTarget:(id)target
@@ -243,5 +258,9 @@ typedef enum {
 @end
 
 int UIApplicationMain(int, char **, NSString *, NSString *);
+
+NSString *NSStringFromCGPoint(CGPoint);
+NSString *NSStringFromCGSize(CGSize);
+NSString *NSStringFromCGRect(CGRect);
 
 #endif // TOUCHHLE_SYSTEM_HEADERS_H

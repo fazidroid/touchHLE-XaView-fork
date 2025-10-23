@@ -71,18 +71,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (CGPoint)locationInView:(id)that_view { // UIView*
     let &UITouchHostObject { location, window, .. } = env.objc.borrow(this);
+    let location_in_window: CGPoint = msg![env; window convertPoint:location fromWindow:nil];
     if that_view == nil {
-        location // TODO: this should use convertPoint:fromView: too
+        location_in_window
     } else {
-        msg![env; that_view convertPoint:location fromView:window]
+        msg![env; that_view convertPoint:location_in_window fromView:window]
     }
 }
 - (CGPoint)previousLocationInView:(id)that_view { // UIView*
     let &UITouchHostObject { previous_location, window, .. } = env.objc.borrow(this);
+    let location_in_window: CGPoint = msg![env; window convertPoint:previous_location fromWindow:nil];
     if that_view == nil {
-        previous_location // TODO: this should use convertPoint:fromView: too
+        location_in_window
     } else {
-        msg![env; that_view convertPoint:previous_location fromView:window]
+        msg![env; that_view convertPoint:location_in_window fromView:window]
     }
 }
 
@@ -122,8 +124,8 @@ pub fn handle_event(env: &mut Environment, event: Event) {
 }
 
 fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
-    // Assumes the last window in the list is the one on top.
-    // TODO: this is not correct once we support zPosition.
+    // Assumes the last window in the list is the one on top and that it
+    // covers the whole screen. FIXME!
     let Some(&top_window) = env
         .framework_state
         .uikit
@@ -229,14 +231,15 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let touch: id = msg![env; touches_arr objectAtIndex:i];
         let &UITouchHostObject { location, .. } = env.objc.borrow(touch);
 
-        // FIXME: handle non-fullscreen windows in hit testing and
-        //        co-ordinate space translation.
+        // FIXME: handle possibly overlapping windows in hit testing.
 
-        let view: id = msg![env; top_window hitTest:location withEvent:event];
+        let location_in_window: CGPoint =
+            msg![env; top_window convertPoint:location fromWindow:nil];
+        let view: id = msg![env; top_window hitTest:location_in_window withEvent:event];
         if view == nil {
             log!(
                 "Couldn't find a view for touch at {:?} in window {:?}, discarding",
-                location,
+                location_in_window,
                 top_window,
             );
             continue;
@@ -248,7 +251,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
                     let f: CGRect = msg![env; view frame];
                     f
                 },
-                location,
+                location_in_window,
                 top_window,
             );
         }

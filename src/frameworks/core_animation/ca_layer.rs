@@ -21,6 +21,7 @@ use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::ns_string;
 use crate::mem::{GuestUSize, Ptr};
 use crate::objc::{id, msg, nil, objc_classes, release, retain, ClassExports, HostObject, ObjC};
+use crate::Environment;
 use std::collections::HashMap;
 
 pub(super) struct CALayerHostObject {
@@ -403,15 +404,44 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (CGPoint)convertPoint:(CGPoint)point
               fromLayer:(id)other { // CALayer*
-    assert!(other != nil); // TODO
 
     if this == other {
         return point;
     }
 
-    // The two layers must have a common ancestor. Let's try to find it.
-    // The idea is to walk up each layer's superlayer chain, one at a time,
-    // alternating between layers until we find a match.
+    convert_point_inner(env, this, other, point)
+}
+- (CGPoint)convertPoint:(CGPoint)point
+                toLayer:(id)other { // CALayer*
+    if this == other {
+        return point;
+    }
+
+    convert_point_inner(env, other, this, point)
+}
+
+// TODO: more
+
+@end
+
+};
+
+fn convert_point_inner(env: &mut Environment, this: id, other: id, point: CGPoint) -> CGPoint {
+    // The convertPoint methods can be used in two ways:
+    // - If two layers are provided (one as the receiver, one as a parameter),
+    //   then the layers are required to have a common ancestor, and it will be
+    //   used to provide a reference for converting the point.
+    // - If one layer is provided, and the other layer is nil, then the layer
+    //   is resolved to the co-ordinate space of the origin of the layer at the
+    //   top of the hierarchy. This is effectively the same as screen space, or
+    //   the co-ordinate space that windows live in).
+    let need_common_ancestor = this != nil && other != nil;
+    assert!(!(this == nil && other == nil));
+
+    // This algorithm attempts to efficiently find the common ancestor of the
+    // two layers by walking up each layer's superlayer chain, one at a time,
+    // alternating between layers until it finds a match.
+    // For the single-layer case, it of course only walks its superlayer chain.
 
     // Maps of layer pointers to origins in that layer's co-ordinate space.
     let mut this_map = HashMap::from([(this, CGPoint { x: 0.0, y: 0.0 })]);
@@ -424,70 +454,60 @@ pub const CLASSES: ClassExports = objc_classes! {
     let (common_ancestor, this_origin, other_origin) = loop {
         if this_superlayer != nil {
             let next: id = msg![env; this_superlayer superlayer];
-            if next == nil {
-                this_superlayer = nil;
-            } else {
-                let bounds: CGRect = msg![env; this_superlayer bounds];
-                let frame: CGRect = msg![env; this_superlayer frame];
-                let next_origin = CGPoint {
-                    x: this_origin.x + frame.origin.x - bounds.origin.x,
-                    y: this_origin.y + frame.origin.y - bounds.origin.y,
-                };
+            let bounds: CGRect = msg![env; this_superlayer bounds];
+            let frame: CGRect = msg![env; this_superlayer frame];
+            let next_origin = CGPoint {
+                x: this_origin.x + frame.origin.x - bounds.origin.x,
+                y: this_origin.y + frame.origin.y - bounds.origin.y,
+            };
+            if need_common_ancestor && next != nil {
                 if let Some(&other_origin) = other_map.get(&next) {
                     break (next, next_origin, other_origin);
                 }
                 this_map.insert(next, next_origin);
-                this_superlayer = next;
-                this_origin = next_origin;
             }
+            this_superlayer = next;
+            this_origin = next_origin;
         }
 
         if other_superlayer != nil {
             let next: id = msg![env; other_superlayer superlayer];
-            if next == nil {
-                other_superlayer = nil;
-            } else {
-                let bounds: CGRect = msg![env; other_superlayer bounds];
-                let frame: CGRect = msg![env; other_superlayer frame];
-                let next_origin = CGPoint {
-                    x: other_origin.x + frame.origin.x - bounds.origin.x,
-                    y: other_origin.y + frame.origin.y - bounds.origin.y,
-                };
+            let bounds: CGRect = msg![env; other_superlayer bounds];
+            let frame: CGRect = msg![env; other_superlayer frame];
+            let next_origin = CGPoint {
+                x: other_origin.x + frame.origin.x - bounds.origin.x,
+                y: other_origin.y + frame.origin.y - bounds.origin.y,
+            };
+            if need_common_ancestor && next != nil {
                 if let Some(&this_origin) = this_map.get(&next) {
                     break (next, this_origin, next_origin);
                 }
                 other_map.insert(next, next_origin);
-                other_superlayer = next;
-                other_origin = next_origin;
             }
+            other_superlayer = next;
+            other_origin = next_origin;
         }
 
-        assert!(
-            this_superlayer != nil || other_superlayer != nil,
-            "Layers have no common ancestor!"
-        );
+        if this_superlayer == nil && other_superlayer == nil {
+            if need_common_ancestor {
+                panic!("Layers {this:?} and {other:?} have no common ancestor!");
+            } else {
+                break (nil, this_origin, other_origin);
+            }
+        }
     };
 
-    log_dbg!("{:?} and {:?}'s common ancestor: {:?}", this, other, common_ancestor);
-    log_dbg!("{:?}'s origin in common ancestor: {:?}", this, this_origin);
-    log_dbg!("{:?}'s origin in common ancestor: {:?}", other, other_origin);
+    assert!((common_ancestor == nil) != need_common_ancestor);
+    if need_common_ancestor {
+        log_dbg!("{this:?} and {other:?}'s common ancestor: {common_ancestor:?}",);
+    }
+    log_dbg!("{this:?}'s origin in {common_ancestor:?}: {this_origin:?}",);
+    log_dbg!("{other:?}'s origin in {common_ancestor:?}: {other_origin:?}",);
     let res = CGPoint {
         x: point.x + other_origin.x - this_origin.x,
         y: point.y + other_origin.y - this_origin.y,
     };
-    log_dbg!("Converted {:?} from {:?} to {:?}: {:?}", point, other, this, res);
+    log_dbg!("Converted {point:?} from {other:?} to {this:?}: {res:?}",);
+
     res
 }
-
-- (CGPoint)convertPoint:(CGPoint)point
-                toLayer:(id)other { // CALayer*
-    assert!(other != nil); // TODO
-
-    msg![env; other convertPoint:point fromLayer:this]
-}
-
-// TODO: more
-
-@end
-
-};

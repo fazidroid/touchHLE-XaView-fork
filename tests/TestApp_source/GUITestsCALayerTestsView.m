@@ -20,6 +20,7 @@ NSUInteger testNum;
   [super initWithFrame:frame];
 
   label = [[UILabel alloc] initWithFrame:[self bounds]];
+  label.text = [NSString stringWithUTF8String:"CALayer tests (press →)"];
   label.textAlignment = UITextAlignmentCenter;
   label.frame = CGRectMake(0, 0, 320, 20);
   [self addSubview:label];
@@ -44,8 +45,10 @@ NSUInteger testNum;
   [self addSubview:button2];
   [button2 layoutSubviews]; // FIXME: workaround for touchHLE not calling this
 
-  testNum = 1;
-  [self displayTest];
+  // Don't display any test initially. The testing for convertPoint:toLayer: etc
+  // won't produce the right results until this view has actually been added to
+  // the window.
+  testNum = 0;
 
   return self;
 }
@@ -89,12 +92,38 @@ NSUInteger testNum;
   [view release];
   return view;
 }
+- (UILabel *)addLabelWithFrame:(CGRect)frame text:(NSString *)text {
+  UILabel *label = [[UILabel alloc] initWithFrame:frame];
+  label.text = text;
+  label.textColor = [UIColor whiteColor];
+  label.backgroundColor = [UIColor clearColor];
+  [testArea addSubview:label];
+  [label release];
+  return label;
+}
 
 // These tests should all look like three squares arranged diagonally.
 // The color differences make it more obvious when you've switched tests.
 
 - (void)test1 {
-  [self addViewWithFrame:CGRectMake(0, 0, 100, 100) color:[UIColor redColor]];
+  UIView *view1 = [self addViewWithFrame:CGRectMake(0, 0, 100, 100)
+                                   color:[UIColor redColor]];
+  [self addLabelWithFrame:CGRectMake(0, 0, 100, 25)
+                     text:NSStringFromCGPoint([view1.layer
+                              convertPoint:CGPointMake(0.0, 0.0)
+                                 fromLayer:nil])];
+  [self addLabelWithFrame:CGRectMake(0, 25, 100, 25)
+                     text:NSStringFromCGPoint([view1
+                              convertPoint:CGPointMake(0.0, 0.0)
+                                  fromView:nil])];
+  [self addLabelWithFrame:CGRectMake(0, 50, 100, 25)
+                     text:NSStringFromCGPoint([view1.layer
+                              convertPoint:CGPointMake(0.0, 0.0)
+                                   toLayer:view1.window.layer])];
+  [self addLabelWithFrame:CGRectMake(0, 75, 100, 25)
+                     text:NSStringFromCGPoint([view1.window
+                              convertPoint:CGPointMake(0.0, 0.0)
+                                  toWindow:nil])];
   [self addViewWithFrame:CGRectMake(100, 100, 100, 100)
                    color:[UIColor greenColor]];
   [self addViewWithFrame:CGRectMake(200, 200, 100, 100)
