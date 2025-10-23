@@ -41,6 +41,7 @@ typedef signed long NSInteger;
 - (instancetype)autorelease;
 - (void)dealloc;
 - (NSUInteger)retainCount;
+- (id)performSelector:(SEL)selector;
 @end
 
 @interface NSAutoreleasePool : NSObject
@@ -50,6 +51,7 @@ typedef signed long NSInteger;
 @end
 
 @interface NSString : NSObject
++ (instancetype)stringWithFormat:(NSString *)format, ...;
 + (instancetype)stringWithUTF8String:(const char *)string;
 @end
 
@@ -70,6 +72,8 @@ typedef double NSTimeInterval;
                                        repeats:(BOOL)repeats;
 - (void)invalidate;
 @end
+
+SEL NSSelectorFromString(NSString *);
 
 // Core Graphics
 
@@ -154,7 +158,10 @@ CGDataProviderRef CGImageGetDataProvider(CGImageRef);
 // Core Animation
 
 @interface CALayer : NSObject
+- (void)setAffineTransform:(CGAffineTransform)transform;
+- (void)setAnchorPoint:(CGPoint)point;
 - (void)setCornerRadius:(CGFloat)radius;
+- (void)setPosition:(CGPoint)position;
 @end
 
 // UIKit
@@ -215,6 +222,7 @@ typedef enum {
 - (void)setFrame:(CGRect)frame;
 - (void)addSubview:(UIView *)view;
 - (void)removeFromSuperview;
+- (void)layoutSubviews;
 - (void)setBackgroundColor:(UIColor *)color;
 @end
 @interface UIWindow : UIView
