@@ -434,7 +434,7 @@ fn convert_point_inner(env: &mut Environment, this: id, other: id, point: CGPoin
     // - If one layer is provided, and the other layer is nil, then the layer
     //   is resolved to the co-ordinate space of the origin of the layer at the
     //   top of the hierarchy. This is effectively the same as screen space, or
-    //   the co-ordinate space that windows live in).
+    //   the co-ordinate space that windows live in.
     let need_common_ancestor = this != nil && other != nil;
     assert!(!(this == nil && other == nil));
 
