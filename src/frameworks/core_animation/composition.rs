@@ -12,9 +12,7 @@
 
 use super::ca_eagl_layer::find_fullscreen_eagl_layer;
 use super::ca_layer::CALayerHostObject;
-use crate::frameworks::core_graphics::{
-    cg_bitmap_context, cg_color, cg_image, CGFloat, CGPoint, CGRect,
-};
+use crate::frameworks::core_graphics::{cg_bitmap_context, cg_color, cg_image, CGFloat, CGRect};
 use crate::gles::gles11_raw as gles11; // constants only
 use crate::gles::gles11_raw::types::*;
 use crate::gles::present::{present_frame, FpsCounter};
@@ -65,8 +63,8 @@ unsafe fn load_matrix(gles: &mut dyn GLES, matrix: Matrix<4>) {
 pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<Instant> {
     // Assumes the last window in the list is the one on top.
     // TODO: this is not correct once we support zPosition.
-    // TODO: can there be windows smaller than the screen? If so we need to draw
-    //       all of them.
+    // TODO: There can be windows smaller than the screen? We should probably
+    //       draw all of them.
     let Some(&top_window) = env
         .framework_state
         .uikit
@@ -150,7 +148,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
     // TODO: draw status bar if it's not hidden
 
     // Initial state for layer tree traversal (see composite_layer_recursive)
-    let origin = CGPoint { x: 0.0, y: 0.0 };
+    let cumulative_transform = Matrix::<4>::identity();
     let opacity = 1.0;
 
     let window = env.window.as_mut().unwrap();
@@ -336,7 +334,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
             &env.mem,
             misc_gl_objects,
             root_layer,
-            origin,
+            cumulative_transform,
             opacity,
         );
     }
@@ -405,11 +403,11 @@ unsafe fn composite_layer_recursive(
     mem: &Mem,
     misc: &MiscGlObjects,
     layer: id,
-    origin: CGPoint,
+    cumulative_transform: Matrix<4>,
     opacity: CGFloat,
 ) {
-    // TODO: this can't handle zPosition, non-AABB layer transforms, rounded
-    // corners, and many other things, but none of these are supported yet :)
+    // TODO: this can't handle zPosition among other things, but it is not
+    //       supported yet :)
     // TODO: back-to-front drawing is not efficient, could we use front-to-back?
 
     let host_obj = objc.borrow::<CALayerHostObject>(layer);
@@ -419,34 +417,25 @@ unsafe fn composite_layer_recursive(
     }
 
     let opacity = opacity * host_obj.opacity;
-    let next_origin = {
-        let &CALayerHostObject {
-            bounds,
-            position,
-            anchor_point,
-            ..
-        } = host_obj;
+    let cumulative_transform = {
+        let &CALayerHostObject { bounds, .. } = host_obj;
 
-        let absolute_pos_top_left = CGPoint {
-            x: origin.x + position.x - bounds.size.width * anchor_point.x,
-            y: origin.y + position.y - bounds.size.height * anchor_point.y,
-        };
-        let next_origin = CGPoint {
-            x: absolute_pos_top_left.x - bounds.origin.x,
-            y: absolute_pos_top_left.y - bounds.origin.y,
-        };
+        // Update the transform to match this layer's co-ordinate space.
+        let cumulative_transform =
+            <Matrix<4> as From<_>>::from(host_obj.superlayer_to_layer_transform())
+                .multiply(&cumulative_transform);
 
-        // Reposition and scale the unit quad (see ARRAY_BUFFER binding).
-        let matrix = {
-            let scale = Matrix::<4>::from(&Matrix::scale_2d(bounds.size.width, bounds.size.height));
-            let position =
-                Matrix::translate_3d(absolute_pos_top_left.x, absolute_pos_top_left.y, 0.0);
-            scale.multiply(&position)
-        };
+        // Reposition and scale the unit quad (see ARRAY_BUFFER binding)
+        // so it will have the right size in this layer's co-ordinate space.
         gles.MatrixMode(gles11::MODELVIEW);
-        load_matrix(gles, matrix);
+        load_matrix(
+            gles,
+            Matrix::<4>::from(&Matrix::scale_2d(bounds.size.width, bounds.size.height))
+                .multiply(&Matrix::translate_3d(bounds.origin.x, bounds.origin.y, 0.0))
+                .multiply(&cumulative_transform),
+        );
 
-        next_origin
+        cumulative_transform
     };
 
     // Draw background color, if any
@@ -625,7 +614,7 @@ unsafe fn composite_layer_recursive(
             mem,
             misc,
             child_layer,
-            /* origin: */ next_origin,
+            cumulative_transform,
             opacity,
         )
     }

@@ -21,6 +21,12 @@ UIView *mainView;
                         autorelease]];
   [pool drain];
   [window makeKeyAndVisible];
+
+  [NSTimer scheduledTimerWithTimeInterval:(1.0 / 60.0)
+                                   target:self
+                                 selector:@selector(onTick:)
+                                 userInfo:nil
+                                  repeats:YES];
 }
 
 // This is a clumsy way to swap out views to switch between different sections
@@ -32,6 +38,12 @@ UIView *mainView;
   [mainView release];
   mainView = view;
   [window addSubview:view];
+}
+
+- (void)onTick:(NSTimer *)timer {
+  if ([mainView respondsToSelector:@selector(tick)]) {
+    [mainView performSelector:@selector(tick)];
+  }
 }
 
 - (void)dealloc {

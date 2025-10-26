@@ -18,9 +18,7 @@ pub mod ui_web_view;
 pub mod ui_window;
 
 use super::ui_graphics::{UIGraphicsPopContext, UIGraphicsPushContext};
-use crate::frameworks::core_graphics::cg_affine_transform::{
-    CGAffineTransform, CGAffineTransformIdentity,
-};
+use crate::frameworks::core_graphics::cg_affine_transform::CGAffineTransform;
 use crate::frameworks::core_graphics::cg_color::CGColorRef;
 use crate::frameworks::core_graphics::cg_context::{CGContextClearRect, CGContextRef};
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
@@ -540,12 +538,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     let layer = env.objc.borrow::<UIViewHostObject>(this).layer;
     msg![env; layer setFrame:frame]
 }
-
 - (CGAffineTransform)transform {
-    CGAffineTransformIdentity
+    let layer = env.objc.borrow::<UIViewHostObject>(this).layer;
+    msg![env; layer affineTransform]
 }
 - (())setTransform:(CGAffineTransform)transform {
-    log!("TODO: [{:?} setTransform:{:?}]", this, transform);
+    let layer = env.objc.borrow::<UIViewHostObject>(this).layer;
+    msg![env; layer setAffineTransform:transform]
 }
 
 - (())setContentMode:(NSInteger)content_mode { // should be UIViewContentMode
@@ -599,12 +598,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         if hidden || alpha < 0.01 || !interactible {
            continue;
         }
-        let frame: CGRect = msg![env; subview frame];
-        let bounds: CGRect = msg![env; subview bounds];
-        let point = CGPoint {
-            x: point.x - frame.origin.x + bounds.origin.x,
-            y: point.y - frame.origin.y + bounds.origin.y,
-        };
+        let point: CGPoint = msg![env; subview convertPoint:point fromView:this];
         let subview: id = msg![env; subview hitTest:point withEvent:event];
         if subview != nil {
             return subview;
@@ -653,45 +647,44 @@ pub const CLASSES: ClassExports = objc_classes! {
     if other == nil {
         let window: id = msg![env; this window];
         assert!(window != nil);
-        // TODO: also assert that window is a key one?
         return msg![env; this convertPoint:point fromView:window]
     }
     let this_layer = env.objc.borrow::<UIViewHostObject>(this).layer;
     let other_layer = env.objc.borrow::<UIViewHostObject>(other).layer;
     msg![env; this_layer convertPoint:point fromLayer:other_layer]
 }
-
 - (CGPoint)convertPoint:(CGPoint)point
                  toView:(id)other { // UIView*
     if other == nil {
         let window: id = msg![env; this window];
         assert!(window != nil);
-        // TODO: also assert that window is a key one?
         return msg![env; this convertPoint:point toView:window]
     }
     let this_layer = env.objc.borrow::<UIViewHostObject>(this).layer;
     let other_layer = env.objc.borrow::<UIViewHostObject>(other).layer;
     msg![env; this_layer convertPoint:point toLayer:other_layer]
 }
-
 - (CGRect)convertRect:(CGRect)rect
              fromView:(id)other { // UIView*
-    let new_origin: CGPoint = msg![env; this convertPoint:(rect.origin) fromView:other];
-    // Size is preserved
-    CGRect {
-        origin: new_origin,
-        size: rect.size
+    if other == nil {
+        let window: id = msg![env; this window];
+        assert!(window != nil);
+        return msg![env; this convertRect:rect fromView:window]
     }
+    let this_layer = env.objc.borrow::<UIViewHostObject>(this).layer;
+    let other_layer = env.objc.borrow::<UIViewHostObject>(other).layer;
+    msg![env; this_layer convertRect:rect fromLayer:other_layer]
 }
-
 - (CGRect)convertRect:(CGRect)rect
                toView:(id)other { // UIView*
-    let new_origin: CGPoint = msg![env; this convertPoint:(rect.origin) toView:other];
-    // Size is preserved
-    CGRect {
-        origin: new_origin,
-        size: rect.size
+    if other == nil {
+        let window: id = msg![env; this window];
+        assert!(window != nil);
+        return msg![env; this convertRect:rect toView:window]
     }
+    let this_layer = env.objc.borrow::<UIViewHostObject>(this).layer;
+    let other_layer = env.objc.borrow::<UIViewHostObject>(other).layer;
+    msg![env; this_layer convertRect:rect toLayer:other_layer]
 }
 
 - (())setAutoresizingMask:(NSUInteger)mask {

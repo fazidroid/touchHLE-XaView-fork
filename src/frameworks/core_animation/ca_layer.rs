@@ -6,6 +6,9 @@
 //! `CALayer`.
 
 use crate::dyld::{ConstantExports, HostConstant};
+use crate::frameworks::core_graphics::cg_affine_transform::{
+    CGAffineTransform, CGAffineTransformIdentity,
+};
 use crate::frameworks::core_graphics::cg_bitmap_context::{
     CGBitmapContextCreate, CGBitmapContextGetHeight, CGBitmapContextGetWidth,
 };
@@ -34,6 +37,7 @@ pub(super) struct CALayerHostObject {
     pub(super) bounds: CGRect,
     pub(super) position: CGPoint,
     pub(super) anchor_point: CGPoint,
+    pub(super) affine_transform: CGAffineTransform,
     pub(super) hidden: bool,
     pub(super) opaque: bool,
     pub(super) opacity: f32,
@@ -54,6 +58,26 @@ pub(super) struct CALayerHostObject {
     pub(super) gles_texture_is_up_to_date: bool,
 }
 impl HostObject for CALayerHostObject {}
+
+impl CALayerHostObject {
+    /// Internal helper method: generate a transformation matrix to transform
+    /// from the superlayer's co-ordinate space (the space that the layer's
+    /// position is specified in) to the layer's internal co-ordinate space
+    /// (the space that the layer's bounds and its sublayers' positions are
+    /// specified in).
+    pub(super) fn superlayer_to_layer_transform(&self) -> CGAffineTransform {
+        CGAffineTransform::make_translation(-self.bounds.origin.x, -self.bounds.origin.y)
+            .concat(CGAffineTransform::make_translation(
+                -self.bounds.size.width * self.anchor_point.x,
+                -self.bounds.size.height * self.anchor_point.y,
+            ))
+            .concat(self.affine_transform)
+            .concat(CGAffineTransform::make_translation(
+                self.position.x,
+                self.position.y,
+            ))
+    }
+}
 
 pub const kCAFilterLinear: &str = "kCAFilterLinear";
 pub const kCAFilterNearest: &str = "kCAFilterNearest";
@@ -88,6 +112,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         },
         position: CGPoint { x: 0.0, y: 0.0 },
         anchor_point: CGPoint { x: 0.5, y: 0.5 },
+        affine_transform: CGAffineTransformIdentity,
         hidden: false,
         opaque: false,
         opacity: 1.0,
@@ -218,36 +243,51 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setAnchorPoint:(CGPoint)anchor_point {
     env.objc.borrow_mut::<CALayerHostObject>(this).anchor_point = anchor_point;
 }
+- (CGAffineTransform)affineTransform {
+    env.objc.borrow::<CALayerHostObject>(this).affine_transform
+}
+- (())setAffineTransform:(CGAffineTransform)affine_transform {
+    env.objc.borrow_mut::<CALayerHostObject>(this).affine_transform = affine_transform;
+}
 
 - (CGRect)frame {
-    let &CALayerHostObject {
+    let host_obj @ &CALayerHostObject {
         bounds,
-        position,
-        anchor_point,
         ..
     } = env.objc.borrow(this);
-    CGRect {
-        origin: CGPoint {
-            x: position.x - bounds.size.width * anchor_point.x,
-            y: position.y - bounds.size.height * anchor_point.y,
-        },
+    host_obj.superlayer_to_layer_transform().apply_to_rect(CGRect {
+        origin: CGPoint { x: bounds.origin.x, y: bounds.origin.y },
         size: bounds.size,
-    }
+    })
 }
 - (())setFrame:(CGRect)frame {
     let CALayerHostObject {
         bounds,
         position,
         anchor_point,
+        affine_transform,
         ..
     } = env.objc.borrow_mut(this);
+
+    let inverse_transform = CGAffineTransform::make_translation(
+        -frame.size.width * anchor_point.x,
+        -frame.size.height * anchor_point.y,
+    )
+    .concat(*affine_transform).invert();
+
+    // Not the same as ::apply_to_size() as this does not ignore translation.
+    let transformed_size = inverse_transform.apply_to_rect(CGRect {
+        origin: CGPoint { x: 0.0, y: 0.0 },
+        size: frame.size
+    }).size;
+    let transformed_offset = inverse_transform.apply_to_point(CGPoint { x: 0.0, y: 0.0 });
     *position = CGPoint {
-        x: frame.origin.x + frame.size.width * anchor_point.x,
-        y: frame.origin.y + frame.size.height * anchor_point.y,
+        x: frame.origin.x + transformed_offset.x,
+        y: frame.origin.y + transformed_offset.y,
     };
     *bounds = CGRect {
         origin: CGPoint { x: 0.0, y: 0.0 },
-        size: frame.size,
+        size: transformed_size,
     };
 }
 
@@ -409,7 +449,9 @@ pub const CLASSES: ClassExports = objc_classes! {
         return point;
     }
 
-    convert_point_inner(env, this, other, point)
+    let res = transform_for_conversion(env, this, other).apply_to_point(point);
+    log_dbg!("Converted {point:?} from {other:?} to {this:?}: {res:?}");
+    res
 }
 - (CGPoint)convertPoint:(CGPoint)point
                 toLayer:(id)other { // CALayer*
@@ -417,7 +459,30 @@ pub const CLASSES: ClassExports = objc_classes! {
         return point;
     }
 
-    convert_point_inner(env, other, this, point)
+    let res = transform_for_conversion(env, other, this).apply_to_point(point);
+    log_dbg!("Converted {point:?} from {this:?} to {other:?}: {res:?}");
+    res
+}
+- (CGRect)convertRect:(CGRect)rect
+            fromLayer:(id)other { // CALayer*
+
+    if this == other {
+        return rect;
+    }
+
+    let res = transform_for_conversion(env, this, other).apply_to_rect(rect);
+    log_dbg!("Converted {rect:?} from {other:?} to {this:?}: {res:?}");
+    res
+}
+- (CGRect)convertRect:(CGRect)rect
+              toLayer:(id)other { // CALayer*
+    if this == other {
+        return rect;
+    }
+
+    let res = transform_for_conversion(env, other, this).apply_to_rect(rect);
+    log_dbg!("Converted {rect:?} from {this:?} to {other:?}: {res:?}");
+    res
 }
 
 // TODO: more
@@ -426,11 +491,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
-fn convert_point_inner(env: &mut Environment, this: id, other: id, point: CGPoint) -> CGPoint {
+fn transform_for_conversion(env: &mut Environment, this: id, other: id) -> CGAffineTransform {
     // The convertPoint methods can be used in two ways:
     // - If two layers are provided (one as the receiver, one as a parameter),
     //   then the layers are required to have a common ancestor, and it will be
-    //   used to provide a reference for converting the point.
+    //   used to provide a reference for converting the point/rect.
     // - If one layer is provided, and the other layer is nil, then the layer
     //   is resolved to the co-ordinate space of the origin of the layer at the
     //   top of the hierarchy. This is effectively the same as screen space, or
@@ -443,56 +508,51 @@ fn convert_point_inner(env: &mut Environment, this: id, other: id, point: CGPoin
     // alternating between layers until it finds a match.
     // For the single-layer case, it of course only walks its superlayer chain.
 
-    // Maps of layer pointers to origins in that layer's co-ordinate space.
-    let mut this_map = HashMap::from([(this, CGPoint { x: 0.0, y: 0.0 })]);
-    let mut other_map = HashMap::from([(other, CGPoint { x: 0.0, y: 0.0 })]);
+    // Maps of layer pointers to transforms that map that layer's co-ordinate
+    // space to that of the starting layer for the iteration.
+    let mut this_map = HashMap::from([(this, CGAffineTransformIdentity)]);
+    let mut other_map = HashMap::from([(other, CGAffineTransformIdentity)]);
     // Current iteration state.
     let mut this_superlayer = this;
-    let mut this_origin = CGPoint { x: 0.0, y: 0.0 };
+    let mut this_transform = CGAffineTransformIdentity;
     let mut other_superlayer = other;
-    let mut other_origin = CGPoint { x: 0.0, y: 0.0 };
-    let (common_ancestor, this_origin, other_origin) = loop {
+    let mut other_transform = CGAffineTransformIdentity;
+    let (common_ancestor, this_transform, other_transform) = loop {
         if this_superlayer != nil {
-            let next: id = msg![env; this_superlayer superlayer];
-            let bounds: CGRect = msg![env; this_superlayer bounds];
-            let frame: CGRect = msg![env; this_superlayer frame];
-            let next_origin = CGPoint {
-                x: this_origin.x + frame.origin.x - bounds.origin.x,
-                y: this_origin.y + frame.origin.y - bounds.origin.y,
-            };
+            let this_hostobj: &CALayerHostObject = env.objc.borrow(this_superlayer);
+            let next = this_hostobj.superlayer;
+            let next_transform =
+                this_transform.concat(this_hostobj.superlayer_to_layer_transform());
             if need_common_ancestor && next != nil {
-                if let Some(&other_origin) = other_map.get(&next) {
-                    break (next, next_origin, other_origin);
+                if let Some(&other_transform) = other_map.get(&next) {
+                    break (next, next_transform, other_transform);
                 }
-                this_map.insert(next, next_origin);
+                this_map.insert(next, next_transform);
             }
             this_superlayer = next;
-            this_origin = next_origin;
+            this_transform = next_transform;
         }
 
         if other_superlayer != nil {
-            let next: id = msg![env; other_superlayer superlayer];
-            let bounds: CGRect = msg![env; other_superlayer bounds];
-            let frame: CGRect = msg![env; other_superlayer frame];
-            let next_origin = CGPoint {
-                x: other_origin.x + frame.origin.x - bounds.origin.x,
-                y: other_origin.y + frame.origin.y - bounds.origin.y,
-            };
+            let other_hostobj: &CALayerHostObject = env.objc.borrow(other_superlayer);
+            let next = other_hostobj.superlayer;
+            let next_transform =
+                other_transform.concat(other_hostobj.superlayer_to_layer_transform());
             if need_common_ancestor && next != nil {
-                if let Some(&this_origin) = this_map.get(&next) {
-                    break (next, this_origin, next_origin);
+                if let Some(&this_transform) = this_map.get(&next) {
+                    break (next, this_transform, next_transform);
                 }
-                other_map.insert(next, next_origin);
+                other_map.insert(next, next_transform);
             }
             other_superlayer = next;
-            other_origin = next_origin;
+            other_transform = next_transform;
         }
 
         if this_superlayer == nil && other_superlayer == nil {
             if need_common_ancestor {
                 panic!("Layers {this:?} and {other:?} have no common ancestor!");
             } else {
-                break (nil, this_origin, other_origin);
+                break (nil, this_transform, other_transform);
             }
         }
     };
@@ -501,13 +561,9 @@ fn convert_point_inner(env: &mut Environment, this: id, other: id, point: CGPoin
     if need_common_ancestor {
         log_dbg!("{this:?} and {other:?}'s common ancestor: {common_ancestor:?}",);
     }
-    log_dbg!("{this:?}'s origin in {common_ancestor:?}: {this_origin:?}",);
-    log_dbg!("{other:?}'s origin in {common_ancestor:?}: {other_origin:?}",);
-    let res = CGPoint {
-        x: point.x + other_origin.x - this_origin.x,
-        y: point.y + other_origin.y - this_origin.y,
-    };
-    log_dbg!("Converted {point:?} from {other:?} to {this:?}: {res:?}",);
-
-    res
+    log_dbg!("{this:?}'s transform in {common_ancestor:?}: {this_transform:?}");
+    log_dbg!("{other:?}'s transform in {common_ancestor:?}: {other_transform:?}");
+    let other_to_this = other_transform.concat(this_transform.invert());
+    log_dbg!("Transform from {other:?} to {this:?}: {other_to_this:?}");
+    other_to_this
 }

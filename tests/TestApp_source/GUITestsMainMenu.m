@@ -15,7 +15,6 @@
 UIView *ball;
 CGFloat ballXVelocity;
 CGFloat ballYVelocity;
-NSTimer *timer;
 
 - (instancetype)initWithFrame:(CGRect)frame {
   [super initWithFrame:frame];
@@ -30,11 +29,6 @@ NSTimer *timer;
   [self addSubview:ball];
   ballXVelocity = 5;
   ballYVelocity = 5;
-  timer = [[NSTimer scheduledTimerWithTimeInterval:(1.0 / 60.0)
-                                            target:self
-                                          selector:@selector(moveBall:)
-                                          userInfo:nil
-                                           repeats:YES] retain];
 
   UIButton *button1 = [UIButton buttonWithType:UIButtonTypeRoundedRect];
   [button1 setTitle:[NSString stringWithUTF8String:"CALayer tests"]
@@ -50,13 +44,11 @@ NSTimer *timer;
 }
 
 - (void)dealloc {
-  [timer invalidate];
-  [timer release];
   [ball release];
   [super dealloc];
 }
 
-- (void)moveBall:(NSTimer *)timer {
+- (void)tick {
   CGRect windowFrame = [self bounds];
   CGRect ballFrame = [ball frame];
   ballFrame.origin.x += ballXVelocity;
@@ -87,11 +79,6 @@ NSTimer *timer;
 }
 
 - (void)goToCALayerTests {
-  // break the strong reference cycle
-  [timer invalidate];
-  [timer release];
-  timer = nil;
-
   [((GUITestsAppDelegate *)[[UIApplication sharedApplication]
       delegate]) setMainView:[[[GUITestsCALayerTestsView alloc]
                                  initWithFrame:[self frame]] autorelease]];

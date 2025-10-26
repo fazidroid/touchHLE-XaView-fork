@@ -42,12 +42,22 @@ typedef signed long NSInteger;
 - (void)dealloc;
 - (NSUInteger)retainCount;
 - (id)performSelector:(SEL)selector;
+- (BOOL)respondsToSelector:(SEL)selector;
 @end
 
 @interface NSAutoreleasePool : NSObject
 + (void)addObject:(id)anObject;
 - (void)addObject:(id)anObject;
 - (void)drain;
+@end
+
+@interface NSArray<ObjectType> : NSObject
+- (NSUInteger)count;
+- (ObjectType)objectAtIndex:(NSUInteger)index;
+@end
+
+@interface NSSet<ObjectType> : NSObject
+- (ObjectType)anyObject;
 @end
 
 @interface NSString : NSObject
@@ -58,6 +68,11 @@ typedef signed long NSInteger;
 NSString *NSStringFromClass(Class);
 
 typedef double NSTimeInterval;
+
+@interface NSProcessInfo : NSObject
++ (instancetype)processInfo;
+- (NSTimeInterval)systemUptime;
+@end
 
 @interface NSTimer : NSObject
 + (instancetype)timerWithTimeInterval:(NSTimeInterval)interval
@@ -218,22 +233,36 @@ typedef enum {
 + (instancetype)redColor;
 + (instancetype)yellowColor;
 @end
+@interface UIEvent : NSObject
+@end
+@class UIView;
+@interface UITouch : NSObject
+- (CGPoint)locationInView:(UIView *)view;
+@end
+@interface UIResponder : NSObject
+@end
 @class UIWindow;
-@interface UIView : NSObject
+@interface UIView : UIResponder
 - (instancetype)initWithFrame:(CGRect)frame;
 - (CALayer *)layer;
 - (CGRect)bounds;
 - (CGRect)frame;
+- (void)setBounds:(CGRect)bounds;
 - (void)setFrame:(CGRect)frame;
+- (void)setTransform:(CGAffineTransform)transform;
 - (CGPoint)convertPoint:(CGPoint)point fromView:(UIView *)view;
 - (CGPoint)convertPoint:(CGPoint)point toView:(UIView *)view;
 - (CGRect)convertRect:(CGRect)point fromView:(UIView *)view;
 - (CGRect)convertRect:(CGRect)point toView:(UIView *)view;
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event;
 - (UIWindow *)window;
 - (void)addSubview:(UIView *)view;
 - (void)removeFromSuperview;
+- (NSArray<UIView *> *)subviews;
 - (void)layoutSubviews;
 - (void)setBackgroundColor:(UIColor *)color;
+- (CGFloat)alpha;
+- (void)setAlpha:(CGFloat)alpha;
 @end
 @interface UIWindow : UIView
 - (void)makeKeyAndVisible;

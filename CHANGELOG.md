@@ -62,6 +62,7 @@ Compatibility:
   - Various small contributions. (@hikari-no-yume, @alborrajo, @ciciplusplus, @atasro2, @abnormalmaps, @hujerhoe, @acieslewicz, @WhatAmISupposedToPutHere, @JaGoTu, @apexad, @chyyran, @mistydemeo, @bognarit80)
   - UITextField now supports real text input with a keyboard. On Windows/macOS physical keyboard is used, on Android it's done via a system soft keyboard. (@ciciplusplus)
   - UIScrollView and UITextView partial implementations. (@Skryptonyte, @ciciplusplus)
+  - Core Animation and UIKit now support affine transforms, allowing UI elements to be rotated, a feature needed by [several games](https://github.com/touchHLE/touchHLE/issues/388). Note however that auto-rotation is not yet supported. (@hikari-no-yume)
   - The libz dynamic library is now available, [compiled from source](https://github.com/touchHLE/zlib-dylib) using a [clean open-source toolchain](https://github.com/touchHLE/common-3.0-sdk). (@acieslewicz)
   - ALAC and Microsoft IMA ADPCM are now supported in Audio Toolbox, with the same caveats as other compressed codecs. (@abnormalmaps)
   - Improved compatibility for iOS 3.1+ apps. (@bognarit80)
