@@ -50,15 +50,13 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         return nil;
     }
 
-    // Assumes the last window in the list is the one on top.
-    // TODO: this is not correct once we support zPosition.
-    let Some(&top_window) = env
-        .framework_state
-        .uikit
-        .ui_view
-        .ui_window
-        .visible_windows
-        .last()
+    let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+    // Assumes the windows in the list are ordered back-to-front.
+    // TODO: this may not be correct once we support windowLevel.
+    let Some(top_window) = windows
+        .into_iter()
+        .rev()
+        .find(|&window| !msg![env; window isHidden])
     else {
         return nil;
     };

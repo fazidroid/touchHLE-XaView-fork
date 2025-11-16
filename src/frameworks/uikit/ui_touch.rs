@@ -126,13 +126,11 @@ pub fn handle_event(env: &mut Environment, event: Event) {
 fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     // Assumes the last window in the list is the one on top and that it
     // covers the whole screen. FIXME!
-    let Some(&top_window) = env
-        .framework_state
-        .uikit
-        .ui_view
-        .ui_window
-        .visible_windows
-        .last()
+    let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+    let Some(top_window) = windows
+        .into_iter()
+        .rev()
+        .find(|&window| !msg![env; window isHidden])
     else {
         log!("No visible window, touch events ignored");
         return;

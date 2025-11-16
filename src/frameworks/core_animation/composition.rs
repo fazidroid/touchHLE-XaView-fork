@@ -62,17 +62,15 @@ unsafe fn load_matrix(gles: &mut dyn GLES, matrix: Matrix<4>) {
 ///
 /// Returns the time a recomposite is due, if any.
 pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<Instant> {
-    // Assumes the last window in the list is the one on top.
-    // TODO: this is not correct once we support zPosition.
-    // TODO: There can be windows smaller than the screen? We should probably
-    //       draw all of them.
-    let Some(&top_window) = env
-        .framework_state
-        .uikit
-        .ui_view
-        .ui_window
-        .visible_windows
-        .last()
+    // Assumes the windows in the list are ordered back-to-front.
+    // TODO: this is not correct once we support windowLevel.
+    // FIXME: There can be windows smaller than the screen! We should draw all
+    //        of them!
+    let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+    let Some(top_window) = windows
+        .into_iter()
+        .rev()
+        .find(|&window| !msg![env; window isHidden])
     else {
         log_dbg!("No visible window, skipping composition");
         return None;

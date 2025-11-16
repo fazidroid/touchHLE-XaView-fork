@@ -161,23 +161,22 @@ pub const CLASSES: ClassExports = objc_classes! {
         .uikit
         .ui_view
         .ui_window
-        .visible_windows
+        .windows
         .contains(&key_window));
     key_window
 }
 
 - (id)windows {
-    log_once!("TODO: UIApplication's windows getter is returning only visible windows");
-    let visible_windows: Vec<id> = (*env
+    let windows: Vec<id> = (*env
         .framework_state
         .uikit
         .ui_view
         .ui_window
-        .visible_windows).to_vec();
-    for window in &visible_windows {
+        .windows).to_vec();
+    for window in &windows {
         retain(env, *window);
     }
-    let windows = ns_array::from_vec(env, visible_windows);
+    let windows = ns_array::from_vec(env, windows);
     autorelease(env, windows)
 }
 

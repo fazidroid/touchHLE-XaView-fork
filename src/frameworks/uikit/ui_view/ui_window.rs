@@ -16,7 +16,7 @@ pub struct State {
     /// List of visible windows for internal purposes. Non-retaining!
     ///
     /// This is public because Core Animation also uses it.
-    pub visible_windows: Vec<id>,
+    pub windows: Vec<id>,
     /// The most recent window which received `makeKeyAndVisible` message.
     /// Non-retaining!
     pub key_window: Option<id>,
@@ -31,32 +31,40 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO: more?
 
 - (id)initWithFrame:(CGRect)frame {
-    // setHidden: may get called during the super call and panics if the window
-    // is not in the list, so it must be added to it before that call.
-    let visible_list = &mut env.framework_state.uikit.ui_view.ui_window.visible_windows;
-    visible_list.push(this);
+    let this = msg_super![env; this initWithFrame:frame];
+    // Undocumented: windows seem to be hidden by default on iOS, unlike views.
+    // Super call to bypass the overriden setter on this class, which would post
+    // a notification.
+    () = msg_super![env; this setHidden:true];
+
+    let list = &mut env.framework_state.uikit.ui_view.ui_window.windows;
+    list.push(this);
     log_dbg!(
-        "New window: {:?}. New set of visible windows: {:?}",
+        "New window: {:?}. New list of all windows: {:?}",
         this,
-        visible_list,
+        list,
     );
 
-    msg_super![env; this initWithFrame:frame]
+    this
 }
 
 // NSCoding implementation
 - (id)initWithCoder:(id)coder {
-    // setHidden: may get called during the super call and panics if the window
-    // is not in the list, so it must be added to it before that call.
-    let visible_list = &mut env.framework_state.uikit.ui_view.ui_window.visible_windows;
-    visible_list.push(this);
+    let this = msg_super![env; this initWithCoder:coder];
+    // Undocumented: windows seem to be hidden by default on iOS, unlike views.
+    // Super call to bypass the overriden setter on this class, which would post
+    // a notification.
+    () = msg_super![env; this setHidden:true];
+
+    let list = &mut env.framework_state.uikit.ui_view.ui_window.windows;
+    list.push(this);
     log_dbg!(
-        "New window: {:?}. New set of visible windows: {:?}",
+        "New window: {:?}. New list of all windows: {:?}",
         this,
-        visible_list,
+        list,
     );
 
-    msg_super![env; this initWithCoder:coder]
+    this
 }
 
 - (())dealloc {
@@ -65,40 +73,23 @@ pub const CLASSES: ClassExports = objc_classes! {
             env.framework_state.uikit.ui_view.ui_window.key_window = None;
         }
     }
-    if !msg![env; this isHidden] {
-        let visible_list = &mut env.framework_state.uikit.ui_view.ui_window.visible_windows;
-        let idx = visible_list.iter().position(|&w| w == this).unwrap();
-        visible_list.remove(idx);
-        log_dbg!(
-            "Deallocating window {:?}. New set of visible windows: {:?}",
-            this,
-            visible_list,
-        );
-    }
+    let list = &mut env.framework_state.uikit.ui_view.ui_window.windows;
+    let idx = list.iter().position(|&w| w == this).unwrap();
+    list.remove(idx);
+    log_dbg!(
+        "Deallocating window {:?}. New list of all windows: {:?}",
+        this,
+        list,
+    );
     msg_super![env; this dealloc]
 }
 
 - (())setHidden:(bool)is_hidden {
-    let was_hidden: bool = msg![env; this isHidden];
     () = msg_super![env; this setHidden:is_hidden];
 
-    let visible_list = &mut env.framework_state.uikit.ui_view.ui_window.visible_windows;
-    if is_hidden && !was_hidden {
-        let idx = visible_list.iter().position(|&w| w == this).unwrap();
-        visible_list.remove(idx);
-        log_dbg!(
-            "Window {:?} is now hidden. New set of visible windows: {:?}",
-            this,
-            visible_list,
-        );
-    } else if !is_hidden && was_hidden {
-        visible_list.push(this);
-        log_dbg!(
-            "Window {:?} is no longer hidden. New set of visible windows: {:?}",
-            this,
-            visible_list,
-        );
-    }
+    // TODO: post UIWindowDidBecomeVisibleNotification,
+    //            UIWindowDidBecomeHiddenNotification
+    log_dbg!("[(UIWindow*){:?} setHidden:{:?}]", this, is_hidden);
 }
 
 - (())makeKeyWindow {
@@ -113,6 +104,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())makeKeyAndVisible {
     // TODO: We don't currently have send any non-touch events to windows,
     // so there's no meaning in it yet.
+
+    // FIXME: This should also bump the window to the top of the list.
 
     () = msg![env; this makeKeyWindow];
 

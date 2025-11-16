@@ -566,6 +566,8 @@ fn show_app_picker_gui(
         quick_options_orientation,
     );
 
+    () = msg![env; window makeKeyAndVisible];
+
     let main_run_loop: id = msg_class![env; NSRunLoop mainRunLoop];
     // If an app is picked, this loop returns. If the user quits touchHLE, the
     // process exits.
