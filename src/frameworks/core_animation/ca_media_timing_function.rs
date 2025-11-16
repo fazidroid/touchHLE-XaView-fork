@@ -109,7 +109,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             kCAMediaTimingFunctionEaseInEaseOut => (kCAMediaTimingFunctionEaseInEaseOut, msg_class![env; CAMediaTimingFunction functionWithControlPoints: 0.42f32 : 0.0f32 : 0.58f32 : 1.0f32]),
             kCAMediaTimingFunctionEaseOut => (kCAMediaTimingFunctionEaseOut, msg_class![env; CAMediaTimingFunction functionWithControlPoints: 0.0f32 : 0.0f32 : 0.58f32 : 1.0f32]),
             kCAMediaTimingFunctionLinear => (kCAMediaTimingFunctionLinear, msg_class![env; CAMediaTimingFunction functionWithControlPoints: 0.0f32 : 0.0f32 : 1.0f32 : 1.0f32]),
-            _ => panic!("Attempted to instance CAMediaTimingFunction with unknown name {}", name_string),
+            _ => panic!("Attempted to instance CAMediaTimingFunction with unknown name {name_string}"),
         };
         env.framework_state.core_animation.ca_media_timing_function.named_functions.insert(name_str, object);
         retain(env, object)
