@@ -62,19 +62,11 @@ unsafe fn load_matrix(gles: &mut dyn GLES, matrix: Matrix<4>) {
 ///
 /// Returns the time a recomposite is due, if any.
 pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<Instant> {
-    // Assumes the windows in the list are ordered back-to-front.
-    // TODO: this is not correct once we support windowLevel.
-    // FIXME: There can be windows smaller than the screen! We should draw all
-    //        of them!
     let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
-    let Some(top_window) = windows
-        .into_iter()
-        .rev()
-        .find(|&window| !msg![env; window isHidden])
-    else {
-        log_dbg!("No visible window, skipping composition");
+    if !windows.iter().any(|&window| !msg![env; window isHidden]) {
+        log_dbg!("No visible windows, skipping composition");
         return None;
-    };
+    }
 
     if find_fullscreen_eagl_layer(env) != nil {
         // No composition done, EAGLContext will present directly.
@@ -126,10 +118,15 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
         .composition
         .recomposite_next = new_recomposite_next;
 
-    let root_layer: id = msg![env; top_window layer];
-
-    // Ensure layer bitmaps are up to date.
-    display_layers(env, root_layer);
+    let window_layers: Vec<id> = windows
+        .into_iter()
+        .map(|window| {
+            let layer: id = msg![env; window layer];
+            // Ensure layer bitmaps are up to date.
+            display_layers(env, layer);
+            layer
+        })
+        .collect();
 
     let screen_bounds: CGRect = {
         let screen: id = msg_class![env; UIScreen mainScreen];
@@ -325,17 +322,21 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
         gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, misc_gl_objects.index_buffer);
     }
 
-    // Here's where the actual drawing happens
-    unsafe {
-        composite_layer_recursive(
-            gles,
-            &mut env.objc,
-            &env.mem,
-            misc_gl_objects,
-            root_layer,
-            cumulative_transform,
-            opacity,
-        );
+    // Assumes the windows in the list are ordered back-to-front.
+    // TODO: this may not be correct once we support windowLevel.
+    for root_layer in window_layers {
+        // Here's where the actual drawing happens
+        unsafe {
+            composite_layer_recursive(
+                gles,
+                &mut env.objc,
+                &env.mem,
+                misc_gl_objects,
+                root_layer,
+                cumulative_transform,
+                opacity,
+            );
+        }
     }
 
     // Clean up some GL state

@@ -15,6 +15,7 @@
 UIView *ball;
 CGFloat ballXVelocity;
 CGFloat ballYVelocity;
+UIWindow *window2;
 
 - (instancetype)initWithFrame:(CGRect)frame {
   [super initWithFrame:frame];
@@ -37,14 +38,23 @@ CGFloat ballYVelocity;
   [button1 addTarget:self
                 action:@selector(goToCALayerTests)
       forControlEvents:UIControlEventTouchUpInside];
-
   [self addSubview:button1];
+
+  UIButton *button2 = [UIButton buttonWithType:UIButtonTypeRoundedRect];
+  [button2 setTitle:[NSString stringWithUTF8String:"Window 2"]
+           forState:UIControlStateNormal];
+  [button2 setFrame:CGRectMake(40, 140, 240, 40)];
+  [button2 addTarget:self
+                action:@selector(toggleWindow)
+      forControlEvents:UIControlEventTouchUpInside];
+  [self addSubview:button2];
 
   return self;
 }
 
 - (void)dealloc {
   [ball release];
+  [window2 release];
   [super dealloc];
 }
 
@@ -82,6 +92,14 @@ CGFloat ballYVelocity;
   [((GUITestsAppDelegate *)[[UIApplication sharedApplication]
       delegate]) setMainView:[[[GUITestsCALayerTestsView alloc]
                                  initWithFrame:[self frame]] autorelease]];
+}
+
+- (void)toggleWindow {
+  if (!window2) {
+    window2 = [[UIWindow alloc] initWithFrame:CGRectMake(80, 0, 80, 80)];
+    window2.backgroundColor = [UIColor magentaColor];
+  }
+  [window2 setHidden:![window2 isHidden]];
 }
 
 @end

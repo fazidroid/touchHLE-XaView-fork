@@ -124,18 +124,6 @@ pub fn handle_event(env: &mut Environment, event: Event) {
 }
 
 fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
-    // Assumes the last window in the list is the one on top and that it
-    // covers the whole screen. FIXME!
-    let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
-    let Some(top_window) = windows
-        .into_iter()
-        .rev()
-        .find(|&window| !msg![env; window isHidden])
-    else {
-        log!("No visible window, touch events ignored");
-        return;
-    };
-
     // UIKit creates and drains autorelease pools when handling events.
     let pool: id = msg_class![env; NSAutoreleasePool new];
 
@@ -229,16 +217,31 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let touch: id = msg![env; touches_arr objectAtIndex:i];
         let &UITouchHostObject { location, .. } = env.objc.borrow(touch);
 
-        // FIXME: handle possibly overlapping windows in hit testing.
+        // Assumes the windows in the list are ordered back-to-front.
+        // TODO: this may not be correct once we support windowLevel.
+        let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+        let Some((window, location_in_window)) = windows.into_iter().rev().find_map(|window| {
+            let location_in_window: CGPoint =
+                msg![env; window convertPoint:location fromWindow:nil];
+            if msg![env; window pointInside:location_in_window withEvent:event] {
+                Some((window, location_in_window))
+            } else {
+                None
+            }
+        }) else {
+            log!(
+                "Couldn't find a window for touch at {:?}, discarding",
+                location,
+            );
+            continue;
+        };
 
-        let location_in_window: CGPoint =
-            msg![env; top_window convertPoint:location fromWindow:nil];
-        let view: id = msg![env; top_window hitTest:location_in_window withEvent:event];
+        let view: id = msg![env; window hitTest:location_in_window withEvent:event];
         if view == nil {
             log!(
                 "Couldn't find a view for touch at {:?} in window {:?}, discarding",
                 location_in_window,
-                top_window,
+                window,
             );
             continue;
         } else {
@@ -250,7 +253,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
                     f
                 },
                 location_in_window,
-                top_window,
+                window,
             );
         }
 
@@ -291,11 +294,11 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let _: () = msg![env; touches addObject:touch];
 
         retain(env, view);
-        retain(env, top_window);
+        retain(env, window);
         {
             let new_touch = env.objc.borrow_mut::<UITouchHostObject>(touch);
             new_touch.view = view;
-            new_touch.window = top_window;
+            new_touch.window = window;
         }
     }
 

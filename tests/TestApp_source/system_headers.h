@@ -263,6 +263,8 @@ typedef enum {
 - (void)setBackgroundColor:(UIColor *)color;
 - (CGFloat)alpha;
 - (void)setAlpha:(CGFloat)alpha;
+- (BOOL)isHidden;
+- (void)setHidden:(BOOL)hidden;
 @end
 @interface UIWindow : UIView
 - (void)makeKeyAndVisible;
