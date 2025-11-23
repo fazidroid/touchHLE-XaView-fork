@@ -174,3 +174,7 @@ com.pangea.nano2: --ignore-gl-errors
 
 # Bugdom 2
 com.pangea.bug2: --ignore-gl-errors
+
+# Casper
+# (force composition fixes graphical issues)
+com.mastertronic.casper: --force-composition
