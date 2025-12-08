@@ -335,7 +335,9 @@ UILabel *lastTappedGlobalFrameLabel;
 
 // CAAnimation tests
 - (void)test13 {
-  UILabel* label = [self addLabelWithFrame:CGRectMake(75, 75, 175, 175) text:[NSString stringWithUTF8String:"hello, animations!"]];
+  UILabel *label = [self
+      addLabelWithFrame:CGRectMake(75, 75, 175, 175)
+                   text:[NSString stringWithUTF8String:"hello, animations!"]];
 
   CALayer *layer = [label layer];
   [layer setBackgroundColor:CGColorCreateGenericRGB(0.0, 0.70, 0.0, 1.0)];
@@ -354,7 +356,9 @@ UILabel *lastTappedGlobalFrameLabel;
                forKey:[NSString stringWithUTF8String:"opacity_animation"]];
 }
 - (void)test14 {
-  UILabel* label = [self addLabelWithFrame:CGRectMake(75, 75, 175, 175) text:[NSString stringWithUTF8String:"hello, animations!"]];
+  UILabel *label = [self
+      addLabelWithFrame:CGRectMake(75, 75, 175, 175)
+                   text:[NSString stringWithUTF8String:"hello, animations!"]];
 
   CALayer *layer = [label layer];
   [layer setBackgroundColor:CGColorCreateGenericRGB(0.0, 0.70, 0.0, 1.0)];
@@ -371,7 +375,9 @@ UILabel *lastTappedGlobalFrameLabel;
                forKey:[NSString stringWithUTF8String:"bg_animation"]];
 }
 - (void)test15 {
-  UILabel* label = [self addLabelWithFrame:CGRectMake(75, 75, 175, 175) text:[NSString stringWithUTF8String:"hello, animations!"]];
+  UILabel *label = [self
+      addLabelWithFrame:CGRectMake(75, 75, 175, 175)
+                   text:[NSString stringWithUTF8String:"hello, animations!"]];
 
   CALayer *layer = [label layer];
   [layer setBackgroundColor:CGColorCreateGenericRGB(0.0, 0.70, 0.0, 1.0)];
@@ -390,7 +396,9 @@ UILabel *lastTappedGlobalFrameLabel;
                forKey:[NSString stringWithUTF8String:"hidden"]];
 }
 - (void)test16 {
-  UILabel* label = [self addLabelWithFrame:CGRectMake(75, 75, 175, 175) text:[NSString stringWithUTF8String:"hello, animations!"]];
+  UILabel *label = [self
+      addLabelWithFrame:CGRectMake(75, 75, 175, 175)
+                   text:[NSString stringWithUTF8String:"hello, animations!"]];
 
   CALayer *layer = [label layer];
   [layer setBackgroundColor:CGColorCreateGenericRGB(0.0, 0.70, 0.0, 1.0)];
@@ -409,7 +417,9 @@ UILabel *lastTappedGlobalFrameLabel;
                forKey:[NSString stringWithUTF8String:"bounds_animation"]];
 }
 - (void)test17 {
-  UILabel* label = [self addLabelWithFrame:CGRectMake(75, 75, 175, 175) text:[NSString stringWithUTF8String:"hello, animations!"]];
+  UILabel *label = [self
+      addLabelWithFrame:CGRectMake(75, 75, 175, 175)
+                   text:[NSString stringWithUTF8String:"hello, animations!"]];
 
   CALayer *layer = [label layer];
   [layer setBackgroundColor:CGColorCreateGenericRGB(0.0, 0.70, 0.0, 1.0)];
@@ -424,7 +434,9 @@ UILabel *lastTappedGlobalFrameLabel;
                forKey:[NSString stringWithUTF8String:"corner_animation"]];
 }
 - (void)test18 {
-  UILabel* label = [self addLabelWithFrame:CGRectMake(75, 75, 175, 175) text:[NSString stringWithUTF8String:"hello, animations!"]];
+  UILabel *label = [self
+      addLabelWithFrame:CGRectMake(75, 75, 175, 175)
+                   text:[NSString stringWithUTF8String:"hello, animations!"]];
 
   CALayer *layer = [label layer];
   [layer setBackgroundColor:CGColorCreateGenericRGB(0.0, 0.70, 0.0, 1.0)];

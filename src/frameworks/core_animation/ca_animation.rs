@@ -48,19 +48,16 @@ pub const CONSTANTS: ConstantExports = &[
     // `CAMediaTimingFillMode` values.
     (
         "_kCAFillModeBackwards",
-        HostConstant::NSString(kCAFillModeBackwards)
+        HostConstant::NSString(kCAFillModeBackwards),
     ),
-    (
-        "_kCAFillModeBoth",
-        HostConstant::NSString(kCAFillModeBoth)
-    ),
+    ("_kCAFillModeBoth", HostConstant::NSString(kCAFillModeBoth)),
     (
         "_kCAFillModeForwards",
-        HostConstant::NSString(kCAFillModeForwards)
+        HostConstant::NSString(kCAFillModeForwards),
     ),
     (
         "_kCAFillModeRemoved",
-        HostConstant::NSString(kCAFillModeRemoved)
+        HostConstant::NSString(kCAFillModeRemoved),
     ),
 ];
 
