@@ -68,6 +68,7 @@ Compatibility:
   - ALAC and Microsoft IMA ADPCM are now supported in Audio Toolbox, with the same caveats as other compressed codecs. (@abnormalmaps)
   - Switched to ARMv7 rather than ARMv6 versions of libstdc++ and libgcc. (@acieslewicz)
   - Added support for certain iPhone OS 3.1 binary format changes (iPhone OS 3.1 apps are still considered unsupported). (@bognarit80)
+  - Limited support for local multiplayer via Wi-Fi in some games. (@ciciplusplus)
 
 Usability:
 
