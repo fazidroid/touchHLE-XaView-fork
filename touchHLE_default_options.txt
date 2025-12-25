@@ -155,12 +155,14 @@ com.1337gamedesign.DarkNebula: --x-tilt-offset=-14
 com.activision.CBNK2: --landscape-left
 
 # FIFA 10
-com.ea.fifa10.bv: --landscape-left
-com.ea.fifa10inc: --landscape-left
+# Stick/Dpad = Move, A = Pass/Tackle, B,LeftShoulder = Shoot/Switch players, Start = Pause
+com.ea.fifa10.bv: --landscape-left --button-to-touch=A,450,206 --button-to-touch=B,430,270 --button-to-touch=LeftShoulder,430,270 --button-to-touch=Start,160,16 --dpad-to-touch=25,195,100,100 --stick-to-touch=25,195,100,100
+com.ea.fifa10inc: --landscape-left --button-to-touch=A,450,206 --button-to-touch=B,430,270 --button-to-touch=LeftShoulder,430,270 --button-to-touch=Start,160,16 --dpad-to-touch=25,195,100,100 --stick-to-touch=25,195,100,100
 
 # FIFA 2010 WORLD CUP SOUTH AFRICA
-com.ea.fifa10wc.bv: --landscape-left
-com.ea.fifa10wc.inc: --landscape-left
+# Stick = Move, A,LeftShoulder = Pass/Tackle/Switch players, B = Shoot/Slide, X = Skill, Start = Pause
+com.ea.fifa10wc.bv: --landscape-left --button-to-touch=A,414,174 --button-to-touch=B,328,256 --button-to-touch=LeftShoulder,414,174 --button-to-touch=X,436,276 --button-to-touch=Start,160,16 --stick-to-touch=25,195,100,100
+com.ea.fifa10wc.inc: --landscape-left --button-to-touch=A,414,174 --button-to-touch=B,328,256 --button-to-touch=LeftShoulder,414,174 --button-to-touch=X,436,276 --button-to-touch=Start,160,16 --stick-to-touch=25,195,100,100
 
 # Real Racing
 com.firemint.realracing: --landscape-left
