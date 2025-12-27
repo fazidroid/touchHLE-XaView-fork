@@ -183,3 +183,9 @@ com.gameloft.Rayman2: --stick-to-touch=22,210,90,100 --button-to-touch=A,376,280
 # Casper
 # (force composition fixes graphical issues)
 com.mastertronic.casper: --force-composition
+
+# Arvale
+4rv4l3j0ur: --landscape-left
+
+# Brothers In Arms: Hour Of Heroes
+com.gameloft.BIA: --landscape-left
