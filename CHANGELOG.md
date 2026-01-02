@@ -81,6 +81,7 @@ Usability:
 - macOS builds and releases of touchHLE now come as an application bundle (`.app` directory) rather than as a bare “Unix executable” file. This should fix problems some users encountered with running touchHLE outside of a terminal, and allows putting touchHLE in the Applications folder like a normal graphical app. To support this, user data (apps, options, etc) is now stored in “Application Support” rather than the current directory, and the bundled files (fonts, dylibs, etc) are now part of the app bundle. If you prefer the old layout, you can still get it if you move all the files out of the bundle. (@hikari-no-yume)
 - The “File manager” button on Android now works more reliably, especially the first time it is tapped. (@hikari-no-yume)
 - The new `--force-composition=` option has been added, which is a workaround that may solve rendering issues in some games, at the cost of performance. For some games it is applied by the default options. (@ciciplusplus)
+- Most errors causing touchHLE to crash now produce a graphical message box, rather than the error message only being found in the log. (@abnormalmaps)
 - touchHLE now writes log messages to a file on all platforms, not just on Android. The file has been renamed from `log.txt` to `touchHLE_log.txt`. (@hikari-no-yume)
 - Two new options for input handling of analog stick (`--stick-to-touch=`) and 8-directional DPad (`--dpad-to-touch=`) via a game controller. (@celerizer)
 
