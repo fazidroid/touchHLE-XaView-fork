@@ -52,6 +52,7 @@ com.idsoftware.wolf3d: --landscape-right
 
 # Spore Origins
 com.ea.spore.naj.efigsj: --landscape-left --y-tilt-offset=35
+com.ea.spore.row.efigsj: --landscape-left --y-tilt-offset=35
 
 # KataDama (I Love Katamari)
 com.namconetworks.katamari: --landscape-left --stabilize-virtual-cursor=0.1,10 --y-tilt-offset=24 --button-to-touch=Start,240,15
