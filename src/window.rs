@@ -1270,15 +1270,6 @@ impl Window {
         size_for_orientation(DeviceOrientation::Portrait, NonZeroU32::new(1).unwrap())
     }
 
-    /// Get the size in pixels of the window without rotation but with the
-    /// scale hack. Scaling caused by fullscreen mode is not included.
-    ///
-    /// Only the aspect ratio and orientation reflect the guest app's view of
-    /// the world.
-    pub fn size_unrotated_scalehacked(&self) -> (u32, u32) {
-        size_for_orientation(DeviceOrientation::Portrait, self.scale_hack)
-    }
-
     /// Get the region of the on-screen window (x, y, width, height) used to
     /// display the app content.
     ///
