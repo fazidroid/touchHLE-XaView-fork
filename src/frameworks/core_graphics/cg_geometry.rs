@@ -326,6 +326,17 @@ fn CGRectIsNull(_env: &mut Environment, rect: CGRect) -> bool {
     rect == CGRectNull
 }
 
+fn CGRectOffset(_env: &mut Environment, rect: CGRect, dx: CGFloat, dy: CGFloat) -> CGRect {
+    assert!(rect != CGRectNull); // TODO
+    CGRect {
+        origin: CGPoint {
+            x: rect.origin.x + dx,
+            y: rect.origin.y + dy,
+        },
+        size: rect.size,
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGPointEqualToPoint(_, _)),
     export_c_func!(CGSizeEqualToSize(_, _)),
@@ -340,6 +351,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGRectGetWidth(_)),
     export_c_func!(CGRectMake(_, _, _, _)),
     export_c_func!(CGRectIsNull(_)),
+    export_c_func!(CGRectOffset(_, _, _)),
 ];
 
 pub const CONSTANTS: ConstantExports = &[
