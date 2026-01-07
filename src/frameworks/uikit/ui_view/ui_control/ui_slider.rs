@@ -25,6 +25,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_super![env; this initWithCoder:coder]
 }
 
+- (())setMinimumValueImage:(id)img { // UIImage *
+    log!("TODO: [(UISlider *){:?} setMinimumValueImage:{:?}]", this, img);
+}
+- (())setMaximumValueImage:(id)img { // UIImage *
+    log!("TODO: [(UISlider *){:?} setMaximumValueImage:{:?}]", this, img);
+}
 
 // TODO: all of it
 
