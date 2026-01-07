@@ -179,6 +179,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, res_imm)
 }
 
+- (id)sortedArrayUsingFunction:(GuestFunction)comparator
+                       context:(MutVoidPtr)context {
+    let array = msg![env; this mutableCopy];
+    () = msg![env; array sortUsingFunction:comparator context:context];
+    let array_imm = msg![env; array copy];
+    release(env, array);
+    autorelease(env, array_imm)
+}
+
 @end
 
 // NSMutableArray is an abstract class. A subclass must provide everything
