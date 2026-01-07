@@ -17,6 +17,8 @@ Changes are categorised as follows:
 
 Compatibility:
 
+- New working apps:
+  - [Devil May Cry 4 Refrain](https://appdb.touchhle.org/apps/999) (@hikari-no-yume)
 - Fixed an assumption that the backing store of a CAEAGLLayer should always be 320×480 pixels. This hack is over three years old and was missed when introducing real support for Core Animation. This should fix stretched or offset screen issues in certain games that render in landscape. (@hikari-no-yume)
 - API support improvements:
   - Limited support for UIKit auto-rotation has been added to fix certain games that render in landscape:
