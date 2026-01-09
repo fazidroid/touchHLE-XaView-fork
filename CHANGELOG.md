@@ -19,11 +19,11 @@ Compatibility:
 
 - New working apps:
   - [Devil May Cry 4 Refrain](https://appdb.touchhle.org/apps/999) (@hikari-no-yume)
-- Fixed an assumption that the backing store of a CAEAGLLayer should always be 320×480 pixels. This hack is over three years old and was missed when introducing real support for Core Animation. This should fix stretched or offset screen issues in certain games that render in landscape. (@hikari-no-yume)
 - API support improvements:
-  - Limited support for UIKit auto-rotation has been added to fix certain games that render in landscape:
-    - If an app requires a landscape orientation via the `UIInterfaceOrientation` and `UISupportedInterfaceOrientations` keys of its `Info.plist`, touchHLE will rotate the virtual device at startup. (@hikari-no-yume)
-    - If an app overrides the `shouldAutorotateToInterfaceOrientation:` method of `UIViewController`, and the virtual device is in a landscape orientation, then the root view of a view controller will be rotated when it is added to a window. (@hikari-no-yume)
+  - Several changes have been made to fix certain apps and games that should appear in landscape, but previously were displayed stretched, cropped and/or un-rotated:
+    - If an app requires a landscape orientation in the `UIInterfaceOrientation` or `UISupportedInterfaceOrientations` keys of its `Info.plist`, touchHLE will now rotate the virtual device at startup. (@hikari-no-yume)
+    - If an app overrides the `shouldAutorotateToInterfaceOrientation:` method in a `UIViewController`, and the virtual device is in a landscape orientation, touchHLE will now apply a rotation transform to the root view when it is added to a window. (@hikari-no-yume)
+    - Fixed a very old assumption that the backing store of a `CAEAGLLayer` should always be 320×480 pixels. (@hikari-no-yume)
 
 ## v0.2.3 (2026-01-02)
 
