@@ -478,6 +478,13 @@ fn nan(env: &mut Environment, arg: ConstPtr<u8>) -> f32 {
     f32::NAN
 }
 
+fn hypot(env: &mut Environment, arg1: f64, arg2: f64) -> f64 {
+    if arg1.is_infinite() {
+        return f64::INFINITY;
+    }
+    sqrt(env, arg1 * arg1 + arg2 * arg2)
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(abs(_)),
     export_c_func!(fabs(_)),
@@ -561,4 +568,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(fminf(_, _)),
     // Other
     export_c_func!(nan(_)),
+    export_c_func!(hypot(_, _)),
 ];
