@@ -1639,6 +1639,15 @@ pub fn from_rust_string(env: &mut Environment, from: String) -> id {
     string
 }
 
+/// Shortcut for host code, roughly equivalent to
+/// `[[NSMutableString alloc] initWithUTF8String:]` in the proper API.
+pub fn mutable_from_rust_string(env: &mut Environment, from: String) -> id {
+    let string: id = msg_class![env; _touchHLE_NSMutableString alloc];
+    let host_object: &mut StringHostObject = env.objc.borrow_mut(string);
+    *host_object = StringHostObject::Utf8(Cow::Owned(from));
+    string
+}
+
 /// Shortcut for host code, allocs and inits with the given u16 vec.
 pub fn from_u16_vec(env: &mut Environment, from: Vec<u16>) -> id {
     let string: id = msg_class![env; _touchHLE_NSString alloc];

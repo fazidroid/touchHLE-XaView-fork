@@ -232,7 +232,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         retain(env, next_arg);
         objects.push(next_arg);
     }
-    let array = from_vec_mut(env, objects);
+    let array = mutable_from_vec(env, objects);
     autorelease(env, array)
 }
 
@@ -674,7 +674,7 @@ pub fn from_vec(env: &mut Environment, objects: Vec<id>) -> id {
 /// Shortcut for host code, roughly equivalent to
 /// `[[NSMutableArray alloc] initWithObjects:count]` but without copying.
 /// The elements should already be "retained by" the `Vec`.
-pub fn from_vec_mut(env: &mut Environment, objects: Vec<id>) -> id {
+pub fn mutable_from_vec(env: &mut Environment, objects: Vec<id>) -> id {
     let array: id = msg_class![env; NSMutableArray alloc];
     env.objc.borrow_mut::<ArrayHostObject>(array).array = objects;
     array
