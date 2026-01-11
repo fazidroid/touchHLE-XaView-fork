@@ -98,6 +98,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)dateWithTimeIntervalSinceReferenceDate:(NSTimeInterval)secs {
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithTimeIntervalSinceReferenceDate:secs];
+    autorelease(env, new)
+}
+
 - (id)init {
     // "Date objects are immutable, representing an invariant time interval
     // relative to an absolute reference date (00:00:00 UTC on 1 January 2001)."
