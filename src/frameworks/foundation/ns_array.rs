@@ -66,19 +66,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // These probably comes from some category related to plists.
 + (id)arrayWithContentsOfFile:(id)path { // NSString*
-    let path = ns_string::to_rust_string(env, path);
-    let res = deserialize_plist_from_file(
-        env,
-        GuestPath::new(&path),
-        /* array_expected: */ true,
-    );
-    autorelease(env, res)
+    let array: id = msg![env; this alloc];
+    let array: id = msg![env; array initWithContentsOfFile:path];
+    autorelease(env, array)
 }
 + (id)arrayWithContentsOfURL:(id)url { // NSURL*
-    let path = ns_url::to_rust_path(env, url);
-    let res = deserialize_plist_from_file(env, &path, /* array_expected: */ true);
-    autorelease(env, res)
+    let array: id = msg![env; this alloc];
+    let array: id = msg![env; array initWithContentsOfURL:url];
+    autorelease(env, array)
 }
+
 + (id)arrayWithObject:(id)object {
     retain(env, object);
     let objects = vec![object];
@@ -234,6 +231,38 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     let array = mutable_from_vec(env, objects);
     autorelease(env, array)
+}
+
+// These probably comes from some category related to plists.
+- (id)initWithContentsOfFile:(id)path { // NSString*
+    release(env, this);
+    let path = ns_string::to_rust_string(env, path);
+    let tmp = deserialize_plist_from_file(
+        env,
+        GuestPath::new(&path),
+        /* array_expected: */ true,
+    );
+    if tmp == nil {
+        return nil;
+    }
+    // We should respect mutability of the top most container!
+    let res = msg_class![env; NSMutableArray alloc];
+    let res = msg![env; res initWithArray:tmp];
+    release(env, tmp);
+    res
+}
+- (id)initWithContentsOfURL:(id)url { // NSURL*
+    release(env, this);
+    let path = ns_url::to_rust_path(env, url);
+    let tmp = deserialize_plist_from_file(env, &path, /* array_expected: */ true);
+    if tmp == nil {
+        return nil;
+    }
+    // We should respect mutability of the top most container!
+    let res = msg_class![env; NSMutableArray alloc];
+    let res = msg![env; res initWithArray:tmp];
+    release(env, tmp);
+    res
 }
 
 - (())addObjectsFromArray:(id)other { // NSArray*

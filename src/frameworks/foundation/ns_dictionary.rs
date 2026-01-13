@@ -404,34 +404,27 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // These probably comes from some category related to plists.
 + (id)dictionaryWithContentsOfFile:(id)path { // NSString*
-    let path = ns_string::to_rust_string(env, path);
-    let res = deserialize_plist_from_file(
-        env,
-        GuestPath::new(&path),
-        /* array_expected: */ false,
-    );
-    autorelease(env, res)
+    let new_dict: id = msg![env; this alloc];
+    let new_dict: id = msg![env; new_dict initWithContentsOfFile:path];
+    autorelease(env, new_dict)
+}
++ (id)dictionaryWithContentsOfURL:(id)url { // NSURL*
+    let new_dict: id = msg![env; this alloc];
+    let new_dict: id = msg![env; new_dict initWithContentsOfURL:url];
+    autorelease(env, new_dict)
 }
 
 + (id)dictionaryWithObjects:(id)objects //NSArray *
                     forKeys:(id)keys { //NSArray *
     let new_dict: id = msg![env; this alloc];
     let new_dict: id = msg![env; new_dict initWithObjects:objects forKeys:keys];
-
     autorelease(env, new_dict)
 }
 
 + (id)dictionaryWithDictionary:(id)dict { // NSDictionary*
     let new_dict: id = msg![env; this alloc];
     let new_dict: id = msg![env; new_dict initWithDictionary:dict];
-
     autorelease(env, new_dict)
-}
-
-+ (id)dictionaryWithContentsOfURL:(id)url { // NSURL*
-    let path = ns_url::to_rust_path(env, url);
-    let res = deserialize_plist_from_file(env, &path, /* array_expected: */ false);
-    autorelease(env, res)
 }
 
 - (id)init {
@@ -520,6 +513,38 @@ pub const CLASSES: ClassExports = objc_classes! {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithCapacity:capacity];
     autorelease(env, new)
+}
+
+// These probably comes from some category related to plists.
+- (id)initWithContentsOfFile:(id)path { // NSString*
+    release(env, this);
+    let path = ns_string::to_rust_string(env, path);
+    let tmp = deserialize_plist_from_file(
+        env,
+        GuestPath::new(&path),
+        /* array_expected: */ false
+    );
+    if tmp == nil {
+        return nil;
+    }
+    // We should respect mutability of the top most container!
+    let res = msg_class![env; NSMutableDictionary alloc];
+    let res = msg![env; res initWithDictionary:tmp];
+    release(env, tmp);
+    res
+}
+- (id)initWithContentsOfURL:(id)url { // NSURL*
+    release(env, this);
+    let path = ns_url::to_rust_path(env, url);
+    let tmp = deserialize_plist_from_file(env, &path, /* array_expected: */ false);
+    if tmp == nil {
+        return nil;
+    }
+    // We should respect mutability of the top most container!
+    let res = msg_class![env; NSMutableDictionary alloc];
+    let res = msg![env; res initWithDictionary:tmp];
+    release(env, tmp);
+    res
 }
 
 @end

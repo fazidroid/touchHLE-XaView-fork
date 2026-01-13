@@ -122,7 +122,9 @@ pub(super) fn deserialize_plist_from_file(
         return nil;
     }
 
-    // TODO: support other mutability options
+    // Note: The top-most container mutability may change
+    // depending on the caller.
+    // (see `NSMutableArray` and `NSMutableDictionary` implementations)
     deserialize_plist(env, &root, NSPropertyListImmutable)
 }
 
