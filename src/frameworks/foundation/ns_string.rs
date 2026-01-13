@@ -354,8 +354,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this stringWithString:res]
 }
 
-
-
 + (id)stringWithCharacters:(ConstPtr<unichar>)characters length:(NSUInteger)length {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithCharacters:characters length:length];
@@ -394,6 +392,27 @@ pub const CLASSES: ClassExports = objc_classes! {
     // I've seen of this method was on ASCII strings, so let's just hardcode
     // UTF-8 and hope that works.
     NSUTF8StringEncoding
+}
+
+- (id)initWithUTF8String:(ConstPtr<u8>)utf8_string {
+    msg![env; this initWithCString:utf8_string encoding:NSUTF8StringEncoding]
+}
+
+- (id)initWithCString:(ConstPtr<u8>)c_string {
+    let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
+    msg![env; this initWithCString:c_string encoding:encoding]
+}
+
+- (id)initWithCString:(ConstPtr<u8>)c_string length:(NSUInteger)len {
+    let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
+    msg![env; this initWithBytes:c_string length:len encoding:encoding]
+}
+
+- (id)initWithCString:(ConstPtr<u8>)c_string
+             encoding:(NSStringEncoding)encoding {
+    assert!(C_STRING_FRIENDLY_ENCODINGS.contains(&encoding), "encoding {encoding}");
+    let len: NSUInteger = env.mem.cstr_at(c_string).len().try_into().unwrap();
+    msg![env; this initWithBytes:c_string length:len encoding:encoding]
 }
 
 - (id)dataUsingEncoding:(NSStringEncoding)encoding {
@@ -1287,27 +1306,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithUTF8String:(ConstPtr<u8>)utf8_string {
-    msg![env; this initWithCString:utf8_string encoding:NSUTF8StringEncoding]
-}
-
-- (id)initWithCString:(ConstPtr<u8>)c_string {
-    let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
-    msg![env; this initWithCString:c_string encoding:encoding]
-}
-
-- (id)initWithCString:(ConstPtr<u8>)c_string length:(NSUInteger)len {
-    let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
-    msg![env; this initWithBytes:c_string length:len encoding:encoding]
-}
-
-- (id)initWithCString:(ConstPtr<u8>)c_string
-             encoding:(NSStringEncoding)encoding {
-    assert!(C_STRING_FRIENDLY_ENCODINGS.contains(&encoding), "encoding {encoding}");
-    let len: NSUInteger = env.mem.cstr_at(c_string).len().try_into().unwrap();
-    msg![env; this initWithBytes:c_string length:len encoding:encoding]
-}
-
 - (id)initWithContentsOfFile:(id)path { // NSString*
     if path == nil {
         return nil;
@@ -1486,6 +1484,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)initWithCapacity:(NSUInteger)_capacity {
     // TODO: capacity
     msg![env; this init]
+}
+
+- (id)initWithBytes:(ConstPtr<u8>)bytes
+             length:(NSUInteger)len
+           encoding:(NSStringEncoding)encoding {
+    // TODO: error handling
+    let slice = env.mem.bytes_at(bytes, len);
+    let host_object = StringHostObject::decode(Cow::Borrowed(slice), encoding);
+
+    *env.objc.borrow_mut(this) = host_object;
+
+    this
 }
 
 - (id)initWithFormat:(id)format, // NSString*
