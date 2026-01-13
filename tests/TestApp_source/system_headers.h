@@ -24,6 +24,11 @@ typedef signed char BOOL;
 typedef unsigned long NSUInteger;
 typedef signed long NSInteger;
 
+typedef struct _NSRange {
+  NSUInteger location;
+  NSUInteger length;
+} NSRange;
+
 #define nil ((id)0)
 
 // id objc_msgSend(id, SEL, ...);
@@ -64,6 +69,9 @@ typedef signed long NSInteger;
 @interface NSString : NSObject
 + (instancetype)stringWithFormat:(NSString *)format, ...;
 + (instancetype)stringWithUTF8String:(const char *)string;
+@end
+@interface NSMutableString : NSString
+- (void)deleteCharactersInRange:(NSRange)range;
 @end
 
 @interface NSValue : NSObject

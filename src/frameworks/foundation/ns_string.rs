@@ -1234,15 +1234,33 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())deleteCharactersInRange:(NSRange)range {
-    // Below implementation handles a trivial case -
-    // whole string is deleted!
     let location = range.location;
-    assert_eq!(location, 0); // TODO
-    let len: NSUInteger = msg![env; this length];
     let length = range.length;
-    assert_eq!(len, length); // TODO
-    let empty = get_static_str(env, "");
-    () = msg![env; this setString:empty];
+
+    let left: id = if location == 0 {
+        get_static_str(env, "")
+    } else {
+        let left_range = NSRange {
+            location: 0,
+            length: location,
+        };
+        msg![env; this substringWithRange:left_range]
+    };
+
+    let idx_after_removal = location + length;
+    let lenght_str: NSUInteger = msg![env; this length];
+    let right: id = if idx_after_removal == lenght_str {
+        get_static_str(env, "")
+    } else {
+        let right_range = NSRange {
+            location: idx_after_removal,
+            length: lenght_str - idx_after_removal,
+        };
+        msg![env; this substringWithRange:right_range]
+    };
+
+    let res: id = msg![env; left stringByAppendingString:right];
+    () = msg![env; this setString:res];
 }
 
 @end
@@ -1530,6 +1548,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     let str = to_rust_string(env, a_string);
     let host_object = StringHostObject::Utf8(str);
     *env.objc.borrow_mut(this) = host_object;
+}
+
+- (id)substringWithRange:(NSRange)range {
+    let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+    let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
+    if did_convert {
+        log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
+    }
+    let host_string =
+        orig_string[(range.location as usize)..((range.location + range.length) as usize)].to_vec();
+    let res = from_u16_vec(env, host_string);
+    autorelease(env, res)
 }
 
 @end

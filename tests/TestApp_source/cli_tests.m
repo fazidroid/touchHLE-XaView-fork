@@ -3070,6 +3070,31 @@ int test_CFURLHasDirectoryPath() {
   return 0;
 }
 
+int test_NSMutableString_deleteCharactersInRange() {
+  NSMutableString *str = [NSMutableString stringWithUTF8String:"abc"];
+  NSRange r1 = {0, 3};
+  [str deleteCharactersInRange:r1];
+  NSString *expected = [NSString stringWithUTF8String:""];
+  if (!CFEqual(str, expected)) {
+    return -1;
+  }
+  str = [NSMutableString stringWithUTF8String:"abc"];
+  NSRange r2 = {1, 1};
+  [str deleteCharactersInRange:r2];
+  expected = [NSString stringWithUTF8String:"ac"];
+  if (!CFEqual(str, expected)) {
+    return -2;
+  }
+  str = [NSMutableString stringWithUTF8String:"abc"];
+  NSRange r3 = {0, 2};
+  [str deleteCharactersInRange:r3];
+  expected = [NSString stringWithUTF8String:"c"];
+  if (!CFEqual(str, expected)) {
+    return -3;
+  }
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -3136,6 +3161,7 @@ struct {
     FUNC_DEF(test_CGGeometry),
     FUNC_DEF(test_CFURLHasDirectoryPath),
     FUNC_DEF(test_CGImage_JPEG),
+    FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
 };
 // clang-format on
 
