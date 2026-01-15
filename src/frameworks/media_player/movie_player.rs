@@ -158,6 +158,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     );
 }
 
+- (())pause {
+    log!("TODO: [(MPMoviePlayerController*){:?} pause]", this);
+}
+
 - (())stop {
     log!("TODO: [(MPMoviePlayerController*){:?} stop]", this);
     assert!(this == env.framework_state.media_player.movie_player.active_player.take().unwrap());
