@@ -234,6 +234,9 @@ impl GLES for GLES1Native<'_> {
     unsafe fn StencilMask(&mut self, mask: GLuint) {
         gles11::StencilMask(mask);
     }
+    unsafe fn LogicOp(&mut self, opcode: GLenum) {
+        gles11::LogicOp(opcode);
+    }
 
     // Points
     unsafe fn PointSize(&mut self, size: GLfloat) {

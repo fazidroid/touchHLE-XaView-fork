@@ -126,6 +126,7 @@ pub trait GLES {
     unsafe fn StencilFunc(&mut self, func: GLenum, ref_: GLint, mask: GLuint);
     unsafe fn StencilOp(&mut self, sfail: GLenum, dpfail: GLenum, dppass: GLenum);
     unsafe fn StencilMask(&mut self, mask: GLuint);
+    unsafe fn LogicOp(&mut self, opcode: GLenum);
 
     // Points
     unsafe fn PointSize(&mut self, size: GLfloat);

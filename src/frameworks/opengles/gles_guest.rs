@@ -407,6 +407,9 @@ fn glStencilOp(env: &mut Environment, sfail: GLenum, dpfail: GLenum, dppass: GLe
 fn glStencilMask(env: &mut Environment, mask: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilMask(mask) });
 }
+fn glLogicOp(env: &mut Environment, opcode: GLenum) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.LogicOp(opcode) });
+}
 // Points
 fn glPointSize(env: &mut Environment, size: GLfloat) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.PointSize(size) })
@@ -1477,6 +1480,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glStencilFunc(_, _, _)),
     export_c_func!(glStencilOp(_, _, _)),
     export_c_func!(glStencilMask(_)),
+    export_c_func!(glLogicOp(_)),
     // Points
     export_c_func!(glPointSize(_)),
     export_c_func!(glPointSizex(_)),

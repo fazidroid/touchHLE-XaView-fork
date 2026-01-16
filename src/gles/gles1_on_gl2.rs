@@ -1002,6 +1002,28 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn StencilMask(&mut self, mask: GLuint) {
         gl21::StencilMask(mask);
     }
+    unsafe fn LogicOp(&mut self, opcode: GLenum) {
+        assert!([
+            gl21::CLEAR,
+            gl21::SET,
+            gl21::COPY,
+            gl21::COPY_INVERTED,
+            gl21::NOOP,
+            gl21::INVERT,
+            gl21::AND,
+            gl21::NAND,
+            gl21::OR,
+            gl21::NOR,
+            gl21::XOR,
+            gl21::EQUIV,
+            gl21::AND_REVERSE,
+            gl21::AND_INVERTED,
+            gl21::OR_REVERSE,
+            gl21::OR_INVERTED,
+        ]
+        .contains(&opcode));
+        gl21::LogicOp(opcode);
+    }
 
     // Points
     unsafe fn PointSize(&mut self, size: GLfloat) {
