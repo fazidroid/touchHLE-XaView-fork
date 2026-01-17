@@ -183,7 +183,8 @@ impl Bundle {
     }
 
     pub fn supported_interface_orientations(&self) -> Vec<&str> {
-        // UIInterfaceOrientation (iPhone OS 2.0) is a single string.
+        // UIInterfaceOrientation (iPhone OS 2.0) is a single string
+        // (or a comma separated list of strings).
         // UISupportedInterfaceOrientations (iOS 3.2) is an array of strings and
         // takes precedence.
         self.plist
@@ -196,10 +197,17 @@ impl Bundle {
                     .collect()
             })
             .unwrap_or_else(|| {
-                vec![self
+                if let Some(v) = self
                     .plist
-                    .get("UIInterfaceOrientation")
-                    .map_or("UIInterfaceOrientationPortrait", |o| o.as_string().unwrap())]
+                    .get("UIInterfaceOrientation") {
+                    let str = v.as_string().unwrap();
+                    if str.contains(',') {
+                        log!("UIInterfaceOrientation is a comma separated list of strings ({}), splitting!", str);
+                    }
+                    str.split(',').collect()
+                } else {
+                    vec!["UIInterfaceOrientationPortrait"]
+                }
             })
     }
 
