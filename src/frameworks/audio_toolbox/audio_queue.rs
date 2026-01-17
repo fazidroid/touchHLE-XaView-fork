@@ -145,10 +145,7 @@ pub fn AudioQueueNewOutput(
     };
 
     let mut format = env.mem.read(in_format);
-    if env
-        .bundle
-        .bundle_identifier()
-        .starts_with("com.ea.candcra.row")
+    if env.bundle.bundle_identifier().starts_with("com.ea.candcra")
         && format.format_id == fourcc(b".mp3")
     {
         log!("Applying game-specific hack for C&C Red Alert: Fixing hardcoded audio format from .mp3 to PCM.");
@@ -283,7 +280,7 @@ pub fn AudioQueueAllocateBuffer(
     let packet_description_capacity = if env
         .bundle
         .bundle_identifier()
-        .starts_with("com.ea.candcra.row")
+        .starts_with("com.ea.candcra")
     {
         log!("Applying game-specific hack for C&C Red Alert: Setting packet description capacity to 1024.");
         1024
