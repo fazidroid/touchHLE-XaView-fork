@@ -22,6 +22,7 @@ use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
 use crate::libc::pthread::cond::pthread_cond_t;
+use crate::window::DeviceFamily;
 pub use mutex::{MutexId, MutexType, PTHREAD_MUTEX_DEFAULT};
 
 /// Index into the [Vec] of threads. Thread 0 is always the main thread.
@@ -273,6 +274,34 @@ impl Environment {
                 log!("App needs non-portrait user interface orientation {:?}, applying device orientation {:?}.", non_portrait_orientation, options.initial_orientation);
             }
         }
+
+        let device_family_override = options.device_family;
+        let device_family_array = bundle.device_family_array();
+        let device_family = match device_family_array.len() {
+            // iPhone only or iPad only
+            1 => {
+                let only_supported = device_family_array[0];
+                if let Some(dfo) = device_family_override {
+                    if dfo != only_supported {
+                        log!("Warning: User-defined {:?} device family override is not supported by the app! ignoring", dfo);
+                    }
+                }
+                only_supported
+            }
+            // iPhone and iPad
+            2 => {
+                if let Some(dfo) = device_family_override {
+                    assert!(device_family_array.contains(&dfo));
+                    dfo
+                } else {
+                    assert!(device_family_array.contains(&DeviceFamily::iPhone));
+                    DeviceFamily::iPhone
+                }
+            }
+            _ => unreachable!(),
+        };
+        log!("{:?} device family is chosen.", device_family);
+        options.device_family = Some(device_family);
 
         let window = if options.headless {
             None

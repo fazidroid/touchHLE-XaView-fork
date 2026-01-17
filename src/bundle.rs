@@ -13,6 +13,7 @@
 
 use crate::fs::{BundleData, Fs, GuestPath, GuestPathBuf};
 use crate::image::Image;
+use crate::window::DeviceFamily;
 use plist::dictionary::Dictionary;
 use plist::Value;
 use std::io::Cursor;
@@ -200,5 +201,18 @@ impl Bundle {
                     .get("UIInterfaceOrientation")
                     .map_or("UIInterfaceOrientationPortrait", |o| o.as_string().unwrap())]
             })
+    }
+
+    pub fn device_family_array(&self) -> Vec<DeviceFamily> {
+        self.plist
+            .get("UIDeviceFamily")
+            .map(|v| {
+                v.as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|o| DeviceFamily::try_from(o.as_unsigned_integer().unwrap()).unwrap())
+                    .collect()
+            })
+            .unwrap_or_else(|| vec![DeviceFamily::iPhone])
     }
 }

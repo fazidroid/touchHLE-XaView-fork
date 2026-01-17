@@ -28,18 +28,58 @@ use std::num::NonZeroU32;
 use std::ptr::null_mut;
 use std::time::{Duration, Instant};
 
+#[allow(non_camel_case_types)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum DeviceFamily {
+    iPhone,
+    iPad,
+}
+impl DeviceFamily {
+    pub fn portrait_size(&self) -> (u32, u32) {
+        match self {
+            DeviceFamily::iPhone => (320, 480),
+            DeviceFamily::iPad => (768, 1024),
+        }
+    }
+}
+impl TryFrom<u64> for DeviceFamily {
+    type Error = ();
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(DeviceFamily::iPhone),
+            2 => Ok(DeviceFamily::iPad),
+            _ => Err(()),
+        }
+    }
+}
+impl TryFrom<&str> for DeviceFamily {
+    type Error = ();
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "iphone" => Ok(DeviceFamily::iPhone),
+            "ipad" => Ok(DeviceFamily::iPad),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum DeviceOrientation {
     Portrait,
     LandscapeLeft,
     LandscapeRight,
 }
-fn size_for_orientation(orientation: DeviceOrientation, scale_hack: NonZeroU32) -> (u32, u32) {
+fn size_for_orientation(
+    family: DeviceFamily,
+    orientation: DeviceOrientation,
+    scale_hack: NonZeroU32,
+) -> (u32, u32) {
+    let (width, height) = family.portrait_size();
     let scale_hack = scale_hack.get();
     match orientation {
-        DeviceOrientation::Portrait => (320 * scale_hack, 480 * scale_hack),
-        DeviceOrientation::LandscapeLeft => (480 * scale_hack, 320 * scale_hack),
-        DeviceOrientation::LandscapeRight => (480 * scale_hack, 320 * scale_hack),
+        DeviceOrientation::Portrait => (width * scale_hack, height * scale_hack),
+        DeviceOrientation::LandscapeLeft => (height * scale_hack, width * scale_hack),
+        DeviceOrientation::LandscapeRight => (height * scale_hack, width * scale_hack),
     }
 }
 fn rotate_fullscreen_size(orientation: DeviceOrientation, screen_size: (u32, u32)) -> (u32, u32) {
@@ -180,6 +220,7 @@ pub struct Window {
     scale_hack: NonZeroU32,
     internal_gl_ins: Option<Box<dyn GLESContext>>,
     splash_image: Option<Image>,
+    device_family: DeviceFamily,
     device_orientation: DeviceOrientation,
     controller_ctx: sdl2::GameControllerSubsystem,
     controllers: Vec<sdl2::controller::GameController>,
@@ -236,6 +277,7 @@ impl Window {
         let scale_hack = options.scale_hack;
         // TODO: some apps specify their orientation in Info.plist, we could use
         // that here.
+        let device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
         let device_orientation = options.initial_orientation;
         let fullscreen = options.fullscreen;
 
@@ -261,7 +303,8 @@ impl Window {
                 .unwrap();
             window
         } else {
-            let (width, height) = size_for_orientation(device_orientation, scale_hack);
+            let (width, height) =
+                size_for_orientation(device_family, device_orientation, scale_hack);
             let window = video_ctx
                 .window(title, width, height)
                 .position_centered()
@@ -320,6 +363,7 @@ impl Window {
             scale_hack,
             internal_gl_ins: None,
             splash_image: launch_image,
+            device_family,
             device_orientation,
             controller_ctx,
             controllers: Vec::new(),
@@ -377,8 +421,11 @@ impl Window {
             independent_of_viewport: bool,
         ) -> (f32, f32) {
             let (vx, vy, vw, vh) = if independent_of_viewport {
-                let (width, height) =
-                    size_for_orientation(window.device_orientation, NonZeroU32::new(1).unwrap());
+                let (width, height) = size_for_orientation(
+                    window.device_family,
+                    window.device_orientation,
+                    NonZeroU32::new(1).unwrap(),
+                );
                 (0, 0, width, height)
             } else {
                 window.viewport()
@@ -1219,7 +1266,7 @@ impl Window {
                 set_sdl2_orientation(new_orientation);
                 rotate_fullscreen_size(new_orientation, self.window.size())
             } else {
-                size_for_orientation(new_orientation, self.scale_hack)
+                size_for_orientation(self.device_family, new_orientation, self.scale_hack)
             };
 
             // macOS quirk: when resizing the window, the new framebuffer's size
@@ -1267,6 +1314,10 @@ impl Window {
         }
     }
 
+    pub fn device_family(&self) -> DeviceFamily {
+        self.device_family
+    }
+
     /// Returns the current device orientation
     pub fn current_rotation(&self) -> DeviceOrientation {
         self.device_orientation
@@ -1277,7 +1328,11 @@ impl Window {
     /// The aspect ratio, scale and orientation reflect the guest app's view of
     /// the world.
     pub fn size_unrotated_unscaled(&self) -> (u32, u32) {
-        size_for_orientation(DeviceOrientation::Portrait, NonZeroU32::new(1).unwrap())
+        size_for_orientation(
+            self.device_family,
+            DeviceOrientation::Portrait,
+            NonZeroU32::new(1).unwrap(),
+        )
     }
 
     /// Get the region of the on-screen window (x, y, width, height) used to
@@ -1287,7 +1342,7 @@ impl Window {
     /// the world, but the scale and orientation might not.
     pub fn viewport(&self) -> (u32, u32, u32, u32) {
         let (app_width, app_height) =
-            size_for_orientation(self.device_orientation, self.scale_hack);
+            size_for_orientation(self.device_family, self.device_orientation, self.scale_hack);
         if !self.fullscreen && !Self::rotatable_fullscreen() {
             return (0, 0, app_width, app_height);
         }
