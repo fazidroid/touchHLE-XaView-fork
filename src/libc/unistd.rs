@@ -16,8 +16,10 @@ use std::time::Duration;
 #[allow(non_camel_case_types)]
 type useconds_t = u32;
 
-const F_OK: i32 = 0;
-const R_OK: i32 = 4;
+const F_OK: i32 = 0; // file existence
+const X_OK: i32 = 1; // execute/search permission
+const W_OK: i32 = 2; // write permission
+const R_OK: i32 = 4; // read permission
 
 fn sleep(env: &mut Environment, seconds: u32) -> u32 {
     env.sleep(Duration::from_secs(seconds.into()), true);
@@ -71,8 +73,9 @@ fn access(env: &mut Environment, path: ConstPtr<u8>, mode: i32) -> i32 {
 
     let binding = env.mem.cstr_at_utf8(path).unwrap();
     let guest_path = GuestPath::new(&binding);
-    let (exists, r, _, _) = env.fs.access(guest_path);
+    let (exists, read, write, execute) = env.fs.access(guest_path);
     // TODO: set errno
+    // TODO: support ORing
     match mode {
         F_OK => {
             if exists {
@@ -81,8 +84,22 @@ fn access(env: &mut Environment, path: ConstPtr<u8>, mode: i32) -> i32 {
                 -1
             }
         }
+        X_OK => {
+            if execute {
+                0
+            } else {
+                -1
+            }
+        }
+        W_OK => {
+            if write {
+                0
+            } else {
+                -1
+            }
+        }
         R_OK => {
-            if r {
+            if read {
                 0
             } else {
                 -1
