@@ -280,8 +280,8 @@ forUndefinedKey:(id)key { // NSString*
         }
         return;
     }
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.POP") && sel == env.objc.lookup_selector("startMovie:").unwrap() && wait {
-        log!("Applying game-specific hack for PoP: WW: ignoring performSelectorOnMainThread:SEL(startMovie:) waitUntilDone:true");
+    if env.bundle.bundle_identifier().starts_with("com.gameloft.POP") && (sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie").unwrap()) && wait {
+        log!("Applying game-specific hack for PoP: WW: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
         return;
     }
     if env.bundle.bundle_identifier().starts_with("com.gameloft.Asphalt5") && (sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie:").unwrap()) && wait {
