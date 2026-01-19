@@ -244,7 +244,12 @@ fn setsockopt(
         return -1;
     }
 
-    let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
+    let Some(sock) = State::get(env).sockets.get(&socket) else {
+        set_errno(env, EBADF);
+        return -1;
+    };
+    let type_ = sock.type_;
+
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
 
     assert_eq!(level, SOL_SOCKET);
