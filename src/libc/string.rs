@@ -189,7 +189,16 @@ pub(super) fn strncpy(
     src: ConstPtr<u8>,
     size: GuestUSize,
 ) -> MutPtr<u8> {
-    GenericChar::<u8>::strncpy(env, dest, src, size)
+    GenericChar::<u8>::strncpy(env, dest, src, size, GuestUSize::MAX)
+}
+fn __strncpy_chk(
+    env: &mut Environment,
+    dest: MutPtr<u8>,
+    src: ConstPtr<u8>,
+    size: GuestUSize,
+    dest_size: GuestUSize,
+) -> MutPtr<u8> {
+    GenericChar::<u8>::strncpy(env, dest, src, size, dest_size)
 }
 fn strsep(env: &mut Environment, stringp: MutPtr<MutPtr<u8>>, delim: ConstPtr<u8>) -> MutPtr<u8> {
     let orig = env.mem.read(stringp);
@@ -319,6 +328,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(strcspn(_, _)),
     export_c_func!(__strcat_chk(_, _, _)),
     export_c_func!(strncpy(_, _, _)),
+    export_c_func!(__strncpy_chk(_, _, _, _)),
     export_c_func!(strsep(_, _)),
     export_c_func!(strdup(_)),
     export_c_func!(strcmp(_, _)),

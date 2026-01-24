@@ -124,7 +124,16 @@ fn wcsncpy(
     src: ConstPtr<wchar_t>,
     size: GuestUSize,
 ) -> MutPtr<wchar_t> {
-    GenericChar::<wchar_t>::strncpy(env, dest, src, size)
+    GenericChar::<wchar_t>::strncpy(env, dest, src, size, GuestUSize::MAX)
+}
+fn __wcsncpy_chk(
+    env: &mut Environment,
+    dest: MutPtr<wchar_t>,
+    src: ConstPtr<wchar_t>,
+    size: GuestUSize,
+    dest_size: GuestUSize,
+) -> MutPtr<wchar_t> {
+    GenericChar::<wchar_t>::strncpy(env, dest, src, size, dest_size)
 }
 fn wcsdup(env: &mut Environment, src: ConstPtr<wchar_t>) -> MutPtr<wchar_t> {
     GenericChar::<wchar_t>::strdup(env, src)
@@ -186,6 +195,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(wcscat(_, _)),
     export_c_func!(wcscspn(_, _)),
     export_c_func!(wcsncpy(_, _, _)),
+    export_c_func!(__wcsncpy_chk(_, _, _, _)),
     export_c_func!(wcsdup(_)),
     export_c_func!(wcscmp(_, _)),
     export_c_func!(wcsncmp(_, _, _)),

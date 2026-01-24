@@ -186,7 +186,11 @@ impl<T: Copy + Default + Eq + Ord + SafeRead + Debug> GenericChar<T> {
         dest: MutPtr<T>,
         src: ConstPtr<T>,
         size: GuestUSize,
+        dest_size: GuestUSize,
     ) -> MutPtr<T> {
+        if dest_size < size {
+            panic!("Buffer overflow");
+        }
         let mut end = false;
         for i in 0..size {
             if !end {
