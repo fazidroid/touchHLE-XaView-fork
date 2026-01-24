@@ -213,6 +213,13 @@ fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
                 // but we return 1 to match the real device.
                 mem.write(params, 1 as _);
             }
+            // MAX_SAMPLES or MAX_SAMPLES_ANGLE
+            0x8d57 => {
+                // TODO: handle GetBooleanv and GetFloatv as well
+                // 1 is an initial value
+                // TODO: This is an OpenGL ES 2.0 extension, not supported yet
+                mem.write(params, 1 as _);
+            }
             _ => {
                 let params = mem.ptr_at_mut(params, 16 /* upper bound */);
                 unsafe { gles.GetIntegerv(pname, params) };
