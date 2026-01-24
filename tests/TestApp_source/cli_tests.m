@@ -8,6 +8,7 @@
 // runs these automatically.
 
 #include <CoreFoundation/CFBase.h>
+#include <CoreFoundation/CFBundle.h>
 #include <CoreFoundation/CFDictionary.h>
 #include <CoreFoundation/CFNumber.h>
 #include <CoreFoundation/CFString.h>
@@ -1019,17 +1020,31 @@ int test_setlocale() {
   return 0;
 }
 
+const int PATH_BUF_SIZE = 256;
+// static array for path: not great, not terrible
+char path[PATH_BUF_SIZE];
+
+const char *path_test_app() {
 #ifdef DEFINE_ME_WHEN_BUILDING_ON_MACOS
-// assume project dir as cwd
-const char *path_test_app = "./tests/TestApp.app";
+  // assume project dir as cwd
+  return "./tests/TestApp.app";
 #else
-const char *path_test_app = "/var/mobile/Applications/"
-                            "00000000-0000-0000-0000-000000000000/TestApp.app";
+  bzero(path, PATH_BUF_SIZE);
+  CFBundleRef mainBundle = CFBundleGetMainBundle();
+  CFURLRef bundleURL = CFBundleCopyBundleURL(mainBundle);
+  CFURLGetFileSystemRepresentation(bundleURL,
+                                   true, // Resolve against base (absolute path)
+                                   (UInt8 *)path, // Output buffer
+                                   PATH_BUF_SIZE  // Buffer size
+  );
+  CFRelease(bundleURL);
+  return path;
 #endif
+}
 
 int test_dirent() {
   struct dirent *dp;
-  DIR *dirp = opendir(path_test_app);
+  DIR *dirp = opendir(path_test_app());
   if (dirp == NULL) {
     return -1;
   }
@@ -1055,7 +1070,7 @@ int test_dirent() {
 
 int test_scandir() {
   struct dirent **namelist;
-  int n = scandir(path_test_app, &namelist, NULL, NULL);
+  int n = scandir(path_test_app(), &namelist, NULL, NULL);
   if (n < 0) {
     return -1;
   }
@@ -1111,7 +1126,7 @@ int test_swprintf() {
 
 int test_realpath() {
   char buf[256];
-  if (chdir(path_test_app))
+  if (chdir(path_test_app()))
     return -1;
   // absolute path
   char *res = realpath("/usr", buf);
@@ -3071,6 +3086,7 @@ int test_CFURLHasDirectoryPath() {
 }
 
 int test_NSMutableString_deleteCharactersInRange() {
+  NSAutoreleasePool *pool = [NSAutoreleasePool new];
   NSMutableString *str = [NSMutableString stringWithUTF8String:"abc"];
   NSRange r1 = {0, 3};
   [str deleteCharactersInRange:r1];
@@ -3092,6 +3108,7 @@ int test_NSMutableString_deleteCharactersInRange() {
   if (!CFEqual(str, expected)) {
     return -3;
   }
+  [pool drain];
   return 0;
 }
 
