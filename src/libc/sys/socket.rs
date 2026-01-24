@@ -677,7 +677,13 @@ fn accept(
     address: MutPtr<sockaddr>,
     address_len: MutPtr<socklen_t>,
 ) -> FileDescriptor {
-    let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
+    // TODO: handle errno properly
+    set_errno(env, 0);
+
+    let Some(socket_host_object) = State::get(env).sockets.get(&socket) else {
+        set_errno(env, EBADF);
+        return -1;
+    };
     let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM);
 
