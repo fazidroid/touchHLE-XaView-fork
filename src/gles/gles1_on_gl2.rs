@@ -384,6 +384,9 @@ const TEX_PARAMS: ParamTable = ParamTable(&[
     (gl21::MAX_TEXTURE_MAX_ANISOTROPY_EXT, ParamType::Float, 1),
 ]);
 
+const UNSUPPORTED_TEX_PARAMS: ParamTable =
+    ParamTable(&[(gl21::TEXTURE_MAX_LEVEL, ParamType::Float, 1)]);
+
 pub struct GLES1OnGL2State {
     pointer_is_fixed_point: [bool; ARRAYS.len()],
     fixed_point_texture_units: HashSet<GLenum>,
@@ -1492,7 +1495,15 @@ impl GLES for GLES1OnGL2<'_> {
     }
     unsafe fn TexParameteri(&mut self, target: GLenum, pname: GLenum, param: GLint) {
         assert!(target == gl21::TEXTURE_2D);
-        TEX_PARAMS.assert_known_param(pname);
+        if UNSUPPORTED_TEX_PARAMS.contains(pname) {
+            log_dbg!(
+                "Tolerating TexParameteri({:#x}, {:#x}) of parameter",
+                target,
+                pname
+            );
+        } else {
+            TEX_PARAMS.assert_known_param(pname);
+        }
         gl21::TexParameteri(target, pname, param);
     }
     unsafe fn TexParameterf(&mut self, target: GLenum, pname: GLenum, param: GLfloat) {
