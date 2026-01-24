@@ -170,6 +170,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+@implementation MPMoviePlayerViewController: UIViewController
+
+- (id)initWithContentURL:(id)url {
+    log!(
+        "TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?} ({:?})] -> nil",
+        this,
+        url,
+        ns_url::to_rust_path(env, url),
+    );
+    release(env, this);
+    nil // TODO
+}
+
+@end
+
 };
 
 /// For use by `NSRunLoop` via [super::handle_players]: check movie players'
