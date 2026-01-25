@@ -431,7 +431,10 @@ impl Read for GuestFile {
             GuestFile::File(file) => file.read(buf),
             GuestFile::IpaBundleFile(file) => file.read(buf),
             GuestFile::ResourceFile(file) => file.get().read(buf),
-            GuestFile::Directory => panic!("Attempt to read from a directory as a guest file"),
+            GuestFile::Directory => Err(std::io::Error::new(
+                std::io::ErrorKind::IsADirectory,
+                "Attempt to read from a directory as a guest file",
+            )),
             _ => unimplemented!(),
         }
     }
@@ -473,7 +476,17 @@ impl Seek for GuestFile {
             GuestFile::File(file) => file.seek(pos),
             GuestFile::IpaBundleFile(file) => file.seek(pos),
             GuestFile::ResourceFile(file) => file.get().seek(pos),
-            GuestFile::Directory => panic!("Attempt to seek in a directory as a guest file"),
+            GuestFile::Directory => {
+                // Note: directories as supposed to be seekable on iOS! https://stackoverflow.com/questions/65911066/what-does-lseek-mean-for-a-directory-file-descriptor
+                // As far as I can (f)tell, apps are really not using that
+                // properly and returning -1 on fseek/ftell is fine.
+                // TODO: implement seeking properly and return "cookie" values
+                log!("Warning: Seeking a directory as a guest file!");
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::IsADirectory,
+                    "Attempt to seek a directory as a guest file",
+                ))
+            }
             _ => unimplemented!(),
         }
     }

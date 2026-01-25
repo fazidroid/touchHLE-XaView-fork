@@ -406,8 +406,6 @@ int test_swscanf() {
   return 0;
 }
 
-int test_errno() { return (errno == 0) ? 0 : -1; }
-
 int test_realloc() {
   void *ptr = realloc(NULL, 32);
   memmove(ptr, "abcd", 4);
@@ -1092,6 +1090,23 @@ int test_scandir() {
       return -2;
     }
   }
+  return 0;
+}
+
+int test_read_directory_as_fd() {
+  FILE *dir_stream = fopen(path_test_app(), "r");
+  if (dir_stream == NULL) {
+    return -1;
+  }
+  char buffer[1024];
+  size_t bytes_read = fread(buffer, 1, 4, dir_stream);
+  if (bytes_read != 0) {
+    return -2;
+  }
+  if (errno != EISDIR) {
+    return -3;
+  }
+  fclose(dir_stream);
   return 0;
 }
 
@@ -3122,7 +3137,6 @@ struct {
 #ifndef DEFINE_ME_WHEN_BUILDING_ON_MACOS
     // below tests are failing on macOS,
     // so we skip them
-    FUNC_DEF(test_errno),
     FUNC_DEF(test_getcwd_chdir),
     FUNC_DEF(test_synchronized),
 #endif
@@ -3179,6 +3193,7 @@ struct {
     FUNC_DEF(test_CFURLHasDirectoryPath),
     FUNC_DEF(test_CGImage_JPEG),
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
+    FUNC_DEF(test_read_directory_as_fd),
 };
 // clang-format on
 
