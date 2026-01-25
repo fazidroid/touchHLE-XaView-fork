@@ -3139,6 +3139,7 @@ struct {
     // so we skip them
     FUNC_DEF(test_getcwd_chdir),
     FUNC_DEF(test_synchronized),
+    FUNC_DEF(test_read_directory_as_fd),
 #endif
     FUNC_DEF(test_qsort),
     FUNC_DEF(test_vsnprintf),
@@ -3193,7 +3194,6 @@ struct {
     FUNC_DEF(test_CFURLHasDirectoryPath),
     FUNC_DEF(test_CGImage_JPEG),
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
-    FUNC_DEF(test_read_directory_as_fd),
 };
 // clang-format on
 
