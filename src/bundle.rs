@@ -101,7 +101,11 @@ impl Bundle {
     }
 
     pub fn display_name(&self) -> &str {
-        self.plist["CFBundleDisplayName"].as_string().unwrap()
+        if let Some(display_name) = self.plist.get("CFBundleDisplayName") {
+            display_name.as_string().unwrap()
+        } else {
+            ""
+        }
     }
 
     pub fn minimum_os_version(&self) -> Option<&str> {
