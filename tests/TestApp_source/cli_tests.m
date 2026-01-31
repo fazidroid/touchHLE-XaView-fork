@@ -3218,6 +3218,12 @@ int test_strptime() {
     return -18;
   }
 
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("10\r\n", "%H:%M:%S,", &tm);
+  if (res != NULL) {
+    return -19;
+  }
+
   return 0;
 }
 

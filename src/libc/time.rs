@@ -563,6 +563,7 @@ fn strptime(
                 continue;
             }
             if c != cc {
+                conversation_failed = true;
                 break;
             }
             buffer_char_idx += 1;
