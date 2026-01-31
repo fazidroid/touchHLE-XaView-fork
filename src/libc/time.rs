@@ -6,9 +6,10 @@
 //! `time.h` (C) and `sys/time.h` (POSIX)
 
 use crate::dyld::{export_c_func, FunctionExports};
+use crate::libc::clocale::{setlocale, LC_CTYPE};
 use crate::libc::errno::set_errno;
 use crate::libc::stdio::printf::{isspace, isspace_inner};
-use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
+use crate::mem::{guest_size_of, ConstPtr, GuestUSize, MutPtr, Ptr, SafeRead};
 use crate::Environment;
 use std::ops::Range;
 use std::time::{Duration, Instant, SystemTime};
@@ -637,6 +638,92 @@ fn strptime(
     }
 }
 
+fn strftime(
+    env: &mut Environment,
+    s: MutPtr<u8>,
+    max_size: GuestUSize,
+    format: ConstPtr<u8>,
+    time_ptr: ConstPtr<tm>,
+) -> GuestUSize {
+    log_dbg!(
+        "strftime({:?}, {}, {:?}, {:?})",
+        s,
+        max_size,
+        env.mem.cstr_at_utf8(format),
+        time_ptr
+    );
+
+    // TODO: support other locales
+    let ctype_locale = setlocale(env, LC_CTYPE, Ptr::null());
+    assert_eq!(env.mem.read(ctype_locale), b'C');
+
+    let time_val = env.mem.read(time_ptr);
+
+    let mut res = Vec::<u8>::new();
+
+    let mut format_char_idx = 0;
+    loop {
+        let c = env.mem.read(format + format_char_idx);
+        format_char_idx += 1;
+
+        if c == b'\0' {
+            break;
+        }
+        if c != b'%' {
+            res.push(c);
+            continue;
+        }
+
+        let specifier = env.mem.read(format + format_char_idx);
+        format_char_idx += 1;
+
+        match specifier {
+            b'm' => {
+                let month = time_val.tm_mon + 1;
+                assert!((1..=12).contains(&month));
+                let formatted_month = format!("{:02}", month);
+                res.extend_from_slice(formatted_month.as_bytes());
+            }
+            b'd' => {
+                let day = time_val.tm_mday; // from 1
+                assert!((1..=31).contains(&day));
+                let formatted_day = format!("{:02}", day);
+                res.extend_from_slice(formatted_day.as_bytes());
+            }
+            b'H' => {
+                let hour = time_val.tm_hour;
+                assert!((0..24).contains(&hour));
+                let formatted_hour = format!("{:02}", hour);
+                res.extend_from_slice(formatted_hour.as_bytes());
+            }
+            b'M' => {
+                let minute = time_val.tm_min;
+                assert!((0..60).contains(&minute));
+                let formatted_minute = format!("{:02}", minute);
+                res.extend_from_slice(formatted_minute.as_bytes());
+            }
+            _ => unimplemented!(
+                "Format character '{}'. Formatted up to index {}",
+                specifier as char,
+                format_char_idx
+            ),
+        }
+    }
+
+    let middle = if ((max_size - 1) as usize) < res.len() {
+        &res[..(max_size - 1) as usize]
+    } else {
+        &res[..]
+    };
+
+    let dest_slice = env.mem.bytes_at_mut(s, max_size);
+    for (i, &byte) in middle.iter().chain(b"\0".iter()).enumerate() {
+        dest_slice[i] = byte;
+    }
+
+    res.len().try_into().unwrap()
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(clock()),
     export_c_func!(time(_)),
@@ -649,4 +736,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(gettimeofday(_, _)),
     export_c_func!(nanosleep(_, _)),
     export_c_func!(strptime(_, _, _)),
+    export_c_func!(strftime(_, _, _, _)),
 ];

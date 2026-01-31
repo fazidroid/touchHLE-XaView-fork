@@ -3227,6 +3227,40 @@ int test_strptime() {
   return 0;
 }
 
+int test_strftime() {
+  struct tm tm;
+  char buf[64];
+  memset(&tm, 0, sizeof(struct tm));
+  tm.tm_mon = 0; // January
+  tm.tm_mday = 31;
+  tm.tm_hour = 12;
+  tm.tm_min = 34;
+
+  size_t res = strftime(buf, sizeof(buf), "%m/%d     %H:%M", &tm);
+  if (res == 0) {
+    return -1;
+  }
+  if (strcmp(buf, "01/31     12:34") != 0) {
+    return -2;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  tm.tm_mon = 10; // November
+  tm.tm_mday = 5;
+  tm.tm_hour = 9;
+  tm.tm_min = 7;
+
+  res = strftime(buf, sizeof(buf), "%m/%d     %H:%M", &tm);
+  if (res == 0) {
+    return -3;
+  }
+  if (strcmp(buf, "11/05     09:07") != 0) {
+    return -4;
+  }
+
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -3295,6 +3329,7 @@ struct {
     FUNC_DEF(test_CGImage_JPEG),
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
     FUNC_DEF(test_strptime),
+    FUNC_DEF(test_strftime),
 };
 // clang-format on
 
