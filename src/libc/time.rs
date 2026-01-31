@@ -10,6 +10,7 @@ use crate::libc::errno::set_errno;
 use crate::libc::stdio::printf::{isspace, isspace_inner};
 use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::Environment;
+use std::ops::Range;
 use std::time::{Duration, Instant, SystemTime};
 
 #[derive(Default)]
@@ -571,64 +572,53 @@ fn strptime(
         let specifier = env.mem.read(format + format_char_idx);
         format_char_idx += 1;
 
-        match specifier {
-            b'H' => {
-                let mut hour: i32 = 0;
-                let mut chars_count = 0;
-                while let c @ b'0'..=b'9' = env.mem.read(buffer + buffer_char_idx) {
-                    if chars_count >= 2 {
-                        break;
-                    }
-                    hour = hour * 10 + (c - b'0') as i32;
-                    buffer_char_idx += 1;
-                    chars_count += 1;
-                }
-                if chars_count != 2 {
-                    conversation_failed = true;
+        let mut parse_2_digits = |range: Range<i32>| -> Result<i32, ()> {
+            let mut num: i32 = 0;
+            let mut chars_count = 0;
+            while let c @ b'0'..=b'9' = env.mem.read(buffer + buffer_char_idx) {
+                if chars_count >= 2 {
                     break;
-                } else {
-                    assert!((0..24).contains(&hour));
+                }
+                num = num * 10 + (c - b'0') as i32;
+                buffer_char_idx += 1;
+                chars_count += 1;
+            }
+            if chars_count != 2 {
+                Err(())
+            } else {
+                assert!(range.contains(&num));
+                Ok(num)
+            }
+        };
+
+        match specifier {
+            b'H' => match parse_2_digits(0..24) {
+                Ok(hour) => {
                     time_val.tm_hour = hour;
                 }
-            }
-            b'M' => {
-                let mut minute: i32 = 0;
-                let mut chars_count = 0;
-                while let c @ b'0'..=b'9' = env.mem.read(buffer + buffer_char_idx) {
-                    if chars_count >= 2 {
-                        break;
-                    }
-                    minute = minute * 10 + (c - b'0') as i32;
-                    buffer_char_idx += 1;
-                    chars_count += 1;
-                }
-                if chars_count != 2 {
+                Err(_) => {
                     conversation_failed = true;
                     break;
-                } else {
-                    assert!((0..60).contains(&minute));
+                }
+            },
+            b'M' => match parse_2_digits(0..60) {
+                Ok(minute) => {
                     time_val.tm_min = minute;
                 }
-            }
-            b'S' => {
-                let mut second: i32 = 0;
-                let mut chars_count = 0;
-                while let c @ b'0'..=b'9' = env.mem.read(buffer + buffer_char_idx) {
-                    if chars_count >= 2 {
-                        break;
-                    }
-                    second = second * 10 + (c - b'0') as i32;
-                    buffer_char_idx += 1;
-                    chars_count += 1;
-                }
-                if chars_count != 2 {
+                Err(_) => {
                     conversation_failed = true;
                     break;
-                } else {
-                    assert!((0..61).contains(&second));
+                }
+            },
+            b'S' => match parse_2_digits(0..61) {
+                Ok(second) => {
                     time_val.tm_sec = second;
                 }
-            }
+                Err(_) => {
+                    conversation_failed = true;
+                    break;
+                }
+            },
             _ => unimplemented!(
                 "Format character '{}'. Formatted up to index {}",
                 specifier as char,
