@@ -181,12 +181,30 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (bool)removeItemAtPath:(id)path // NSString*
                    error:(MutPtr<id>)error { // NSError**
+    // TODO: call delegate
     let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
     match env.fs.remove(GuestPath::new(&path)) {
         Ok(()) => true,
         Err(()) => {
             if !error.is_null() {
                 todo!(); // TODO: create an NSError if requested
+            }
+            false
+        }
+    }
+}
+
+- (bool)moveItemAtPath:(id)path // NSString*
+                toPath:(id)toPath // NSString*
+                 error:(MutPtr<id>)error { // NSError**
+    // TODO: call delegate
+    let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
+    let toPath = ns_string::to_rust_string(env, toPath); // TODO: avoid copy
+    match env.fs.rename(GuestPath::new(&path), GuestPath::new(&toPath)) {
+        Ok(()) => true,
+        Err(()) => {
+            if !error.is_null() {
+               todo!(); // TODO: create an NSError if requested
             }
             false
         }
