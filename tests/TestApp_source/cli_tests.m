@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 #include <wchar.h>
 
@@ -3127,6 +3129,98 @@ int test_NSMutableString_deleteCharactersInRange() {
   return 0;
 }
 
+int test_strptime() {
+  struct tm tm;
+  memset(&tm, 0, sizeof(struct tm));
+  char *res = strptime("12:34:56,", "%H:%M:%S,", &tm);
+  if (res == NULL || *res != '\0') {
+    return -1;
+  }
+  if (tm.tm_hour != 12 || tm.tm_min != 34 || tm.tm_sec != 56) {
+    return -2;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("01:02:03,", "%H:%M:%S,", &tm);
+  if (res == NULL || *res != '\0') {
+    return -3;
+  }
+  if (tm.tm_hour != 1 || tm.tm_min != 2 || tm.tm_sec != 3) {
+    return -4;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("invalid", "%H:%M:%S,", &tm);
+  if (res != NULL) {
+    return -5;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("12:34:56,extra", "%H:%M:%S,", &tm);
+  if (res == NULL || strcmp(res, "extra") != 0) {
+    return -6;
+  }
+  if (tm.tm_hour != 12 || tm.tm_min != 34 || tm.tm_sec != 56) {
+    return -7;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("12   :34: 56", "%H : %M : %S", &tm);
+  if (res == NULL || *res != '\0') {
+    return -8;
+  }
+  if (tm.tm_hour != 12 || tm.tm_min != 34 || tm.tm_sec != 56) {
+    return -9;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("12:34:56", "%H :%M :%S", &tm);
+  if (res == NULL || *res != '\0') {
+    return -10;
+  }
+  if (tm.tm_hour != 12 || tm.tm_min != 34 || tm.tm_sec != 56) {
+    return -11;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("12\t\n :34\f:56", "%H :%M :%S", &tm);
+  if (res == NULL || *res != '\0') {
+    return -12;
+  }
+  if (tm.tm_hour != 12 || tm.tm_min != 34 || tm.tm_sec != 56) {
+    return -13;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("  12:34:56  ", " %H:%M:%S ", &tm);
+  if (res == NULL || *res != '\0') {
+    return -14;
+  }
+  if (tm.tm_hour != 12 || tm.tm_min != 34 || tm.tm_sec != 56) {
+    return -15;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("XX:34:56", "%H:%M:%S", &tm);
+  if (res != NULL) {
+    return -16;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("12:XX:56", "%H:%M:%S", &tm);
+  if (res != NULL) {
+    return -17;
+  }
+
+  memset(&tm, 0, sizeof(struct tm));
+  res = strptime("12:34:XX", "%H:%M:%S", &tm);
+  if (res != NULL) {
+    return -18;
+  }
+
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -3194,6 +3288,7 @@ struct {
     FUNC_DEF(test_CFURLHasDirectoryPath),
     FUNC_DEF(test_CGImage_JPEG),
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
+    FUNC_DEF(test_strptime),
 };
 // clang-format on
 

@@ -7,6 +7,7 @@
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::errno::set_errno;
+use crate::libc::stdio::printf::{isspace, isspace_inner};
 use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::Environment;
 use std::time::{Duration, Instant, SystemTime};
@@ -524,6 +525,127 @@ fn nanosleep(env: &mut Environment, rqtp: ConstPtr<timespec>, _rmtp: MutPtr<time
     0 // success
 }
 
+fn strptime(
+    env: &mut Environment,
+    buffer: ConstPtr<u8>,
+    format: ConstPtr<u8>,
+    time_ptr: MutPtr<tm>,
+) -> MutPtr<u8> {
+    log_dbg!(
+        "strptime({:?}, {:?})",
+        env.mem.cstr_at_utf8(buffer),
+        env.mem.cstr_at_utf8(format)
+    );
+
+    let mut time_val = env.mem.read(time_ptr);
+
+    let mut conversation_failed = false;
+    let mut buffer_char_idx = 0;
+    let mut format_char_idx = 0;
+    loop {
+        let c = env.mem.read(format + format_char_idx);
+        format_char_idx += 1;
+
+        if c == b'\0' {
+            break;
+        }
+        if c != b'%' {
+            let mut cc = env.mem.read(buffer + buffer_char_idx);
+            if isspace(env, format + format_char_idx - 1) {
+                // "All ordinary characters are matched exactly with the buffer
+                // , where white space in the format string will match any
+                // amount of white space in the buffer."
+                while isspace_inner(cc) {
+                    buffer_char_idx += 1;
+                    cc = env.mem.read(buffer + buffer_char_idx);
+                }
+                continue;
+            }
+            if c != cc {
+                break;
+            }
+            buffer_char_idx += 1;
+            continue;
+        }
+
+        let specifier = env.mem.read(format + format_char_idx);
+        format_char_idx += 1;
+
+        match specifier {
+            b'H' => {
+                let mut hour: i32 = 0;
+                let mut chars_count = 0;
+                while let c @ b'0'..=b'9' = env.mem.read(buffer + buffer_char_idx) {
+                    if chars_count >= 2 {
+                        break;
+                    }
+                    hour = hour * 10 + (c - b'0') as i32;
+                    buffer_char_idx += 1;
+                    chars_count += 1;
+                }
+                if chars_count != 2 {
+                    conversation_failed = true;
+                    break;
+                } else {
+                    assert!((0..24).contains(&hour));
+                    time_val.tm_hour = hour;
+                }
+            }
+            b'M' => {
+                let mut minute: i32 = 0;
+                let mut chars_count = 0;
+                while let c @ b'0'..=b'9' = env.mem.read(buffer + buffer_char_idx) {
+                    if chars_count >= 2 {
+                        break;
+                    }
+                    minute = minute * 10 + (c - b'0') as i32;
+                    buffer_char_idx += 1;
+                    chars_count += 1;
+                }
+                if chars_count != 2 {
+                    conversation_failed = true;
+                    break;
+                } else {
+                    assert!((0..60).contains(&minute));
+                    time_val.tm_min = minute;
+                }
+            }
+            b'S' => {
+                let mut second: i32 = 0;
+                let mut chars_count = 0;
+                while let c @ b'0'..=b'9' = env.mem.read(buffer + buffer_char_idx) {
+                    if chars_count >= 2 {
+                        break;
+                    }
+                    second = second * 10 + (c - b'0') as i32;
+                    buffer_char_idx += 1;
+                    chars_count += 1;
+                }
+                if chars_count != 2 {
+                    conversation_failed = true;
+                    break;
+                } else {
+                    assert!((0..61).contains(&second));
+                    time_val.tm_sec = second;
+                }
+            }
+            _ => unimplemented!(
+                "Format character '{}'. Formatted up to index {}",
+                specifier as char,
+                format_char_idx
+            ),
+        }
+    }
+
+    env.mem.write(time_ptr, time_val);
+
+    if conversation_failed {
+        Ptr::null()
+    } else {
+        (buffer + buffer_char_idx).cast_mut()
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(clock()),
     export_c_func!(time(_)),
@@ -535,4 +657,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(localtime(_)),
     export_c_func!(gettimeofday(_, _)),
     export_c_func!(nanosleep(_, _)),
+    export_c_func!(strptime(_, _, _)),
 ];
