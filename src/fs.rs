@@ -51,7 +51,10 @@ enum FileLocation {
 
 #[derive(Debug)]
 pub enum FsError {
+    AccessDenied,
     AlreadyExist,
+    DirectoryNotEmpty,
+    DoesNotExist,
     InvalidParentDir,
     NonexistentParentDir,
     ReadonlyParentDir,
@@ -1084,10 +1087,12 @@ impl Fs {
 
     /// Removes a file or a directory. If the node is a directory, it must be
     /// empty.
-    pub fn remove<P: AsRef<GuestPath>>(&mut self, path: P) -> Result<(), ()> {
+    pub fn remove<P: AsRef<GuestPath>>(&mut self, path: P) -> Result<(), FsError> {
         let path = path.as_ref();
 
-        let (parent_node, node_name) = self.lookup_parent_node(path).ok_or(())?;
+        let (parent_node, node_name) = self
+            .lookup_parent_node(path)
+            .ok_or(FsError::NonexistentParentDir)?;
 
         // Parent directory is not a directory
         let FsNode::Directory {
@@ -1095,17 +1100,17 @@ impl Fs {
             writeable: dir_writeable,
         } = parent_node
         else {
-            return Err(());
+            return Err(FsError::InvalidParentDir);
         };
 
         if !dir_writeable.is_some() {
             log!("Warning: attempt to delete file or directroy at path {:?}, but parent directory is read-only", path);
-            return Err(());
+            return Err(FsError::ReadonlyParentDir);
         };
 
         let Some(node) = children.get(&node_name) else {
             // There is no file/directory with this name
-            return Err(());
+            return Err(FsError::DoesNotExist);
         };
 
         match node {
@@ -1116,7 +1121,7 @@ impl Fs {
                 // Read-only files can't be removed. (This is probably not
                 // correct, but it is safer for now.)
                 if !writeable {
-                    return Err(());
+                    return Err(FsError::AccessDenied);
                 }
 
                 let host_path = match location {
@@ -1137,12 +1142,12 @@ impl Fs {
             } => {
                 // Directory is not empty
                 if !children.is_empty() {
-                    return Err(());
+                    return Err(FsError::DirectoryNotEmpty);
                 }
                 // Read-only directories can't be removed. (This is probably not
                 // correct, but it is safer for now.)
                 let Some(host_path) = writeable else {
-                    return Err(());
+                    return Err(FsError::AccessDenied);
                 };
 
                 handle_open_err(std::fs::remove_dir(host_path), host_path);

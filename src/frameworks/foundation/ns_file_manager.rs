@@ -7,8 +7,9 @@
 
 use super::{ns_array, ns_string, NSUInteger};
 use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant};
+use crate::frameworks::foundation::ns_error::{NSCocoaErrorDomain, NSFileReadNoSuchFileError};
 use crate::frameworks::foundation::ns_string::get_static_str;
-use crate::fs::{GuestPath, GuestPathBuf};
+use crate::fs::{FsError, GuestPath, GuestPathBuf};
 use crate::mem::{ConstPtr, MutPtr, Ptr};
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, ClassExports, HostObject,
@@ -180,14 +181,22 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (bool)removeItemAtPath:(id)path // NSString*
-                   error:(MutPtr<id>)error { // NSError**
+                   error:(MutPtr<id>)out_error { // NSError**
     // TODO: call delegate
     let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
     match env.fs.remove(GuestPath::new(&path)) {
         Ok(()) => true,
-        Err(()) => {
-            if !error.is_null() {
-                todo!(); // TODO: create an NSError if requested
+        Err(err) => {
+            if !out_error.is_null() {
+                match err {
+                    FsError::DoesNotExist => {
+                        let domain = get_static_str(env, NSCocoaErrorDomain);
+                        let error = msg_class![env; NSError alloc];
+                        let error = msg![env; error initWithDomain:domain code:NSFileReadNoSuchFileError userInfo:nil];
+                        env.mem.write(out_error, error);
+                    }
+                    _ => unimplemented!()
+                }
             }
             false
         }
