@@ -7,9 +7,12 @@
 
 use super::ns_string::{from_rust_ordering, from_rust_string};
 use super::{NSComparisonResult, NSTimeInterval};
-use crate::frameworks::core_foundation::time::{apple_epoch, CFAbsoluteTimeGetGregorianDate, SECS_FROM_UNIX_TO_APPLE_EPOCHS};
+use crate::frameworks::core_foundation::time::{
+    apple_epoch, CFAbsoluteTimeGetGregorianDate, SECS_FROM_UNIX_TO_APPLE_EPOCHS,
+};
 use crate::objc::{
-    autorelease, id, msg, msg_class, nil, objc_classes, release, ClassExports, HostObject, NSZonePtr,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, ClassExports, HostObject,
+    NSZonePtr,
 };
 
 use crate::frameworks::foundation::ns_keyed_unarchiver::decode_current_date;
