@@ -14,7 +14,7 @@ use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
 };
-use crate::window::DeviceOrientation;
+use crate::window::{DeviceFamily, DeviceOrientation};
 use crate::Environment;
 
 #[derive(Default)]
@@ -249,7 +249,8 @@ pub(super) fn UIApplicationMain(
         };
         let ui_application: id = msg![env; principal_class new];
 
-        if let Some(main_nib_filename) = env.bundle.main_nib_filename() {
+        let device_family = env.options.device_family;
+        if let Some(main_nib_filename) = env.bundle.main_nib_filename(device_family) {
             let ns_main_nib_filename = from_rust_string(env, main_nib_filename.to_string());
             // We need to check first if main nib file exists,
             // as `UINib nibWithNibName:bundle:` will crash on nonexistent
@@ -265,8 +266,14 @@ pub(super) fn UIApplicationMain(
             } else {
                 log!(
                     "Warning: couldn't load main nib file {:?}",
-                    env.bundle.main_nib_filename()
+                    env.bundle.main_nib_filename(device_family)
                 );
+                if let Some(device_family) = device_family {
+                    if device_family == DeviceFamily::iPad {
+                        // TODO: fallback to non-iPad one?
+                        unimplemented!();
+                    }
+                }
             }
         }
 

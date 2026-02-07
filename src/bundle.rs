@@ -199,7 +199,17 @@ impl Bundle {
         Ok(image)
     }
 
-    pub fn main_nib_filename(&self) -> Option<&str> {
+    pub fn main_nib_filename(&self, device_family: Option<DeviceFamily>) -> Option<&str> {
+        // TODO: extend this logic for all device-specific keys
+        if let Some(device_family) = device_family {
+            if device_family == DeviceFamily::iPad && self.plist.get("NSMainNibFile~ipad").is_some()
+            {
+                return self
+                    .plist
+                    .get("NSMainNibFile~ipad")
+                    .map(|v| v.as_string().unwrap());
+            }
+        }
         self.plist
             .get("NSMainNibFile")
             .map(|v| v.as_string().unwrap())
