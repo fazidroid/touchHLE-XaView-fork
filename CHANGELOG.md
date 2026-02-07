@@ -19,12 +19,15 @@ Compatibility:
 
 - New working apps:
   - [Devil May Cry 4 Refrain](https://appdb.touchhle.org/apps/999) (@hikari-no-yume)
+  - [Amerzone Pt1](https://appdb.touchhle.org/apps/1091) (@ciciplusplus)
+  - [Eternal Legacy](https://appdb.touchhle.org/apps/1107) (@ciciplusplus)
 - API support improvements:
-  - Various small contributions. (@hikari-no-yume, @ciciplusplus, @zazatree, @abnormalmaps, @alborrajo, @acieslewicz)
+  - Various small contributions. (@hikari-no-yume, @ciciplusplus, @zazatree, @abnormalmaps, @alborrajo, @acieslewicz, @zazatree)
   - Several changes have been made to fix certain apps and games that should appear in landscape, but previously were displayed stretched, cropped and/or un-rotated:
     - If an app requires a landscape orientation in the `UIInterfaceOrientation` or `UISupportedInterfaceOrientations` keys of its `Info.plist`, touchHLE will now rotate the virtual device at startup. (@hikari-no-yume)
     - If an app overrides the `shouldAutorotateToInterfaceOrientation:` method in a `UIViewController`, and the virtual device is in a landscape orientation, touchHLE will now apply a rotation transform to the root view when it is added to a window. (@hikari-no-yume)
     - Fixed a very old assumption that the backing store of a `CAEAGLLayer` should always be 320×480 pixels. (@hikari-no-yume)
+  - Support for iPad device family. Device family is deduced from the app bundle, but user can also override it with `--device-family=` option. (@ciciplusplus)
 
 ## v0.2.3 (2026-01-02)
 
