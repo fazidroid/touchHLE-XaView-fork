@@ -224,6 +224,7 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
 
     let app_id = bundle.bundle_identifier();
     let minimum_os_version = bundle.minimum_os_version();
+    let required_device_capabilities = bundle.required_device_capabilities();
 
     echo!("App bundle info:");
     echo!("- Display name: {}", bundle.display_name());
@@ -238,6 +239,14 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
         "- Minimum OS version: {}",
         minimum_os_version.unwrap_or("(not specified)")
     );
+    echo!(
+        "- Required device capabilities: {}",
+        if !required_device_capabilities.is_empty() {
+            required_device_capabilities.join(", ")
+        } else {
+            "(not specified)".to_string()
+        }
+    );
     echo!();
 
     if let Some(version) = minimum_os_version {
@@ -250,6 +259,12 @@ pub fn main<T: Iterator<Item = String>>(mut args: T) -> Result<(), String> {
         if major > 4 || (major == 4 && minor > 0) {
             echo!("Warning: app requires OS version {}. Only apps for iOS 4.0 and earlier are currently supported.", version);
         }
+    }
+
+    if required_device_capabilities.contains(&"opengles-2")
+        || required_device_capabilities.contains(&"opengles-3")
+    {
+        echo!("Warning: app requires OpenGL ES 2.0+ support. Only OpenGL ES 1.1 is currently supported.");
     }
 
     if just_info {

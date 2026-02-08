@@ -114,6 +114,19 @@ impl Bundle {
             .map(|v| v.as_string().unwrap())
     }
 
+    pub fn required_device_capabilities(&self) -> Vec<&str> {
+        self.plist
+            .get("UIRequiredDeviceCapabilities")
+            .map(|v| {
+                v.as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|o| o.as_string().unwrap())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     pub fn executable_path(&self) -> GuestPathBuf {
         // FIXME: Is this key optional? All iPhone apps seem to have it.
         self.path
