@@ -34,6 +34,11 @@ pub enum DeviceFamily {
     iPhone,
     iPad,
 }
+impl std::fmt::Display for DeviceFamily {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
 impl DeviceFamily {
     pub fn portrait_size(&self) -> (u32, u32) {
         match self {
