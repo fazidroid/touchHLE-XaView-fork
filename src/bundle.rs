@@ -118,11 +118,17 @@ impl Bundle {
         self.plist
             .get("UIRequiredDeviceCapabilities")
             .map(|v| {
-                v.as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|o| o.as_string().unwrap())
-                    .collect()
+                if let Some(dict) = v.as_dictionary() {
+                    // TODO: support undesired capabilities
+                    assert!(dict.values().all(|x| x.as_boolean().unwrap()));
+                    dict.keys().map(|o| o.as_str()).collect()
+                } else {
+                    v.as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|o| o.as_string().unwrap())
+                        .collect()
+                }
             })
             .unwrap_or_default()
     }
