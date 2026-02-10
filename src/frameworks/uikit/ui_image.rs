@@ -167,6 +167,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 
+- (CGFloat)scale {
+    // TODO: support other scales, such as @2x
+    1.0
+}
+
 - (())drawInRect:(CGRect)rect {
     let context = UIGraphicsGetCurrentContext(env);
     let image = env.objc.borrow::<UIImageHostObject>(this).cg_image;
