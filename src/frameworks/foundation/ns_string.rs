@@ -10,7 +10,7 @@
 
 mod path_algorithms;
 
-use super::{ns_array, unichar, NSInteger};
+use super::{ns_array, unichar, NSInteger, _nib_archive_decoder};
 use super::{
     NSComparisonResult, NSNotFound, NSOrderedAscending, NSOrderedDescending, NSOrderedSame,
     NSRange, NSUInteger,
@@ -1275,6 +1275,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 // TODO: more init methods
+
+// NSCoding implementation
+- (id)initWithCoder:(id)coder {
+    let class: Class = msg![env; coder class];
+    let nib_archive_class: Class = msg_class![env; _touchHLE_NIBArchiveDecoder class];
+    let new_str = if env.objc.class_is_subclass_of(class, nib_archive_class) {
+        _nib_archive_decoder::decode_current_string(env, coder)
+    } else {
+        unimplemented!();
+    };
+    release(env, this);
+    new_str
+}
 
 - (id)initWithData:(id)data // NSData *
           encoding:(NSStringEncoding)encoding {
