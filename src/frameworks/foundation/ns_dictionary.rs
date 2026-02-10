@@ -710,6 +710,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     res
 }
 
+// NSFastEnumeration implementation
+- (NSUInteger)countByEnumeratingWithState:(MutPtr<NSFastEnumerationState>)state
+                                  objects:(MutPtr<id>)stackbuf
+                                    count:(NSUInteger)len {
+    // TODO: check that dict wasn't mutated!
+    // We assume that order in which objects are reported is consistent
+    // between calls!
+    let objects: id = msg![env; this allKeys];
+    let count: NSUInteger = msg![env; objects count];
+    fast_enumeration_helper(env, this, |env, idx| {
+        if idx < count {
+            msg![env; objects objectAtIndex:idx]
+        } else {
+            nil
+        }
+    }, state, stackbuf, len)
+}
+
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
     let entries: Vec<_> =
