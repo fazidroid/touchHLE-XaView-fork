@@ -30,7 +30,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)displayLinkWithTarget:(id)target selector:(SEL)sel {
-    let ns_timer = msg_class![env; this timerWithTimeInterval:(1.0/60.0)
+    let ns_timer = msg_class![env; NSTimer timerWithTimeInterval:(1.0/60.0)
                      target:target
                    selector:sel
                    userInfo:nil
