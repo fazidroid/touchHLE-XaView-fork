@@ -44,6 +44,7 @@ pub const UIInterfaceOrientationLandscapeRight: UIInterfaceOrientation =
     UIDeviceOrientationLandscapeLeft;
 
 type UIRemoteNotificationType = NSUInteger;
+type UIStatusBarAnimation = NSInteger;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -99,6 +100,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (())setStatusBarHidden:(bool)hidden
                 animated:(bool)_animated {
+    // TODO: animation
+    msg![env; this setStatusBarHidden:hidden]
+}
+- (())setStatusBarHidden:(bool)hidden
+           withAnimation:(UIStatusBarAnimation)_animation {
     // TODO: animation
     msg![env; this setStatusBarHidden:hidden]
 }
