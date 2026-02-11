@@ -14,7 +14,7 @@ use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
 };
-use crate::window::{DeviceFamily, DeviceOrientation};
+use crate::window::DeviceOrientation;
 use crate::Environment;
 
 #[derive(Default)]
@@ -268,12 +268,6 @@ pub(super) fn UIApplicationMain(
                     "Warning: couldn't load main nib file {:?}",
                     env.bundle.main_nib_filename(device_family)
                 );
-                if let Some(device_family) = device_family {
-                    if device_family == DeviceFamily::iPad {
-                        // TODO: fallback to non-iPad one?
-                        unimplemented!();
-                    }
-                }
             }
         }
 
