@@ -16,7 +16,9 @@ use crate::frameworks::core_foundation::{CFHashCode, CFIndex};
 use crate::frameworks::foundation::ns_enumerator::{
     fast_enumeration_helper, NSFastEnumerationState,
 };
-use crate::frameworks::foundation::ns_file_manager::{NSFileModificationDate, NSFileSize};
+use crate::frameworks::foundation::ns_file_manager::{
+    NSFileModificationDate, NSFileSize, NSFileType,
+};
 use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::objc::{
@@ -490,6 +492,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         // But as seen on iPhone Simulator, it's returning 0 with an empty dict
         0
     }
+}
+- (id)fileType {
+    let file_type_key = get_static_str(env, NSFileType);
+    msg![env; this objectForKey:file_type_key]
 }
 
 @end

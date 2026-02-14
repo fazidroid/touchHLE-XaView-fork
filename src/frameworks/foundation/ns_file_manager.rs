@@ -27,6 +27,9 @@ const NSUserDomainMask: NSSearchPathDomainMask = 1;
 pub const NSFileModificationDate: &str = "NSFileModificationDate";
 pub const NSFileSize: &str = "NSFileSize";
 const NSFileSystemFreeSize: &str = "NSFileSystemFreeSize";
+pub const NSFileType: &str = "NSFileType";
+pub const NSFileTypeDirectory: &str = "NSFileTypeDirectory";
+pub const NSFileTypeRegular: &str = "NSFileTypeRegular";
 
 pub const CONSTANTS: ConstantExports = &[
     (
@@ -37,6 +40,15 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_NSFileSystemFreeSize",
         HostConstant::NSString(NSFileSystemFreeSize),
+    ),
+    ("_NSFileType", HostConstant::NSString(NSFileType)),
+    (
+        "_NSFileTypeDirectory",
+        HostConstant::NSString(NSFileTypeDirectory),
+    ),
+    (
+        "_NSFileTypeRegular",
+        HostConstant::NSString(NSFileTypeRegular),
     ),
 ];
 
@@ -368,7 +380,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)fileAttributesAtPath:(id)path // NSString *
               traverseLink:(bool)traverse {
     // TODO: other attributes
-    log_once!("Warning: NSFileManager fileAttributesAtPath:traverseLink: returns only NSFileModificationDate and NSFileSize attributes!");
+    log_once!("Warning: NSFileManager fileAttributesAtPath:traverseLink: returns only NSFileType, NSFileModificationDate and NSFileSize attributes!");
 
     let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
     // TODO: traverse link
@@ -383,7 +395,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     assert!(error.is_null()); // TODO
 
     // TODO: other attributes
-    log_once!("Warning: NSFileManager attributesOfItemAtPath:error: returns only NSFileModificationDate and NSFileSize attributes!");
+    log_once!("Warning: NSFileManager attributesOfItemAtPath:error: returns only NSFileType, NSFileModificationDate and NSFileSize attributes!");
 
     let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
     // TODO: traverse link
@@ -456,6 +468,16 @@ fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
 
     let size_key = get_static_str(env, NSFileSize);
     () = msg![env; dict setObject:size_num forKey:size_key];
+
+    let file_type_key = get_static_str(env, NSFileType);
+    // TODO: other types
+    if env.fs.is_file(guest_path) {
+        let file_type_regular = get_static_str(env, NSFileTypeRegular);
+        () = msg![env; dict setObject:file_type_regular forKey:file_type_key];
+    } else if env.fs.is_dir(guest_path) {
+        let file_type_directory = get_static_str(env, NSFileTypeDirectory);
+        () = msg![env; dict setObject:file_type_directory forKey:file_type_key];
+    }
 
     let dict_imm = msg![env; dict copy];
     release(env, dict);
