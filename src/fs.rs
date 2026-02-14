@@ -61,6 +61,12 @@ pub enum FsError {
 }
 
 #[derive(Debug)]
+pub enum FsNodeType {
+    File,
+    Directory,
+}
+
+#[derive(Debug)]
 enum FsNode {
     File {
         location: FileLocation,
@@ -836,6 +842,25 @@ impl Fs {
             return Err(());
         };
         Ok(children.keys().map(|name| name.as_str()))
+    }
+
+    /// Similar to [Fs::enumerate], but also returns fs node type.
+    pub fn enumerate_with_types<P: AsRef<GuestPath>>(
+        &self,
+        path: P,
+    ) -> Result<impl Iterator<Item = (&str, FsNodeType)>, ()> {
+        let Some(FsNode::Directory { children, .. }) = self.lookup_node(path.as_ref()) else {
+            return Err(());
+        };
+        Ok(children.iter().map(|(name, node)| {
+            (
+                name.as_str(),
+                match node {
+                    FsNode::File { .. } => FsNodeType::File,
+                    FsNode::Directory { .. } => FsNodeType::Directory,
+                },
+            )
+        }))
     }
 
     /// Recursively list the paths of files/directories in a directory.
