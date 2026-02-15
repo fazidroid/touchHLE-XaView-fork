@@ -164,8 +164,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())stop {
     log!("TODO: [(MPMoviePlayerController*){:?} stop]", this);
-    assert!(this == env.framework_state.media_player.movie_player.active_player.take().unwrap());
-    release(env, this);
+    if env.framework_state.media_player.movie_player.active_player.is_some() {
+        // Some application may send 2 `stop` messages for each 1 `play`
+        // message for the player. In that case, we want to release the active
+        // player only on the first one.
+        assert!(this == env.framework_state.media_player.movie_player.active_player.take().unwrap());
+        release(env, this);
+    }
 }
 
 @end
