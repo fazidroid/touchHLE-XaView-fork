@@ -247,6 +247,21 @@ forUndefinedKey:(id)key { // NSString*
     msg_send(env, (this, sel, o1, o2))
 }
 
+- (())performSelectorInBackground:(SEL)sel
+                       withObject:(id)arg {
+    if env.options.objc_type_checks {
+        // `performSelectorInBackground:withObject:` allow for single argument
+        // or no arguments. In our current implementation, we are re-using
+        // `NSThread detachNewThreadSelector:toTarget:withObject:` which is
+        // expected to have only one argument in the selector.
+        //
+        // Note that above mismatch is not an issue in the case of skipping
+        // type checks, thus the assert is guarded by an if statement.
+        assert!(sel.as_str(&env.mem).ends_with(':')); // TODO
+    }
+    msg_class![env; NSThread detachNewThreadSelector:sel toTarget:this withObject:arg]
+}
+
 - (())performSelector:(SEL)sel withObject:(id)arg afterDelay:(NSTimeInterval)delay {
     log_dbg!("performSelector:{} withObject:{:?} afterDelay:{}", sel.as_str(&env.mem), arg, delay);
 
