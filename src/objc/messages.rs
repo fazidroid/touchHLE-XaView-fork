@@ -91,25 +91,28 @@ fn objc_msgSend_inner(env: &mut Environment, receiver: id, selector: SEL, super2
             if let Some(imp) = methods.get(&selector) {
                 match imp {
                     IMP::Host(host_imp) => {
-                        // TODO: do type checks when calling GuestIMPs too.
-                        // That requires using Objective-C type strings, rather
-                        // than Rust types, and should probably warn rather than
-                        // panicking, because apps might rely on type punning.
-                        if let Some((sent_type_id, sent_type_desc)) = message_type_info {
-                            let (expected_type_id, expected_type_desc) = host_imp.type_info();
-                            if sent_type_id != expected_type_id {
-                                panic!(
-                                    "\
+                        if env.options.objc_type_checks {
+                            // TODO: do type checks when calling GuestIMPs too.
+                            // That requires using Objective-C type strings,
+                            // rather than Rust types, and should probably
+                            // warn rather than panicking,
+                            // because apps might rely on type punning.
+                            if let Some((sent_type_id, sent_type_desc)) = message_type_info {
+                                let (expected_type_id, expected_type_desc) = host_imp.type_info();
+                                if sent_type_id != expected_type_id {
+                                    panic!(
+                                        "\
 Type mismatch when sending message {} to {:?}!
 - Message has type: {:?} / {}
 - Method expects type: {:?} / {}",
-                                    selector.as_str(&env.mem),
-                                    receiver,
-                                    sent_type_id,
-                                    sent_type_desc,
-                                    expected_type_id,
-                                    expected_type_desc
-                                );
+                                        selector.as_str(&env.mem),
+                                        receiver,
+                                        sent_type_id,
+                                        sent_type_desc,
+                                        expected_type_id,
+                                        expected_type_desc
+                                    );
+                                }
                             }
                         }
                         host_imp.call_from_guest(env)
