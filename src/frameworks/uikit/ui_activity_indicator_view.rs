@@ -6,8 +6,7 @@
 //! `UIActivityIndicatorView`.
 
 use crate::frameworks::foundation::NSInteger;
-use crate::objc::{id, msg, ClassExports};
-use crate::objc_classes;
+use crate::objc::{id, msg, objc_classes, todo_objc_setter, ClassExports};
 
 type UIActivityIndicatorViewStyle = NSInteger;
 
@@ -20,6 +19,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)initWithActivityIndicatorStyle:(UIActivityIndicatorViewStyle)_style {
     // TODO: proper init
     msg![env; this init]
+}
+
+- (())setActivityIndicatorViewStyle:(UIActivityIndicatorViewStyle)style {
+    todo_objc_setter!(this, style);
 }
 
 - (())startAnimating {
