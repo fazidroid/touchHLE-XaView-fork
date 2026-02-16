@@ -27,6 +27,12 @@ const CLASSES: ClassExports = objc_classes! {
     log!("TODO: [(CMMotionManager *){:?} isGyroAvailable] -> false", this);
     false
 }
+- (bool)isDeviceMotionAvailable {
+    log!("TODO: [(CMMotionManager *){:?} isDeviceMotionAvailable] -> false", this);
+    // According to docs, this is functionally equivalent to `isGyroAvailable`
+    // method. (All devices have accelerometer, but only some do have gyro).
+    false
+}
 
 @end
 
