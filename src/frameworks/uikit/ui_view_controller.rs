@@ -179,6 +179,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())dismissModalViewControllerAnimated:(bool)animated {
     log!("TODO: [(UIViewController*){:?} dismissModalViewControllerAnimated:{}]", this, animated); // TODO
 }
+- (())dismissMoviePlayerViewControllerAnimated {
+    log!("TODO: [(UIViewController*){:?} dismissMoviePlayerViewControllerAnimated]", this); // TODO
+}
 
 - (bool)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interface_orientation {
     interface_orientation == UIInterfaceOrientationPortrait
