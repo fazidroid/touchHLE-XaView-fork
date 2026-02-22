@@ -47,8 +47,10 @@ pub const MPMoviePlayerContentPreloadDidFinishNotification: &str =
 pub const MPMoviePlayerScalingModeDidChangeNotification: &str =
     "MPMoviePlayerScalingModeDidChangeNotification";
 // TODO: More notifications?
+const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
+    "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
 
-/// `NSNotificationName` values.
+/// `NSNotificationName` values and other constants.
 pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMoviePlayerPlaybackDidFinishNotification",
@@ -61,6 +63,10 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMoviePlayerScalingModeDidChangeNotification",
         HostConstant::NSString(MPMoviePlayerScalingModeDidChangeNotification),
+    ),
+    (
+        "_MPMoviePlayerPlaybackDidFinishReasonUserInfoKey",
+        HostConstant::NSString(MPMoviePlayerPlaybackDidFinishReasonUserInfoKey),
     ),
 ];
 
