@@ -133,6 +133,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setControlStyle:(MPMovieControlStyle)style {
     todo_objc_setter!(this, style);
 }
+- (())setFullscreen:(bool)fullsreen {
+    todo_objc_setter!(this, fullsreen);
+}
 
 - (id)view {
     nil // TODO
