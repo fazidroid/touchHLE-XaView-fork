@@ -69,6 +69,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     data
 }
 
++ (bool)archiveRootObject:(id)root_object // NSCoding *
+                   toFile:(id)file { // NSString *
+    log_dbg!("[NSKeyedArchiver archiveRootObject:{:?} toFile:{:?}('{}')]", root_object, file, to_rust_string(env, file));
+    let data: id = msg![env; this archivedDataWithRootObject:root_object];
+    msg![env; data writeToFile:file atomically:true]
+}
+
 - (())encodeObject:(id)object // NSCoding *
             forKey:(id)key { // NSString *
     let key = normalize_key(env, key);
