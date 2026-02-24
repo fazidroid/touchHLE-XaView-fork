@@ -80,7 +80,7 @@ pub const CLASSES: ClassExports = objc_classes! {
            forKey:(id)key { // NSString *
     let key = normalize_key(env, key);
     let data = env.mem.bytes_at(bytes.cast(), length).to_vec();
-    let scope = get_value_to_encode_for_key(env, this);
+    let scope = get_value_to_encode_for_current_key(env, this);
     assert!(!scope.contains_key(&key));
     scope.insert(key, Value::Data(data));
 }
@@ -122,7 +122,7 @@ fn normalize_key(env: &mut Environment, key: id) -> String {
     key.to_string()
 }
 
-fn get_value_to_encode_for_key(env: &mut Environment, archiver: id) -> &mut Dictionary {
+fn get_value_to_encode_for_current_key(env: &mut Environment, archiver: id) -> &mut Dictionary {
     assert_eq!(
         env.objc
             .borrow::<NSKeyedArchiverHostObject>(archiver)
@@ -145,10 +145,10 @@ fn get_value_to_encode_for_key(env: &mut Environment, archiver: id) -> &mut Dict
     .unwrap()
 }
 
-fn encode_object_for_key(env: &mut Environment, this: id, object: id, normalized_key: String) {
+fn encode_object(env: &mut Environment, archiver: id, object: id) -> Uid {
     let class = msg![env; object class];
-    let host_object = env.objc.borrow_mut::<NSKeyedArchiverHostObject>(this);
-    let uid = if let Some(existing_uid) = host_object.already_archived.get(&object).cloned() {
+    let host_object = env.objc.borrow_mut::<NSKeyedArchiverHostObject>(archiver);
+    if let Some(existing_uid) = host_object.already_archived.get(&object).cloned() {
         // Object has already been archived, just insert a UID reference
         existing_uid
     } else {
@@ -172,7 +172,7 @@ fn encode_object_for_key(env: &mut Environment, this: id, object: id, normalized
                 classes.push(Value::String(class_name.into()));
                 current_class = env.objc.get_superclass(current_class);
             }
-            let host_object = env.objc.borrow_mut::<NSKeyedArchiverHostObject>(this);
+            let host_object = env.objc.borrow_mut::<NSKeyedArchiverHostObject>(archiver);
             let entry = host_object
                 .plist
                 .get_mut("$objects")
@@ -188,19 +188,23 @@ fn encode_object_for_key(env: &mut Environment, this: id, object: id, normalized
         } else {
             let previous_key = env
                 .objc
-                .borrow_mut::<NSKeyedArchiverHostObject>(this)
+                .borrow_mut::<NSKeyedArchiverHostObject>(archiver)
                 .current_key
                 .replace(new_uid);
             let class: id = msg![env; object class];
-            encode_object_for_key(env, this, class, "$class".into());
-            () = msg![env; object encodeWithCoder:this];
+            encode_object_for_key(env, archiver, class, "$class".into());
+            () = msg![env; object encodeWithCoder:archiver];
             env.objc
-                .borrow_mut::<NSKeyedArchiverHostObject>(this)
+                .borrow_mut::<NSKeyedArchiverHostObject>(archiver)
                 .current_key = previous_key;
         }
         new_uid
-    };
-    let scope = get_value_to_encode_for_key(env, this);
+    }
+}
+
+fn encode_object_for_key(env: &mut Environment, archiver: id, object: id, normalized_key: String) {
+    let uid = encode_object(env, archiver, object);
+    let scope = get_value_to_encode_for_current_key(env, archiver);
     assert!(!scope.contains_key(&normalized_key));
     scope.insert(normalized_key, Value::Uid(uid));
 }
