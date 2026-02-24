@@ -685,7 +685,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         // It seems that every NSDictionary item in an NSKeyedArchiver plist
         // looks like:
         // {
-        //   "$class" => (uid of NSArray class goes here),
+        //   "$class" => (uid of NSDictionary class goes here),
         //   "NS.keys" => [
         //     // keys here
         //   ]
