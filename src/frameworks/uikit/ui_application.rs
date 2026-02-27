@@ -291,13 +291,19 @@ pub(super) fn UIApplicationMain(
                 .delegate_is_retained = true;
             retain(env, delegate);
         } else {
-            // We have to construct the delegate.
             assert!(delegate_class_name != nil);
-            let name = ns_string::to_rust_string(env, delegate_class_name);
-            let class = env.objc.get_known_class(&name, &mut env.mem);
-            let delegate: id = msg![env; class new];
-            let _: () = msg![env; ui_application setDelegate:delegate];
-            assert!(delegate != nil);
+            if msg![env; delegate_class_name isEqual:principal_class_name] {
+                // If same non-nil class name is used for both principal and
+                // delegate, it means that app is using itself as a delegate
+                let _: () = msg![env; ui_application setDelegate:ui_application];
+            } else {
+                // We have to construct the delegate.
+                let name = ns_string::to_rust_string(env, delegate_class_name);
+                let class = env.objc.get_known_class(&name, &mut env.mem);
+                let delegate: id = msg![env; class new];
+                let _: () = msg![env; ui_application setDelegate:delegate];
+                assert!(delegate != nil);
+            }
         };
         // We can't hang on to the delegate, the guest app may change it at any
         // time.
