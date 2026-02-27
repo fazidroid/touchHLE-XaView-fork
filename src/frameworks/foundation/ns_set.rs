@@ -42,6 +42,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; _touchHLE_NSSet allocWithZone:zone]
 }
 
++ (id)set {
+    let set: id = msg![env; this new];
+    autorelease(env, set)
+}
+
 + (id)setWithObject:(id)object {
     assert!(object != nil);
     let new: id = msg![env; this alloc];
