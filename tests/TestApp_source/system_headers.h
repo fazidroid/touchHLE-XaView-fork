@@ -85,7 +85,8 @@ typedef enum {
                                         withString:(NSString *)replacement;
 - (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target
                                         withString:(NSString *)replacement
-                                           options:(NSStringCompareOptions)options
+                                           options:
+                                               (NSStringCompareOptions)options
                                              range:(NSRange)range;
 - (BOOL)isEqualToString:(NSString *)other;
 @end
