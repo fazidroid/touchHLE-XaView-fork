@@ -3130,6 +3130,109 @@ int test_NSMutableString_deleteCharactersInRange() {
   return 0;
 }
 
+int test_NSString_stringByReplacingOccurrencesOfString() {
+  NSAutoreleasePool *pool = [NSAutoreleasePool new];
+
+  // Simple replacement
+  NSString *str = [NSString stringWithUTF8String:"hello world"];
+  NSString *target = [NSString stringWithUTF8String:"world"];
+  NSString *replacement = [NSString stringWithUTF8String:"touchHLE"];
+  NSString *res = [str stringByReplacingOccurrencesOfString:target
+                                                 withString:replacement];
+  NSString *expected = [NSString stringWithUTF8String:"hello touchHLE"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -1;
+  }
+
+  // Multiple occurrences
+  str = [NSString stringWithUTF8String:"aaa"];
+  target = [NSString stringWithUTF8String:"a"];
+  replacement = [NSString stringWithUTF8String:"b"];
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement];
+  expected = [NSString stringWithUTF8String:"bbb"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -2;
+  }
+
+  // Overlapping occurrences (should not be replaced multiple times)
+  str = [NSString stringWithUTF8String:"aaaa"];
+  target = [NSString stringWithUTF8String:"aa"];
+  replacement = [NSString stringWithUTF8String:"b"];
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement];
+  expected = [NSString stringWithUTF8String:"bb"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -3;
+  }
+
+  // No occurrences
+  str = [NSString stringWithUTF8String:"hello"];
+  target = [NSString stringWithUTF8String:"world"];
+  replacement = [NSString stringWithUTF8String:"!"];
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement];
+  expected = [NSString stringWithUTF8String:"hello"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -4;
+  }
+
+  // Replace with empty string
+  str = [NSString stringWithUTF8String:"hello world"];
+  target = [NSString stringWithUTF8String:"world"];
+  replacement = [NSString stringWithUTF8String:""];
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement];
+  expected = [NSString stringWithUTF8String:"hello "];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -5;
+  }
+
+  // Replace whole string
+  str = [NSString stringWithUTF8String:"hello"];
+  target = [NSString stringWithUTF8String:"hello"];
+  replacement = [NSString stringWithUTF8String:"world"];
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement];
+  expected = [NSString stringWithUTF8String:"world"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -6;
+  }
+
+  // Empty target (macOS behavior: returns original string)
+  str = [NSString stringWithUTF8String:"hello"];
+  target = [NSString stringWithUTF8String:""];
+  replacement = [NSString stringWithUTF8String:"!"];
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement];
+  expected = [NSString stringWithUTF8String:"hello"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -7;
+  }
+
+  // Source, target and replacement empty
+  str = [NSString stringWithUTF8String:""];
+  target = [NSString stringWithUTF8String:""];
+  replacement = [NSString stringWithUTF8String:""];
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement];
+  expected = [NSString stringWithUTF8String:""];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -8;
+  }
+
+  [pool drain];
+  return 0;
+}
+
 int test_strptime() {
   struct tm tm;
   memset(&tm, 0, sizeof(struct tm));
@@ -3402,6 +3505,7 @@ struct {
     FUNC_DEF(test_CFURLHasDirectoryPath),
     FUNC_DEF(test_CGImage_JPEG),
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
+    FUNC_DEF(test_NSString_stringByReplacingOccurrencesOfString),
     FUNC_DEF(test_strptime),
     FUNC_DEF(test_strftime),
     FUNC_DEF(test_RespondsToSelector),

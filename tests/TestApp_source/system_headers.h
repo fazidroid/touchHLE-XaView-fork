@@ -70,6 +70,9 @@ typedef struct _NSRange {
 @interface NSString : NSObject
 + (instancetype)stringWithFormat:(NSString *)format, ...;
 + (instancetype)stringWithUTF8String:(const char *)string;
+- (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target
+                                        withString:(NSString *)replacement;
+- (BOOL)isEqualToString:(NSString *)other;
 @end
 @interface NSMutableString : NSString
 - (void)deleteCharactersInRange:(NSRange)range;

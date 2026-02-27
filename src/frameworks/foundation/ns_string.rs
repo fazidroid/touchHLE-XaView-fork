@@ -861,8 +861,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     let replacement_iter = env.objc.borrow::<StringHostObject>(replacement)
         .iter_code_units();
 
-    // TODO: zero-length target support?
-    assert!(target_iter.clone().next().is_some());
+    // Zero-length target case
+    if target_iter.clone().next().is_none() {
+        let res = msg![env; this copy];
+        return autorelease(env, res);
+    }
 
     let mut result: Utf16String = Vec::new();
     loop {
