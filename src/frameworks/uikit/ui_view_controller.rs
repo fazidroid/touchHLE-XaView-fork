@@ -175,6 +175,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setEditing:(bool)editing {
     todo_objc_setter!(this, editing);
 }
+- (())setWantsFullScreenLayout:(bool)wants {
+    todo_objc_setter!(this, wants);
+}
 
 - (())dismissModalViewControllerAnimated:(bool)animated {
     log!("TODO: [(UIViewController*){:?} dismissModalViewControllerAnimated:{}]", this, animated); // TODO
