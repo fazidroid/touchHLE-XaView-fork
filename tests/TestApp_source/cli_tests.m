@@ -3233,6 +3233,89 @@ int test_NSString_stringByReplacingOccurrencesOfString() {
   return 0;
 }
 
+int test_NSString_stringByReplacingOccurrencesOfString_options_range() {
+  NSAutoreleasePool *pool = [NSAutoreleasePool new];
+
+  // Case insensitive replacement
+  NSString *str = [NSString stringWithUTF8String:"Hello HELLO hello"];
+  NSString *target = [NSString stringWithUTF8String:"hello"];
+  NSString *replacement = [NSString stringWithUTF8String:"hi"];
+  NSRange range = NSMakeRange(0, 17);
+  NSString *res =
+      [str stringByReplacingOccurrencesOfString:target
+                                     withString:replacement
+                                        options:NSCaseInsensitiveSearch
+                                          range:range];
+  NSString *expected = [NSString stringWithUTF8String:"hi hi hi"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -1;
+  }
+
+  // Replacement within a range
+  str = [NSString stringWithUTF8String:"[hello] hello [hello]"];
+  target = [NSString stringWithUTF8String:"hello"];
+  replacement = [NSString stringWithUTF8String:"hi"];
+  range = NSMakeRange(7, 7); // Only the middle "hello"
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement
+                                          options:0
+                                            range:range];
+  expected = [NSString stringWithUTF8String:"[hello] hi [hello]"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -2;
+  }
+
+  // Case insensitive within a range
+  str = [NSString stringWithUTF8String:"AAA aaa AAA"];
+  target = [NSString stringWithUTF8String:"AAA"];
+  replacement = [NSString stringWithUTF8String:"B"];
+  range = NSMakeRange(0, 7); // "AAA aaa"
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement
+                                          options:NSCaseInsensitiveSearch
+                                            range:range];
+  expected = [NSString stringWithUTF8String:"B B AAA"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -3;
+  }
+
+  // Range at the end
+  str = [NSString stringWithUTF8String:"hello hello"];
+  target = [NSString stringWithUTF8String:"hello"];
+  replacement = [NSString stringWithUTF8String:"world"];
+  range = NSMakeRange(6, 5);
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement
+                                          options:0
+                                            range:range];
+  expected = [NSString stringWithUTF8String:"hello world"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -4;
+  }
+
+  // Empty range
+  str = [NSString stringWithUTF8String:"hello"];
+  target = [NSString stringWithUTF8String:"hello"];
+  replacement = [NSString stringWithUTF8String:"world"];
+  range = NSMakeRange(2, 0);
+  res = [str stringByReplacingOccurrencesOfString:target
+                                       withString:replacement
+                                          options:0
+                                            range:range];
+  expected = [NSString stringWithUTF8String:"hello"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -5;
+  }
+
+  [pool drain];
+  return 0;
+}
+
 int test_strptime() {
   struct tm tm;
   memset(&tm, 0, sizeof(struct tm));
@@ -3506,6 +3589,7 @@ struct {
     FUNC_DEF(test_CGImage_JPEG),
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
     FUNC_DEF(test_NSString_stringByReplacingOccurrencesOfString),
+    FUNC_DEF(test_NSString_stringByReplacingOccurrencesOfString_options_range),
     FUNC_DEF(test_strptime),
     FUNC_DEF(test_strftime),
     FUNC_DEF(test_RespondsToSelector),

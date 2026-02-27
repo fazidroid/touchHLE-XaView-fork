@@ -225,7 +225,11 @@ impl Clone for CodeUnitIterator<'_> {
 impl CodeUnitIterator<'_> {
     /// If the sequence of code units in `prefix` is a prefix of `self`,
     /// return [Some] with `self` advanced past that prefix, otherwise [None].
-    fn strip_prefix(&self, prefix: &CodeUnitIterator) -> Option<Self> {
+    ///
+    /// Code units comparison is done conditional to `case_insensitive` bool:
+    /// if it's true, the code units are converted to chars first and compared
+    /// as lowercase variants, otherwise the match is exact.
+    fn strip_prefix(&self, prefix: &CodeUnitIterator, case_insensitive: bool) -> Option<Self> {
         let mut self_match = self.clone();
         let mut prefix_match = prefix.clone();
         loop {
@@ -235,7 +239,18 @@ impl CodeUnitIterator<'_> {
                 }
                 Some(prefix_c) => {
                     let self_c = self_match.next();
-                    if self_c != Some(prefix_c) {
+                    if case_insensitive {
+                        self_c?;
+                        let (Some(a_c), Some(b_c)) = (
+                            char::from_u32(self_c.unwrap() as u32),
+                            char::from_u32(prefix_c as u32),
+                        ) else {
+                            panic!("Invalid chars in the strings!");
+                        };
+                        if !a_c.to_lowercase().eq(b_c.to_lowercase()) {
+                            return None;
+                        }
+                    } else if self_c != Some(prefix_c) {
                         return None;
                     }
                 }
@@ -694,7 +709,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let mut components = Vec::<Utf16String>::new();
     let mut current_component: Utf16String = Vec::new();
     loop {
-        if let Some(new_main_iter) = main_iter.strip_prefix(&sep_iter) {
+        if let Some(new_main_iter) = main_iter.strip_prefix(&sep_iter, /* case_insensitive: */ false) {
             // matched separator, end current component
             components.push(std::mem::take(&mut current_component));
             main_iter = new_main_iter;
@@ -852,42 +867,26 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)stringByReplacingOccurrencesOfString:(id)target // NSString*
                                 withString:(id)replacement { // NSString*
-    // TODO: support foreign subclasses (perhaps via a helper function that
-    // copies the string first)
-    let mut main_iter = env.objc.borrow::<StringHostObject>(this)
-        .iter_code_units();
-    let target_iter = env.objc.borrow::<StringHostObject>(target)
-        .iter_code_units();
-    let replacement_iter = env.objc.borrow::<StringHostObject>(replacement)
-        .iter_code_units();
+    let length: NSUInteger = msg![env; this length];
+    let range = NSRange { location: 0, length };
+    msg![env; this stringByReplacingOccurrencesOfString:target
+                                             withString:replacement
+                                                options:0u32
+                                                  range:range]
+}
 
-    // Zero-length target case
-    if target_iter.clone().next().is_none() {
-        let res = msg![env; this copy];
-        return autorelease(env, res);
-    }
-
-    let mut result: Utf16String = Vec::new();
-    loop {
-        if let Some(new_main_iter) = main_iter.strip_prefix(&target_iter) {
-            // matched target, replace it
-            result.extend(replacement_iter.clone());
-            main_iter = new_main_iter;
-        } else {
-            // no match, copy as normal
-            match main_iter.next() {
-                Some(cur) => result.push(cur),
-                None => break,
-            }
-        }
-    }
-
-    // TODO: For a foreign subclass of NSString, do we have to return that
-    // subclass? The signature implies this isn't the case and it's probably not
-    // worth the effort, but it's an interesting question.
-    let result_ns_string = msg_class![env; _touchHLE_NSString alloc];
-    *env.objc.borrow_mut(result_ns_string) = StringHostObject::Utf16(result);
-    autorelease(env, result_ns_string)
+- (id)stringByReplacingOccurrencesOfString:(id)target // NSString*
+                                withString:(id)replacement // NSString*
+                                   options:(NSStringCompareOptions)options
+                                     range:(NSRange)range {
+    let loc = range.location;
+    let len = range.length;
+    let left: id = msg![env; this substringToIndex:loc];
+    let middle: id = msg![env; this substringWithRange:range];
+    let right: id = msg![env; this substringFromIndex:(loc + len)];
+    let new_middle: id = string_by_replacing_occurrences_inner(env, middle, target, replacement, options);
+    let res: id = msg![env; left stringByAppendingString:new_middle];
+    msg![env; res stringByAppendingString:right]
 }
 
 - (id)stringByAppendingString:(id)other { // NSString*
@@ -1989,4 +1988,64 @@ pub fn get_bytes_buffer_inner(
     }
 
     true
+}
+
+/// Helper function used by
+/// `[NSString stringByReplacingOccurrencesOfString:withString:options:range:]`
+/// method.
+fn string_by_replacing_occurrences_inner(
+    env: &mut Environment,
+    source: id,      // NSString *
+    target: id,      // NSString *
+    replacement: id, // NSString *
+    options: NSStringCompareOptions,
+) -> id {
+    // TODO: support foreign subclasses (perhaps via a helper function that
+    // copies the string first)
+    let mut main_iter = env
+        .objc
+        .borrow::<StringHostObject>(source)
+        .iter_code_units();
+    let target_iter = env
+        .objc
+        .borrow::<StringHostObject>(target)
+        .iter_code_units();
+    let replacement_iter = env
+        .objc
+        .borrow::<StringHostObject>(replacement)
+        .iter_code_units();
+
+    // Zero-length target case
+    if target_iter.clone().next().is_none() {
+        let res = msg![env; source copy];
+        return autorelease(env, res);
+    }
+
+    let case_insensitive = match options {
+        0 => false, // No options mean literal match
+        NSCaseInsensitiveSearch => true,
+        _ => unimplemented!(),
+    };
+
+    let mut result: Utf16String = Vec::new();
+    loop {
+        if let Some(new_main_iter) = main_iter.strip_prefix(&target_iter, case_insensitive) {
+            // matched target, replace it
+            result.extend(replacement_iter.clone());
+            main_iter = new_main_iter;
+        } else {
+            // no match, copy as normal
+            match main_iter.next() {
+                Some(cur) => result.push(cur),
+                None => break,
+            }
+        }
+    }
+
+    // TODO: For a foreign subclass of NSString, do we have to return that
+    // subclass? The signature implies this isn't the case and it's probably not
+    // worth the effort, but it's an interesting question.
+    let result_ns_string = msg_class![env; _touchHLE_NSString alloc];
+    *env.objc.borrow_mut(result_ns_string) = StringHostObject::Utf16(result);
+    autorelease(env, result_ns_string)
 }

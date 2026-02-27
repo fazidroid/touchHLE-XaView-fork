@@ -29,6 +29,13 @@ typedef struct _NSRange {
   NSUInteger length;
 } NSRange;
 
+static inline NSRange NSMakeRange(NSUInteger loc, NSUInteger len) {
+  NSRange r;
+  r.location = loc;
+  r.length = len;
+  return r;
+}
+
 #define nil ((id)0)
 
 // id objc_msgSend(id, SEL, ...);
@@ -67,11 +74,19 @@ typedef struct _NSRange {
 - (ObjectType)anyObject;
 @end
 
+typedef enum {
+  NSCaseInsensitiveSearch = 1,
+} NSStringCompareOptions;
+
 @interface NSString : NSObject
 + (instancetype)stringWithFormat:(NSString *)format, ...;
 + (instancetype)stringWithUTF8String:(const char *)string;
 - (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target
                                         withString:(NSString *)replacement;
+- (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target
+                                        withString:(NSString *)replacement
+                                           options:(NSStringCompareOptions)options
+                                             range:(NSRange)range;
 - (BOOL)isEqualToString:(NSString *)other;
 @end
 @interface NSMutableString : NSString
