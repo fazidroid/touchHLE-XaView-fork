@@ -378,13 +378,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)pathWithComponents:(id)components {
     let count: NSUInteger = msg![env; components count];
     if count == 0 {
-        return nil;
+        return get_static_str(env, "");
     }
     let mut res = msg_class![env; NSString new];
     let enumerator: id = msg![env; components objectEnumerator];
-    // FIXME: remove duplicate path separators
-    // While Apple's docs claim that "This method doesn’t clean up the path
-    // created", it seems that duplicate path separators are removed.
     loop {
         let next: id = msg![env; enumerator nextObject];
         if next == nil {
@@ -397,9 +394,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         // FIXME: this leads to O(N^2) for N char string, but it should be O(N)
         res = msg![env; res stringByAppendingPathComponent:next];
     }
-    // Note: we need to strip leading "/"
-    // because we started from an empty string
-    msg![env; res substringFromIndex:1u32]
+    log_dbg!("pathWithComponents: {} -> '{}'", {
+        let desc = msg![env; components description];
+        to_rust_string(env, desc)
+    }, to_rust_string(env, res));
+    res
 }
 
 + (NSStringEncoding)defaultCStringEncoding {

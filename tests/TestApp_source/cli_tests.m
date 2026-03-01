@@ -3316,6 +3316,79 @@ int test_NSString_stringByReplacingOccurrencesOfString_options_range() {
   return 0;
 }
 
+int test_NSString_pathWithComponents() {
+  NSAutoreleasePool *pool = [NSAutoreleasePool new];
+
+  // Absolute path
+  NSArray *components =
+      [NSArray arrayWithObjects:[NSString stringWithUTF8String:"/"],
+                                [NSString stringWithUTF8String:"a"],
+                                [NSString stringWithUTF8String:"b"], nil];
+  NSString *res = [NSString pathWithComponents:components];
+  NSString *expected = [NSString stringWithUTF8String:"/a/b"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -1;
+  }
+
+  // Relative path
+  components =
+      [NSArray arrayWithObjects:[NSString stringWithUTF8String:"a"],
+                                [NSString stringWithUTF8String:"b"], nil];
+  res = [NSString pathWithComponents:components];
+  expected = [NSString stringWithUTF8String:"a/b"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -2;
+  }
+
+  // No redundant slashes
+  components =
+      [NSArray arrayWithObjects:[NSString stringWithUTF8String:"a/"],
+                                [NSString stringWithUTF8String:"/b"], nil];
+  res = [NSString pathWithComponents:components];
+  expected = [NSString stringWithUTF8String:"a/b"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -3;
+  }
+
+  // Single component
+  components =
+      [NSArray arrayWithObjects:[NSString stringWithUTF8String:"a"], nil];
+  res = [NSString pathWithComponents:components];
+  expected = [NSString stringWithUTF8String:"a"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -4;
+  }
+
+  // Empty array
+  components = [NSArray array];
+  res = [NSString pathWithComponents:components];
+  expected = [NSString stringWithUTF8String:""];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -5;
+  }
+
+  // Empty strings inside components
+  components =
+      [NSArray arrayWithObjects:[NSString stringWithUTF8String:"a"],
+                                [NSString stringWithUTF8String:""],
+                                [NSString stringWithUTF8String:""],
+                                [NSString stringWithUTF8String:"b"], nil];
+  res = [NSString pathWithComponents:components];
+  expected = [NSString stringWithUTF8String:"a/b"];
+  if (![res isEqualToString:expected]) {
+    [pool drain];
+    return -6;
+  }
+
+  [pool drain];
+  return 0;
+}
+
 int test_strptime() {
   struct tm tm;
   memset(&tm, 0, sizeof(struct tm));
@@ -3590,6 +3663,7 @@ struct {
     FUNC_DEF(test_NSMutableString_deleteCharactersInRange),
     FUNC_DEF(test_NSString_stringByReplacingOccurrencesOfString),
     FUNC_DEF(test_NSString_stringByReplacingOccurrencesOfString_options_range),
+    FUNC_DEF(test_NSString_pathWithComponents),
     FUNC_DEF(test_strptime),
     FUNC_DEF(test_strftime),
     FUNC_DEF(test_RespondsToSelector),

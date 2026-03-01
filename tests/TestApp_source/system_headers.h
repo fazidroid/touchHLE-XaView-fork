@@ -66,6 +66,8 @@ static inline NSRange NSMakeRange(NSUInteger loc, NSUInteger len) {
 @end
 
 @interface NSArray<ObjectType> : NSObject
++ (instancetype)array;
++ (instancetype)arrayWithObjects:(ObjectType)firstObj, ...;
 - (NSUInteger)count;
 - (ObjectType)objectAtIndex:(NSUInteger)index;
 @end
@@ -81,6 +83,7 @@ typedef enum {
 @interface NSString : NSObject
 + (instancetype)stringWithFormat:(NSString *)format, ...;
 + (instancetype)stringWithUTF8String:(const char *)string;
++ (NSString *)pathWithComponents:(NSArray *)components;
 - (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target
                                         withString:(NSString *)replacement;
 - (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target
