@@ -15,7 +15,7 @@ use crate::objc::{
     NSZonePtr,
 };
 use crate::window::DeviceOrientation;
-use crate::Environment;
+use crate::{todo_objc_setter, Environment};
 
 #[derive(Default)]
 pub struct State {
@@ -45,6 +45,7 @@ pub const UIInterfaceOrientationLandscapeRight: UIInterfaceOrientation =
 
 type UIRemoteNotificationType = NSUInteger;
 type UIStatusBarAnimation = NSInteger;
+type UIStatusBarStyle = NSInteger;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -107,6 +108,10 @@ pub const CLASSES: ClassExports = objc_classes! {
            withAnimation:(UIStatusBarAnimation)_animation {
     // TODO: animation
     msg![env; this setStatusBarHidden:hidden]
+}
+
+- (())setStatusBarStyle:(UIStatusBarStyle)style {
+    todo_objc_setter!(this, style);
 }
 
 - (UIInterfaceOrientation)statusBarOrientation {
