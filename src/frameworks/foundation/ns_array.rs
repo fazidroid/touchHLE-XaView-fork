@@ -6,7 +6,9 @@
 //! The `NSArray` class cluster, including `NSMutableArray`.
 
 use super::ns_enumerator::{fast_enumeration_helper, NSFastEnumerationState};
-use super::ns_property_list_serialization::deserialize_plist_from_file;
+use super::ns_property_list_serialization::{
+    deserialize_plist_from_file, NSPropertyListBinaryFormat_v1_0,
+};
 use super::{
     ns_keyed_unarchiver, ns_string, ns_url, NSComparisonResult, NSNotFound, NSRange, NSUInteger,
     _nib_archive_decoder,
@@ -14,7 +16,7 @@ use super::{
 use crate::abi::{CallFromHost, GuestFunction};
 use crate::fs::GuestPath;
 use crate::libc::stdlib::qsort::qsort_generic;
-use crate::mem::{ConstPtr, MutPtr, MutVoidPtr};
+use crate::mem::{ConstPtr, MutPtr, MutVoidPtr, Ptr};
 use crate::objc::{
     autorelease, id, msg, msg_class, msg_send, nil, objc_classes, release, retain, Class,
     ClassExports, HostObject, NSZonePtr, SEL,
@@ -118,6 +120,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     release(env, this);
     let path = ns_url::to_rust_path(env, url);
     deserialize_plist_from_file(env, &path, /* array_expected: */ true)
+}
+
+- (bool)writeToFile:(id)path // NSString*
+         atomically:(bool)atomically {
+    let error_desc: MutPtr<id> = Ptr::null();
+    let data: id = msg_class![env; NSPropertyListSerialization
+            dataFromPropertyList:this
+                          format:NSPropertyListBinaryFormat_v1_0
+                errorDescription:error_desc];
+    let res = msg![env; data writeToFile:path atomically:atomically];
+    log_dbg!(
+        "[(NSArray *){:?} writeToFile:{:?} atomically:{}] -> {}",
+        this,
+        ns_string::to_rust_string(env, path),
+        atomically,
+        res
+    );
+    res
 }
 
 // NSCopying implementation
