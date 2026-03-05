@@ -113,10 +113,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (bool)runMode:(NSRunLoopMode)mode beforeDate:(id)limit_date {
-        let time_limit: NSTimeInterval = msg![env; limit_date timeIntervalSince1970];
-            run_run_loop(env, this, /* single_iteration: */ true, Some(time_limit));
-                true
-                }
+    let time_limit: NSTimeInterval = msg![env; limit_date timeIntervalSince1970];
+    run_run_loop(env, this, /* single_iteration: */ true, Some(time_limit));
+    true
 }
 
 // TODO: other run methods
