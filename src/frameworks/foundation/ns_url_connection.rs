@@ -36,14 +36,14 @@ pub const CLASSES: ClassExports = objc_classes! {
         start_immediately,
     );
 
-    // Хак: если игра просит начать загрузку сразу, моментально имитируем ответ
+    // Hack: immediately simulate response.
     if start_immediately && delegate != nil {
-        // Проверяем, умеет ли игра принимать сигнал об успешной загрузке
+        // Check if delegate can finish loading.
         let responds_finish: bool = msg![env; delegate respondsToSelector:crate::sel!(connectionDidFinishLoading:)];
         if responds_finish {
             msg![env; delegate connectionDidFinishLoading:this];
         } else {
-            // Если не умеет, шлём сигнал об ошибке сети
+            // Otherwise, send a failure signal.
             let responds_fail: bool = msg![env; delegate respondsToSelector:crate::sel!(connection:didFailWithError:)];
             if responds_fail {
                 msg![env; delegate connection:this didFailWithError:nil];
@@ -51,7 +51,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
 
-    // Возвращаем сам объект (this), а не nil, чтобы игра считала подключение рабочим
+    // Return 'this' instead of 'nil'.
     this
 }
 
