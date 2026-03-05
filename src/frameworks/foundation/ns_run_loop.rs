@@ -112,6 +112,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     run_run_loop(env, this, /* single_iteration: */ false, Some(time_limit));
 }
 
+- (bool)runMode:(NSRunLoopMode)mode beforeDate:(id)limit_date {
+        let time_limit: NSTimeInterval = msg![env; limit_date timeIntervalSince1970];
+            run_run_loop(env, this, /* single_iteration: */ true, Some(time_limit));
+                true
+                }
+}
+
 // TODO: other run methods
 
 @end
@@ -357,16 +364,4 @@ fn run_loop_for_thread(env: &mut Environment, this: Class, thread_id: ThreadId) 
         .run_loops
         .get(&thread_id)
         .unwrap()
-
-        extern "C" fn run_mode_before_date(
-                _env: &mut crate::cpu::CpuEnvironment,
-                    _obj: crate::objc::id,
-                        _cmd: crate::objc::Sel,
-                            _mode: crate::objc::id,
-                                _limit_date: crate::objc::id,
-                                ) -> bool {
-                                    crate::warn!("TODO: -[NSRunLoop runMode:beforeDate:]");
-                                        false // Возвращаем false (NO), чтобы игра не ушла в бесконечный цикл ожидания
-                                        }
-        )
 }
