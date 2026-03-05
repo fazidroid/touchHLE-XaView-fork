@@ -357,4 +357,16 @@ fn run_loop_for_thread(env: &mut Environment, this: Class, thread_id: ThreadId) 
         .run_loops
         .get(&thread_id)
         .unwrap()
+
+        extern "C" fn run_mode_before_date(
+                _env: &mut crate::cpu::CpuEnvironment,
+                    _obj: crate::objc::id,
+                        _cmd: crate::objc::Sel,
+                            _mode: crate::objc::id,
+                                _limit_date: crate::objc::id,
+                                ) -> bool {
+                                    crate::warn!("TODO: -[NSRunLoop runMode:beforeDate:]");
+                                        false // Возвращаем false (NO), чтобы игра не ушла в бесконечный цикл ожидания
+                                        }
+        )
 }
