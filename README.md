@@ -1,3 +1,9 @@
+XaView FORK:
+1) Asphalt 6 support: ⚠️ (Partically)
+2) More Asphalt 5 versions support: ❌
+
+///
+
 # touchHLE: high-level emulator for iPhone OS apps
 
 **touchHLE** is a high-level emulator for iPhone OS apps. It runs on modern desktop operating systems and Android, and is written in Rust.
