@@ -42,6 +42,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: [(UIWebView*) {:?} loadHTMLString:baseURL:]", this);
 }
 
+// Хак для защиты от Use-After-Free зомби-строк
+- (id)stringByAppendingFormat:(id)_format {
+    log!("Zombie object UIWebView called as NSString!");
+    crate::objc::nil
+}
+
 @end
 
 };
