@@ -27,22 +27,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithRequest:(id)request // NSURLRequest *
              delegate:(id)delegate
-                  startImmediately:(bool)start_immediately {
-                      log!(
-                              "TODO: [(NSURLConnection *){:?} initWithRequest:{:?} delegate:{:?} startImmediately:{}]",
-                                      this,
-                                              request,
-                                                      delegate,
-                                                              start_immediately,
-                                                                  );
-
-                                                                      // Hack: simulate network failure.
-                                                                          if start_immediately && delegate != nil {
-                                                                                  let _: () = msg![env; delegate connection:this didFailWithError:nil];
-                                                                                      }
-
-                                                                                          this
-                                                                                          }
+     startImmediately:(bool)start_immediately {
+    log!(
+        "TODO: [(NSURLConnection *){:?} initWithRequest:{:?} delegate:{:?} startImmediately:{}]",
+        this,
+        request,
+        delegate,
+        start_immediately,
+    );
+    if start_immediately && delegate != nil {
+        let _: () = msg![env; delegate connection:this didFailWithError:nil];
+    }
+    this
+}
 
 @end
 
