@@ -5,7 +5,7 @@
  */
 //! `NSURLConnection`.
 
-use crate::objc::{autorelease, id, msg, objc_classes, ClassExports};
+use crate::objc::{autorelease, id, msg, objc_classes, nil, ClassExports};
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -36,7 +36,12 @@ pub const CLASSES: ClassExports = objc_classes! {
         start_immediately,
     );
 
-this
+    // Hack: simulate network failure.
+    if start_immediately && delegate != crate::objc::nil {
+        let _: () = msg![env; delegate connection:this didFailWithError:crate::objc::nil];
+    }
+
+    this
 }
 
 @end
