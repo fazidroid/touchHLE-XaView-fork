@@ -5,7 +5,7 @@
  */
 //! `NSURLConnection`.
 
-use crate::objc::{id, msg, objc_classes, ClassExports};
+use crate::objc::{autorelease, id, msg, nil, objc_classes, retain, ClassExports};
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -17,7 +17,7 @@ pub const CLASSES: ClassExports = objc_classes! {
                    delegate:(id)delegate {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithRequest:request delegate:delegate];
-    crate::objc::autorelease(env, new)
+    autorelease(env, new)
 }
 
 - (id)initWithRequest:(id)request
@@ -25,23 +25,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithRequest:request delegate:delegate startImmediately:true]
 }
 
-- (id)initWithRequest:(id)request
+- (id)initWithRequest:(id)_request
              delegate:(id)delegate
      startImmediately:(bool)start_immediately {
-    log!(
-        "TODO: [(NSURLConnection *){:?} initWithRequest:{:?} delegate:{:?} startImmediately:{}]",
-        this,
-        request,
-        delegate,
-        start_immediately,
-    );
-
-    if start_immediately && delegate != crate::objc::nil {
-        let sel = crate::sel!(connectionDidFinishLoading:);
-        let delay: f64 = 0.0;
-        let _: () = msg![env; delegate performSelector:sel withObject:this afterDelay:delay];
+    if start_immediately && delegate != nil {
+        retain(env, this);
+        let _: () = msg![env; delegate connectionDidFinishLoading:this];
     }
-
     this
 }
 
