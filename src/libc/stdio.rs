@@ -52,11 +52,13 @@ impl State {
         file_ptr: MutPtr<FILE>,
     ) -> &mut FILEHostObject {
         let FILE { fd } = mem.read(file_ptr);
-        
+
         // Hack: create dummy file.
         self.file_streams.entry(file_ptr).or_insert_with(|| {
             log!("Unknown file fd {}. Creating dummy.", fd);
-            FILEHostObject { pushbacks: Vec::new() }
+            FILEHostObject {
+                pushbacks: Vec::new(),
+            }
         })
     }
 }

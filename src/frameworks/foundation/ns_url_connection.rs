@@ -36,11 +36,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         start_immediately,
     );
 
-    // Hack: immediately simulate success response.
-    if start_immediately && delegate != nil {
-        let _: () = msg![env; delegate connectionDidFinishLoading:this];
-    }
-
+    // Просто возвращаем объект. Не вызываем никаких делегатов,
+    // чтобы не разрушить память игры.
     this
 }
 
