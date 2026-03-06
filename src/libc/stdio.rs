@@ -53,16 +53,11 @@ impl State {
     ) -> &mut FILEHostObject {
         let FILE { fd } = mem.read(file_ptr);
         
-        // Hack: create a dummy file object if it doesn't exist
-        if !self.file_streams.contains_key(&file_ptr) {
+        // Hack: create a dummy file object if it doesn't exist using the Entry API
+        self.file_streams.entry(file_ptr).or_insert_with(|| {
             log!("Unknown file fd {}. Creating dummy.", fd);
-            self.file_streams.insert(
-                file_ptr,
-                FILEHostObject { pushbacks: Vec::new() },
-            );
-        }
-        
-        self.file_streams.get_mut(&file_ptr).unwrap()
+            FILEHostObject { pushbacks: Vec::new() }
+        })
     }
 }
 
