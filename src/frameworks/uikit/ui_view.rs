@@ -110,6 +110,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.get_known_class("CALayer", &mut env.mem)
 }
 
++ (())setAnimationsEnabled:(bool)enabled {
+    log!("TODO: +[UIView setAnimationsEnabled:{}]", enabled);
+}
+
 // TODO: accessors etc
 
 // initWithCoder: and initWithFrame: are basically UIView's designated
