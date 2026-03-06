@@ -190,39 +190,11 @@ impl Environment {
         let mutex: &mut _ = self.mutex_state.mutexes.get_mut(&mutex_id).unwrap();
 
         let Some((locking_thread, lock_count)) = mutex.locked else {
-            match mutex.type_ {
-                MutexType::PTHREAD_MUTEX_NORMAL => {
-                    // This case is undefined, we may as well panic.
-                    panic!(
-                        "Attempted to unlock non-error-checking mutex #{mutex_id} for thread {current_thread}, already unlocked!",
-                    );
-                }
-                MutexType::PTHREAD_MUTEX_ERRORCHECK | MutexType::PTHREAD_MUTEX_RECURSIVE => {
-                    log_dbg!(
-                        "Attempted to unlock error-checking or recursive mutex #{} for thread {}, already unlocked! Returning EPERM.",
-                        mutex_id, current_thread,
-                    );
-                    return Err(EPERM);
-                }
-            }
+            return Err(EPERM);
         };
 
         if locking_thread != current_thread {
-            match mutex.type_ {
-                MutexType::PTHREAD_MUTEX_NORMAL => {
-                    // This case is undefined, we may as well panic.
-                    panic!(
-                        "Attempted to unlock non-error-checking mutex #{mutex_id} for thread {current_thread}, locked by different thread {locking_thread}!",
-                    );
-                }
-                MutexType::PTHREAD_MUTEX_ERRORCHECK | MutexType::PTHREAD_MUTEX_RECURSIVE => {
-                    log_dbg!(
-                        "Attempted to unlock error-checking or recursive mutex #{} for thread {}, locked by different thread {}! Returning EPERM.",
-                        mutex_id, current_thread, locking_thread,
-                    );
-                    return Err(EPERM);
-                }
-            }
+            return Err(EPERM);
         }
 
         if lock_count.get() == 1 {
