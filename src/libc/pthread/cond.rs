@@ -151,10 +151,20 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
     0 // success
 }
 
+pub fn pthread_cond_timedwait(
+    _env: &mut Environment,
+    _cond: MutPtr<pthread_cond_t>,
+    _mutex: MutPtr<pthread_mutex_t>,
+    _abstime: u32,
+) -> i32 {
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_cond_init(_, _)),
     export_c_func!(pthread_cond_wait(_, _)),
     export_c_func!(pthread_cond_signal(_)),
     export_c_func!(pthread_cond_broadcast(_)),
     export_c_func!(pthread_cond_destroy(_)),
+    export_c_func!(pthread_cond_timedwait(_, _, _)),
 ];
