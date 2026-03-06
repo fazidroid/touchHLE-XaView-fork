@@ -52,17 +52,16 @@ impl State {
         file_ptr: MutPtr<FILE>,
     ) -> &mut FILEHostObject {
         let FILE { fd } = mem.read(file_ptr);
-        if matches!(fd, STDIN_FILENO | STDOUT_FILENO | STDERR_FILENO)
-            && !self.file_streams.contains_key(&file_ptr)
-        {
-            // Special case, need to do a lazy creation of host object
+        
+        // Hack: create a dummy file object if it doesn't exist
+        if !self.file_streams.contains_key(&file_ptr) {
+            log!("Unknown file fd {}. Creating dummy.", fd);
             self.file_streams.insert(
                 file_ptr,
-                FILEHostObject {
-                    pushbacks: Vec::new(),
-                },
+                FILEHostObject { pushbacks: Vec::new() },
             );
         }
+        
         self.file_streams.get_mut(&file_ptr).unwrap()
     }
 }
