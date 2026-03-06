@@ -36,9 +36,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         start_immediately,
     );
 
-    // Просто возвращаем объект. Не вызываем никаких делегатов,
-    // чтобы не разрушить память игры.
-    this
+this
 }
 
 @end
