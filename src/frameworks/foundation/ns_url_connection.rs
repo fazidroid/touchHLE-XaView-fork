@@ -5,7 +5,7 @@
  */
 //! `NSURLConnection`.
 
-use crate::objc::{autorelease, id, msg, nil, objc_classes, release, ClassExports};
+use crate::objc::{autorelease, id, msg, nil, objc_classes, retain, ClassExports};
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -13,30 +13,26 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSURLConnection: NSObject
 
-+ (id)connectionWithRequest:(id)request // NSURLRequest *
++ (id)connectionWithRequest:(id)request
                    delegate:(id)delegate {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithRequest:request delegate:delegate];
     autorelease(env, new)
 }
 
-- (id)initWithRequest:(id)request // NSURLRequest *
+- (id)initWithRequest:(id)request
              delegate:(id)delegate {
     msg![env; this initWithRequest:request delegate:delegate startImmediately:true]
 }
 
-- (id)initWithRequest:(id)request // NSURLRequest *
+- (id)initWithRequest:(id)_request
              delegate:(id)delegate
      startImmediately:(bool)start_immediately {
-    log!(
-        "TODO: [(NSURLConnection *){:?} initWithRequest:{:?} delegate:{:?} startImmediately:{}]",
-        this,
-        request,
-        delegate,
-        start_immediately,
-    );
-    release(env, this);
-    nil
+    if start_immediately && delegate != nil {
+        retain(env, this);
+        let _: () = msg![env; delegate connection:this didFailWithError:nil];
+    }
+    this
 }
 
 @end
