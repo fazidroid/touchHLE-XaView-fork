@@ -81,4 +81,32 @@ pub const CONSTANTS: ConstantExports = &[
         "_NSOSStatusErrorDomain",
         HostConstant::NSString(NSOSStatusErrorDomain),
     ),
+    (
+        "_NSErrorFailingURLStringKey",
+        HostConstant::NSString("NSErrorFailingURLStringKey"),
+    ),
+    (
+        "_NSLocalizedFailureReasonErrorKey",
+        HostConstant::NSString("NSLocalizedFailureReasonErrorKey"),
+    ),
+    (
+        "_NSUnderlyingErrorKey",
+        HostConstant::NSString("NSUnderlyingErrorKey"),
+    ),
+    (
+        "_NSHTTPCookieName",
+        HostConstant::NSString("NSHTTPCookieName"),
+    ),
+    (
+        "_NSHTTPCookieValue",
+        HostConstant::NSString("NSHTTPCookieValue"),
+    ),
+    (
+        "_NSHTTPCookieDomain",
+        HostConstant::NSString("NSHTTPCookieDomain"),
+    ),
+    (
+        "_NSHTTPCookiePath",
+        HostConstant::NSString("NSHTTPCookiePath"),
+    ),
 ];
