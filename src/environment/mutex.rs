@@ -193,8 +193,16 @@ impl Environment {
             return Err(EPERM);
         };
 
-        if locking_thread != current_thread {
-            return Err(EPERM);
+        if locking_thread == current_thread {
+            match mutex.type_ {
+                MutexType::PTHREAD_MUTEX_NORMAL | MutexType::PTHREAD_MUTEX_ERRORCHECK => {
+                    return Err(EDEADLK);
+                }
+                MutexType::PTHREAD_MUTEX_RECURSIVE => {
+                    mutex.locked = Some((locking_thread, lock_count.checked_add(1).unwrap()));
+                    return Ok(lock_count.get() + 1);
+                }
+            }
         }
 
         if lock_count.get() == 1 {
