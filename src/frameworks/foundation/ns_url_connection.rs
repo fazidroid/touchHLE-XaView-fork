@@ -5,7 +5,7 @@
  */
 //! `NSURLConnection`.
 
-use crate::objc::{autorelease, id, msg, objc_classes, nil, ClassExports};
+use crate::objc::{autorelease, id, msg, nil, objc_classes, ClassExports};
 
 pub const CLASSES: ClassExports = objc_classes! {
 
