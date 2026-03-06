@@ -23,6 +23,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     nil
 }
 
++ (id)artistsQuery {
+    log_once!("TODO: [MPMediaQuery artistsQuery] (not implemented yet)");
+    nil
+}
+
 @end
 
 };
