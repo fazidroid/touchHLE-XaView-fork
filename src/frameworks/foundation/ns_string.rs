@@ -1725,28 +1725,29 @@ pub fn from_u16_vec(env: &mut Environment, from: Vec<u16>) -> id {
     string
 }
 
-/// Shortcut for host code, provides a view of a string in UTF-8.
-/// Warning: This may panic if the string is not valid UTF-16!
-///
-/// TODO: Try to avoid allocating a new String in more cases.
-///
-/// TODO: Try to avoid converting from UTF-16 in more cases.
 pub fn to_rust_string(env: &mut Environment, string: id) -> Cow<'static, str> {
-    // TODO: handle foreign subclasses of NSString
+    if string == nil {
+        return Cow::Borrowed("");
+    }
+    if !env.objc.get_host_object(string).is_some_and(|obj| obj.downcast_ref::<StringHostObject>().is_some()) {
+        return Cow::Borrowed("");
+    }
     env.objc
         .borrow_mut::<StringHostObject>(string)
         .to_utf8()
         .unwrap()
 }
 
-/// Shortcut for host code, calls a callback once for each UTF-16 code-unit in a
-/// string. This is equivalent to a for loop using the `length` and
-/// `characterAtIndex:` methods, but much more efficient.
 pub fn for_each_code_unit<F>(env: &mut Environment, string: id, mut f: F)
 where
     F: FnMut(NSUInteger, u16),
 {
-    // TODO: handle foreign subclasses of NSString
+    if string == nil {
+        return;
+    }
+    if !env.objc.get_host_object(string).is_some_and(|obj| obj.downcast_ref::<StringHostObject>().is_some()) {
+        return;
+    }
     let mut idx: NSUInteger = 0;
     env.objc
         .borrow::<StringHostObject>(string)
