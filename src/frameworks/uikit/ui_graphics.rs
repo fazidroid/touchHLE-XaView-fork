@@ -41,16 +41,16 @@ pub fn UIGraphicsGetCurrentContext(env: &mut Environment) -> CGContextRef {
 }
 
 pub fn UIGraphicsBeginImageContext(_env: &mut Environment, _size: CGSize) {
-    crate::warn_stub!("UIGraphicsBeginImageContext");
+    log!("TODO: UIGraphicsBeginImageContext");
 }
 
 pub fn UIGraphicsGetImageFromCurrentImageContext(_env: &mut Environment) -> id {
-    crate::warn_stub!("UIGraphicsGetImageFromCurrentImageContext");
+    log!("TODO: UIGraphicsGetImageFromCurrentImageContext");
     nil
 }
 
 pub fn UIGraphicsEndImageContext(_env: &mut Environment) {
-    crate::warn_stub!("UIGraphicsEndImageContext");
+    log!("TODO: UIGraphicsEndImageContext");
 }
 
 pub const FUNCTIONS: FunctionExports = &[
