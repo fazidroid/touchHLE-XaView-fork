@@ -38,7 +38,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // Hack: immediately simulate success response.
     if start_immediately && delegate != nil {
-        msg![env; delegate connectionDidFinishLoading:this];
+        let _: () = msg![env; delegate connectionDidFinishLoading:this];
     }
 
     this
