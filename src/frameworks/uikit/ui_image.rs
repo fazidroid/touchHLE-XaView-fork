@@ -26,8 +26,6 @@ const CACHE_SIZE: usize = 10;
 
 #[derive(Default)]
 pub struct State {
-    /// Cache of images for `[UIImage imageNamed:]` method.
-    /// Images are explicitly retained.
     cached_images: HashMap<String, id>,
 }
 impl State {
@@ -61,8 +59,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-+ (id)imageNamed:(id)name { // NSString*
-    // TODO: figure out whether this is actually correct in all cases
++ (id)imageNamed:(id)name {
     let bundle: id = msg_class![env; NSBundle mainBundle];
     let path: id = msg![env; bundle pathForResource:name ofType:nil];
     let name_str = ns_string::to_rust_string(env, name).to_string();
@@ -70,10 +67,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         log!("Warning: [UIImage imageNamed:{:?}] => nil", name_str);
         return nil;
     }
-    // TODO: find a better eviction policy
     if State::get(env).cached_images.len() > CACHE_SIZE {
         let cache = std::mem::take(&mut State::get_mut(env).cached_images);
-        log_dbg!("Evicting {} images from UIImage cache.", cache.len());
         for (_, img) in cache {
             release(env, img);
         }
@@ -86,13 +81,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     *State::get(env).cached_images.get(&name_str).unwrap()
 }
 
-+ (id)imageWithContentsOfFile:(id)path { // NSString*
++ (id)imageWithContentsOfFile:(id)path {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithContentsOfFile:path];
     autorelease(env, new)
 }
 
-+ (id)imageWithData:(id)data { // NSData*
++ (id)imageWithData:(id)data {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithData:data];
     autorelease(env, new)
@@ -100,39 +95,37 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())dealloc {
     let &UIImageHostObject { cg_image } = env.objc.borrow(this);
-    CGImageRelease(env, cg_image);
-
+    if cg_image != nil {
+        CGImageRelease(env, cg_image);
+    }
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
 - (id)initWithCGImage:(CGImageRef)cg_image {
-    CGImageRetain(env, cg_image);
+    if cg_image != nil {
+        CGImageRetain(env, cg_image);
+    }
     env.objc.borrow_mut::<UIImageHostObject>(this).cg_image = cg_image;
     this
 }
 
-- (id)initWithContentsOfFile:(id)path { // NSString*
+- (id)initWithContentsOfFile:(id)path {
     if path == nil {
         return nil;
     }
-    let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
+    let path = ns_string::to_rust_string(env, path);
     let Ok(bytes) = env.fs.read(GuestPath::new(&path)) else {
-        log!("Warning: couldn't read image file at {:?}, returning nil", path);
         release(env, this);
         return nil;
     };
-    // TODO: Real error handling. For now, most errors are likely to be caused
-    //       by a functionality gap in touchHLE, not the app actually trying to
-    //       load a broken file, so panicking is most useful.
     let image = Image::from_bytes(&bytes).unwrap();
     let cg_image = cg_image::from_image(env, image);
     env.objc.borrow_mut::<UIImageHostObject>(this).cg_image = cg_image;
     this
 }
 
-- (id)initWithData:(id)data { // NSData*
+- (id)initWithData:(id)data {
     let slice = ns_data::to_rust_slice(env, data);
-    // TODO: refactor common parts
     let image = Image::from_bytes(slice).unwrap();
     let cg_image = cg_image::from_image(env, image);
     env.objc.borrow_mut::<UIImageHostObject>(this).cg_image = cg_image;
@@ -141,25 +134,22 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)stretchableImageWithLeftCapWidth:(NSInteger)_leftCapWidth
                           topCapHeight:(NSInteger)_topCapHeight {
-    log!("TODO: properly support stretchableImageWithLeftCapWidth:topCapHeight:");
     retain(env, this)
 }
-
-// TODO: more init methods
-// TODO: more accessors
 
 - (CGImageRef)CGImage {
     env.objc.borrow::<UIImageHostObject>(this).cg_image
 }
 
-// TODO: should have UIImageOrientation type
 - (NSInteger)imageOrientation {
-    // FIXME: load image orientation info from file?
-    0 // UIImageOrientationUp
+    0
 }
 
 - (CGSize)size {
     let image = env.objc.borrow::<UIImageHostObject>(this).cg_image;
+    if image == nil {
+        return CGSize { width: 0.0, height: 0.0 };
+    }
     let (width, height) = cg_image::borrow_image(&env.objc, image).dimensions();
     CGSize {
         width: width as _,
@@ -168,45 +158,41 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (CGFloat)scale {
-    // TODO: support other scales, such as @2x
     1.0
 }
 
 - (())drawInRect:(CGRect)rect {
     let context = UIGraphicsGetCurrentContext(env);
     let image = env.objc.borrow::<UIImageHostObject>(this).cg_image;
-    CGContextDrawImage(env, context, rect, image);
+    if image != nil && context != nil {
+        CGContextDrawImage(env, context, rect, image);
+    }
 }
 
 - (())drawAtPoint:(CGPoint)point {
     let context = UIGraphicsGetCurrentContext(env);
     let image = env.objc.borrow::<UIImageHostObject>(this).cg_image;
-    let rect = CGRect {
-        origin: point,
-        size: CGSize {
-            width: CGImageGetWidth(env, image) as CGFloat,
-            height: CGImageGetHeight(env, image) as CGFloat,
-        }
-    };
-    CGContextDrawImage(env, context, rect, image);
+    if image != nil && context != nil {
+        let rect = CGRect {
+            origin: point,
+            size: CGSize {
+                width: CGImageGetWidth(env, image) as CGFloat,
+                height: CGImageGetHeight(env, image) as CGFloat,
+            }
+        };
+        CGContextDrawImage(env, context, rect, image);
+    }
 }
 
 @end
 
-// Undocumented class used in NIBs
-// TODO: It's not clear _why_ placeholder is needed?
 @implementation UIImageNibPlaceholder: UIImage
 
-// NSCoding implementation
 - (id)initWithCoder:(id)coder {
     release(env, this);
-
-    // TODO: decode other attributes
     let key_ns_string = get_static_str(env, "UIResourceName");
     let resource_name: id = msg![env; coder decodeObjectForKey:key_ns_string];
-
     let res = msg_class![env; UIImage imageNamed:resource_name];
-    // TODO: It is not clear if we need to additionally retain here?
     retain(env, res)
 }
 

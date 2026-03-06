@@ -44,9 +44,9 @@ pub fn UIGraphicsBeginImageContext(_env: &mut Environment, _size: CGSize) {
     log!("TODO: UIGraphicsBeginImageContext");
 }
 
-pub fn UIGraphicsGetImageFromCurrentImageContext(_env: &mut Environment) -> id {
+pub fn UIGraphicsGetImageFromCurrentImageContext(env: &mut Environment) -> id {
     log!("TODO: UIGraphicsGetImageFromCurrentImageContext");
-    nil
+    crate::objc::msg_class![env; UIImage alloc]
 }
 
 pub fn UIGraphicsEndImageContext(_env: &mut Environment) {
