@@ -158,7 +158,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     false // default value
 }
 - (())setAdjustsFontSizeToFitWidth:(bool)adjusts {
-    assert!(!adjusts); // TODO
+    log!("TODO: setAdjustsFontSizeToFitWidth:{}", adjusts);
 }
 
 - (id)textColor {
