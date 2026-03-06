@@ -5,7 +5,7 @@
  */
 //! `NSURLConnection`.
 
-use crate::objc::{autorelease, id, msg, nil, objc_classes, release, ClassExports};
+use crate::objc::{autorelease, id, msg, nil, objc_classes, ClassExports};
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -36,26 +36,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         start_immediately,
     );
 
-    // Hack: immediately simulate response.
+    // Hack: immediately simulate success response.
     if start_immediately && delegate != nil {
-        // Выносим селектор в отдельную переменную
-        let sel_finish = crate::sel!(connectionDidFinishLoading:);
-        let responds_finish: bool = msg![env; delegate respondsToSelector:sel_finish];
-        
-        if responds_finish {
-            msg![env; delegate connectionDidFinishLoading:this];
-        } else {
-            // И здесь тоже выносим в отдельную переменную
-            let sel_fail = crate::sel!(connection:didFailWithError:);
-            let responds_fail: bool = msg![env; delegate respondsToSelector:sel_fail];
-            
-            if responds_fail {
-                msg![env; delegate connection:this didFailWithError:nil];
-            }
-        }
+        msg![env; delegate connectionDidFinishLoading:this];
     }
 
-    // Return 'this' instead of 'nil'.
     this
 }
 
