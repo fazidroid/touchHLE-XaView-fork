@@ -38,6 +38,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: [(UIWebView*) {:?} loadRequest:{:?} ({})]", this, request, url_string);
 }
 
+- (())loadHTMLString:(id)_string baseURL:(id)_baseURL {
+    log!("TODO: [(UIWebView*) {:?} loadHTMLString:baseURL:]", this);
+}
+
 @end
 
 };
