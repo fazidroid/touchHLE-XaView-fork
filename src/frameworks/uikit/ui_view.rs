@@ -111,7 +111,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (())setAnimationsEnabled:(bool)enabled {
-    log!("TODO: +[UIView setAnimationsEnabled:{}]", enabled);
+    log!("TODO: +[UIView setAnimationsEnabled:{}]", enabled);
 }
 
 // TODO: accessors etc
