@@ -13,11 +13,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSURLConnection: NSObject
 
-+ (id)connectionWithRequest:(id)request // NSURLRequest *
-                   delegate:(id)delegate {
-    let new: id = msg![env; this alloc];
-    let new: id = msg![env; new initWithRequest:request delegate:delegate];
-    autorelease(env, new)
++ (id)connectionWithRequest:(id)request delegate:(id)delegate {
+    nil
 }
 
 - (id)initWithRequest:(id)request // NSURLRequest *
@@ -25,16 +22,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithRequest:request delegate:delegate startImmediately:true]
 }
 
-- (id)initWithRequest:(id)request
-             delegate:(id)delegate
-     startImmediately:(bool)start_immediately {
-    log!(
-        "TODO: [(NSURLConnection *){:?} initWithRequest:{:?} delegate:{:?} startImmediately:{}]",
-        this,
-        request,
-        delegate,
-        start_immediately,
-    );
+- (id)initWithRequest:(id)request delegate:(id)delegate startImmediately:(bool)start_immediately {
     release(env, this);
     nil
 }
