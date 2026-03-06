@@ -188,7 +188,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // Заглушка для панели навигации
 - (id)navigationItem {
-    crate::warn_stub!("[(UIViewController*){:?} navigationItem]", this);
+    log!("TODO: [(UIViewController*){:?} navigationItem]", this);
         nil
         }
 
