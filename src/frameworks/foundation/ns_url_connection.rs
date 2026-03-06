@@ -5,7 +5,7 @@
  */
 //! `NSURLConnection`.
 
-use crate::objc::{autorelease, id, msg, nil, objc_classes, release, ClassExports};
+use crate::objc::{id, msg, nil, objc_classes, release, ClassExports};
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -13,16 +13,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSURLConnection: NSObject
 
-+ (id)connectionWithRequest:(id)request delegate:(id)delegate {
++ (id)connectionWithRequest:(id)_request
+                   delegate:(id)_delegate {
     nil
 }
 
-- (id)initWithRequest:(id)request // NSURLRequest *
+- (id)initWithRequest:(id)request
              delegate:(id)delegate {
     msg![env; this initWithRequest:request delegate:delegate startImmediately:true]
 }
 
-- (id)initWithRequest:(id)request delegate:(id)delegate startImmediately:(bool)start_immediately {
+- (id)initWithRequest:(id)_request
+             delegate:(id)_delegate
+     startImmediately:(bool)_start_immediately {
     release(env, this);
     nil
 }
