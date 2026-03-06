@@ -344,19 +344,27 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)stringWithContentsOfFile:(id)path { // NSString*
-    let new: id = msg![env; this alloc];
-    let new: id = msg![env; new initWithContentsOfFile:path];
-    autorelease(env, new)
+    let new_alloc: id = msg![env; this alloc];
+    let new_init: id = msg![env; new_alloc initWithContentsOfFile:path];
+    if new_init == nil {
+        release(env, new_alloc);
+        return nil;
+    }
+    autorelease(env, new_init)
 }
 
 + (id)stringWithContentsOfFile:(id)path // NSString*
                       encoding:(NSStringEncoding)encoding
                          error:(MutPtr<id>)error { // NSError**
-    let new: id = msg![env; this alloc];
-    let new: id = msg![env; new initWithContentsOfFile:path
-                                              encoding:encoding
-                                                 error:error];
-    autorelease(env, new)
+    let new_alloc: id = msg![env; this alloc];
+    let new_init: id = msg![env; new_alloc initWithContentsOfFile:path
+                                                         encoding:encoding
+                                                            error:error];
+    if new_init == nil {
+        release(env, new_alloc);
+        return nil;
+    }
+    autorelease(env, new_init)
 }
 
 + (id)stringWithFormat:(id)format, // NSString*
