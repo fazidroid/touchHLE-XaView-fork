@@ -1729,7 +1729,9 @@ pub fn to_rust_string(env: &mut Environment, string: id) -> Cow<'static, str> {
     if string == nil {
         return Cow::Borrowed("");
     }
-    if !env.objc.get_host_object(string).is_some_and(|obj| obj.downcast_ref::<StringHostObject>().is_some()) {
+    let obj_class = ObjC::read_isa(string, &env.mem);
+    let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
+    if !env.objc.class_is_subclass_of(obj_class, nsstring_class) {
         return Cow::Borrowed("");
     }
     env.objc
@@ -1745,7 +1747,9 @@ where
     if string == nil {
         return;
     }
-    if !env.objc.get_host_object(string).is_some_and(|obj| obj.downcast_ref::<StringHostObject>().is_some()) {
+    let obj_class = ObjC::read_isa(string, &env.mem);
+    let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
+    if !env.objc.class_is_subclass_of(obj_class, nsstring_class) {
         return;
     }
     let mut idx: NSUInteger = 0;
