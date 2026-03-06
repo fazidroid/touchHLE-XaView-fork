@@ -186,6 +186,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: [(UIViewController*){:?} dismissMoviePlayerViewControllerAnimated]", this); // TODO
 }
 
+// Заглушка для панели навигации
+- (id)navigationItem {
+    crate::warn_stub!("[(UIViewController*){:?} navigationItem]", this);
+        nil
+        }
+
 - (bool)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interface_orientation {
     interface_orientation == UIInterfaceOrientationPortrait
 }
