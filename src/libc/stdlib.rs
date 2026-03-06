@@ -494,6 +494,15 @@ fn system(env: &mut Environment, cmd: ConstPtr<u8>) -> i32 {
     todo!()
 }
 
+fn div(_env: &mut Environment, numer: i32, denom: i32) -> u64 {
+    if denom == 0 {
+        return 0;
+    }
+    let quot = numer.wrapping_div(denom);
+    let rem = numer.wrapping_rem(denom);
+    (quot as u32 as u64) | ((rem as u32 as u64) << 32)
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(malloc(_)),
     export_c_func!(malloc_size(_)),
@@ -523,6 +532,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(mbstowcs(_, _, _)),
     export_c_func!(wcstombs(_, _, _)),
     export_c_func!(system(_)),
+    export_c_func!(div(_, _)),
 ];
 
 /// A simple wrapper around [atof_inner_generic] for the case of C string.
