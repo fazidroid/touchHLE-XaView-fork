@@ -38,13 +38,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // Hack: immediately simulate response.
     if start_immediately && delegate != nil {
-        // Check if delegate can finish loading.
-        let responds_finish: bool = msg![env; delegate respondsToSelector:crate::sel!(connectionDidFinishLoading:)];
+        // Выносим селектор в отдельную переменную
+        let sel_finish = crate::sel!(connectionDidFinishLoading:);
+        let responds_finish: bool = msg![env; delegate respondsToSelector:sel_finish];
+        
         if responds_finish {
             msg![env; delegate connectionDidFinishLoading:this];
         } else {
-            // Otherwise, send a failure signal.
-            let responds_fail: bool = msg![env; delegate respondsToSelector:crate::sel!(connection:didFailWithError:)];
+            // И здесь тоже выносим в отдельную переменную
+            let sel_fail = crate::sel!(connection:didFailWithError:);
+            let responds_fail: bool = msg![env; delegate respondsToSelector:sel_fail];
+            
             if responds_fail {
                 msg![env; delegate connection:this didFailWithError:nil];
             }
