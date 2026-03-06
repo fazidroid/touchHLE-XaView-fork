@@ -1350,9 +1350,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     if path == nil {
         return nil;
     }
-    // TODO: avoid copy?
-    let path = to_rust_string(env, path);
-    let Ok(bytes) = env.fs.read(GuestPath::new(&path)) else {
+    let nsstring_class: Class = msg_class![env; NSString class];
+    if !msg![env; path isKindOfClass:nsstring_class] {
+        return nil; // Защита от зомби-объектов и неверных типов
+    }
+    
+    let path_str = to_rust_string(env, path);
+    let Ok(bytes) = env.fs.read(GuestPath::new(&path_str)) else {
         return nil;
     };
     let len = bytes.len();
@@ -1373,18 +1377,23 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)initWithContentsOfFile:(id)path // NSString*
                     encoding:(NSStringEncoding)encoding
                        error:(MutPtr<id>)error { // NSError**
-    // TODO: avoid copy?
-    let path = to_rust_string(env, path);
-    let Ok(bytes) = env.fs.read(GuestPath::new(&path)) else {
-        assert!(error.is_null()); // TODO: error handling
+    if path == nil {
+        return nil;
+    }
+    let nsstring_class: Class = msg_class![env; NSString class];
+    if !msg![env; path isKindOfClass:nsstring_class] {
+        return nil; // Защита от зомби-объектов
+    }
+    
+    let path_str = to_rust_string(env, path);
+    let Ok(bytes) = env.fs.read(GuestPath::new(&path_str)) else {
+        // Убрали опасный assert, просто тихо возвращаем nil, если файла нет
         return nil;
     };
 
     // TODO: error handling for encoding
     let host_object = StringHostObject::decode(Cow::Owned(bytes), encoding);
-
     *env.objc.borrow_mut(this) = host_object;
-
     this
 }
 
