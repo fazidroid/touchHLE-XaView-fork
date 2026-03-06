@@ -1346,13 +1346,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithContentsOfFile:(id)path { // NSString*
+- (id)initWithContentsOfFile:(id)path {
     if path == nil {
         return nil;
     }
     let nsstring_class: Class = msg_class![env; NSString class];
     if !msg![env; path isKindOfClass:nsstring_class] {
-        return nil; // Защита от зомби-объектов и неверных типов
+        return nil;
     }
     
     let path_str = to_rust_string(env, path);
@@ -1374,24 +1374,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithContentsOfFile:(id)path // NSString*
+- (id)initWithContentsOfFile:(id)path
                     encoding:(NSStringEncoding)encoding
-                       error:(MutPtr<id>)error { // NSError**
+                       error:(MutPtr<id>)_error {
     if path == nil {
         return nil;
     }
     let nsstring_class: Class = msg_class![env; NSString class];
     if !msg![env; path isKindOfClass:nsstring_class] {
-        return nil; // Защита от зомби-объектов
+        return nil;
     }
     
     let path_str = to_rust_string(env, path);
     let Ok(bytes) = env.fs.read(GuestPath::new(&path_str)) else {
-        // Убрали опасный assert, просто тихо возвращаем nil, если файла нет
         return nil;
     };
 
-    // TODO: error handling for encoding
     let host_object = StringHostObject::decode(Cow::Owned(bytes), encoding);
     *env.objc.borrow_mut(this) = host_object;
     this
