@@ -25,7 +25,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithRequest:request delegate:delegate startImmediately:true]
 }
 
-- (id)initWithRequest:(id)request // NSURLRequest *
+- (id)initWithRequest:(id)request
              delegate:(id)delegate
      startImmediately:(bool)start_immediately {
     log!(
@@ -35,10 +35,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         delegate,
         start_immediately,
     );
-    if start_immediately && delegate != nil {
-        let _: () = msg![env; delegate connection:this didFailWithError:nil];
-    }
-    this
+    release(env, this);
+    nil
 }
 
 @end
