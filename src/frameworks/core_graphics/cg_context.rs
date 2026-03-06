@@ -24,9 +24,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
-// CGContext seems to be a CFType-based type, but in our implementation those
-// are just Objective-C types, so we need a class for it, but its name is not
-// visible anywhere.
 @implementation _touchHLE_CGContext: NSObject
 
 - (())dealloc {
@@ -48,7 +45,6 @@ pub(super) struct CGContextHostObject {
     pub(super) rgb_fill_color: (CGFloat, CGFloat, CGFloat, CGFloat),
     /// Current transform.
     pub(super) transform: CGAffineTransform,
-    // TODO: keep more states saved once they are implemented
     pub(super) state_stack: Vec<((CGFloat, CGFloat, CGFloat, CGFloat), CGAffineTransform)>,
 }
 impl HostObject for CGContextHostObject {}
@@ -73,6 +69,7 @@ pub fn CGContextRetain(env: &mut Environment, c: CGContextRef) -> CGContextRef {
 }
 
 fn CGContextSetFillColorWithColor(env: &mut Environment, context: CGContextRef, color: CGColorRef) {
+    if context.is_null() { return; }
     let (r, g, b, a) = cg_color::to_rgba(&env.objc, color);
     CGContextSetRGBFillColor(env, context, r, g, b, a)
 }
@@ -85,6 +82,7 @@ pub fn CGContextSetRGBFillColor(
     blue: CGFloat,
     alpha: CGFloat,
 ) {
+    if context.is_null() { return; }
     let color = (red, green, blue, alpha);
     env.objc
         .borrow_mut::<CGContextHostObject>(context)
@@ -97,6 +95,7 @@ fn CGContextSetGrayFillColor(
     gray: CGFloat,
     alpha: CGFloat,
 ) {
+    if context.is_null() { return; }
     let color = (gray, gray, gray, alpha);
     env.objc
         .borrow_mut::<CGContextHostObject>(context)
@@ -104,14 +103,17 @@ fn CGContextSetGrayFillColor(
 }
 
 pub fn CGContextFillRect(env: &mut Environment, context: CGContextRef, rect: CGRect) {
+    if context.is_null() { return; }
     cg_bitmap_context::fill_rect(env, context, rect, /* clear: */ false);
 }
 
 pub fn CGContextClearRect(env: &mut Environment, context: CGContextRef, rect: CGRect) {
+    if context.is_null() { return; }
     cg_bitmap_context::fill_rect(env, context, rect, /* clear: */ true);
 }
 
 fn CGContextClipToRect(env: &mut Environment, context: CGContextRef, rect: CGRect) {
+    if context.is_null() { return; }
     if rect.origin == CGPointZero
         && rect.size.height == CGBitmapContextGetHeight(env, context) as f32
         && rect.size.width == CGBitmapContextGetWidth(env, context) as f32
@@ -133,21 +135,26 @@ pub fn CGContextConcatCTM(
     transform: CGAffineTransform,
 ) {
     log_dbg!("CGContextConcatCTM({:?})", transform);
+    if context.is_null() { return; }
     let host_obj = env.objc.borrow_mut::<CGContextHostObject>(context);
     host_obj.transform = transform.concat(host_obj.transform);
 }
 pub fn CGContextGetCTM(env: &mut Environment, context: CGContextRef) -> CGAffineTransform {
+    // Возвращаем единичную матрицу трансформации, если контекст пустой
+    if context.is_null() { return CGAffineTransform::make_scale(1.0, 1.0); }
     let res = env.objc.borrow::<CGContextHostObject>(context).transform;
     log_dbg!("CGContextGetCTM() => {:?}", res);
     res
 }
 pub fn CGContextRotateCTM(env: &mut Environment, context: CGContextRef, angle: CGFloat) {
     log_dbg!("CGContextRotateCTM({:?})", angle);
+    if context.is_null() { return; }
     let host_obj = env.objc.borrow_mut::<CGContextHostObject>(context);
     host_obj.transform = host_obj.transform.rotate(angle);
 }
 pub fn CGContextScaleCTM(env: &mut Environment, context: CGContextRef, x: CGFloat, y: CGFloat) {
     log_dbg!("CGContextScaleCTM({:?})", (x, y));
+    if context.is_null() { return; }
     let host_obj = env.objc.borrow_mut::<CGContextHostObject>(context);
     host_obj.transform = host_obj.transform.scale(x, y);
 }
@@ -158,6 +165,7 @@ pub fn CGContextTranslateCTM(
     ty: CGFloat,
 ) {
     log_dbg!("CGContextTranslateCTM({:?})", (tx, ty));
+    if context.is_null() { return; }
     let host_obj = env.objc.borrow_mut::<CGContextHostObject>(context);
     host_obj.transform = host_obj.transform.translate(tx, ty);
 }
@@ -168,10 +176,12 @@ pub fn CGContextDrawImage(
     rect: CGRect,
     image: CGImageRef,
 ) {
+    if context.is_null() { return; }
     cg_bitmap_context::draw_image(env, context, rect, image);
 }
 
 fn CGContextSaveGState(env: &mut Environment, context: CGContextRef) {
+    if context.is_null() { return; }
     let host_obj = env.objc.borrow_mut::<CGContextHostObject>(context);
     host_obj
         .state_stack
@@ -179,6 +189,7 @@ fn CGContextSaveGState(env: &mut Environment, context: CGContextRef) {
 }
 
 fn CGContextRestoreGState(env: &mut Environment, context: CGContextRef) {
+    if context.is_null() { return; }
     let host_obj = env.objc.borrow_mut::<CGContextHostObject>(context);
     let state = host_obj.state_stack.pop().unwrap();
     host_obj.rgb_fill_color = state.0;
@@ -190,6 +201,7 @@ fn CGContextSetInterpolationQuality(
     context: CGContextRef,
     quality: CGInterpolationQuality,
 ) {
+    if context.is_null() { return; }
     log!(
         "TODO: CGContextSetInterpolationQuality({:?}, {:?})",
         context,
