@@ -9,7 +9,8 @@ use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::core_graphics::cg_context::{
     CGContextRef, CGContextRelease, CGContextRetain,
 };
-use crate::objc::nil;
+use crate::frameworks::core_graphics::CGSize;
+use crate::objc::{id, nil};
 use crate::Environment;
 
 #[derive(Default)]
@@ -39,8 +40,24 @@ pub fn UIGraphicsGetCurrentContext(env: &mut Environment) -> CGContextRef {
         .unwrap_or(nil)
 }
 
+pub fn UIGraphicsBeginImageContext(_env: &mut Environment, _size: CGSize) {
+    crate::warn_stub!("UIGraphicsBeginImageContext");
+}
+
+pub fn UIGraphicsGetImageFromCurrentImageContext(_env: &mut Environment) -> id {
+    crate::warn_stub!("UIGraphicsGetImageFromCurrentImageContext");
+    nil
+}
+
+pub fn UIGraphicsEndImageContext(_env: &mut Environment) {
+    crate::warn_stub!("UIGraphicsEndImageContext");
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(UIGraphicsPushContext(_)),
     export_c_func!(UIGraphicsPopContext()),
     export_c_func!(UIGraphicsGetCurrentContext()),
+    export_c_func!(UIGraphicsBeginImageContext(_)),
+    export_c_func!(UIGraphicsGetImageFromCurrentImageContext()),
+    export_c_func!(UIGraphicsEndImageContext()),
 ];
