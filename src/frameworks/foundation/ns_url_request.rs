@@ -77,8 +77,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         cachePolicy:(NSURLRequestCachePolicy)cache_policy
     timeoutInterval:(NSTimeInterval)timeout_interval {
     
-    // БЕЗОПАСНЫЙ РЕЖИМ: мы больше никогда не возвращаем nil и не делаем release(env, this), 
-    // чтобы C++ обертки игры не вызывали Use-After-Free краши.
+    // БЕЗОПАСНЫЙ РЕЖИМ
     
     if url != nil {
         let url_copy = msg![env; url copy];
