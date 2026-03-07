@@ -207,7 +207,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)scheduledLocalNotifications {
-    msg_class![env; NSArray array]
+    let class = env.objc.get_known_class("NSArray", &mut env.mem);
+    let arr: id = msg![env; class alloc];
+    let arr_init: id = msg![env; arr init];
+    autorelease(env, arr_init)
 }
 
 - (NSInteger)applicationState {
@@ -247,6 +250,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 - (id)init {
+    let empty_str = get_static_str(env, "");
+    let empty_dict = msg_class![env; NSDictionary dictionary];
+
+    {
+        // Изолируем мутабельное заимствование в блоке, чтобы компилятор не ругался
+        let mut host = env.objc.borrow_mut::<UILocalNotificationHostObject>(this);
+        host.alert_body = empty_str;
+        host.alert_action = empty_str;
+        host.sound_name = empty_str;
+        host.user_info = empty_dict;
+    }
+
+    // Увеличиваем счетчик ссылок, так как наш dealloc потом их отпустит
+    retain(env, empty_str);
+    retain(env, empty_str);
+    retain(env, empty_str);
+    retain(env, empty_dict);
+
     this
 }
 - (())dealloc {
