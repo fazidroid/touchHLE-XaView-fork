@@ -28,7 +28,7 @@ const ALL_SPECIFIERS: [u8; 25] = [
     b'@', b'D', b'U', b'O',
 ];
 
-const INTEGER_SPECIFIERS: [u8; 6] = [b'd', b'i', b'o', b'u', b'x', b'X'];
+const INTEGER_SPECIFIERS: [u8; 9] = [b'd', b'i', b'o', b'u', b'x', b'X', b'D', b'U', b'O'];
 const FLOAT_SPECIFIERS: [u8; 3] = [b'f', b'e', b'g'];
 
 /// String formatting implementation for `printf` and `NSLog` function families.
@@ -243,11 +243,11 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     res.extend_from_slice("(null)".as_bytes());
                 }
             }
-            b'd' | b'i' | b'u' => {
+            b'd' | b'i' | b'u' | b'D' | b'U' | b'O' => {
                 assert!(!left_justified);
                 // Note: on 32-bit system int and long are i32,
                 // so single length_modifier is ignored (but not double one!)
-                let int: i64 = if specifier == b'u' {
+                let int: i64 = if specifier == b'u' || specifier == b'U' {
                     if length_modifier == Some("ll") {
                         let uint: u64 = args.next(env);
                         uint.try_into().unwrap()
@@ -262,7 +262,14 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     int.into()
                 };
 
-                let int_with_precision = if precision.is_some_and(|value| value > 0) {
+                let int_with_precision = if specifier == b'O' {
+                    // Форматируем как восьмеричное
+                    if precision.is_some_and(|value| value > 0) {
+                        format!("{:01$o}", int, precision.unwrap())
+                    } else {
+                        format!("{int:o}")
+                    }
+                } else if precision.is_some_and(|value| value > 0) {
                     format!("{:01$}", int, precision.unwrap())
                 } else {
                     format!("{int}")
