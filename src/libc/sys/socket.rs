@@ -1020,7 +1020,7 @@ fn shutdown(env: &mut Environment, socket: i32, how: i32) -> i32 {
 
 // ЗАГЛУШКА ДЛЯ GAMELOFT: игра пытается найти сетевой интерфейс 
 // по имени (например, en0 для Wi-Fi). Мы всегда возвращаем 0 (не найдено).
-fn if_nametoindex(env: &mut Environment, _ifname: ConstPtr<u8>) -> u32 {
+fn if_nametoindex(_env: &mut Environment, _ifname: ConstPtr<u8>) -> u32 {
     log!("TODO: if_nametoindex(...) -> 0 (simulating no network interfaces)");
     0
 }
