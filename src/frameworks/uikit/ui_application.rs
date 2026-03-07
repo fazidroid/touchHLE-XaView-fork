@@ -254,8 +254,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     let empty_dict = msg_class![env; NSDictionary dictionary];
 
     {
-        // Изолируем мутабельное заимствование в блоке
-        let mut host = env.objc.borrow_mut::<UILocalNotificationHostObject>(this);
+        // Убрали mut, так как borrow_mut уже дает нам право менять содержимое
+        let host = env.objc.borrow_mut::<UILocalNotificationHostObject>(this);
         host.alert_body = empty_str;
         host.alert_action = empty_str;
         host.sound_name = empty_str;
