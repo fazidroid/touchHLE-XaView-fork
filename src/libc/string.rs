@@ -325,39 +325,21 @@ fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> Con
     }
 }
 
-// ЗАГЛУШКА ДЛЯ GAMELOFT LIVE
-// Просто копируем входной буфер в выходной
+// ЗАГЛУШКА ДЛЯ GAMELOFT LIVE:
+// Функция принимает 11 аргументов, но эмулятор поддерживает максимум 7
+// Прячем хвост в DotDotDot. Возвращаем ошибку -43 (kCCParamError)
+// чтобы игра не пыталась прочитать мусор из выходного буфера
 fn CCCrypt(
-    env: &mut Environment,
+    _env: &mut Environment,
     _op: u32,
     _alg: u32,
     _options: u32,
     _key: ConstVoidPtr,
     _key_len: GuestUSize,
     _iv: ConstVoidPtr,
-    data_in: ConstVoidPtr,
-    data_in_len: GuestUSize,
-    data_out: MutVoidPtr,
-    data_out_available: GuestUSize,
-    data_out_moved: MutPtr<GuestUSize>,
+    _va_args: crate::abi::DotDotDot,
 ) -> i32 {
-    crate::log!("TODO: CCCrypt (dummy implementation)");
-    
-    let len_to_copy = if data_in_len < data_out_available { 
-        data_in_len 
-    } else { 
-        data_out_available 
-    };
-    
-    if len_to_copy > 0 && !data_in.is_null() && !data_out.is_null() {
-        memmove(env, data_out, data_in, len_to_copy);
-    }
-    
-    if !data_out_moved.is_null() {
-        env.mem.write(data_out_moved, len_to_copy);
-    }
-    
-    0 // kCCSuccess
+    -43 // kCCParamError
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -395,5 +377,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(strrchr(_, _)),
     export_c_func!(strlcpy(_, _, _)),
     export_c_func!(strpbrk(_, _)),
-    export_c_func!(CCCrypt(_, _, _, _, _, _, _, _, _, _, _)), // Зарегистрировали крипто-функцию (11 параметров)
+    export_c_func!(CCCrypt(_, _, _, _, _, _, _)), // Ровно 7 подчеркиваний!
 ];
