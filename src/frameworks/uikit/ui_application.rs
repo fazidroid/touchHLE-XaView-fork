@@ -64,7 +64,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)sharedApplication {
-    // Ленивая инициализация ядра: если игра просит его слишком рано, создаем на лету
+    // Ленивая инициализация ядра
     if env.framework_state.uikit.ui_application.shared_application.is_none() {
         let class = env.objc.get_known_class("UIApplication", &mut env.mem);
         let app: id = msg![env; class alloc];
