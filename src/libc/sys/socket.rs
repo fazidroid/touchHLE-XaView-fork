@@ -1018,11 +1018,11 @@ fn shutdown(env: &mut Environment, socket: i32, how: i32) -> i32 {
     close(env, socket)
 }
 
-// ЗАГЛУШКА ДЛЯ GAMELOFT: игра пытается найти сетевой интерфейс 
-// по имени (например, en0 для Wi-Fi). Мы всегда возвращаем 0 (не найдено).
+// ЗАГЛУШКА ДЛЯ GAMELOFT: возвращаем 1 (как будто интерфейс существует),
+// чтобы игра не уходила в ветку обработки ошибок и не передавала NULL в другие функции.
 fn if_nametoindex(_env: &mut Environment, _ifname: ConstPtr<u8>) -> u32 {
-    log!("TODO: if_nametoindex(...) -> 0 (simulating no network interfaces)");
-    0
+    log!("TODO: if_nametoindex(...) -> 1 (faking interface to avoid C++ crash)");
+    1
 }
 
 pub const FUNCTIONS: FunctionExports = &[

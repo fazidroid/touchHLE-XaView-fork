@@ -307,16 +307,19 @@ fn strlcpy(
 }
 
 fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> ConstPtr<u8> {
-    // Считываем набор искомых символов
+    // БРОНЕЖИЛЕТ ОТ КРАШЕЙ: если C++ игра передает пустой указатель, 
+    // мы просто безопасно возвращаем пустоту, не пытаясь читать память.
+    if s.is_null() || charset.is_null() {
+        return Ptr::null();
+    }
+    
     let sep = env.mem.cstr_at(charset);
     let mut i = 0;
     loop {
         let c = env.mem.read(s + i);
-        // Если дошли до конца строки, возвращаем нулевой указатель (не найдено)
         if c == b'\0' {
             return Ptr::null();
         }
-        // Если символ есть в искомом наборе, возвращаем указатель на него
         if sep.contains(&c) {
             return s + i;
         }
