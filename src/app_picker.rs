@@ -275,7 +275,7 @@ fn show_app_picker_gui(
     let icon = {
         let bytes: &[u8] = match super::branding() {
             "" => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/icon.png")),
-            "UNOFFICIAL" => include_bytes!(concat!(
+            "XAVIEW" => include_bytes!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/res/icon_unofficial.png"
             )),
@@ -417,7 +417,7 @@ fn show_app_picker_gui(
         () = msg![env; main_view addSubview:label];
     }
 
-    let brand_color: id = if super::branding() == "UNOFFICIAL" {
+    let brand_color: id = if super::branding() == "XAVIEW" {
         msg_class![env; UIColor redColor]
     } else {
         msg_class![env; UIColor grayColor]
