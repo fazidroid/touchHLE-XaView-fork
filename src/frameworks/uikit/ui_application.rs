@@ -31,7 +31,25 @@ impl HostObject for UIApplicationHostObject {}
 
 // Добавляем память для наших уведомлений
 #[derive(Default)]
-struct UILocalNotificationHostObject {}
+struct UILocalNotificationHostObject {
+    fire_date: id,
+    time_zone: id,
+    alert_body: id,
+    alert_action: id,
+    sound_name: id,
+    user_info: id,
+    badge_number: NSInteger,
+    repeat_interval: NSInteger,
+}
+impl Default for UILocalNotificationHostObject {
+    fn default() -> Self {
+        Self {
+            fire_date: nil, time_zone: nil, alert_body: nil,
+            alert_action: nil, sound_name: nil, user_info: nil,
+            badge_number: 0, repeat_interval: 0,
+        }
+    }
+}
 impl HostObject for UILocalNotificationHostObject {}
 
 pub type UIInterfaceOrientation = UIDeviceOrientation;
@@ -190,8 +208,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // === БРОНЕЖИЛЕТ ОТ C++ ВЫЛЕТОВ УВЕДОМЛЕНИЙ ===
 - (id)scheduledLocalNotifications {
-    // Возвращаем настоящий пустой массив, чтобы C++ не подавился нулем!
-    msg_class![env; NSArray array]
+    // Возвращаем настоящий пустой массив (через alloc/init для надежности)
+    let class = env.objc.get_known_class("NSArray", &mut env.mem);
+    let arr: id = msg![env; class alloc];
+    let arr: id = msg![env; arr init];
+    autorelease(env, arr)
+}
+- (UIRemoteNotificationType)enabledRemoteNotificationTypes {
+    0
 }
 - (())setScheduledLocalNotifications:(id)_notifications {
     log!("TODO: ignoring setScheduledLocalNotifications");
@@ -229,24 +253,62 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)init {
     this
 }
-// Сеттеры
-- (())setFireDate:(id)_date {}
-- (())setTimeZone:(id)_tz {}
-- (())setAlertBody:(id)_body {}
-- (())setAlertAction:(id)_action {}
-- (())setSoundName:(id)_name {}
-- (())setApplicationIconBadgeNumber:(NSInteger)_bn {}
-- (())setUserInfo:(id)_info {}
-- (())setRepeatInterval:(NSInteger)_interval {}
-// Геттеры (отдаем 0 и nil, чтобы игра думала, что всё ок)
-- (id)fireDate { nil }
-- (id)timeZone { nil }
-- (id)alertBody { nil }
-- (id)alertAction { nil }
-- (id)soundName { nil }
-- (NSInteger)applicationIconBadgeNumber { 0 }
-- (id)userInfo { nil }
-- (NSInteger)repeatInterval { 0 }
+- (())dealloc {
+    let host = env.objc.borrow_mut::<UILocalNotificationHostObject>(this);
+    release(env, host.fire_date);
+    release(env, host.time_zone);
+    release(env, host.alert_body);
+    release(env, host.alert_action);
+    release(env, host.sound_name);
+    release(env, host.user_info);
+    env.objc.dealloc_object(this, &mut env.mem)
+}
+
+- (())setFireDate:(id)val {
+    let old = std::mem::replace(&mut env.objc.borrow_mut::<UILocalNotificationHostObject>(this).fire_date, val);
+    retain(env, val); release(env, old);
+}
+- (id)fireDate { env.objc.borrow::<UILocalNotificationHostObject>(this).fire_date }
+
+- (())setTimeZone:(id)val {
+    let old = std::mem::replace(&mut env.objc.borrow_mut::<UILocalNotificationHostObject>(this).time_zone, val);
+    retain(env, val); release(env, old);
+}
+- (id)timeZone { env.objc.borrow::<UILocalNotificationHostObject>(this).time_zone }
+
+- (())setAlertBody:(id)val {
+    let old = std::mem::replace(&mut env.objc.borrow_mut::<UILocalNotificationHostObject>(this).alert_body, val);
+    retain(env, val); release(env, old);
+}
+- (id)alertBody { env.objc.borrow::<UILocalNotificationHostObject>(this).alert_body }
+
+- (())setAlertAction:(id)val {
+    let old = std::mem::replace(&mut env.objc.borrow_mut::<UILocalNotificationHostObject>(this).alert_action, val);
+    retain(env, val); release(env, old);
+}
+- (id)alertAction { env.objc.borrow::<UILocalNotificationHostObject>(this).alert_action }
+
+- (())setSoundName:(id)val {
+    let old = std::mem::replace(&mut env.objc.borrow_mut::<UILocalNotificationHostObject>(this).sound_name, val);
+    retain(env, val); release(env, old);
+}
+- (id)soundName { env.objc.borrow::<UILocalNotificationHostObject>(this).sound_name }
+
+- (())setUserInfo:(id)val {
+    let old = std::mem::replace(&mut env.objc.borrow_mut::<UILocalNotificationHostObject>(this).user_info, val);
+    retain(env, val); release(env, old);
+}
+- (id)userInfo { env.objc.borrow::<UILocalNotificationHostObject>(this).user_info }
+
+- (())setApplicationIconBadgeNumber:(NSInteger)val {
+    env.objc.borrow_mut::<UILocalNotificationHostObject>(this).badge_number = val;
+}
+- (NSInteger)applicationIconBadgeNumber { env.objc.borrow::<UILocalNotificationHostObject>(this).badge_number }
+
+- (())setRepeatInterval:(NSInteger)val {
+    env.objc.borrow_mut::<UILocalNotificationHostObject>(this).repeat_interval = val;
+}
+- (NSInteger)repeatInterval { env.objc.borrow::<UILocalNotificationHostObject>(this).repeat_interval }
 
 @end
 
