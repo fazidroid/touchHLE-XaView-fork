@@ -30,7 +30,6 @@ struct UIApplicationHostObject {
 impl HostObject for UIApplicationHostObject {}
 
 // Добавляем память для наших уведомлений
-#[derive(Default)]
 struct UILocalNotificationHostObject {
     fire_date: id,
     time_zone: id,
