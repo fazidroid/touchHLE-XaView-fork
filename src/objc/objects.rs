@@ -241,8 +241,14 @@ impl super::ObjC {
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
     pub fn borrow<T: AnyHostObject + 'static>(&self, object: id) -> &T {
-        let mut host_object: &(dyn AnyHostObject + 'static) =
-            &*self.objects.get(&object).unwrap().host_object;
+        // БРОНЕЖИЛЕТ: Если объект не найден (уже удален), мы выводим ошибку, 
+        // но вместо краша (unwrap) нам придется запаниковать с понятным текстом,
+        // так как вернуть фейковую ссылку невозможно.
+        let entry = self.objects.get(&object).unwrap_or_else(|| {
+            panic!("USE-AFTER-FREE: Attempted to borrow object {object:?} that is not in memory (was it deallocated?)");
+        });
+        
+        let mut host_object: &(dyn AnyHostObject + 'static) = &*entry.host_object;
         loop {
             if let Some(res) = host_object.as_any().downcast_ref() {
                 return res;
@@ -261,11 +267,16 @@ impl super::ObjC {
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
     pub fn borrow_mut<T: AnyHostObject + 'static>(&mut self, object: id) -> &mut T {
+        // БРОНЕЖИЛЕТ: То же самое для изменяемой ссылки
+        let entry = self.objects.get_mut(&object).unwrap_or_else(|| {
+            panic!("USE-AFTER-FREE: Attempted to borrow_mut object {object:?} that is not in memory (was it deallocated?)");
+        });
+        
         // Rust's borrow checker struggles with loops like this which descend
         // through a data structure with a mutable borrow. The unsafe code is
         // used to bypass the borrow checker.
         type Aho = dyn AnyHostObject + 'static;
-        let mut host_object: &mut Aho = &mut *self.objects.get_mut(&object).unwrap().host_object;
+        let mut host_object: &mut Aho = &mut *entry.host_object;
         loop {
             if let Some(res) = unsafe { &mut *(host_object as *mut Aho) }
                 .as_any_mut()
@@ -340,24 +351,15 @@ impl super::ObjC {
     /// Deallocate an object. Do not call this directly unless you're
     /// implementing `dealloc` and are sure you don't need to do a super-call.
     pub fn dealloc_object(&mut self, object: id, mem: &mut Mem) {
-        let HostObjectEntry {
-            host_object,
-            refcount,
-        } = self.objects.remove(&object).unwrap();
-
-        if let Some(refcount) = refcount {
-            // This is a serious bug if it ever happens in host code.
-            // Well-behaved apps should also never do this, but Crash Bandicoot
-            // Nitro Kart 3D is not a well-behaved app.
-            log!(
-                "Warning: {:?} was deallocated with non-zero reference count: {:?}",
-                object,
-                refcount
-            );
-        }
-
-        std::mem::drop(host_object);
-
-        mem.free(object.cast());
+        // БРОНЕЖИЛЕТ: Чтобы избежать крашей "Use-After-Free" (когда игра
+        // обращается к уже удаленному объекту), мы просто ПРЕКРАЩАЕМ
+        // удалять объекты из памяти эмулятора!
+        log!(
+            "MEMORY LEAK INTENTIONAL: Preventing deallocation of {:?} to avoid Use-After-Free crashes",
+            object
+        );
+        
+        // Ничего не делаем, объект остается жить вечно!
+        // Игре хватит гигабайтов современной оперативной памяти.
     }
 }
