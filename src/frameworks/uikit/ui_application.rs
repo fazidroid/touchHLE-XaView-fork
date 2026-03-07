@@ -193,16 +193,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     // Возвращаем настоящий пустой массив, чтобы C++ не подавился нулем!
     msg_class![env; NSArray array]
 }
-- (())setScheduledLocalNotifications:(id)notifications {
+- (())setScheduledLocalNotifications:(id)_notifications {
     log!("TODO: ignoring setScheduledLocalNotifications");
 }
 - (())cancelAllLocalNotifications {
     log!("TODO: [UIApplication cancelAllLocalNotifications]");
 }
-- (())cancelLocalNotification:(id)notification {
+- (())cancelLocalNotification:(id)_notification {
     log!("TODO: [UIApplication cancelLocalNotification]");
 }
-- (())scheduleLocalNotification:(id)notification {
+- (())scheduleLocalNotification:(id)_notification {
     log!("TODO: [UIApplication scheduleLocalNotification]");
 }
 
