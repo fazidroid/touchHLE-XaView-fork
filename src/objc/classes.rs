@@ -419,17 +419,54 @@ impl ClassHostObject {
 /// touchHLE to currently support, but which can be easily replaced with simple
 /// fakes.
 fn substitute_classes(
-    _mem: &Mem,
-    _class: Class,
-    _metaclass: Class,
+    mem: &Mem,
+    class: Class,
+    metaclass: Class,
 ) -> Option<(Box<FakeClass>, Box<FakeClass>)> {
-    
-    // ОТКЛЮЧЕНО: Агрессивная подмена классов ломает память в играх со
-    // встроенными SDK (например, Asphalt 6 v1.3.7 и выше), вызывая 
-    // краш `objects.contains_key`. Мы позволяем игре загружать свои 
-    // оригинальные классы. Без сети они всё равно безопасны.
-    
-    None
+    let class_t { data, .. } = mem.read(class.cast());
+    let class_rw_t { name, .. } = mem.read(data);
+    let name = mem.cstr_at_utf8(name).unwrap();
+
+    // Currently the only thing we try to substitute: classes that seem to be
+    // from various third-party advertising or social network SDKs.
+    // Naturally it makes a lot of use of UIKit and networking in ways we
+    // don't support yet. This isn't "ad blocking" because ads no longer work
+    // on real devices anyway :)
+    if !(name.starts_with("AdMob")
+        || name.starts_with("AltAds")
+        || name.starts_with("Mobclix")
+        || name.starts_with("FB") // Facebook
+        || name.starts_with("Flurry")
+        || name.starts_with("OpenFeint")
+        || name.starts_with("Tapjoy"))
+    {
+        return None;
+    }
+
+    {
+        let class_t { data, .. } = mem.read(metaclass.cast());
+        let class_rw_t {
+            name: metaclass_name,
+            ..
+        } = mem.read(data);
+        let metaclass_name = mem.cstr_at_utf8(metaclass_name).unwrap();
+        assert!(name == metaclass_name);
+    }
+
+    log!(
+        "Note: substituting fake class for {} to improve compatibility",
+        name
+    );
+
+    let class_host_object = Box::new(FakeClass {
+        name: name.to_string(),
+        is_metaclass: false,
+    });
+    let metaclass_host_object = Box::new(FakeClass {
+        name: name.to_string(),
+        is_metaclass: true,
+    });
+    Some((class_host_object, metaclass_host_object))
 }
 
 impl ObjC {
@@ -579,8 +616,13 @@ impl ObjC {
                 assert!(class_host_object.name == metaclass_host_object.name);
                 let name = class_host_object.name.clone();
 
-                self.register_static_object(class, class_host_object);
-                self.register_static_object(metaclass, metaclass_host_object);
+                // БРОНЕЖИЛЕТ ОТ ДУБЛИКАТОВ (для фейков)
+                if self.get_host_object(class).is_none() {
+                    self.register_static_object(class, class_host_object);
+                }
+                if self.get_host_object(metaclass).is_none() {
+                    self.register_static_object(metaclass, metaclass_host_object);
+                }
                 name
             } else {
                 let class_host_object = Box::new(ClassHostObject::from_bin(
@@ -593,8 +635,13 @@ impl ObjC {
                 assert!(class_host_object.name == metaclass_host_object.name);
                 let name = class_host_object.name.clone();
 
-                self.register_static_object(class, class_host_object);
-                self.register_static_object(metaclass, metaclass_host_object);
+                // БРОНЕЖИЛЕТ ОТ ДУБЛИКАТОВ (для оригиналов)
+                if self.get_host_object(class).is_none() {
+                    self.register_static_object(class, class_host_object);
+                }
+                if self.get_host_object(metaclass).is_none() {
+                    self.register_static_object(metaclass, metaclass_host_object);
+                }
                 name
             };
 
