@@ -241,7 +241,11 @@ impl super::ObjC {
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
     pub fn borrow<T: AnyHostObject + 'static>(&self, object: id) -> &T {
-        // БРОНЕЖИЛЕТ: Если объект не найден
+        // БРОНЕЖИЛЕТ ОТ NULL: Ловим нулевые указатели
+        if object == nil {
+            panic!("NULL POINTER DEREFERENCE: Attempted to borrow `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
+        }
+        
         let entry = self.objects.get(&object).unwrap_or_else(|| {
             panic!("USE-AFTER-FREE: Attempted to borrow object {object:?} that is not in memory (was it deallocated?)");
         });
@@ -265,14 +269,15 @@ impl super::ObjC {
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
     pub fn borrow_mut<T: AnyHostObject + 'static>(&mut self, object: id) -> &mut T {
-        // БРОНЕЖИЛЕТ: То же самое для изменяемой ссылки
+        // БРОНЕЖИЛЕТ ОТ NULL: Ловим нулевые указатели
+        if object == nil {
+            panic!("NULL POINTER DEREFERENCE: Attempted to borrow_mut `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
+        }
+
         let entry = self.objects.get_mut(&object).unwrap_or_else(|| {
             panic!("USE-AFTER-FREE: Attempted to borrow_mut object {object:?} that is not in memory (was it deallocated?)");
         });
         
-        // Rust's borrow checker struggles with loops like this which descend
-        // through a data structure with a mutable borrow. The unsafe code is
-        // used to bypass the borrow checker.
         type Aho = dyn AnyHostObject + 'static;
         let mut host_object: &mut Aho = &mut *entry.host_object;
         loop {
