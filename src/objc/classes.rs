@@ -419,9 +419,9 @@ impl ClassHostObject {
 /// touchHLE to currently support, but which can be easily replaced with simple
 /// fakes.
 fn substitute_classes(
-    mem: &Mem,
-    class: Class,
-    metaclass: Class,
+    _mem: &Mem,
+    _class: Class,
+    _metaclass: Class,
 ) -> Option<(Box<FakeClass>, Box<FakeClass>)> {
     
     // ОТКЛЮЧЕНО: Агрессивная подмена классов ломает память в играх со
