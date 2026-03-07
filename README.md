@@ -2,7 +2,7 @@ XaView FORK:
 
 =Asphalt 6 support: ⚠️ (Partically)
 
--Fully working: 1.0.2 Demo, 1.1.6, 1.3.2
+-Fully working: 1.0.2 Demo, 1.1.6, 1.3.2, 1.3.3
 
 -Working with issues: 1.0.0p (one 1.0.0p version have black texture issue in 360 garage, other have glitch issue in main menu garage)
 
