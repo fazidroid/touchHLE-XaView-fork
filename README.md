@@ -1,15 +1,11 @@
 XaView FORK:
-1) Asphalt 6 support: ⚠️ (Partically)
+=Asphalt 6 support: ⚠️ (Partically)
+-Fully working: 1.0.2 Demo, 1.1.6
+-Working with issues: 1.0.0p (one 1.0.0p version have black texture issue in 360 garage, other have glitch issue in main menu garage)
+-Working on fixes right now: 1.3.2
+-Not tested: Others
 
-Fully working: 1.0.2 Demo, 1.1.6
-
-Working with issues: 1.0.0p (one 1.0.0p version have black texture issue in 360 garage, other have glitch issue in main menu garage)
-
-Working on fixes right now: 1.3.2
-
-Not tested: Others
-
-3) More Asphalt 5 versions support: ❌
+=More Asphalt 5 versions support: ❌
 
 ///
 
