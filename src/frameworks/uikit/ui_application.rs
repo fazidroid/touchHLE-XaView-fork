@@ -211,8 +211,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)scheduledLocalNotifications {
-    // Возвращаем nil, чтобы C++ даже не пытался обходить массив
-    nil
+    // Единственный 100% безопасный способ создать пустой массив для C++
+    let empty_vec: Vec<id> = Vec::new();
+    let arr = ns_array::from_vec(env, empty_vec);
+    autorelease(env, arr)
 }
 
 - (NSInteger)applicationState { 0 }
@@ -252,29 +254,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 - (id)init {
-    let empty_str = get_static_str(env, "");
-    let empty_dict = msg_class![env; NSDictionary dictionary];
-    let default_date = msg_class![env; NSDate date];
-
-    {
-        let host = env.objc.borrow_mut::<UILocalNotificationHostObject>(this);
-        host.fire_date = default_date;
-        host.time_zone = empty_str;
-        host.alert_body = empty_str;
-        host.alert_action = empty_str;
-        host.sound_name = empty_str;
-        host.alert_launch_image = empty_str;
-        host.user_info = empty_dict;
-        host.has_action = false;
-    }
-
-    retain(env, default_date);
-    retain(env, empty_str);
-    retain(env, empty_str);
-    retain(env, empty_str);
-    retain(env, empty_str);
-    retain(env, empty_dict);
-
     this
 }
 - (())dealloc {
@@ -385,6 +364,7 @@ pub const CLASSES: ClassExports = objc_classes! {
                      options:(NSUInteger)_opts {
     msg_class![env; NSDate date]
 }
+- (id)calendarIdentifier { get_static_str(env, "gregorian") }
 @end
 
 @implementation NSDateComponents: NSObject
@@ -419,6 +399,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)systemTimeZone { msg_class![env; NSTimeZone defaultTimeZone] }
 + (id)localTimeZone { msg_class![env; NSTimeZone defaultTimeZone] }
 + (id)timeZoneWithName:(id)_name { msg_class![env; NSTimeZone defaultTimeZone] }
+- (id)name { get_static_str(env, "GMT") }
+- (id)abbreviation { get_static_str(env, "GMT") }
 @end
 
 };
@@ -569,6 +551,7 @@ const UIApplicationWillEnterForegroundNotification: &str = "UIApplicationWillEnt
 const UIApplicationWillResignActiveNotification: &str = "UIApplicationWillResignActiveNotification";
 const UIApplicationWillTerminateNotification: &str = "UIApplicationWillTerminateNotification";
 const UIApplicationLaunchOptionsRemoteNotificationKey: &str = "UIApplicationLaunchOptionsRemoteNotificationKey";
+const UIApplicationLaunchOptionsLocalNotificationKey: &str = "UIApplicationLaunchOptionsLocalNotificationKey";
 const UIApplicationDidReceiveMemoryWarningNotification: &str = "UIApplicationDidReceiveMemoryWarningNotification";
 const UILocalNotificationDefaultSoundName: &str = "UILocalNotificationDefaultSoundName";
 
@@ -604,6 +587,10 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_UIApplicationLaunchOptionsRemoteNotificationKey", 
         HostConstant::NSString(UIApplicationLaunchOptionsRemoteNotificationKey)
+    ),
+    (
+        "_UIApplicationLaunchOptionsLocalNotificationKey", 
+        HostConstant::NSString(UIApplicationLaunchOptionsLocalNotificationKey)
     ),
     (
         "_UILocalNotificationDefaultSoundName", 
