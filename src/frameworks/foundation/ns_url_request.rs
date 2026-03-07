@@ -131,6 +131,38 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSMutableURLRequest: NSURLRequest
 
+- (id)initWithURL:(id)url {
+    // Вызываем родительский метод с дефолтными параметрами
+    msg![env; this initWithURL:url
+                   cachePolicy:NSURLRequestUseProtocolCachePolicy
+               timeoutInterval:60.0]
+}
+
+- (id)initWithURL:(id)url
+        cachePolicy:(NSURLRequestCachePolicy)cache_policy
+    timeoutInterval:(NSTimeInterval)timeout_interval {
+    
+    // Эмулятор может не найти метод родителя через super, поэтому
+    // мы просто дублируем логику инициализации для мутабельного класса
+    if url == nil {
+        return nil;
+    }
+    
+    // Если сеть выключена, притворяемся, что ничего не вышло
+    if !env.options.network_access {
+        log!("Network access is disabled, blocking NSMutableURLRequest");
+        release(env, this);
+        return nil;
+    }
+
+    let url_copy = msg![env; url copy];
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url_copy;
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).cache_policy = cache_policy;
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).timeout_interval = timeout_interval;
+
+    this
+}
+
 - (())setHTTPMethod:(id)http_method { // NSString *
     let http_method_copy = msg![env; http_method copy];
 
