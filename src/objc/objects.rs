@@ -241,9 +241,7 @@ impl super::ObjC {
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
     pub fn borrow<T: AnyHostObject + 'static>(&self, object: id) -> &T {
-        // БРОНЕЖИЛЕТ: Если объект не найден (уже удален), мы выводим ошибку, 
-        // но вместо краша (unwrap) нам придется запаниковать с понятным текстом,
-        // так как вернуть фейковую ссылку невозможно.
+        // БРОНЕЖИЛЕТ: Если объект не найден
         let entry = self.objects.get(&object).unwrap_or_else(|| {
             panic!("USE-AFTER-FREE: Attempted to borrow object {object:?} that is not in memory (was it deallocated?)");
         });
