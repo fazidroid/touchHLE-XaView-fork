@@ -81,16 +81,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)sharedApplication {
-    // Если ядро уже создано — просто отдаем его
     if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
         return app;
     }
-    // Если нет (C++ пришел слишком рано) — железобетонно создаем и сохраняем
     let class = env.objc.get_known_class("UIApplication", &mut env.mem);
     let app: id = msg![env; class alloc];
     let app_init: id = msg![env; app init];
     env.framework_state.uikit.ui_application.shared_application = Some(app_init);
-    
     app_init
 }
 
@@ -209,24 +206,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: ignoring setApplicationIconBadgeNumber:{}", bn);
 }
 
-// === БРОНЕЖИЛЕТ ОТ C++ ВЫЛЕТОВ УВЕДОМЛЕНИЙ ===
 - (id)scheduledLocalNotifications {
-    // Самый надежный и правильный способ получить пустой массив в iOS
     msg_class![env; NSArray array]
 }
 
 - (NSInteger)applicationState {
     0 // UIApplicationStateActive
 }
-    // Возвращаем настоящий пустой массив (через alloc/init для надежности)
-    let class = env.objc.get_known_class("NSArray", &mut env.mem);
-    let arr: id = msg![env; class alloc];
-    let arr: id = msg![env; arr init];
-    autorelease(env, arr)
-}
-- (UIRemoteNotificationType)enabledRemoteNotificationTypes {
-    0
-}
+
 - (())setScheduledLocalNotifications:(id)_notifications {
     log!("TODO: ignoring setScheduledLocalNotifications");
 }
@@ -253,7 +240,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
-// === ПОЛНОЦЕННАЯ ЗАГЛУШКА УВЕДОМЛЕНИЙ ===
 @implementation UILocalNotification: NSObject
 
 + (id)allocWithZone:(NSZonePtr)_zone {
