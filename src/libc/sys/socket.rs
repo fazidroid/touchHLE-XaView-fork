@@ -1018,6 +1018,13 @@ fn shutdown(env: &mut Environment, socket: i32, how: i32) -> i32 {
     close(env, socket)
 }
 
+// ЗАГЛУШКА ДЛЯ GAMELOFT: игра пытается найти сетевой интерфейс 
+// по имени (например, en0 для Wi-Fi). Мы всегда возвращаем 0 (не найдено).
+fn if_nametoindex(env: &mut Environment, _ifname: ConstPtr<u8>) -> u32 {
+    log!("TODO: if_nametoindex(...) -> 0 (simulating no network interfaces)");
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(socket(_, _, _)),
     export_c_func!(ioctl(_, _, _)),
@@ -1033,6 +1040,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(send(_, _, _, _)),
     export_c_func!(sendto(_, _, _, _, _, _)),
     export_c_func!(shutdown(_, _)),
+    export_c_func!(if_nametoindex(_)), // Зарегистрировали нашу функцию
 ];
 
 /// A helper to close a socket, not a part of API
