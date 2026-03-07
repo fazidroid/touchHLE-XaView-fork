@@ -8,7 +8,7 @@
 use super::{ns_string, NSTimeInterval, NSUInteger};
 use crate::frameworks::foundation::ns_string::to_rust_string;
 use crate::objc::{
-    autorelease, id, nil, objc_classes, release, ClassExports, HostObject, NSZonePtr,
+    autorelease, id, nil, objc_classes, release, retain, ClassExports, HostObject, NSZonePtr,
 };
 use crate::{msg, msg_class};
 
@@ -38,8 +38,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSURLRequest: NSObject
 
 + (id)allocWithZone:(NSZonePtr)_zone {
-    // TODO: this should be mutable _only_ in the subclass
-    // TODO: fill default headers
     let http_header_fields: id = msg_class![env; NSMutableDictionary new];
     let host_object = Box::new(NSURLRequestHostObject {
         url: nil,
@@ -68,38 +66,31 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
+// Добавляем базовый init, который так нужен играм Gameloft
+- (id)initWithURL:(id)url {
+    msg![env; this initWithURL:url
+                   cachePolicy:NSURLRequestUseProtocolCachePolicy
+               timeoutInterval:60.0]
+}
+
 - (id)initWithURL:(id)url
         cachePolicy:(NSURLRequestCachePolicy)cache_policy
     timeoutInterval:(NSTimeInterval)timeout_interval {
-    if url == nil {
-        return nil;
+    
+    // БЕЗОПАСНЫЙ РЕЖИМ: мы больше никогда не возвращаем nil и не делаем release(env, this), 
+    // чтобы C++ обертки игры не вызывали Use-After-Free краши.
+    
+    if url != nil {
+        let url_copy = msg![env; url copy];
+        env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url_copy;
     }
-    let url_desc: id = msg![env; url description];
-    log_dbg!(
-        "[(NSURLRequest *){:?} initWithURL:{} cachePolicy:{} timeoutInterval:{}]",
-        this,
-        to_rust_string(env, url_desc),
-        cache_policy,
-        timeout_interval,
-    );
-
-    // Preserving old behaviour
-    if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, [(NSURLRequest *){:?} initWithURL:{} cachePolicy:{} timeoutInterval:{}] -> nil",
-            this,
-            to_rust_string(env, url_desc),
-            cache_policy,
-            timeout_interval,
-        );
-        release(env, this);
-        return nil;
-    }
-
-    let url_copy = msg![env; url copy];
-    env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url_copy;
+    
     env.objc.borrow_mut::<NSURLRequestHostObject>(this).cache_policy = cache_policy;
     env.objc.borrow_mut::<NSURLRequestHostObject>(this).timeout_interval = timeout_interval;
+
+    if !env.options.network_access {
+        log!("Network access is disabled, but returning valid NSURLRequest to prevent C++ crashes");
+    }
 
     this
 }
@@ -131,58 +122,25 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSMutableURLRequest: NSURLRequest
 
-- (id)initWithURL:(id)url {
-    // Вызываем родительский метод с дефолтными параметрами
-    msg![env; this initWithURL:url
-                   cachePolicy:NSURLRequestUseProtocolCachePolicy
-               timeoutInterval:60.0]
-}
-
-- (id)initWithURL:(id)url
-        cachePolicy:(NSURLRequestCachePolicy)cache_policy
-    timeoutInterval:(NSTimeInterval)timeout_interval {
-    
-    // Эмулятор может не найти метод родителя через super, поэтому
-    // мы просто дублируем логику инициализации для мутабельного класса
-    if url == nil {
-        return nil;
-    }
-    
-    // Если сеть выключена, притворяемся, что ничего не вышло
-    if !env.options.network_access {
-        log!("Network access is disabled, blocking NSMutableURLRequest");
-        release(env, this);
-        return nil;
-    }
-
-    let url_copy = msg![env; url copy];
-    env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url_copy;
-    env.objc.borrow_mut::<NSURLRequestHostObject>(this).cache_policy = cache_policy;
-    env.objc.borrow_mut::<NSURLRequestHostObject>(this).timeout_interval = timeout_interval;
-
-    this
-}
-
 - (())setHTTPMethod:(id)http_method { // NSString *
+    if http_method == nil { return; }
     let http_method_copy = msg![env; http_method copy];
-
     let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
     let old_http_method = std::mem::replace(&mut host_obj.http_method, http_method_copy);
     release(env, old_http_method);
-    // No need to retain http_method as we made a copy
 }
 
 - (())setHTTPBody:(id)http_body { // NSData *
+    if http_body == nil { return; }
     let http_body_copy = msg![env; http_body copy];
-
     let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
     let old_http_body = std::mem::replace(&mut host_obj.http_body, http_body_copy);
     release(env, old_http_body);
-    // No need to retain http_body as we made a copy
 }
 
 - (())setValue:(id)value // NSString *
     forHTTPHeaderField:(id)field { // NSString *
+    if value == nil || field == nil { return; }
     log_dbg!("[(NSURLRequest*){:?} setValue:'{}' forHTTPHeaderField:'{}']", this, to_rust_string(env, value), to_rust_string(env, field));
     let http_header_fields = env.objc.borrow_mut::<NSURLRequestHostObject>(this).http_header_fields;
     () = msg![env; http_header_fields setObject:value forKey:field];
