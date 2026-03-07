@@ -214,6 +214,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: ignoring setApplicationIconBadgeNumber:{}", bn);
 }
 
+// Заглушки для локальных уведомлений
+- (())cancelAllLocalNotifications {
+    log!("TODO: [UIApplication cancelAllLocalNotifications]");
+}
+- (())scheduleLocalNotification:(id)notification {
+    log!("TODO: [UIApplication scheduleLocalNotification:{:?}]", notification);
+}
+
 // UIResponder implementation
 // From the Apple UIView docs regarding [UIResponder nextResponder]:
 // "The shared UIApplication object normally returns nil, but it returns its
@@ -233,7 +241,23 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
-};
+// Заглушка для класса локальных уведомлений
+@implementation UILocalNotification: NSObject
+- (id)init {
+    log!("TODO: [UILocalNotification init]");
+    this
+}
+// Добавим парочку частых сеттеров, чтобы игра не упала, настраивая уведомление
+- (())setFireDate:(id)_date {}
+- (())setTimeZone:(id)_tz {}
+- (())setAlertBody:(id)_body {}
+- (())setAlertAction:(id)_action {}
+- (())setSoundName:(id)_name {}
+- (())setApplicationIconBadgeNumber:(NSInteger)_bn {}
+- (())setUserInfo:(id)_info {}
+@end
+
+}; // Это закрывающая скобка макроса objc_classes!
 
 /// `UIApplicationMain`, the entry point of the application.
 ///
