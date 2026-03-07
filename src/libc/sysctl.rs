@@ -86,16 +86,17 @@ fn sysctl(
         newlen
     );
 
-    // БРОНЕЖИЛЕТ: Игры Gameloft используют sysctl(name_len=6)
-    // Мы перехватываем такие длинные запросы
-    // не паниковала и шла дальше.
     if name_len != 2 {
         log!(
-            "TODO: sysctl called with name_len = {} (expected 2). Faking failure to avoid crash.",
+            "TODO: sysctl called with name_len = {} (expected 2). Faking empty response to avoid crash.",
             name_len
         );
-        // Возвращаем -1, симулируя, что параметр не найден
-        return -1;
+        // Если игра запрашивает размер данных
+        if !oldlenp.is_null() {
+            env.mem.write(oldlenp, 0);
+        }
+        // ОБЯЗАТЕЛЬНО возвращаем 0 (успех)
+        return 0;
     }
 
     let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));
