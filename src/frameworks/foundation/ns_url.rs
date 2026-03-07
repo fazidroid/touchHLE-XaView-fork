@@ -201,6 +201,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     // TODO
     nil
 }
+
+- (id)initWithMemoryCapacity:(NSUInteger)memoryCapacity
+                diskCapacity:(NSUInteger)diskCapacity
+                    diskPath:(id)path {
+    log!("TODO: [(NSURLCache*){:?} initWithMemoryCapacity:{} diskCapacity:{} diskPath:{:?}]", this, memoryCapacity, diskCapacity, path);
+    this
+}
+
 @end
 
 };
