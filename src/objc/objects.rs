@@ -348,7 +348,7 @@ impl super::ObjC {
 
     /// Deallocate an object. Do not call this directly unless you're
     /// implementing `dealloc` and are sure you don't need to do a super-call.
-    pub fn dealloc_object(&mut self, object: id, mem: &mut Mem) {
+    pub fn dealloc_object(&mut self, object: id, _mem: &mut Mem) {
         // БРОНЕЖИЛЕТ: Чтобы избежать крашей "Use-After-Free" (когда игра
         // обращается к уже удаленному объекту), мы просто ПРЕКРАЩАЕМ
         // удалять объекты из памяти эмулятора!
