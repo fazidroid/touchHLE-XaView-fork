@@ -329,6 +329,7 @@ fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> Con
 // Функция принимает 11 аргументов, но эмулятор поддерживает максимум 7
 // Прячем хвост в DotDotDot. Возвращаем ошибку -43 (kCCParamError)
 // чтобы игра не пыталась прочитать мусор из выходного буфера
+[allow(clippy::too_many_arguments)]
 fn CCCrypt(
     _env: &mut Environment,
     _op: u32,
