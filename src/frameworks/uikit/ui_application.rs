@@ -29,7 +29,7 @@ struct UIApplicationHostObject {
 }
 impl HostObject for UIApplicationHostObject {}
 
-// Добавляем память для наших уведомлений
+// Структура для уведомлений
 struct UILocalNotificationHostObject {
     fire_date: id,
     time_zone: id,
@@ -50,6 +50,11 @@ impl Default for UILocalNotificationHostObject {
     }
 }
 impl HostObject for UILocalNotificationHostObject {}
+
+// Пустышка для календарей и зон
+#[derive(Default)]
+struct DummyHostObject {}
+impl HostObject for DummyHostObject {}
 
 pub type UIInterfaceOrientation = UIDeviceOrientation;
 #[allow(unused)]
@@ -81,14 +86,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)sharedApplication {
-    if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
-        return app;
-    }
-    let class = env.objc.get_known_class("UIApplication", &mut env.mem);
-    let app: id = msg![env; class alloc];
-    let app_init: id = msg![env; app init];
-    env.framework_state.uikit.ui_application.shared_application = Some(app_init);
-    app_init
+    // Безопасный возврат, как было изначально
+    env.framework_state.uikit.ui_application.shared_application.unwrap_or(nil)
 }
 
 - (id)init {
@@ -199,9 +198,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("TODO: ignoring registerForRemoteNotificationTypes:{}", types);
 }
 
-- (NSInteger)applicationIconBadgeNumber {
-    0
-}
+- (NSInteger)applicationIconBadgeNumber { 0 }
 - (())setApplicationIconBadgeNumber:(NSInteger)bn {
     log!("TODO: ignoring setApplicationIconBadgeNumber:{}", bn);
 }
@@ -213,9 +210,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, arr_init)
 }
 
-- (NSInteger)applicationState {
-    0 // UIApplicationStateActive
-}
+- (NSInteger)applicationState { 0 }
 
 - (())setScheduledLocalNotifications:(id)_notifications {
     log!("TODO: ignoring setScheduledLocalNotifications");
@@ -243,8 +238,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
-@implementation UILocalNotification: NSObject
+// === ЗАГЛУШКИ ДЛЯ ПРЕДОТВРАЩЕНИЯ C++ КРАШЕЙ ===
 
+@implementation UILocalNotification: NSObject
 + (id)allocWithZone:(NSZonePtr)_zone {
     let host_object = Box::<UILocalNotificationHostObject>::default();
     env.objc.alloc_object(this, host_object, &mut env.mem)
@@ -252,17 +248,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)init {
     let empty_str = get_static_str(env, "");
     let empty_dict = msg_class![env; NSDictionary dictionary];
+    let default_date = msg_class![env; NSDate date];
 
     {
-        // Убрали mut, так как borrow_mut уже дает нам право менять содержимое
         let host = env.objc.borrow_mut::<UILocalNotificationHostObject>(this);
+        host.fire_date = default_date;
+        host.time_zone = empty_str;
         host.alert_body = empty_str;
         host.alert_action = empty_str;
         host.sound_name = empty_str;
         host.user_info = empty_dict;
     }
 
-    // Увеличиваем счетчик ссылок, так как наш dealloc потом их отпустит
+    retain(env, default_date);
+    retain(env, empty_str);
     retain(env, empty_str);
     retain(env, empty_str);
     retain(env, empty_str);
@@ -272,23 +271,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (())dealloc {
     let &UILocalNotificationHostObject {
-        fire_date,
-        time_zone,
-        alert_body,
-        alert_action,
-        sound_name,
-        user_info,
-        badge_number: _,
-        repeat_interval: _,
+        fire_date, time_zone, alert_body, alert_action, sound_name, user_info,
+        badge_number: _, repeat_interval: _,
     } = env.objc.borrow(this);
 
-    release(env, fire_date);
-    release(env, time_zone);
-    release(env, alert_body);
-    release(env, alert_action);
-    release(env, sound_name);
-    release(env, user_info);
-
+    release(env, fire_date); release(env, time_zone); release(env, alert_body);
+    release(env, alert_action); release(env, sound_name); release(env, user_info);
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
@@ -337,7 +325,60 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow_mut::<UILocalNotificationHostObject>(this).repeat_interval = val;
 }
 - (NSInteger)repeatInterval { env.objc.borrow::<UILocalNotificationHostObject>(this).repeat_interval }
+@end
 
+@implementation NSCalendar: NSObject
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let class = env.objc.get_known_class("NSCalendar", &mut env.mem);
+    env.objc.alloc_object(class, Box::<DummyHostObject>::default(), &mut env.mem)
+}
++ (id)currentCalendar {
+    let class = env.objc.get_known_class("NSCalendar", &mut env.mem);
+    let obj: id = msg![env; class alloc];
+    msg![env; obj init]
+}
++ (id)autoupdatingCurrentCalendar { msg_class![env; NSCalendar currentCalendar] }
+- (id)components:(NSUInteger)_flags fromDate:(id)_date {
+    let class = env.objc.get_known_class("NSDateComponents", &mut env.mem);
+    let obj: id = msg![env; class alloc];
+    msg![env; obj init]
+}
+- (id)dateFromComponents:(id)_comps { msg_class![env; NSDate date] }
+- (id)dateByAddingComponents:(id)_comps toDate:(id)_date options:(NSUInteger)_opts { msg_class![env; NSDate date] }
+@end
+
+@implementation NSDateComponents: NSObject
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let class = env.objc.get_known_class("NSDateComponents", &mut env.mem);
+    env.objc.alloc_object(class, Box::<DummyHostObject>::default(), &mut env.mem)
+}
+- (NSInteger)year { 2026 }
+- (())setYear:(NSInteger)_v {}
+- (NSInteger)month { 1 }
+- (())setMonth:(NSInteger)_v {}
+- (NSInteger)day { 1 }
+- (())setDay:(NSInteger)_v {}
+- (NSInteger)hour { 0 }
+- (())setHour:(NSInteger)_v {}
+- (NSInteger)minute { 0 }
+- (())setMinute:(NSInteger)_v {}
+- (NSInteger)second { 0 }
+- (())setSecond:(NSInteger)_v {}
+@end
+
+@implementation NSTimeZone: NSObject
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let class = env.objc.get_known_class("NSTimeZone", &mut env.mem);
+    env.objc.alloc_object(class, Box::<DummyHostObject>::default(), &mut env.mem)
+}
++ (id)defaultTimeZone {
+    let class = env.objc.get_known_class("NSTimeZone", &mut env.mem);
+    let obj: id = msg![env; class alloc];
+    msg![env; obj init]
+}
++ (id)systemTimeZone { msg_class![env; NSTimeZone defaultTimeZone] }
++ (id)localTimeZone { msg_class![env; NSTimeZone defaultTimeZone] }
++ (id)timeZoneWithName:(id)_name { msg_class![env; NSTimeZone defaultTimeZone] }
 @end
 
 };
