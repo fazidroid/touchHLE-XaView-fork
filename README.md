@@ -2,9 +2,10 @@ XaView FORK:
 
 =Asphalt 6 support: ✅
 
--Fully working: 1.0.2c Demo, 1.0.0p (iPad), 1.1.6, 1.3.2, 1.3.3j, 1.3.4f
+-Fully working: 1.0.2c Demo, 1.0.0p (iPad), 1.1.6, 1.3.2, 1.3.3j
 
 -Working with issues: 1.0.0p (iPhone) version have black texture issue in 360 garage, other one have glitch issue in main menu garage)
+1.3.4f (Freeze on some cars changing in car selection, perfomance better then 1.3.7y and 1.3.8h but still worse then old versions)
 1.3.7y and 1.3.8h (Freezes on some cars changing in car selection, random freezes in main menu, garage and in race (because of this you cant even finish any race), also bad perfomance)
 
 -Working on fixes right now: Others versions not in the list, searching in web right now, if you can help with finding them, it will be cool
