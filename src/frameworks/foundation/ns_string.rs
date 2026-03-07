@@ -2064,18 +2064,6 @@ fn string_by_replacing_occurrences_inner(
         .objc
         .borrow::<StringHostObject>(safe_replacement)
         .iter_code_units();
-    let mut main_iter = env
-        .objc
-        .borrow::<StringHostObject>(source)
-        .iter_code_units();
-    let target_iter = env
-        .objc
-        .borrow::<StringHostObject>(target)
-        .iter_code_units();
-    let replacement_iter = env
-        .objc
-        .borrow::<StringHostObject>(replacement)
-        .iter_code_units();
 
     // Zero-length target case
     if target_iter.clone().next().is_none() {
