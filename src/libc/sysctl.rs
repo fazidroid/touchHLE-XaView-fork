@@ -85,7 +85,19 @@ fn sysctl(
         newp,
         newlen
     );
-    assert_eq!(name_len, 2);
+
+    // БРОНЕЖИЛЕТ: Игры Gameloft используют sysctl(name_len=6) для проверки сети (MAC-адреса и т.д.).
+    // Мы перехватываем такие длинные запросы и возвращаем ошибку (-1), чтобы игра
+    // не паниковала и шла дальше.
+    if name_len != 2 {
+        log!(
+            "TODO: sysctl called with name_len = {} (expected 2). Faking failure to avoid crash.",
+            name_len
+        );
+        // Возвращаем -1, симулируя, что параметр не найден
+        return -1;
+    }
+
     let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));
     sysctl_generic(
         env,
