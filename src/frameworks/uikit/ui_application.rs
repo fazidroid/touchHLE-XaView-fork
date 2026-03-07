@@ -81,13 +81,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)sharedApplication {
-    // Ленивая инициализация ядра
-    if env.framework_state.uikit.ui_application.shared_application.is_none() {
-        let class = env.objc.get_known_class("UIApplication", &mut env.mem);
-        let app: id = msg![env; class alloc];
-        let _app: id = msg![env; app init];
+    // Если ядро уже создано — просто отдаем его
+    if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
+        return app;
     }
-    env.framework_state.uikit.ui_application.shared_application.unwrap_or(nil)
+    // Если нет (C++ пришел слишком рано) — железобетонно создаем и сохраняем
+    let class = env.objc.get_known_class("UIApplication", &mut env.mem);
+    let app: id = msg![env; class alloc];
+    let app_init: id = msg![env; app init];
+    env.framework_state.uikit.ui_application.shared_application = Some(app_init);
+    
+    app_init
 }
 
 - (id)init {
@@ -207,6 +211,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // === БРОНЕЖИЛЕТ ОТ C++ ВЫЛЕТОВ УВЕДОМЛЕНИЙ ===
 - (id)scheduledLocalNotifications {
+    // Самый надежный и правильный способ получить пустой массив в iOS
+    msg_class![env; NSArray array]
+}
+
+- (NSInteger)applicationState {
+    0 // UIApplicationStateActive
+}
     // Возвращаем настоящий пустой массив (через alloc/init для надежности)
     let class = env.objc.get_known_class("NSArray", &mut env.mem);
     let arr: id = msg![env; class alloc];
