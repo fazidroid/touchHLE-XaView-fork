@@ -605,7 +605,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         num
     }
 
-    assert_ne!(other, nil);
+    // БРОНЕЖИЛЕТ ОТ NULL
+    if other == nil {
+        return NSOrderedSame;
+    }
 
     // TODO: support foreign subclasses (perhaps via a helper function that
     // copies the string first)
@@ -703,8 +706,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)componentsSeparatedByString:(id)separator { // NSString*
-    // TODO: support foreign subclasses (perhaps via a helper function that
-    // copies the string first)
+    // БРОНЕЖИЛЕТ ОТ NULL
+    if separator == nil {
+        let array = ns_array::from_vec(env, vec![this]);
+        return autorelease(env, array);
+    }
     let mut main_iter = env.objc.borrow::<StringHostObject>(this)
         .iter_code_units();
     let sep_iter = env.objc.borrow::<StringHostObject>(separator)
@@ -897,7 +903,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)stringByAppendingString:(id)other { // NSString*
-    assert!(other != nil); // TODO: raise exception
+    // БРОНЕЖИЛЕТ ОТ NULL
+    if other == nil {
+        return this;
+    }
 
     // TODO: ideally, don't convert to UTF-16 here
     let this_len: NSUInteger = msg![env; this length];
@@ -1236,7 +1245,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())appendString:(id)a_string { // NSString*
-    assert_ne!(a_string, nil);
+    // БРОНЕЖИЛЕТ ОТ NULL
+    if a_string == nil {
+        return;
+    }
     // TODO: this is inefficient? append in place instead
     let new: id = msg![env; this stringByAppendingString:a_string];
     () = msg![env; this setString:new];
@@ -1573,7 +1585,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())setString:(id)a_string { // NSString*
-    assert_ne!(a_string, nil);
+    // БРОНЕЖИЛЕТ ОТ NULL
+    if a_string == nil {
+        let host_object = StringHostObject::Utf8("".to_string().into());
+        *env.objc.borrow_mut(this) = host_object;
+        return;
+    }
     let str = to_rust_string(env, a_string);
     let host_object = StringHostObject::Utf8(str);
     *env.objc.borrow_mut(this) = host_object;
@@ -2019,8 +2036,34 @@ fn string_by_replacing_occurrences_inner(
     replacement: id, // NSString *
     options: NSStringCompareOptions,
 ) -> id {
+    // БРОНЕЖИЛЕТ ОТ NULL
+    if source == nil {
+        return nil;
+    }
+    if target == nil {
+        let res = msg![env; source copy];
+        return autorelease(env, res);
+    }
+    let safe_replacement = if replacement == nil {
+        get_static_str(env, "")
+    } else {
+        replacement
+    };
+
     // TODO: support foreign subclasses (perhaps via a helper function that
     // copies the string first)
+    let mut main_iter = env
+        .objc
+        .borrow::<StringHostObject>(source)
+        .iter_code_units();
+    let target_iter = env
+        .objc
+        .borrow::<StringHostObject>(target)
+        .iter_code_units();
+    let replacement_iter = env
+        .objc
+        .borrow::<StringHostObject>(safe_replacement)
+        .iter_code_units();
     let mut main_iter = env
         .objc
         .borrow::<StringHostObject>(source)
