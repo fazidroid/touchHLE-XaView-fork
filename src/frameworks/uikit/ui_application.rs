@@ -253,13 +253,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 - (())dealloc {
-    let host = env.objc.borrow_mut::<UILocalNotificationHostObject>(this);
-    release(env, host.fire_date);
-    release(env, host.time_zone);
-    release(env, host.alert_body);
-    release(env, host.alert_action);
-    release(env, host.sound_name);
-    release(env, host.user_info);
+    let &UILocalNotificationHostObject {
+        fire_date,
+        time_zone,
+        alert_body,
+        alert_action,
+        sound_name,
+        user_info,
+        badge_number: _,
+        repeat_interval: _,
+    } = env.objc.borrow(this);
+
+    release(env, fire_date);
+    release(env, time_zone);
+    release(env, alert_body);
+    release(env, alert_action);
+    release(env, sound_name);
+    release(env, user_info);
+
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
