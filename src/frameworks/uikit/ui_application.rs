@@ -86,7 +86,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)sharedApplication {
-    // Ленивая инициализация: спасает от крашей, если C++ запрашивает ядро слишком рано
+    // Ленивая инициализация
     if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
         return app;
     }
