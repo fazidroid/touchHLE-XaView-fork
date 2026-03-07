@@ -307,8 +307,6 @@ fn strlcpy(
 }
 
 fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> ConstPtr<u8> {
-    // БРОНЕЖИЛЕТ ОТ КРАШЕЙ: если C++ игра передает пустой указатель, 
-    // мы просто безопасно возвращаем пустоту, не пытаясь читать память.
     if s.is_null() || charset.is_null() {
         return Ptr::null();
     }
@@ -325,6 +323,41 @@ fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> Con
         }
         i += 1;
     }
+}
+
+// ЗАГЛУШКА ДЛЯ GAMELOFT LIVE
+// Просто копируем входной буфер в выходной
+fn CCCrypt(
+    env: &mut Environment,
+    _op: u32,
+    _alg: u32,
+    _options: u32,
+    _key: ConstVoidPtr,
+    _key_len: GuestUSize,
+    _iv: ConstVoidPtr,
+    data_in: ConstVoidPtr,
+    data_in_len: GuestUSize,
+    data_out: MutVoidPtr,
+    data_out_available: GuestUSize,
+    data_out_moved: MutPtr<GuestUSize>,
+) -> i32 {
+    crate::log!("TODO: CCCrypt (dummy implementation)");
+    
+    let len_to_copy = if data_in_len < data_out_available { 
+        data_in_len 
+    } else { 
+        data_out_available 
+    };
+    
+    if len_to_copy > 0 && !data_in.is_null() && !data_out.is_null() {
+        memmove(env, data_out, data_in, len_to_copy);
+    }
+    
+    if !data_out_moved.is_null() {
+        env.mem.write(data_out_moved, len_to_copy);
+    }
+    
+    0 // kCCSuccess
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -361,5 +394,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(strchr(_, _)),
     export_c_func!(strrchr(_, _)),
     export_c_func!(strlcpy(_, _, _)),
-    export_c_func!(strpbrk(_, _)), // Зарегистрировали нашу новую функцию
+    export_c_func!(strpbrk(_, _)),
+    export_c_func!(CCCrypt(_, _, _, _, _, _, _, _, _, _, _)), // Зарегистрировали крипто-функцию (11 параметров)
 ];
