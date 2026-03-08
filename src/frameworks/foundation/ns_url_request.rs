@@ -78,10 +78,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     timeoutInterval:(NSTimeInterval)timeout_interval {
     // БЕЗОПАСНЫЙ РЕЖИМ
     if url != nil {
-        let url_copy = msg![env; url copy];
-        env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url_copy;
+    let url_copy = msg![env; url copy];
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).url = url_copy;
     }
-    
     env.objc.borrow_mut::<NSURLRequestHostObject>(this).cache_policy = cache_policy;
     env.objc.borrow_mut::<NSURLRequestHostObject>(this).timeout_interval = timeout_interval;
 

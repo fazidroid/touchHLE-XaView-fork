@@ -1395,7 +1395,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     if !msg![env; path isKindOfClass:nsstring_class] {
         return nil;
     }
-    
     let path_str = to_rust_string(env, path);
     let Ok(bytes) = env.fs.read(GuestPath::new(&path_str)) else {
         return nil;

@@ -310,7 +310,6 @@ fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> Con
     if s.is_null() || charset.is_null() {
         return Ptr::null();
     }
-    
     let sep = env.mem.cstr_at(charset);
     let mut i = 0;
     loop {
