@@ -364,9 +364,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; obj init]
 }
 - (id)dateFromComponents:(id)_comps { msg_class![env; NSDate date] }
-- (id)dateByAddingComponents:(id)_comps 
-    toDate:(id)_date 
-    options:(NSUInteger)_opts {
+- (id)dateByAddingComponents:(id)_comps
+                      toDate:(id)_date
+                     options:(NSUInteger)_opts {
     msg_class![env; NSDate date]
 }
 - (id)calendarIdentifier { get_static_str(env, "gregorian") }
@@ -429,10 +429,10 @@ pub(super) fn UIApplicationMain(
         
         let ui_application: id =
             if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
-            app
-        } else {
-            msg![env; principal_class new]
-        };
+                app
+            } else {
+                msg![env; principal_class new]
+            };
 
         let device_family = env.options.device_family;
         if let Some(main_nib_filename) = env.bundle.main_nib_filename(device_family) {
@@ -509,7 +509,10 @@ pub(super) fn UIApplicationMain(
     {
         let pool: id = msg_class![env; NSAutoreleasePool new];
         let delegate: id = msg![env; ui_application delegate];
-        if env.objc.object_has_method_named(&env.mem, delegate, "applicationDidBecomeActive:") {
+        if env
+            .objc
+            .object_has_method_named(&env.mem, delegate, "applicationDidBecomeActive:")
+        {
             () = msg![env; delegate applicationDidBecomeActive:ui_application];
         }
 
@@ -535,7 +538,10 @@ pub(super) fn exit(env: &mut Environment) {
             let _: bool = msg![env; user_defaults synchronize];
         }
         let delegate: id = msg![env; ui_application delegate];
-        if env.objc.object_has_method_named(&env.mem, delegate, "applicationWillResignActive:") {
+        if env
+            .objc
+            .object_has_method_named(&env.mem, delegate, "applicationWillResignActive:")
+        {
             () = msg![env; delegate applicationWillResignActive:ui_application];
         }
         let notif_name = get_static_str(env, UIApplicationWillResignActiveNotification);
@@ -546,7 +552,10 @@ pub(super) fn exit(env: &mut Environment) {
     {
         let pool: id = msg_class![env; NSAutoreleasePool new];
         let delegate: id = msg![env; ui_application delegate];
-        if env.objc.object_has_method_named(&env.mem, delegate, "applicationWillTerminate:") {
+        if env
+            .objc
+            .object_has_method_named(&env.mem, delegate, "applicationWillTerminate:")
+        {
             () = msg![env; delegate applicationWillTerminate:ui_application];
         }
         let notif_name = get_static_str(env, UIApplicationWillTerminateNotification);
@@ -580,40 +589,40 @@ pub const CONSTANTS: ConstantExports = &[
         HostConstant::NSString(UIApplicationDidFinishLaunchingNotification),
     ),
     (
-        "_UIApplicationDidBecomeActiveNotification", 
-        HostConstant::NSString(UIApplicationDidBecomeActiveNotification)
+        "_UIApplicationDidBecomeActiveNotification",
+        HostConstant::NSString(UIApplicationDidBecomeActiveNotification),
     ),
     (
-        "_UIApplicationDidEnterBackgroundNotification", 
-        HostConstant::NSString(UIApplicationDidEnterBackgroundNotification)
+        "_UIApplicationDidEnterBackgroundNotification",
+        HostConstant::NSString(UIApplicationDidEnterBackgroundNotification),
     ),
     (
-        "_UIApplicationWillEnterForegroundNotification", 
-        HostConstant::NSString(UIApplicationWillEnterForegroundNotification)
+        "_UIApplicationWillEnterForegroundNotification",
+        HostConstant::NSString(UIApplicationWillEnterForegroundNotification),
     ),
     (
-        "_UIApplicationWillResignActiveNotification", 
-        HostConstant::NSString(UIApplicationWillResignActiveNotification)
+        "_UIApplicationWillResignActiveNotification",
+        HostConstant::NSString(UIApplicationWillResignActiveNotification),
     ),
     (
-        "_UIApplicationWillTerminateNotification", 
-        HostConstant::NSString(UIApplicationWillTerminateNotification)
+        "_UIApplicationWillTerminateNotification",
+        HostConstant::NSString(UIApplicationWillTerminateNotification),
     ),
     (
-        "_UIApplicationDidReceiveMemoryWarningNotification", 
-        HostConstant::NSString(UIApplicationDidReceiveMemoryWarningNotification)
+        "_UIApplicationDidReceiveMemoryWarningNotification",
+        HostConstant::NSString(UIApplicationDidReceiveMemoryWarningNotification),
     ),
     (
-        "_UIApplicationLaunchOptionsRemoteNotificationKey", 
-        HostConstant::NSString(UIApplicationLaunchOptionsRemoteNotificationKey)
+        "_UIApplicationLaunchOptionsRemoteNotificationKey",
+        HostConstant::NSString(UIApplicationLaunchOptionsRemoteNotificationKey),
     ),
     (
-        "_UIApplicationLaunchOptionsLocalNotificationKey", 
-        HostConstant::NSString(UIApplicationLaunchOptionsLocalNotificationKey)
+        "_UIApplicationLaunchOptionsLocalNotificationKey",
+        HostConstant::NSString(UIApplicationLaunchOptionsLocalNotificationKey),
     ),
     (
-        "_UILocalNotificationDefaultSoundName", 
-        HostConstant::NSString(UILocalNotificationDefaultSoundName)
+        "_UILocalNotificationDefaultSoundName",
+        HostConstant::NSString(UILocalNotificationDefaultSoundName),
     ),
 ];
 

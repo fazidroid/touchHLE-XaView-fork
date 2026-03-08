@@ -240,17 +240,17 @@ impl super::ObjC {
 
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
-    pub fn borrow<T: AnyHostObject + 'static>(&self, object: id) -> &T {
-        // БРОНЕЖИЛЕТ ОТ NULL: Ловим нулевые указатели
+    pub fn borrow_mut<T: AnyHostObject + 'static>(&mut self, object: id) -> &mut T {
         if object == nil {
-            panic!("NULL POINTER DEREFERENCE: Attempted to borrow `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
+            panic!("NULL POINTER DEREFERENCE: Attempted to borrow_mut `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
         }
-        
-        let entry = self.objects.get(&object).unwrap_or_else(|| {
-            panic!("USE-AFTER-FREE: Attempted to borrow object {object:?} that is not in memory (was it deallocated?)");
+
+        let entry = self.objects.get_mut(&object).unwrap_or_else(|| {
+            panic!("USE-AFTER-FREE: Attempted to borrow_mut object {object:?} that is not in memory (was it deallocated?)");
         });
-        
-        let mut host_object: &(dyn AnyHostObject + 'static) = &*entry.host_object;
+
+        type Aho = dyn AnyHostObject + 'static;
+        let mut host_object: &mut Aho = &mut *entry.host_object;
         loop {
             if let Some(res) = host_object.as_any().downcast_ref() {
                 return res;
@@ -354,14 +354,11 @@ impl super::ObjC {
     /// Deallocate an object. Do not call this directly unless you're
     /// implementing `dealloc` and are sure you don't need to do a super-call.
     pub fn dealloc_object(&mut self, object: id, _mem: &mut Mem) {
-        // БРОНЕЖИЛЕТ: Чтобы избежать крашей "Use-After-Free" (когда игра
-        // обращается к уже удаленному объекту), мы просто ПРЕКРАЩАЕМ
-        // удалять объекты из памяти эмулятора!
         log!(
             "MEMORY LEAK INTENTIONAL: Preventing deallocation of {:?} to avoid Use-After-Free crashes",
             object
         );
-        
+
         // Ничего не делаем, объект остается жить вечно!
         // Игре хватит гигабайтов современной оперативной памяти.
     }
