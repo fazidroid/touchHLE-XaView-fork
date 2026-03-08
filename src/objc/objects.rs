@@ -240,9 +240,9 @@ impl super::ObjC {
 
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
-    pub fn borrow_mut<T: AnyHostObject + 'static>(&mut self, object: id) -> &mut T {
+    pub fn borrow<T: AnyHostObject + 'static>(&self, object: id) -> &T {
         if object == nil {
-            panic!("NULL POINTER DEREFERENCE: Attempted to borrow_mut `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
+            panic!("NULL POINTER DEREFERENCE: Attempted to borrow `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
         }
 
         let entry = self.objects.get_mut(&object).unwrap_or_else(|| {
@@ -268,7 +268,7 @@ impl super::ObjC {
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
     pub fn borrow_mut<T: AnyHostObject + 'static>(&mut self, object: id) -> &mut T {
-        // БРОНЕЖИЛЕТ ОТ NULL
+        // БРОНЕЖИЛЕТ ОТ NULL: Ловим нулевые указатели
         if object == nil {
             panic!("NULL POINTER DEREFERENCE: Attempted to borrow_mut `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
         }
