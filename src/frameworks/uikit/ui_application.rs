@@ -44,10 +44,16 @@ struct UILocalNotificationHostObject {
 impl Default for UILocalNotificationHostObject {
     fn default() -> Self {
         Self {
-            fire_date: nil, time_zone: nil, alert_body: nil,
-            alert_action: nil, sound_name: nil, user_info: nil,
-            alert_launch_image: nil, badge_number: 0, 
-            repeat_interval: 0, has_action: false,
+            fire_date: nil,
+            time_zone: nil,
+            alert_body: nil,
+            alert_action: nil,
+            sound_name: nil,
+            user_info: nil,
+            alert_launch_image: nil,
+            badge_number: 0,
+            repeat_interval: 0,
+            has_action: false,
         }
     }
 }
@@ -269,7 +275,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     release(env, sound_name);
     release(env, alert_launch_image);
     release(env, user_info);
-    
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
@@ -360,8 +365,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (id)dateFromComponents:(id)_comps { msg_class![env; NSDate date] }
 - (id)dateByAddingComponents:(id)_comps 
-                      toDate:(id)_date 
-                     options:(NSUInteger)_opts {
+    toDate:(id)_date 
+    options:(NSUInteger)_opts {
     msg_class![env; NSDate date]
 }
 - (id)calendarIdentifier { get_static_str(env, "gregorian") }
@@ -422,9 +427,8 @@ pub(super) fn UIApplicationMain(
             env.objc.get_known_class("UIApplication", &mut env.mem)
         };
         
-        let ui_application: id = if let Some(app) = 
-            env.framework_state.uikit.ui_application.shared_application 
-        {
+        let ui_application: id =
+            if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
             app
         } else {
             msg![env; principal_class new]
@@ -441,7 +445,10 @@ pub(super) fn UIApplicationMain(
                 release(env, ns_main_nib_filename);
                 let _: id = msg![env; nib instantiateWithOwner:ui_application options:nil];
             } else {
-                log!("Warning: couldn't load main nib file {:?}", env.bundle.main_nib_filename(device_family));
+                log!(
+                    "Warning: couldn't load main nib file {:?}",
+                    env.bundle.main_nib_filename(device_family)
+                );
             }
         }
 
@@ -451,7 +458,9 @@ pub(super) fn UIApplicationMain(
 
         let delegate: id = msg![env; ui_application delegate];
         if delegate != nil {
-            env.objc.borrow_mut::<UIApplicationHostObject>(ui_application).delegate_is_retained = true;
+            env.objc
+                .borrow_mut::<UIApplicationHostObject>(ui_application)
+                .delegate_is_retained = true;
             retain(env, delegate);
         } else {
             assert!(delegate_class_name != nil);
@@ -474,7 +483,11 @@ pub(super) fn UIApplicationMain(
     {
         let pool: id = msg_class![env; NSAutoreleasePool new];
         let delegate: id = msg![env; ui_application delegate];
-        if env.objc.object_has_method_named(&env.mem, delegate, "application:didFinishLaunchingWithOptions:") {
+        if env.objc.object_has_method_named(
+            &env.mem,
+            delegate,
+            "application:didFinishLaunchingWithOptions:",
+        ) {
             let empty_dict: id = msg_class![env; NSDictionary dictionary];
             () = msg![env; delegate application:ui_application didFinishLaunchingWithOptions:empty_dict];
         } else if env.objc.object_has_method_named(&env.mem, delegate, "applicationDidFinishLaunching:") {
@@ -544,21 +557,27 @@ pub(super) fn exit(env: &mut Environment) {
     std::process::exit(0);
 }
 
-const UIApplicationDidFinishLaunchingNotification: &str = "UIApplicationDidFinishLaunchingNotification";
+const UIApplicationDidFinishLaunchingNotification: &str =
+    "UIApplicationDidFinishLaunchingNotification";
 const UIApplicationDidBecomeActiveNotification: &str = "UIApplicationDidBecomeActiveNotification";
-const UIApplicationDidEnterBackgroundNotification: &str = "UIApplicationDidEnterBackgroundNotification";
-const UIApplicationWillEnterForegroundNotification: &str = "UIApplicationWillEnterForegroundNotification";
+const UIApplicationDidEnterBackgroundNotification: &str =
+    "UIApplicationDidEnterBackgroundNotification";
+const UIApplicationWillEnterForegroundNotification: &str =
+    "UIApplicationWillEnterForegroundNotification";
 const UIApplicationWillResignActiveNotification: &str = "UIApplicationWillResignActiveNotification";
 const UIApplicationWillTerminateNotification: &str = "UIApplicationWillTerminateNotification";
-const UIApplicationLaunchOptionsRemoteNotificationKey: &str = "UIApplicationLaunchOptionsRemoteNotificationKey";
-const UIApplicationLaunchOptionsLocalNotificationKey: &str = "UIApplicationLaunchOptionsLocalNotificationKey";
-const UIApplicationDidReceiveMemoryWarningNotification: &str = "UIApplicationDidReceiveMemoryWarningNotification";
+const UIApplicationLaunchOptionsRemoteNotificationKey: &str =
+    "UIApplicationLaunchOptionsRemoteNotificationKey";
+const UIApplicationLaunchOptionsLocalNotificationKey: &str =
+    "UIApplicationLaunchOptionsLocalNotificationKey";
+const UIApplicationDidReceiveMemoryWarningNotification: &str =
+    "UIApplicationDidReceiveMemoryWarningNotification";
 const UILocalNotificationDefaultSoundName: &str = "UILocalNotificationDefaultSoundName";
 
 pub const CONSTANTS: ConstantExports = &[
     (
-        "_UIApplicationDidFinishLaunchingNotification", 
-        HostConstant::NSString(UIApplicationDidFinishLaunchingNotification)
+        "_UIApplicationDidFinishLaunchingNotification",
+        HostConstant::NSString(UIApplicationDidFinishLaunchingNotification),
     ),
     (
         "_UIApplicationDidBecomeActiveNotification", 

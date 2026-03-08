@@ -10,7 +10,7 @@ use crate::frameworks::core_graphics::cg_context::{
     CGContextRef, CGContextRelease, CGContextRetain,
 };
 use crate::frameworks::core_graphics::CGSize;
-use crate::objc::{id, nil, msg, msg_class};
+use crate::objc::{id, msg, msg_class, nil};
 use crate::Environment;
 
 #[derive(Default)]
