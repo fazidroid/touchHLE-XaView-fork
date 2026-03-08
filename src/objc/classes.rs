@@ -616,7 +616,7 @@ impl ObjC {
                 assert!(class_host_object.name == metaclass_host_object.name);
                 let name = class_host_object.name.clone();
 
-                // БРОНЕЖИЛЕТ ОТ ДУБЛИКАТОВ (для фейков)
+                // БРОНЕЖИЛЕТотДУБЛИКАТОВ
                 if self.get_host_object(class).is_none() {
                     self.register_static_object(class, class_host_object);
                 }
@@ -635,7 +635,7 @@ impl ObjC {
                 assert!(class_host_object.name == metaclass_host_object.name);
                 let name = class_host_object.name.clone();
 
-                // БРОНЕЖИЛЕТ ОТ ДУБЛИКАТОВ (для оригиналов)
+                // БРОНЕЖИЛЕТотДУБЛИКАТОВ
                 if self.get_host_object(class).is_none() {
                     self.register_static_object(class, class_host_object);
                 }

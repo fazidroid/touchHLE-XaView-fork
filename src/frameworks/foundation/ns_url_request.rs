@@ -66,7 +66,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-// Добавляем базовый init, который так нужен играм Gameloft
+// Добавляем базовый init
 - (id)initWithURL:(id)url {
     msg![env; this initWithURL:url
                    cachePolicy:NSURLRequestUseProtocolCachePolicy

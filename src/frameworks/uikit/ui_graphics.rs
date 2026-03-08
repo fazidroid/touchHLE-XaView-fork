@@ -43,13 +43,13 @@ pub fn UIGraphicsGetCurrentContext(env: &mut Environment) -> CGContextRef {
 
 pub fn UIGraphicsBeginImageContext(env: &mut Environment, size: CGSize) {
     log!("TODO: UIGraphicsBeginImageContext size {:?}", size);
-    // Безопасно кладем nil в стек — функции CoreGraphics это поддерживают
+    // Безопасно кладем nil в стек
     UIGraphicsPushContext(env, nil);
 }
 
 pub fn UIGraphicsGetImageFromCurrentImageContext(env: &mut Environment) -> id {
     log!("TODO: UIGraphicsGetImageFromCurrentImageContext");
-    // Возвращаем пустую, но правильно инициализированную картинку
+    // Возвращаем пустую
     let img: id = msg_class![env; UIImage alloc];
     msg![env; img init]
 }

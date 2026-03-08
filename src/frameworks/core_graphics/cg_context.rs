@@ -154,7 +154,7 @@ pub fn CGContextConcatCTM(
     host_obj.transform = transform.concat(host_obj.transform);
 }
 pub fn CGContextGetCTM(env: &mut Environment, context: CGContextRef) -> CGAffineTransform {
-    // Возвращаем единичную матрицу трансформации, если контекст пустой
+    // Возвращаем единичную матрицу
     if context.is_null() {
         return CGAffineTransform::make_scale(1.0, 1.0);
     }

@@ -217,7 +217,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)scheduledLocalNotifications {
-    // Единственный 100% безопасный способ создать пустой массив для C++
+    // Единственный безопасный способ
     let empty_vec: Vec<id> = Vec::new();
     let arr = ns_array::from_vec(env, empty_vec);
     autorelease(env, arr)
