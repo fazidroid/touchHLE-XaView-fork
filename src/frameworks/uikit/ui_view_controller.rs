@@ -196,6 +196,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     interface_orientation == UIInterfaceOrientationPortrait
 }
 
+// ДОБАВЛЕННЫЙ МЕТОД:
+- (i32)interfaceOrientation {
+    crate::log!("TODO: [(UIViewController*){:?} interfaceOrientation] -> 3 (LandscapeRight)", this);
+        3 // UIInterfaceOrientationLandscapeRight
+        }
+
 // UIResponder implementation
 // From the Apple UIView docs regarding [UIResponder nextResponder]:
 // "UIViewController similarly implements the method
