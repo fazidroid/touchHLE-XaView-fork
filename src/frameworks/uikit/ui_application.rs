@@ -391,23 +391,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setSecond:(NSInteger)_v {}
 @end
 
-@implementation NSTimeZone: NSObject
-+ (id)allocWithZone:(NSZonePtr)_zone {
-    let class = env.objc.get_known_class("NSTimeZone", &mut env.mem);
-    env.objc.alloc_object(class, Box::<DummyHostObject>::default(), &mut env.mem)
-}
-+ (id)defaultTimeZone {
-    let class = env.objc.get_known_class("NSTimeZone", &mut env.mem);
-    let obj: id = msg![env; class alloc];
-    msg![env; obj init]
-}
-+ (id)systemTimeZone { msg_class![env; NSTimeZone defaultTimeZone] }
-+ (id)localTimeZone { msg_class![env; NSTimeZone defaultTimeZone] }
-+ (id)timeZoneWithName:(id)_name { msg_class![env; NSTimeZone defaultTimeZone] }
-- (id)name { get_static_str(env, "GMT") }
-- (id)abbreviation { get_static_str(env, "GMT") }
-@end
-
 };
 
 pub(super) fn UIApplicationMain(
