@@ -426,8 +426,9 @@ pub(super) fn UIApplicationMain(
         } else {
             env.objc.get_known_class("UIApplication", &mut env.mem)
         };
-        
-        let ui_application: id = if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
+
+        let ui_application: id =
+            if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
                 app
             } else {
                 msg![env; principal_class new]

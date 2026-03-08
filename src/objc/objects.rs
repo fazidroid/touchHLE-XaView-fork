@@ -276,7 +276,7 @@ impl super::ObjC {
         let entry = self.objects.get_mut(&object).unwrap_or_else(|| {
             panic!("USE-AFTER-FREE: Attempted to borrow_mut object {object:?} that is not in memory (was it deallocated?)");
         });
-        
+
         type Aho = dyn AnyHostObject + 'static;
         let mut host_object: &mut Aho = &mut *entry.host_object;
         loop {
