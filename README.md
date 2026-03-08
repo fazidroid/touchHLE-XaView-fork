@@ -18,6 +18,10 @@ iPad: 1.0.0p, 1.1.8a
 
 [ ! ] Dont turn on network, it will make Asphalt 6 black screen freeze
 
+=Audi RS3 (Demo ad build of Asphalt 6) support: ✅
+1.0.1
+*Cant find decrypted 1.0.0 version, or other versions if exists, help me if you can
+
 =More Asphalt 5 versions support: ❌
 
 ///
