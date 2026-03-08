@@ -11,7 +11,7 @@
 //! TODO: Less terrible text layout. RustType doesn't do text layout so this
 //! code has its own, not particularly good implementation. We might want to
 //! switch to something like cosmic-text in future, but that has a _lot_ more
-//! dependencies test.
+//! dependencies.
 
 use crate::paths;
 use rusttype::{Point, Scale};

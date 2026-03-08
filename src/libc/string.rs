@@ -339,7 +339,17 @@ fn CCCrypt(
     -43 // kCCParamError
 }
 
+pub fn strerror(env: &mut Environment, errnum: i32) -> ConstPtr<u8> {
+        crate::log!("TODO: strerror({})", errnum);
+            // Формируем базовое сообщение об ошибке с нулевым байтом на конце
+                let msg = format!("Error {}\0", errnum);
+                    // Выделяем память в гостевой системе и отдаем игре указатель
+                        env.mem.alloc_and_write_cstr(msg.as_bytes()).cast_const()
+                        }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(strerror(_)),
     export_c_func!(strtok(_, _)),
     export_c_func!(bzero(_, _)),
     // Functions shared with wchar.rs
