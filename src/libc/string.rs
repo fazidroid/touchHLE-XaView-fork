@@ -345,7 +345,6 @@ pub fn strerror(env: &mut Environment, errnum: i32) -> ConstPtr<u8> {
                 let msg = format!("Error {}\0", errnum);
                     // Выделяем память в гостевой системе и отдаем игре указатель
                         env.mem.alloc_and_write_cstr(msg.as_bytes()).cast_const()
-                        }
 }
 
 pub const FUNCTIONS: FunctionExports = &[
