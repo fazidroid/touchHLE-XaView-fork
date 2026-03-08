@@ -268,7 +268,7 @@ impl super::ObjC {
     /// Get a reference to a host object and downcast it. Panics if there is
     /// no such object, or if downcasting fails.
     pub fn borrow_mut<T: AnyHostObject + 'static>(&mut self, object: id) -> &mut T {
-        // БРОНЕЖИЛЕТ ОТ NULL: Ловим нулевые указатели
+        // БРОНЕЖИЛЕТотNULL:
         if object == nil {
             panic!("NULL POINTER DEREFERENCE: Attempted to borrow_mut `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
         }
