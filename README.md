@@ -2,7 +2,9 @@ XaView FORK:
 
 =Asphalt 6 support: ✅
 
--Fully working: 1.0.2c Demo, 1.0.0p [iPad], 1.1.6
+-Fully working: iPhone: 1.0.2c Demo, 1.1.6
+
+iPad: 1.0.0p, 1.1.8a
 
 -Working with issues: 1.0.0p [iPhone] (Have black texture issue in 360 garage, other one have glitch issue in main menu garage)
 
