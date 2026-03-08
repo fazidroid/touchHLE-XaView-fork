@@ -340,7 +340,6 @@ fn CCCrypt(
 }
 
 pub fn strerror(env: &mut Environment, errnum: i32) -> ConstPtr<u8> {
-    crate::log!("TODO: strerror({})", errnum);
     let msg = format!("Error {}\0", errnum);
     env.mem.alloc_and_write_cstr(msg.as_bytes()).cast_const()
 }
