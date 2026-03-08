@@ -1358,7 +1358,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithContentsOfURL:(id)url {
+- (id)initWithContentsOfURL:(id)_url {
     // Заглушка
     *env.objc.borrow_mut(this) = StringHostObject::Utf8(std::borrow::Cow::Borrowed(""));
     this
