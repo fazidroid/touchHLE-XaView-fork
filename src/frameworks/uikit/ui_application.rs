@@ -427,8 +427,7 @@ pub(super) fn UIApplicationMain(
             env.objc.get_known_class("UIApplication", &mut env.mem)
         };
         
-        let ui_application: id =
-            if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
+        let ui_application: id = if let Some(app) = env.framework_state.uikit.ui_application.shared_application {
                 app
             } else {
                 msg![env; principal_class new]
@@ -490,7 +489,11 @@ pub(super) fn UIApplicationMain(
         ) {
             let empty_dict: id = msg_class![env; NSDictionary dictionary];
             () = msg![env; delegate application:ui_application didFinishLaunchingWithOptions:empty_dict];
-        } else if env.objc.object_has_method_named(&env.mem, delegate, "applicationDidFinishLaunching:") {
+        } else if env.objc.object_has_method_named(
+            &env.mem,
+            delegate,
+            "applicationDidFinishLaunching:",
+        ) {
             () = msg![env; delegate applicationDidFinishLaunching:ui_application];
         }
 
