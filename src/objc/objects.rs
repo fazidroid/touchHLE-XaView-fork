@@ -233,23 +233,20 @@ impl super::ObjC {
         );
     }
 
-    /// Get a reference to a host object, if the object exists.
     pub fn get_host_object(&self, object: id) -> Option<&dyn AnyHostObject> {
         self.objects.get(&object).map(|entry| &*entry.host_object)
     }
 
-    /// Get a reference to a host object and downcast it. Panics if there is
-    /// no such object, or if downcasting fails.
     pub fn borrow<T: AnyHostObject + 'static>(&self, object: id) -> &T {
         if object == nil {
             panic!("NULL POINTER DEREFERENCE: Attempted to borrow `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
         }
 
-        let entry = self.objects.get_mut(&object).unwrap_or_else(|| {
-            panic!("USE-AFTER-FREE: Attempted to borrow_mut object {object:?} that is not in memory (was it deallocated?)");
+        let entry = self.objects.get(&object).unwrap_or_else(|| {
+            panic!("USE-AFTER-FREE: Attempted to borrow object {object:?} that is not in memory (was it deallocated?)");
         });
-        type Aho = dyn AnyHostObject + 'static;
-        let mut host_object: &mut Aho = &mut *entry.host_object;
+
+        let mut host_object: &(dyn AnyHostObject + 'static) = &*entry.host_object;
         loop {
             if let Some(res) = host_object.as_any().downcast_ref() {
                 return res;
@@ -265,8 +262,6 @@ impl super::ObjC {
         }
     }
 
-    /// Get a reference to a host object and downcast it. Panics if there is
-    /// no such object, or if downcasting fails.
     pub fn borrow_mut<T: AnyHostObject + 'static>(&mut self, object: id) -> &mut T {
         // БРОНЕЖИЛЕТотNULL:
         if object == nil {
