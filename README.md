@@ -16,6 +16,8 @@ iPad: 1.0.0p, 1.1.8a
 
 -Working on fixes right now: Others versions not in the list, searching in web right now, if you can help with finding them, it will be cool
 
+[ ! ] Dont turn on network, it will make Asphalt 6 black screen freeze
+
 =More Asphalt 5 versions support: ❌
 
 ///
