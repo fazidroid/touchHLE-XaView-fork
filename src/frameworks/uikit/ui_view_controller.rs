@@ -198,7 +198,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // ДОБАВЛЕННЫЙ МЕТОД:
 - (i32)interfaceOrientation {
-    crate::log!("TODO: [(UIViewController*){:?} interfaceOrientation] -> 3 (LandscapeRight)", this);
+    log!("TODO: [(UIViewController*){:?} interfaceOrientation] -> 3 (LandscapeRight)", this);
         3 // UIInterfaceOrientationLandscapeRight
         }
 
