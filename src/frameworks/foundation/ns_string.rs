@@ -1358,6 +1358,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)initWithContentsOfURL:(id)url {
+    // Заглушка: имитируем пустой ответ от мертвых рекламных серверов Gameloft
+    *env.objc.borrow_mut(this) = StringHostObject::Utf8(std::borrow::Cow::Borrowed(""));
+    this
+}
+
 - (id)initWithContentsOfFile:(id)path {
     if path == nil {
         return nil;
