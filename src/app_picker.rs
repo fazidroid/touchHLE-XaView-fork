@@ -164,6 +164,12 @@ struct AppPickerDelegateHostObject {
     device_model_select_5: bool,
     // SelectModelSix
     device_model_select_6: bool,
+    // AddExtraFlags
+    device_model_select_7: bool, device_model_select_8: bool, device_model_select_9: bool,
+    device_model_select_10: bool, device_model_select_11: bool, device_model_select_12: bool,
+    device_model_select_13: bool, device_model_select_14: bool, device_model_select_15: bool,
+    device_model_select_16: bool,
+}
 }
 impl HostObject for AppPickerDelegateHostObject {}
 
@@ -260,6 +266,16 @@ const CLASSES: ClassExports = objc_classes! {
 - (())deviceModel4 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_4 = true; }
 - (())deviceModel5 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_5 = true; }
 - (())deviceModel6 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_6 = true; }
+- (())deviceModel7 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_7 = true; }
+- (())deviceModel8 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_8 = true; }
+- (())deviceModel9 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_9 = true; }
+- (())deviceModel10 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_10 = true; }
+- (())deviceModel11 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_11 = true; }
+- (())deviceModel12 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_12 = true; }
+- (())deviceModel13 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_13 = true; }
+- (())deviceModel14 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_14 = true; }
+- (())deviceModel15 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_15 = true; }
+- (())deviceModel16 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_16 = true; }
 
 - (())openFileManager {
     // Assert (see above).
@@ -736,29 +752,48 @@ fn show_app_picker_gui(
         } else if std::mem::take(&mut host_obj.device_model_toggle) {
             quick_options_device_model_open = !quick_options_device_model_open;
             () = msg![env; (quick_options_stuff.device_model_menu) setHidden:(!quick_options_device_model_open)];
-            // ArrowSymbols
             let arrow = if quick_options_device_model_open { "v" } else { "^" };
-            let models = ["iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "iPhone 2G (Stable)"];
+            let models = [
+                "iPod touch 5", "iPod touch 4", "iPod touch 3", "iPod touch 2", "iPod touch 1", "",
+                "iPad mini", "iPad 4", "iPad 3", "iPad 2", "iPad 1", "",
+                "iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "",
+                "iPhone 2G (Stable)"
+            ];
             let text = format!("{} {}", models[quick_options_device_model_idx], arrow);
             let text_ns = ns_string::from_rust_string(env, text);
             () = msg![env; (quick_options_stuff.device_model_btn) setTitle:text_ns forState:UIControlStateNormal];
             release(env, text_ns);
         } else {
             let mut new_idx = None;
-            if std::mem::take(&mut host_obj.device_model_select_0) { new_idx = Some(0); }
-            else if std::mem::take(&mut host_obj.device_model_select_1) { new_idx = Some(1); }
-            else if std::mem::take(&mut host_obj.device_model_select_2) { new_idx = Some(2); }
-            else if std::mem::take(&mut host_obj.device_model_select_3) { new_idx = Some(3); }
-            else if std::mem::take(&mut host_obj.device_model_select_4) { new_idx = Some(4); }
-            else if std::mem::take(&mut host_obj.device_model_select_5) { new_idx = Some(5); }
-            else if std::mem::take(&mut host_obj.device_model_select_6) { new_idx = Some(6); }
+            let mut h = &mut host_obj;
+            if std::mem::take(&mut h.device_model_select_0) { new_idx = Some(0); }
+            else if std::mem::take(&mut h.device_model_select_1) { new_idx = Some(1); }
+            else if std::mem::take(&mut h.device_model_select_2) { new_idx = Some(2); }
+            else if std::mem::take(&mut h.device_model_select_3) { new_idx = Some(3); }
+            else if std::mem::take(&mut h.device_model_select_4) { new_idx = Some(4); }
+            else if std::mem::take(&mut h.device_model_select_5) { new_idx = Some(6); } // iPadMini
+            else if std::mem::take(&mut h.device_model_select_6) { new_idx = Some(7); }
+            else if std::mem::take(&mut h.device_model_select_7) { new_idx = Some(8); }
+            else if std::mem::take(&mut h.device_model_select_8) { new_idx = Some(9); }
+            else if std::mem::take(&mut h.device_model_select_9) { new_idx = Some(10); }
+            else if std::mem::take(&mut h.device_model_select_10) { new_idx = Some(12); } // iPhone5C
+            else if std::mem::take(&mut h.device_model_select_11) { new_idx = Some(13); }
+            else if std::mem::take(&mut h.device_model_select_12) { new_idx = Some(14); }
+            else if std::mem::take(&mut h.device_model_select_13) { new_idx = Some(15); }
+            else if std::mem::take(&mut h.device_model_select_14) { new_idx = Some(16); }
+            else if std::mem::take(&mut h.device_model_select_15) { new_idx = Some(17); }
+            else if std::mem::take(&mut h.device_model_select_16) { new_idx = Some(19); } // iPhone2G
 
             if let Some(idx) = new_idx {
                 quick_options_device_model_idx = idx;
-                // AutoCloseMenu
                 quick_options_device_model_open = false;
                 () = msg![env; (quick_options_stuff.device_model_menu) setHidden:true];
-                let models = ["iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "iPhone 2G (Stable)"];
+                let models = [
+                    "iPod touch 5", "iPod touch 4", "iPod touch 3", "iPod touch 2", "iPod touch 1", "",
+                    "iPad mini", "iPad 4", "iPad 3", "iPad 2", "iPad 1", "",
+                    "iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "",
+                    "iPhone 2G (Stable)"
+                ];
                 // ArrowUp
                 let text = format!("{} ^", models[idx]);
                 let text_ns = ns_string::from_rust_string(env, text);
@@ -792,11 +827,16 @@ fn show_app_picker_gui(
         option_args.push("--allow-network-access".to_string());
     }
 
-    let model_args = [
-        "iPhone5,3", "iPhone5,1", "iPhone4,1", "iPhone3,1", "iPhone2,1", "iPhone1,2", "iPhone1,1"
+    let m_args = [
+        "iPod5,1", "iPod4,1", "iPod3,1", "iPod2,1", "iPod1,1", "",
+        "iPad2,5", "iPad3,4", "iPad3,1", "iPad2,1", "iPad1,1", "",
+        "iPhone5,3", "iPhone5,1", "iPhone4,1", "iPhone3,1", "iPhone2,1", "iPhone1,2", "",
+        "iPhone1,1"
     ];
     // PassSelectedModel
-    option_args.push(format!("--device-model={}", model_args[quick_options_device_model_idx]));
+    if !m_args[quick_options_device_model_idx].is_empty() {
+        option_args.push(format!("--device-model={}", m_args[quick_options_device_model_idx]));
+    }
 
     Ok(app_path)
 }
@@ -1514,25 +1554,35 @@ fn setup_quick_options(
             () = msg![env; border_view addSubview:button];
             device_model_btn = button;
 
-            let menu_height = 8.0 * 30.0;
+            // ConstrainVisibleHeight
+            let visible_menu_height = 240.0; 
             let menu_frame = CGRect {
-                origin: CGPoint { x: btn_frame.origin.x, y: btn_frame.origin.y - menu_height },
-                size: CGSize { width: 200.0, height: menu_height },
+                origin: CGPoint { x: btn_frame.origin.x, y: btn_frame.origin.y - visible_menu_height },
+                size: CGSize { width: 200.0, height: visible_menu_height },
             };
-            let menu_view: id = msg_class![env; UIView alloc];
+            
+            // CreateScrollContainer
+            let menu_view: id = msg_class![env; UIScrollView alloc];
             let menu_view: id = msg![env; menu_view initWithFrame:menu_frame];
-            // DropdownBgDarkGray
             () = msg![env; menu_view setBackgroundColor:dark_gray];
             () = msg![env; menu_view setHidden:true];
             () = msg![env; main_view addSubview:menu_view];
             device_model_menu = menu_view;
 
             let models = [
-                ("iPhone 5C", "deviceModel0"), ("iPhone 5", "deviceModel1"),
-                ("iPhone 4S", "deviceModel2"), ("iPhone 4", "deviceModel3"),
-                ("iPhone 3GS", "deviceModel4"), ("iPhone 3G", "deviceModel5"),
-                ("--- Unstable upper ---", ""), ("iPhone 2G (Stable)", "deviceModel6"),
+                ("iPod touch 5", "deviceModel0"), ("iPod touch 4", "deviceModel1"), ("iPod touch 3", "deviceModel2"), ("iPod touch 2", "deviceModel3"), ("iPod touch 1", "deviceModel4"),
+                ("/// iPod Touch (Unstable) ///", ""),
+                ("iPad mini", "deviceModel5"), ("iPad 4", "deviceModel6"), ("iPad 3", "deviceModel7"), ("iPad 2", "deviceModel8"), ("iPad 1", "deviceModel9"),
+                ("/// iPad (Unstable) ///", ""),
+                ("iPhone 5C", "deviceModel10"), ("iPhone 5", "deviceModel11"), ("iPhone 4S", "deviceModel12"), ("iPhone 4", "deviceModel13"), ("iPhone 3GS", "deviceModel14"), ("iPhone 3G", "deviceModel15"),
+                ("--- Unstable upper ---", ""),
+                ("iPhone 2G (Stable)", "deviceModel16"),
             ];
+
+            // SetScrollContentSize
+            let total_content_height = (models.len() as CGFloat) * 30.0;
+            () = msg![env; menu_view setContentSize:(CGSize { width: 200.0, height: total_content_height })];
+
             for (j, (title, sel)) in models.iter().enumerate() {
                 let item_frame = CGRect {
                     origin: CGPoint { x: 0.0, y: (j as CGFloat) * 30.0 },
