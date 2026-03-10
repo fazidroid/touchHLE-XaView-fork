@@ -800,7 +800,8 @@ fn show_app_picker_gui(
             if scroll_u || scroll_d {
                 for (j, &item) in quick_options_stuff.device_model_items.iter().enumerate() {
                     let y_pos = ((j as isize - quick_options_device_model_scroll) as CGFloat) * 30.0;
-                    let is_vis = y_pos >= 0.0 && y_pos < 180.0; // 6 строк по 30px
+                    // FixClippyRange
+                    let is_vis = (0.0..180.0).contains(&y_pos);
                     () = msg![env; item setHidden:(!is_vis)];
                     if is_vis {
                         let i_frame = CGRect { origin: CGPoint { x: 0.0, y: y_pos }, size: CGSize { width: 160.0, height: 30.0 } };
