@@ -148,6 +148,22 @@ struct AppPickerDelegateHostObject {
     analog_stick_tilt_controls: Option<bool>,
     network: Option<bool>,
     fullscreen: Option<bool>,
+    // ToggleModelDropdown
+    device_model_toggle: bool,
+    // SelectModelZero
+    device_model_select_0: bool,
+    // SelectModelOne
+    device_model_select_1: bool,
+    // SelectModelTwo
+    device_model_select_2: bool,
+    // SelectModelThree
+    device_model_select_3: bool,
+    // SelectModelFour
+    device_model_select_4: bool,
+    // SelectModelFive
+    device_model_select_5: bool,
+    // SelectModelSix
+    device_model_select_6: bool,
 }
 impl HostObject for AppPickerDelegateHostObject {}
 
@@ -234,6 +250,17 @@ const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).fullscreen = Some(switch_state);
 }
 
+- (())deviceModelToggle {
+    env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_toggle = true;
+}
+- (())deviceModel0 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_0 = true; }
+- (())deviceModel1 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_1 = true; }
+- (())deviceModel2 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_2 = true; }
+- (())deviceModel3 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_3 = true; }
+- (())deviceModel4 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_4 = true; }
+- (())deviceModel5 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_5 = true; }
+- (())deviceModel6 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_6 = true; }
+
 - (())openFileManager {
     // Assert (see above).
     let _ = env.objc.borrow_mut::<AppPickerDelegateHostObject>(this);
@@ -275,7 +302,7 @@ fn show_app_picker_gui(
     let icon = {
         let bytes: &[u8] = match super::branding() {
             "" => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/icon.png")),
-            "XAVIEW" => include_bytes!(concat!(
+            "UNOFFICIAL" => include_bytes!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/res/icon_unofficial.png"
             )),
@@ -417,7 +444,7 @@ fn show_app_picker_gui(
         () = msg![env; main_view addSubview:label];
     }
 
-    let brand_color: id = if super::branding() == "XAVIEW" {
+    let brand_color: id = if super::branding() == "UNOFFICIAL" {
         msg_class![env; UIColor redColor]
     } else {
         msg_class![env; UIColor grayColor]
@@ -523,6 +550,10 @@ fn show_app_picker_gui(
     let mut quick_options_orientation: Option<DeviceOrientation> = None;
     let mut quick_options_analog_stick_tilt_controls = true;
     let mut quick_options_network = false;
+    // DefaultIndex
+    let mut quick_options_device_model_idx = 6;
+    // DropdownClosed
+    let mut quick_options_device_model_open = false;
 
     fn update_quick_option_buttons(env: &mut Environment, buttons: &[id], selected_idx: usize) {
         for (idx, &button) in buttons.iter().enumerate() {
@@ -702,6 +733,38 @@ fn show_app_picker_gui(
                 false => None,
                 true => Some(()),
             };
+        } else if std::mem::take(&mut host_obj.device_model_toggle) {
+            quick_options_device_model_open = !quick_options_device_model_open;
+            () = msg![env; (quick_options_stuff.device_model_menu) setHidden:(!quick_options_device_model_open)];
+            // ArrowSymbols
+            let arrow = if quick_options_device_model_open { "🔽" } else { "🔼" };
+            let models = ["iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "iPhone 2G (Stable)"];
+            let text = format!("{} {}", models[quick_options_device_model_idx], arrow);
+            let text_ns = ns_string::from_rust_string(env, text);
+            () = msg![env; (quick_options_stuff.device_model_btn) setTitle:text_ns forState:UIControlStateNormal];
+            release(env, text_ns);
+        } else {
+            let mut new_idx = None;
+            if std::mem::take(&mut host_obj.device_model_select_0) { new_idx = Some(0); }
+            else if std::mem::take(&mut host_obj.device_model_select_1) { new_idx = Some(1); }
+            else if std::mem::take(&mut host_obj.device_model_select_2) { new_idx = Some(2); }
+            else if std::mem::take(&mut host_obj.device_model_select_3) { new_idx = Some(3); }
+            else if std::mem::take(&mut host_obj.device_model_select_4) { new_idx = Some(4); }
+            else if std::mem::take(&mut host_obj.device_model_select_5) { new_idx = Some(5); }
+            else if std::mem::take(&mut host_obj.device_model_select_6) { new_idx = Some(6); }
+
+            if let Some(idx) = new_idx {
+                quick_options_device_model_idx = idx;
+                // AutoCloseMenu
+                quick_options_device_model_open = false;
+                () = msg![env; (quick_options_stuff.device_model_menu) setHidden:true];
+                let models = ["iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "iPhone 2G (Stable)"];
+                // ArrowUp
+                let text = format!("{} 🔼", models[idx]);
+                let text_ns = ns_string::from_rust_string(env, text);
+                () = msg![env; (quick_options_stuff.device_model_btn) setTitle:text_ns forState:UIControlStateNormal];
+                release(env, text_ns);
+            }
         }
     };
 
@@ -728,6 +791,12 @@ fn show_app_picker_gui(
     if quick_options_network {
         option_args.push("--allow-network-access".to_string());
     }
+
+    let model_args = [
+        "iPhone5,3", "iPhone5,1", "iPhone4,1", "iPhone3,1", "iPhone2,1", "iPhone1,2", "iPhone1,1"
+    ];
+    // PassSelectedModel
+    option_args.push(format!("--device-model={}", model_args[quick_options_device_model_idx]));
 
     Ok(app_path)
 }
@@ -1245,6 +1314,10 @@ struct QuickOptionsStuff {
     main_view: id,
     scale_hack_buttons: [id; 5],
     orientation_buttons: [id; 3],
+    // DropdownMainBtn
+    device_model_btn: id,
+    // DropdownMenuContainer
+    device_model_menu: id,
 }
 
 fn setup_quick_options(
@@ -1307,6 +1380,8 @@ fn setup_quick_options(
         Label(&'static str),
         Buttons(&'static [(&'static str, &'static str)]),
         Switch(&'static str, bool),
+        // NewEnumVariant
+        DeviceModelDropdown,
     }
     let rows = [
         RowKind::Label("Scale hack"),
@@ -1327,6 +1402,8 @@ fn setup_quick_options(
         RowKind::Switch("network:", false),
         RowKind::Label("Use analog sticks for tilt controls"),
         RowKind::Switch("analogStickTiltControls:", true),
+        RowKind::Label("Device model"),
+        RowKind::DeviceModelDropdown,
         // ---- (divider for stuff skipped below)
         RowKind::Label("Fullscreen (override)"),
         RowKind::Switch("fullscreen:", false),
@@ -1394,6 +1471,66 @@ fn setup_quick_options(
                                forControlEvents:UIControlEventValueChanged];
                 () = msg![env; main_view addSubview:switch];
             }
+            // IgnoreMenuFirstPass
+            RowKind::DeviceModelDropdown => {}
+        }
+    }
+
+    let mut device_model_btn: id = nil;
+    let mut device_model_menu: id = nil;
+
+    for (i, row) in rows.iter().enumerate() {
+        if let RowKind::DeviceModelDropdown = row {
+            let row_center = divider + ((1 + i) as CGFloat) * ((main_frame.size.height - divider) / ((rows_len_full + 1) as CGFloat));
+            let btn_frame = CGRect {
+                origin: CGPoint { x: main_frame.size.width / 2.0 - 200.0 / 2.0, y: row_center - 30.0 / 2.0 },
+                size: CGSize { width: 200.0, height: 30.0 },
+            };
+            let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeRoundedRect];
+            let text = ns_string::get_static_str(env, "iPhone 2G (Stable) 🔼");
+            () = msg![env; button setTitle:text forState:UIControlStateNormal];
+            () = msg![env; button setFrame:btn_frame];
+            let selector = env.objc.lookup_selector("deviceModelToggle").unwrap();
+            () = msg![env; button addTarget:delegate action:selector forControlEvents:UIControlEventTouchUpInside];
+            () = msg![env; main_view addSubview:button];
+            device_model_btn = button;
+
+            let menu_height = 8.0 * 30.0;
+            let menu_frame = CGRect {
+                origin: CGPoint { x: btn_frame.origin.x, y: btn_frame.origin.y - menu_height },
+                size: CGSize { width: 200.0, height: menu_height },
+            };
+            let menu_view: id = msg_class![env; UIView alloc];
+            let menu_view: id = msg![env; menu_view initWithFrame:menu_frame];
+            let bg_color: id = msg_class![env; UIColor lightGrayColor];
+            () = msg![env; menu_view setBackgroundColor:bg_color];
+            () = msg![env; menu_view setHidden:true];
+            () = msg![env; main_view addSubview:menu_view];
+            device_model_menu = menu_view;
+
+            let models = [
+                ("iPhone 5C", "deviceModel0"), ("iPhone 5", "deviceModel1"),
+                ("iPhone 4S", "deviceModel2"), ("iPhone 4", "deviceModel3"),
+                ("iPhone 3GS", "deviceModel4"), ("iPhone 3G", "deviceModel5"),
+                ("--- Unstable upper ---", ""), ("iPhone 2G (Stable)", "deviceModel6"),
+            ];
+            for (j, (title, sel)) in models.iter().enumerate() {
+                let item_frame = CGRect {
+                    origin: CGPoint { x: 0.0, y: (j as CGFloat) * 30.0 },
+                    size: CGSize { width: 200.0, height: 30.0 },
+                };
+                let item_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
+                let text = ns_string::get_static_str(env, title);
+                () = msg![env; item_btn setTitle:text forState:UIControlStateNormal];
+                let text_color: id = msg_class![env; UIColor blackColor];
+                () = msg![env; item_btn setTitleColor:text_color forState:UIControlStateNormal];
+                () = msg![env; item_btn setFrame:item_frame];
+                if !sel.is_empty() {
+                    let selector = env.objc.lookup_selector(sel).unwrap();
+                    () = msg![env; item_btn addTarget:delegate action:selector forControlEvents:UIControlEventTouchUpInside];
+                }
+                () = msg![env; menu_view addSubview:item_btn];
+            }
         }
     }
 
@@ -1401,5 +1538,7 @@ fn setup_quick_options(
         main_view,
         scale_hack_buttons: button_rows[0][..].try_into().unwrap(),
         orientation_buttons: button_rows[1][..].try_into().unwrap(),
+        device_model_btn,
+        device_model_menu,
     }
 }
