@@ -863,8 +863,14 @@ fn show_app_picker_gui(
                 // UpdateScrollThumb
                 let thumb_y = (quick_options_device_model_scroll as CGFloat / 14.0) * 126.0;
                 let thumb_frame = CGRect {
-                    origin: CGPoint { x: 256.0, y: thumb_y },
-                    size: CGSize { width: 24.0, height: 54.0 },
+                    origin: CGPoint {
+                        x: 256.0,
+                        y: thumb_y,
+                    },
+                    size: CGSize {
+                        width: 24.0,
+                        height: 54.0,
+                    },
                 };
                 () = msg![env; (quick_options_stuff.device_model_thumb) setFrame:thumb_frame];
             }
