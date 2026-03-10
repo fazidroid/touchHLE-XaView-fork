@@ -1544,6 +1544,8 @@ fn setup_quick_options(
 
     let mut device_model_btn: id = nil;
     let mut device_model_menu: id = nil;
+    // DeclareArrayOuterScope
+    let mut device_model_items = [nil; 20];
 
     for (i, row) in rows.iter().enumerate() {
         if let RowKind::DeviceModelDropdown = row {
@@ -1609,7 +1611,7 @@ fn setup_quick_options(
                 ("iPhone 2G (Stable)", "deviceModel16"),
             ];
 
-            let mut device_model_items = [nil; 20];
+            // RemovedInnerDeclaration
 
             for (j, (title, sel)) in models.iter().enumerate() {
                 let y_pos = (j as CGFloat) * item_h;
