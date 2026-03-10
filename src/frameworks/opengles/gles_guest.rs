@@ -1282,6 +1282,19 @@ fn glRenderbufferStorageMultisampleAPPLE(
     glRenderbufferStorageOES(env, target, internalformat, width, height)
 }
 
+fn glResolveMultisampleFramebufferAPPLE(_env: &mut Environment) {
+    // NoopResolveStub
+}
+
+fn glDiscardFramebufferEXT(
+    _env: &mut Environment,
+    _target: GLenum,
+    _num_attachments: GLsizei,
+    _attachments: ConstPtr<GLenum>,
+) {
+    // NoopDiscardStub
+}
+
 fn glFramebufferRenderbufferOES(
     env: &mut Environment,
     target: GLenum,
@@ -1293,6 +1306,7 @@ fn glFramebufferRenderbufferOES(
         gles.FramebufferRenderbufferOES(target, attachment, renderbuffertarget, renderbuffer)
     })
 }
+
 fn glFramebufferTexture2DOES(
     env: &mut Environment,
     target: GLenum,
@@ -1633,6 +1647,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glBindRenderbufferOES(_, _)),
     export_c_func!(glRenderbufferStorageOES(_, _, _, _)),
     export_c_func!(glRenderbufferStorageMultisampleAPPLE(_, _, _, _, _)),
+    export_c_func!(glResolveMultisampleFramebufferAPPLE()),
+    export_c_func!(glDiscardFramebufferEXT(_, _, _, _)),
     export_c_func!(glFramebufferRenderbufferOES(_, _, _, _)),
     export_c_func!(glFramebufferTexture2DOES(_, _, _, _, _)),
     export_c_func!(glGetFramebufferAttachmentParameterivOES(_, _, _, _)),
