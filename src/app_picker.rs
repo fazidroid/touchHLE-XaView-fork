@@ -764,24 +764,23 @@ fn show_app_picker_gui(
             release(env, text_ns);
         } else {
             let mut new_idx = None;
-            let mut h = &mut host_obj;
-            if std::mem::take(&mut h.device_model_select_0) { new_idx = Some(0); }
-            else if std::mem::take(&mut h.device_model_select_1) { new_idx = Some(1); }
-            else if std::mem::take(&mut h.device_model_select_2) { new_idx = Some(2); }
-            else if std::mem::take(&mut h.device_model_select_3) { new_idx = Some(3); }
-            else if std::mem::take(&mut h.device_model_select_4) { new_idx = Some(4); }
-            else if std::mem::take(&mut h.device_model_select_5) { new_idx = Some(6); } // iPadMini
-            else if std::mem::take(&mut h.device_model_select_6) { new_idx = Some(7); }
-            else if std::mem::take(&mut h.device_model_select_7) { new_idx = Some(8); }
-            else if std::mem::take(&mut h.device_model_select_8) { new_idx = Some(9); }
-            else if std::mem::take(&mut h.device_model_select_9) { new_idx = Some(10); }
-            else if std::mem::take(&mut h.device_model_select_10) { new_idx = Some(12); } // iPhone5C
-            else if std::mem::take(&mut h.device_model_select_11) { new_idx = Some(13); }
-            else if std::mem::take(&mut h.device_model_select_12) { new_idx = Some(14); }
-            else if std::mem::take(&mut h.device_model_select_13) { new_idx = Some(15); }
-            else if std::mem::take(&mut h.device_model_select_14) { new_idx = Some(16); }
-            else if std::mem::take(&mut h.device_model_select_15) { new_idx = Some(17); }
-            else if std::mem::take(&mut h.device_model_select_16) { new_idx = Some(19); } // iPhone2G
+            if std::mem::take(&mut host_obj.device_model_select_0) { new_idx = Some(0); }
+            else if std::mem::take(&mut host_obj.device_model_select_1) { new_idx = Some(1); }
+            else if std::mem::take(&mut host_obj.device_model_select_2) { new_idx = Some(2); }
+            else if std::mem::take(&mut host_obj.device_model_select_3) { new_idx = Some(3); }
+            else if std::mem::take(&mut host_obj.device_model_select_4) { new_idx = Some(4); }
+            else if std::mem::take(&mut host_obj.device_model_select_5) { new_idx = Some(6); } // iPadMini
+            else if std::mem::take(&mut host_obj.device_model_select_6) { new_idx = Some(7); }
+            else if std::mem::take(&mut host_obj.device_model_select_7) { new_idx = Some(8); }
+            else if std::mem::take(&mut host_obj.device_model_select_8) { new_idx = Some(9); }
+            else if std::mem::take(&mut host_obj.device_model_select_9) { new_idx = Some(10); }
+            else if std::mem::take(&mut host_obj.device_model_select_10) { new_idx = Some(12); } // iPhone5C
+            else if std::mem::take(&mut host_obj.device_model_select_11) { new_idx = Some(13); }
+            else if std::mem::take(&mut host_obj.device_model_select_12) { new_idx = Some(14); }
+            else if std::mem::take(&mut host_obj.device_model_select_13) { new_idx = Some(15); }
+            else if std::mem::take(&mut host_obj.device_model_select_14) { new_idx = Some(16); }
+            else if std::mem::take(&mut host_obj.device_model_select_15) { new_idx = Some(17); }
+            else if std::mem::take(&mut host_obj.device_model_select_16) { new_idx = Some(19); } // iPhone2G
 
             if let Some(idx) = new_idx {
                 quick_options_device_model_idx = idx;
