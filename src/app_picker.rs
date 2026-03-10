@@ -1650,7 +1650,7 @@ fn setup_quick_options(
                     height: 30.0,
                 },
             };
-            
+
             // DrawBorderContainer
             let border_view: id = msg_class![env; UIView alloc];
             let border_view: id = msg![env; border_view initWithFrame:btn_frame];
@@ -1695,7 +1695,7 @@ fn setup_quick_options(
                     height: visible_menu_height,
                 },
             };
-            
+
             // CreateScrollContainer
             let menu_view: id = msg_class![env; UIView alloc];
             let menu_view: id = msg![env; menu_view initWithFrame:menu_frame];
