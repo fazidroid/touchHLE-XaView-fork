@@ -73,14 +73,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (CGFloat)scale {
     // SupportRetinaScale
     let model = env.options.device_model.as_str();
-    let is_retina = model.starts_with("iPhone3") 
-        || model.starts_with("iPhone4") 
-        || model.starts_with("iPhone5") 
-        || model.starts_with("iPod4") 
-        || model.starts_with("iPod5") 
-        || model.starts_with("iPad3") 
+    let is_retina = model.starts_with("iPhone3")
+        || model.starts_with("iPhone4")
+        || model.starts_with("iPhone5")
+        || model.starts_with("iPod4")
+        || model.starts_with("iPod5")
+        || model.starts_with("iPad3")
         || model.starts_with("iPad4");
-        
+
     if is_retina {
         2.0
     } else {
