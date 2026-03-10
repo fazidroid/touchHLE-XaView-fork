@@ -34,6 +34,14 @@ pub const CLASSES: ClassExports = objc_classes! {
         new
    }
 }
+
++ (id)screens {
+    // ReturnMainScreenArray
+    let main_screen: id = msg_class![env; UIScreen mainScreen];
+    let arr = crate::frameworks::foundation::ns_array::from_vec(env, vec![main_screen]);
+    crate::objc::autorelease(env, arr)
+}
+
 - (id)retain { this }
 - (())release {}
 - (id)autorelease { this }
