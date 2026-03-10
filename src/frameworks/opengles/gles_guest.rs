@@ -1269,6 +1269,19 @@ fn glRenderbufferStorageOES(
         gles.RenderbufferStorageOES(target, internalformat, width, height)
     })
 }
+
+fn glRenderbufferStorageMultisampleAPPLE(
+    env: &mut Environment,
+    target: GLenum,
+    _samples: GLsizei,
+    internalformat: GLenum,
+    width: GLsizei,
+    height: GLsizei,
+) {
+    // MsaaFallbackStub
+    glRenderbufferStorageOES(env, target, internalformat, width, height)
+}
+
 fn glFramebufferRenderbufferOES(
     env: &mut Environment,
     target: GLenum,
@@ -1619,6 +1632,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glBindFramebufferOES(_, _)),
     export_c_func!(glBindRenderbufferOES(_, _)),
     export_c_func!(glRenderbufferStorageOES(_, _, _, _)),
+    export_c_func!(glRenderbufferStorageMultisampleAPPLE(_, _, _, _, _)),
     export_c_func!(glFramebufferRenderbufferOES(_, _, _, _)),
     export_c_func!(glFramebufferTexture2DOES(_, _, _, _, _)),
     export_c_func!(glGetFramebufferAttachmentParameterivOES(_, _, _, _)),
