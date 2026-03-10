@@ -304,7 +304,7 @@ fn show_app_picker_gui(
             "" => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/icon.png")),
             "XAVIEW" => include_bytes!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/res/icon_unofficial.png"
+                "/res/icon_xaview.png"
             )),
             "PREVIEW" => {
                 include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/icon_preview.png"))
@@ -1486,14 +1486,32 @@ fn setup_quick_options(
                 origin: CGPoint { x: main_frame.size.width / 2.0 - 200.0 / 2.0, y: row_center - 30.0 / 2.0 },
                 size: CGSize { width: 200.0, height: 30.0 },
             };
-            let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeRoundedRect];
-            // UseAsciiArrows
+            
+            // DrawBorderContainer
+            let border_view: id = msg_class![env; UIView alloc];
+            let border_view: id = msg![env; border_view initWithFrame:btn_frame];
+            let dark_gray: id = msg_class![env; UIColor darkGrayColor];
+            () = msg![env; border_view setBackgroundColor:dark_gray];
+            () = msg![env; main_view addSubview:border_view];
+
+            // InnerMainButton
+            let inner_frame = CGRect {
+                origin: CGPoint { x: 2.0, y: 2.0 },
+                size: CGSize { width: btn_frame.size.width - 4.0, height: btn_frame.size.height - 4.0 },
+            };
+            let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
             let text = ns_string::from_rust_string(env, "iPhone 2G (Stable) ^".to_string());
             () = msg![env; button setTitle:text forState:UIControlStateNormal];
-            () = msg![env; button setFrame:btn_frame];
+            let text_color: id = msg_class![env; UIColor blackColor];
+            () = msg![env; button setTitleColor:text_color forState:UIControlStateNormal];
+            let light_gray: id = msg_class![env; UIColor lightGrayColor];
+            () = msg![env; button setBackgroundColor:light_gray];
+            () = msg![env; button setFrame:inner_frame];
+            // FixVisibilityMain
+            () = msg![env; button layoutSubviews];
             let selector = env.objc.lookup_selector("deviceModelToggle").unwrap();
             () = msg![env; button addTarget:delegate action:selector forControlEvents:UIControlEventTouchUpInside];
-            () = msg![env; main_view addSubview:button];
+            () = msg![env; border_view addSubview:button];
             device_model_btn = button;
 
             let menu_height = 8.0 * 30.0;
@@ -1503,8 +1521,8 @@ fn setup_quick_options(
             };
             let menu_view: id = msg_class![env; UIView alloc];
             let menu_view: id = msg![env; menu_view initWithFrame:menu_frame];
-            let bg_color: id = msg_class![env; UIColor lightGrayColor];
-            () = msg![env; menu_view setBackgroundColor:bg_color];
+            // DropdownBgDarkGray
+            () = msg![env; menu_view setBackgroundColor:dark_gray];
             () = msg![env; menu_view setHidden:true];
             () = msg![env; main_view addSubview:menu_view];
             device_model_menu = menu_view;
@@ -1523,9 +1541,12 @@ fn setup_quick_options(
                 let item_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
                 let text = ns_string::get_static_str(env, title);
                 () = msg![env; item_btn setTitle:text forState:UIControlStateNormal];
-                let text_color: id = msg_class![env; UIColor blackColor];
-                () = msg![env; item_btn setTitleColor:text_color forState:UIControlStateNormal];
+                // WhiteTextDarkBg
+                let item_color: id = msg_class![env; UIColor whiteColor];
+                () = msg![env; item_btn setTitleColor:item_color forState:UIControlStateNormal];
                 () = msg![env; item_btn setFrame:item_frame];
+                // FixVisibilityItem
+                () = msg![env; item_btn layoutSubviews];
                 if !sel.is_empty() {
                     let selector = env.objc.lookup_selector(sel).unwrap();
                     () = msg![env; item_btn addTarget:delegate action:selector forControlEvents:UIControlEventTouchUpInside];
