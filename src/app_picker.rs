@@ -165,9 +165,15 @@ struct AppPickerDelegateHostObject {
     // SelectModelSix
     device_model_select_6: bool,
     // AddExtraFlags
-    device_model_select_7: bool, device_model_select_8: bool, device_model_select_9: bool,
-    device_model_select_10: bool, device_model_select_11: bool, device_model_select_12: bool,
-    device_model_select_13: bool, device_model_select_14: bool, device_model_select_15: bool,
+    device_model_select_7: bool,
+    device_model_select_8: bool,
+    device_model_select_9: bool,
+    device_model_select_10: bool,
+    device_model_select_11: bool,
+    device_model_select_12: bool,
+    device_model_select_13: bool,
+    device_model_select_14: bool,
+    device_model_select_15: bool,
     device_model_select_16: bool,
     // AddScrollFlags
     device_model_scroll_up: bool,
@@ -322,10 +328,7 @@ fn show_app_picker_gui(
     let icon = {
         let bytes: &[u8] = match super::branding() {
             "" => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/icon.png")),
-            "XAVIEW" => include_bytes!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/res/icon_xaview.png"
-            )),
+            "XAVIEW" => include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/icon_xaview.png")),
             "PREVIEW" => {
                 include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/icon_preview.png"))
             }
@@ -758,12 +761,32 @@ fn show_app_picker_gui(
         } else if std::mem::take(&mut host_obj.device_model_toggle) {
             quick_options_device_model_open = !quick_options_device_model_open;
             () = msg![env; (quick_options_stuff.device_model_menu) setHidden:(!quick_options_device_model_open)];
-            let arrow = if quick_options_device_model_open { "v" } else { "^" };
+            let arrow = if quick_options_device_model_open {
+                "v"
+            } else {
+                "^"
+            };
             let models = [
-                "iPod touch 5", "iPod touch 4", "iPod touch 3", "iPod touch 2", "iPod touch 1", "",
-                "iPad mini", "iPad 4", "iPad 3", "iPad 2", "iPad 1", "",
-                "iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "",
-                "iPhone 2G (Stable)"
+                "iPod touch 5",
+                "iPod touch 4",
+                "iPod touch 3",
+                "iPod touch 2",
+                "iPod touch 1",
+                "",
+                "iPad mini",
+                "iPad 4",
+                "iPad 3",
+                "iPad 2",
+                "iPad 1",
+                "",
+                "iPhone 5C",
+                "iPhone 5",
+                "iPhone 4S",
+                "iPhone 4",
+                "iPhone 3GS",
+                "iPhone 3G",
+                "",
+                "iPhone 2G (Stable)",
             ];
             let text = format!("{} {}", models[quick_options_device_model_idx], arrow);
             let text_ns = ns_string::from_rust_string(env, text);
@@ -771,23 +794,45 @@ fn show_app_picker_gui(
             release(env, text_ns);
         } else {
             let mut new_idx = None;
-            if std::mem::take(&mut host_obj.device_model_select_0) { new_idx = Some(0); }
-            else if std::mem::take(&mut host_obj.device_model_select_1) { new_idx = Some(1); }
-            else if std::mem::take(&mut host_obj.device_model_select_2) { new_idx = Some(2); }
-            else if std::mem::take(&mut host_obj.device_model_select_3) { new_idx = Some(3); }
-            else if std::mem::take(&mut host_obj.device_model_select_4) { new_idx = Some(4); }
-            else if std::mem::take(&mut host_obj.device_model_select_5) { new_idx = Some(6); } // iPadMini
-            else if std::mem::take(&mut host_obj.device_model_select_6) { new_idx = Some(7); }
-            else if std::mem::take(&mut host_obj.device_model_select_7) { new_idx = Some(8); }
-            else if std::mem::take(&mut host_obj.device_model_select_8) { new_idx = Some(9); }
-            else if std::mem::take(&mut host_obj.device_model_select_9) { new_idx = Some(10); }
-            else if std::mem::take(&mut host_obj.device_model_select_10) { new_idx = Some(12); } // iPhone5C
-            else if std::mem::take(&mut host_obj.device_model_select_11) { new_idx = Some(13); }
-            else if std::mem::take(&mut host_obj.device_model_select_12) { new_idx = Some(14); }
-            else if std::mem::take(&mut host_obj.device_model_select_13) { new_idx = Some(15); }
-            else if std::mem::take(&mut host_obj.device_model_select_14) { new_idx = Some(16); }
-            else if std::mem::take(&mut host_obj.device_model_select_15) { new_idx = Some(17); }
-            else if std::mem::take(&mut host_obj.device_model_select_16) { new_idx = Some(19); } // iPhone2G
+            if std::mem::take(&mut host_obj.device_model_select_0) {
+                new_idx = Some(0);
+            } else if std::mem::take(&mut host_obj.device_model_select_1) {
+                new_idx = Some(1);
+            } else if std::mem::take(&mut host_obj.device_model_select_2) {
+                new_idx = Some(2);
+            } else if std::mem::take(&mut host_obj.device_model_select_3) {
+                new_idx = Some(3);
+            } else if std::mem::take(&mut host_obj.device_model_select_4) {
+                new_idx = Some(4);
+            } else if std::mem::take(&mut host_obj.device_model_select_5) {
+                new_idx = Some(6);
+            }
+            // iPadMini
+            else if std::mem::take(&mut host_obj.device_model_select_6) {
+                new_idx = Some(7);
+            } else if std::mem::take(&mut host_obj.device_model_select_7) {
+                new_idx = Some(8);
+            } else if std::mem::take(&mut host_obj.device_model_select_8) {
+                new_idx = Some(9);
+            } else if std::mem::take(&mut host_obj.device_model_select_9) {
+                new_idx = Some(10);
+            } else if std::mem::take(&mut host_obj.device_model_select_10) {
+                new_idx = Some(12);
+            }
+            // iPhone5C
+            else if std::mem::take(&mut host_obj.device_model_select_11) {
+                new_idx = Some(13);
+            } else if std::mem::take(&mut host_obj.device_model_select_12) {
+                new_idx = Some(14);
+            } else if std::mem::take(&mut host_obj.device_model_select_13) {
+                new_idx = Some(15);
+            } else if std::mem::take(&mut host_obj.device_model_select_14) {
+                new_idx = Some(16);
+            } else if std::mem::take(&mut host_obj.device_model_select_15) {
+                new_idx = Some(17);
+            } else if std::mem::take(&mut host_obj.device_model_select_16) {
+                new_idx = Some(19);
+            } // iPhone2G
 
             // HandleScrolling
             let scroll_u = std::mem::take(&mut host_obj.device_model_scroll_up);
@@ -799,12 +844,19 @@ fn show_app_picker_gui(
             }
             if scroll_u || scroll_d {
                 for (j, &item) in quick_options_stuff.device_model_items.iter().enumerate() {
-                    let y_pos = ((j as isize - quick_options_device_model_scroll) as CGFloat) * 30.0;
+                    let y_pos =
+                        ((j as isize - quick_options_device_model_scroll) as CGFloat) * 30.0;
                     // FixClippyRange
                     let is_vis = (0.0..180.0).contains(&y_pos);
                     () = msg![env; item setHidden:(!is_vis)];
                     if is_vis {
-                        let i_frame = CGRect { origin: CGPoint { x: 0.0, y: y_pos }, size: CGSize { width: 160.0, height: 30.0 } };
+                        let i_frame = CGRect {
+                            origin: CGPoint { x: 0.0, y: y_pos },
+                            size: CGSize {
+                                width: 160.0,
+                                height: 30.0,
+                            },
+                        };
                         () = msg![env; item setFrame:i_frame];
                     }
                 }
@@ -815,10 +867,26 @@ fn show_app_picker_gui(
                 quick_options_device_model_open = false;
                 () = msg![env; (quick_options_stuff.device_model_menu) setHidden:true];
                 let models = [
-                    "iPod touch 5", "iPod touch 4", "iPod touch 3", "iPod touch 2", "iPod touch 1", "",
-                    "iPad mini", "iPad 4", "iPad 3", "iPad 2", "iPad 1", "",
-                    "iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "",
-                    "iPhone 2G (Stable)"
+                    "iPod touch 5",
+                    "iPod touch 4",
+                    "iPod touch 3",
+                    "iPod touch 2",
+                    "iPod touch 1",
+                    "",
+                    "iPad mini",
+                    "iPad 4",
+                    "iPad 3",
+                    "iPad 2",
+                    "iPad 1",
+                    "",
+                    "iPhone 5C",
+                    "iPhone 5",
+                    "iPhone 4S",
+                    "iPhone 4",
+                    "iPhone 3GS",
+                    "iPhone 3G",
+                    "",
+                    "iPhone 2G (Stable)",
                 ];
                 // ArrowUp
                 let text = format!("{} ^", models[idx]);
@@ -854,14 +922,33 @@ fn show_app_picker_gui(
     }
 
     let m_args = [
-        "iPod5,1", "iPod4,1", "iPod3,1", "iPod2,1", "iPod1,1", "",
-        "iPad2,5", "iPad3,4", "iPad3,1", "iPad2,1", "iPad1,1", "",
-        "iPhone5,3", "iPhone5,1", "iPhone4,1", "iPhone3,1", "iPhone2,1", "iPhone1,2", "",
-        "iPhone1,1"
+        "iPod5,1",
+        "iPod4,1",
+        "iPod3,1",
+        "iPod2,1",
+        "iPod1,1",
+        "",
+        "iPad2,5",
+        "iPad3,4",
+        "iPad3,1",
+        "iPad2,1",
+        "iPad1,1",
+        "",
+        "iPhone5,3",
+        "iPhone5,1",
+        "iPhone4,1",
+        "iPhone3,1",
+        "iPhone2,1",
+        "iPhone1,2",
+        "",
+        "iPhone1,1",
     ];
     // PassSelectedModel
     if !m_args[quick_options_device_model_idx].is_empty() {
-        option_args.push(format!("--device-model={}", m_args[quick_options_device_model_idx]));
+        option_args.push(format!(
+            "--device-model={}",
+            m_args[quick_options_device_model_idx]
+        ));
     }
 
     Ok(app_path)
@@ -1550,10 +1637,18 @@ fn setup_quick_options(
 
     for (i, row) in rows.iter().enumerate() {
         if let RowKind::DeviceModelDropdown = row {
-            let row_center = divider + ((1 + i) as CGFloat) * ((main_frame.size.height - divider) / ((rows_len_full + 1) as CGFloat));
+            let row_center = divider
+                + ((1 + i) as CGFloat)
+                    * ((main_frame.size.height - divider) / ((rows_len_full + 1) as CGFloat));
             let btn_frame = CGRect {
-                origin: CGPoint { x: main_frame.size.width / 2.0 - 200.0 / 2.0, y: row_center - 30.0 / 2.0 },
-                size: CGSize { width: 200.0, height: 30.0 },
+                origin: CGPoint {
+                    x: main_frame.size.width / 2.0 - 200.0 / 2.0,
+                    y: row_center - 30.0 / 2.0,
+                },
+                size: CGSize {
+                    width: 200.0,
+                    height: 30.0,
+                },
             };
             
             // DrawBorderContainer
@@ -1566,7 +1661,10 @@ fn setup_quick_options(
             // InnerMainButton
             let inner_frame = CGRect {
                 origin: CGPoint { x: 2.0, y: 2.0 },
-                size: CGSize { width: btn_frame.size.width - 4.0, height: btn_frame.size.height - 4.0 },
+                size: CGSize {
+                    width: btn_frame.size.width - 4.0,
+                    height: btn_frame.size.height - 4.0,
+                },
             };
             let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
             let text = ns_string::from_rust_string(env, "iPhone 2G (Stable) ^".to_string());
@@ -1586,10 +1684,16 @@ fn setup_quick_options(
             // ConstrainVisibleHeight
             let visible_items = 6;
             let item_h = 30.0;
-            let visible_menu_height = (visible_items as CGFloat) * item_h; 
+            let visible_menu_height = (visible_items as CGFloat) * item_h;
             let menu_frame = CGRect {
-                origin: CGPoint { x: btn_frame.origin.x, y: btn_frame.origin.y - visible_menu_height },
-                size: CGSize { width: 200.0, height: visible_menu_height },
+                origin: CGPoint {
+                    x: btn_frame.origin.x,
+                    y: btn_frame.origin.y - visible_menu_height,
+                },
+                size: CGSize {
+                    width: 200.0,
+                    height: visible_menu_height,
+                },
             };
             
             // CreateScrollContainer
@@ -1603,11 +1707,24 @@ fn setup_quick_options(
             device_model_menu = menu_view;
 
             let models = [
-                ("iPod touch 5", "deviceModel0"), ("iPod touch 4", "deviceModel1"), ("iPod touch 3", "deviceModel2"), ("iPod touch 2", "deviceModel3"), ("iPod touch 1", "deviceModel4"),
+                ("iPod touch 5", "deviceModel0"),
+                ("iPod touch 4", "deviceModel1"),
+                ("iPod touch 3", "deviceModel2"),
+                ("iPod touch 2", "deviceModel3"),
+                ("iPod touch 1", "deviceModel4"),
                 ("/// iPod Touch (Unstable) ///", ""),
-                ("iPad mini", "deviceModel5"), ("iPad 4", "deviceModel6"), ("iPad 3", "deviceModel7"), ("iPad 2", "deviceModel8"), ("iPad 1", "deviceModel9"),
+                ("iPad mini", "deviceModel5"),
+                ("iPad 4", "deviceModel6"),
+                ("iPad 3", "deviceModel7"),
+                ("iPad 2", "deviceModel8"),
+                ("iPad 1", "deviceModel9"),
                 ("/// iPad (Unstable) ///", ""),
-                ("iPhone 5C", "deviceModel10"), ("iPhone 5", "deviceModel11"), ("iPhone 4S", "deviceModel12"), ("iPhone 4", "deviceModel13"), ("iPhone 3GS", "deviceModel14"), ("iPhone 3G", "deviceModel15"),
+                ("iPhone 5C", "deviceModel10"),
+                ("iPhone 5", "deviceModel11"),
+                ("iPhone 4S", "deviceModel12"),
+                ("iPhone 4", "deviceModel13"),
+                ("iPhone 3GS", "deviceModel14"),
+                ("iPhone 3G", "deviceModel15"),
                 ("--- Unstable upper ---", ""),
                 ("iPhone 2G (Stable)", "deviceModel16"),
             ];
@@ -1619,7 +1736,10 @@ fn setup_quick_options(
                 let item_frame = CGRect {
                     origin: CGPoint { x: 0.0, y: y_pos },
                     // Width160ForScroll
-                    size: CGSize { width: 160.0, height: item_h },
+                    size: CGSize {
+                        width: 160.0,
+                        height: item_h,
+                    },
                 };
                 let item_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
                 let text = ns_string::get_static_str(env, title);
