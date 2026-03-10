@@ -131,6 +131,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; UIApplication sharedApplication]
 }
 
+- (())setScreen:(id)screen {
+    // SetScreenStub
+    log!("TODO: [(UIWindow*){:?} setScreen:{:?}]", this, screen);
+}
+
 - (())addSubview:(id)view {
     log_dbg!("[(UIWindow*){:?} addSubview:{:?}] => ()", this, view);
 
