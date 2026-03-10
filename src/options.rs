@@ -35,6 +35,7 @@ pub enum Button {
 #[derive(Clone)]
 pub struct Options {
     pub fullscreen: bool,
+    pub device_model: Option<String>, // StoreDeviceModel
     pub device_family: Option<DeviceFamily>,
     pub initial_orientation: DeviceOrientation,
     pub scale_hack: NonZeroU32,
@@ -67,6 +68,7 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             fullscreen: false,
+            device_model: None, // DefaultNoModel
             device_family: None,
             initial_orientation: DeviceOrientation::Portrait,
             scale_hack: NonZeroU32::new(1).unwrap(),
@@ -114,6 +116,8 @@ impl Options {
 
         if arg == "--fullscreen" {
             self.fullscreen = true;
+        } else if let Some(value) = arg.strip_prefix("--device-model=") { // ParseModelArg
+            self.device_model = Some(value.to_string());
         } else if arg == "--landscape-left" {
             self.initial_orientation = DeviceOrientation::LandscapeLeft;
         } else if arg == "--landscape-right" {
