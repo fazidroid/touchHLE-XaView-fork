@@ -853,13 +853,20 @@ fn show_app_picker_gui(
                         let i_frame = CGRect {
                             origin: CGPoint { x: 0.0, y: y_pos },
                             size: CGSize {
-                                width: 160.0,
+                                width: 256.0,
                                 height: 30.0,
                             },
                         };
                         () = msg![env; item setFrame:i_frame];
                     }
                 }
+                // UpdateScrollThumb
+                let thumb_y = (quick_options_device_model_scroll as CGFloat / 14.0) * 126.0;
+                let thumb_frame = CGRect {
+                    origin: CGPoint { x: 256.0, y: thumb_y },
+                    size: CGSize { width: 24.0, height: 54.0 },
+                };
+                () = msg![env; (quick_options_stuff.device_model_thumb) setFrame:thumb_frame];
             }
 
             if let Some(idx) = new_idx {
@@ -1472,6 +1479,8 @@ struct QuickOptionsStuff {
     device_model_menu: id,
     // ScrollItemsArray
     device_model_items: [id; 20],
+    // ScrollbarThumb
+    device_model_thumb: id,
 }
 
 fn setup_quick_options(
@@ -1632,6 +1641,7 @@ fn setup_quick_options(
 
     let mut device_model_btn: id = nil;
     let mut device_model_menu: id = nil;
+    let mut device_model_thumb: id = nil;
     // DeclareArrayOuterScope
     let mut device_model_items = [nil; 20];
 
@@ -1642,11 +1652,11 @@ fn setup_quick_options(
                     * ((main_frame.size.height - divider) / ((rows_len_full + 1) as CGFloat));
             let btn_frame = CGRect {
                 origin: CGPoint {
-                    x: main_frame.size.width / 2.0 - 200.0 / 2.0,
+                    x: main_frame.size.width / 2.0 - 280.0 / 2.0,
                     y: row_center - 30.0 / 2.0,
                 },
                 size: CGSize {
-                    width: 200.0,
+                    width: 280.0,
                     height: 30.0,
                 },
             };
@@ -1691,7 +1701,7 @@ fn setup_quick_options(
                     y: btn_frame.origin.y - visible_menu_height,
                 },
                 size: CGSize {
-                    width: 200.0,
+                    width: 280.0,
                     height: visible_menu_height,
                 },
             };
@@ -1735,9 +1745,9 @@ fn setup_quick_options(
                 let y_pos = (j as CGFloat) * item_h;
                 let item_frame = CGRect {
                     origin: CGPoint { x: 0.0, y: y_pos },
-                    // Width160ForScroll
+                    // ListWidthMinusScroll
                     size: CGSize {
-                        width: 160.0,
+                        width: 256.0,
                         height: item_h,
                     },
                 };
@@ -1761,19 +1771,37 @@ fn setup_quick_options(
                 device_model_items[j] = item_btn;
             }
 
-            // UpDownScrollButtons
-            let btn_color: id = msg_class![env; UIColor blackColor];
+            // TrackBackground
+            let track_view: id = msg_class![env; UIView alloc];
+            () = msg![env; track_view initWithFrame:(CGRect { origin: CGPoint { x: 256.0, y: 0.0 }, size: CGSize { width: 24.0, height: visible_menu_height } })];
+            let track_color: id = msg_class![env; UIColor blackColor];
+            () = msg![env; track_view setBackgroundColor:track_color];
+            () = msg![env; menu_view addSubview:track_view];
+
+            // ScrollThumb
+            let thumb_view: id = msg_class![env; UIView alloc];
+            () = msg![env; thumb_view initWithFrame:(CGRect { origin: CGPoint { x: 256.0, y: 0.0 }, size: CGSize { width: 24.0, height: 54.0 } })];
+            let thumb_color: id = msg_class![env; UIColor lightGrayColor];
+            () = msg![env; thumb_view setBackgroundColor:thumb_color];
+            () = msg![env; menu_view addSubview:thumb_view];
+            device_model_thumb = thumb_view;
+
+            // TransparentButtons
+            let clear_color: id = msg_class![env; UIColor clearColor];
             let up_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
-            () = msg![env; up_btn setFrame:(CGRect { origin: CGPoint { x: 160.0, y: 0.0 }, size: CGSize { width: 40.0, height: visible_menu_height / 2.0 } })];
+            () = msg![env; up_btn setFrame:(CGRect { origin: CGPoint { x: 256.0, y: 0.0 }, size: CGSize { width: 24.0, height: visible_menu_height / 2.0 } })];
             () = msg![env; up_btn setTitle:(ns_string::from_rust_string(env, "^".to_string())) forState:UIControlStateNormal];
-            () = msg![env; up_btn setBackgroundColor:btn_color];
+            () = msg![env; up_btn setBackgroundColor:clear_color];
+            let title_color: id = msg_class![env; UIColor clearColor];
+            () = msg![env; up_btn setTitleColor:title_color forState:UIControlStateNormal];
             () = msg![env; up_btn addTarget:delegate action:(env.objc.lookup_selector("deviceModelScrollUp").unwrap()) forControlEvents:UIControlEventTouchUpInside];
             () = msg![env; menu_view addSubview:up_btn];
 
             let down_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
-            () = msg![env; down_btn setFrame:(CGRect { origin: CGPoint { x: 160.0, y: visible_menu_height / 2.0 }, size: CGSize { width: 40.0, height: visible_menu_height / 2.0 } })];
+            () = msg![env; down_btn setFrame:(CGRect { origin: CGPoint { x: 256.0, y: visible_menu_height / 2.0 }, size: CGSize { width: 24.0, height: visible_menu_height / 2.0 } })];
             () = msg![env; down_btn setTitle:(ns_string::from_rust_string(env, "v".to_string())) forState:UIControlStateNormal];
-            () = msg![env; down_btn setBackgroundColor:btn_color];
+            () = msg![env; down_btn setBackgroundColor:clear_color];
+            () = msg![env; down_btn setTitleColor:title_color forState:UIControlStateNormal];
             () = msg![env; down_btn addTarget:delegate action:(env.objc.lookup_selector("deviceModelScrollDown").unwrap()) forControlEvents:UIControlEventTouchUpInside];
             () = msg![env; menu_view addSubview:down_btn];
         }
@@ -1787,5 +1815,6 @@ fn setup_quick_options(
         device_model_menu,
         // AddItemsToArray
         device_model_items,
+        device_model_thumb,
     }
 }
