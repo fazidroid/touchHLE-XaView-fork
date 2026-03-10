@@ -1648,7 +1648,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glRenderbufferStorageOES(_, _, _, _)),
     export_c_func!(glRenderbufferStorageMultisampleAPPLE(_, _, _, _, _)),
     export_c_func!(glResolveMultisampleFramebufferAPPLE()),
-    export_c_func!(glDiscardFramebufferEXT(_, _, _, _)),
+    export_c_func!(glDiscardFramebufferEXT(_, _, _)),
     export_c_func!(glFramebufferRenderbufferOES(_, _, _, _)),
     export_c_func!(glFramebufferTexture2DOES(_, _, _, _, _)),
     export_c_func!(glGetFramebufferAttachmentParameterivOES(_, _, _, _)),
