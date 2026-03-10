@@ -72,7 +72,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (CGFloat)scale {
     // SupportRetinaScale
-    let model = env.options.device_model.as_str();
+    let model = env.options.device_model.as_deref().unwrap_or("");
     let is_retina = model.starts_with("iPhone3")
         || model.starts_with("iPhone4")
         || model.starts_with("iPhone5")
