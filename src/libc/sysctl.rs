@@ -102,10 +102,35 @@ fn sysctl(
     let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));
     sysctl_generic(
         env,
-        |_| {
-            let Some(val) = INT_MAP.get(&(name0, name1)).cloned() else {
+        |env| { // MutateEnvCapture
+            let Some(mut val) = INT_MAP.get(&(name0, name1)).cloned() else {
                 unimplemented!("Unknown sysctl parameter ({name0}, {name1})!")
             };
+            if let Some(model) = &env.options.device_model { // CheckModelOverride
+                if name0 == 6 && name1 == 1 {
+                    let hw_machine = match model.as_str() { // MatchHwMachine
+                        "iPhone5,3" => b"iPhone5,3",
+                        "iPhone5,1" => b"iPhone5,1",
+                        "iPhone4,1" => b"iPhone4,1",
+                        "iPhone3,1" => b"iPhone3,1",
+                        "iPhone2,1" => b"iPhone2,1",
+                        "iPhone1,2" => b"iPhone1,2",
+                        _ => b"iPhone1,1", // DefaultFallback
+                    };
+                    val.1 = SysInfoType::String(hw_machine); // OverrideMachine
+                } else if name0 == 6 && name1 == 2 {
+                    let hw_model = match model.as_str() { // MatchHwModel
+                        "iPhone5,3" => b"N48AP",
+                        "iPhone5,1" => b"N41AP",
+                        "iPhone4,1" => b"N94AP",
+                        "iPhone3,1" => b"N90AP",
+                        "iPhone2,1" => b"N88AP",
+                        "iPhone1,2" => b"N82AP",
+                        _ => b"M68AP", // DefaultFallback
+                    };
+                    val.1 = SysInfoType::String(hw_model); // OverrideModel
+                }
+            }
             val
         },
         oldp,
@@ -137,12 +162,37 @@ fn sysctlbyname(
     );
     sysctl_generic(
         env,
-        |env| {
+        |env| { // MutateEnvCapture
             let name_str = env.mem.cstr_at_utf8(name).unwrap();
-            let Some((name_str, val)) = STRING_MAP.get_key_value(name_str) else {
+            let Some((name_str, mut val)) = STRING_MAP.get_key_value(name_str).map(|(k, v)| (*k, v.clone())) else {
                 unimplemented!("Unknown sysctlbyname parameter {name_str}!")
             };
-            (name_str, val.clone())
+            if let Some(model) = &env.options.device_model { // CheckModelOverride
+                if name_str == "hw.machine" {
+                    let hw_machine = match model.as_str() { // MatchHwMachine
+                        "iPhone5,3" => b"iPhone5,3",
+                        "iPhone5,1" => b"iPhone5,1",
+                        "iPhone4,1" => b"iPhone4,1",
+                        "iPhone3,1" => b"iPhone3,1",
+                        "iPhone2,1" => b"iPhone2,1",
+                        "iPhone1,2" => b"iPhone1,2",
+                        _ => b"iPhone1,1", // DefaultFallback
+                    };
+                    val = SysInfoType::String(hw_machine); // OverrideMachine
+                } else if name_str == "hw.model" {
+                    let hw_model = match model.as_str() { // MatchHwModel
+                        "iPhone5,3" => b"N48AP",
+                        "iPhone5,1" => b"N41AP",
+                        "iPhone4,1" => b"N94AP",
+                        "iPhone3,1" => b"N90AP",
+                        "iPhone2,1" => b"N88AP",
+                        "iPhone1,2" => b"N82AP",
+                        _ => b"M68AP", // DefaultFallback
+                    };
+                    val = SysInfoType::String(hw_model); // OverrideModel
+                }
+            }
+            (name_str, val)
         },
         oldp,
         oldlenp,
