@@ -71,8 +71,27 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (CGFloat)scale {
-    // TODO: support retina
-    1.0
+    // SupportRetinaScale
+    let model = env.options.device_model.as_str();
+    let is_retina = model.starts_with("iPhone3") 
+        || model.starts_with("iPhone4") 
+        || model.starts_with("iPhone5") 
+        || model.starts_with("iPod4") 
+        || model.starts_with("iPod5") 
+        || model.starts_with("iPad3") 
+        || model.starts_with("iPad4");
+        
+    if is_retina {
+        2.0
+    } else {
+        1.0
+    }
+}
+
+- (id)displayLinkWithTarget:(id)target selector:(id)sel {
+    // ReturnDisplayLinkStub
+    let cls = env.objc.get_known_class("CADisplayLink", &mut env.mem);
+    msg![env; cls displayLinkWithTarget:target selector:sel]
 }
 
 @end
