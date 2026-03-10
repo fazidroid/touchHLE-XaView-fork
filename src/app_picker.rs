@@ -169,6 +169,9 @@ struct AppPickerDelegateHostObject {
     device_model_select_10: bool, device_model_select_11: bool, device_model_select_12: bool,
     device_model_select_13: bool, device_model_select_14: bool, device_model_select_15: bool,
     device_model_select_16: bool,
+    // AddScrollFlags
+    device_model_scroll_up: bool,
+    device_model_scroll_down: bool,
 }
 impl HostObject for AppPickerDelegateHostObject {}
 
@@ -275,6 +278,8 @@ const CLASSES: ClassExports = objc_classes! {
 - (())deviceModel14 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_14 = true; }
 - (())deviceModel15 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_15 = true; }
 - (())deviceModel16 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_16 = true; }
+- (())deviceModelScrollUp { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_scroll_up = true; }
+- (())deviceModelScrollDown { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_scroll_down = true; }
 
 - (())openFileManager {
     // Assert (see above).
@@ -569,6 +574,8 @@ fn show_app_picker_gui(
     let mut quick_options_device_model_idx = 6;
     // DropdownClosed
     let mut quick_options_device_model_open = false;
+    // ScrollOffsetState
+    let mut quick_options_device_model_scroll: isize = 0;
 
     fn update_quick_option_buttons(env: &mut Environment, buttons: &[id], selected_idx: usize) {
         for (idx, &button) in buttons.iter().enumerate() {
@@ -781,6 +788,26 @@ fn show_app_picker_gui(
             else if std::mem::take(&mut host_obj.device_model_select_14) { new_idx = Some(16); }
             else if std::mem::take(&mut host_obj.device_model_select_15) { new_idx = Some(17); }
             else if std::mem::take(&mut host_obj.device_model_select_16) { new_idx = Some(19); } // iPhone2G
+
+            // HandleScrolling
+            let scroll_u = std::mem::take(&mut host_obj.device_model_scroll_up);
+            let scroll_d = std::mem::take(&mut host_obj.device_model_scroll_down);
+            if scroll_u && quick_options_device_model_scroll > 0 {
+                quick_options_device_model_scroll -= 1;
+            } else if scroll_d && quick_options_device_model_scroll < 14 {
+                quick_options_device_model_scroll += 1; // Макс скролл = 20 - 6 = 14
+            }
+            if scroll_u || scroll_d {
+                for (j, &item) in quick_options_stuff.device_model_items.iter().enumerate() {
+                    let y_pos = ((j as isize - quick_options_device_model_scroll) as CGFloat) * 30.0;
+                    let is_vis = y_pos >= 0.0 && y_pos < 180.0; // 6 строк по 30px
+                    () = msg![env; item setHidden:(!is_vis)];
+                    if is_vis {
+                        let i_frame = CGRect { origin: CGPoint { x: 0.0, y: y_pos }, size: CGSize { width: 160.0, height: 30.0 } };
+                        () = msg![env; item setFrame:i_frame];
+                    }
+                }
+            }
 
             if let Some(idx) = new_idx {
                 quick_options_device_model_idx = idx;
@@ -1354,8 +1381,9 @@ struct QuickOptionsStuff {
     orientation_buttons: [id; 3],
     // DropdownMainBtn
     device_model_btn: id,
-    // DropdownMenuContainer
     device_model_menu: id,
+    // ScrollItemsArray
+    device_model_items: [id; 20],
 }
 
 fn setup_quick_options(
@@ -1553,17 +1581,21 @@ fn setup_quick_options(
             device_model_btn = button;
 
             // ConstrainVisibleHeight
-            let visible_menu_height = 240.0; 
+            let visible_items = 6;
+            let item_h = 30.0;
+            let visible_menu_height = (visible_items as CGFloat) * item_h; 
             let menu_frame = CGRect {
                 origin: CGPoint { x: btn_frame.origin.x, y: btn_frame.origin.y - visible_menu_height },
                 size: CGSize { width: 200.0, height: visible_menu_height },
             };
             
             // CreateScrollContainer
-            let menu_view: id = msg_class![env; UIScrollView alloc];
+            let menu_view: id = msg_class![env; UIView alloc];
             let menu_view: id = msg![env; menu_view initWithFrame:menu_frame];
             () = msg![env; menu_view setBackgroundColor:dark_gray];
             () = msg![env; menu_view setHidden:true];
+            // ClipOutOfBounds
+            () = msg![env; menu_view setClipsToBounds:true];
             () = msg![env; main_view addSubview:menu_view];
             device_model_menu = menu_view;
 
@@ -1577,14 +1609,14 @@ fn setup_quick_options(
                 ("iPhone 2G (Stable)", "deviceModel16"),
             ];
 
-            // SetScrollContentSize
-            let total_content_height = (models.len() as CGFloat) * 30.0;
-            () = msg![env; menu_view setContentSize:(CGSize { width: 200.0, height: total_content_height })];
+            let mut device_model_items = [nil; 20];
 
             for (j, (title, sel)) in models.iter().enumerate() {
+                let y_pos = (j as CGFloat) * item_h;
                 let item_frame = CGRect {
-                    origin: CGPoint { x: 0.0, y: (j as CGFloat) * 30.0 },
-                    size: CGSize { width: 200.0, height: 30.0 },
+                    origin: CGPoint { x: 0.0, y: y_pos },
+                    // Width160ForScroll
+                    size: CGSize { width: 160.0, height: item_h },
                 };
                 let item_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
                 let text = ns_string::get_static_str(env, title);
@@ -1595,12 +1627,32 @@ fn setup_quick_options(
                 () = msg![env; item_btn setFrame:item_frame];
                 // FixVisibilityItem
                 () = msg![env; item_btn layoutSubviews];
+                if y_pos >= visible_menu_height {
+                    () = msg![env; item_btn setHidden:true];
+                }
                 if !sel.is_empty() {
                     let selector = env.objc.lookup_selector(sel).unwrap();
                     () = msg![env; item_btn addTarget:delegate action:selector forControlEvents:UIControlEventTouchUpInside];
                 }
                 () = msg![env; menu_view addSubview:item_btn];
+                device_model_items[j] = item_btn;
             }
+
+            // UpDownScrollButtons
+            let btn_color: id = msg_class![env; UIColor blackColor];
+            let up_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
+            () = msg![env; up_btn setFrame:(CGRect { origin: CGPoint { x: 160.0, y: 0.0 }, size: CGSize { width: 40.0, height: visible_menu_height / 2.0 } })];
+            () = msg![env; up_btn setTitle:(ns_string::from_rust_string(env, "^".to_string())) forState:UIControlStateNormal];
+            () = msg![env; up_btn setBackgroundColor:btn_color];
+            () = msg![env; up_btn addTarget:delegate action:(env.objc.lookup_selector("deviceModelScrollUp").unwrap()) forControlEvents:UIControlEventTouchUpInside];
+            () = msg![env; menu_view addSubview:up_btn];
+
+            let down_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
+            () = msg![env; down_btn setFrame:(CGRect { origin: CGPoint { x: 160.0, y: visible_menu_height / 2.0 }, size: CGSize { width: 40.0, height: visible_menu_height / 2.0 } })];
+            () = msg![env; down_btn setTitle:(ns_string::from_rust_string(env, "v".to_string())) forState:UIControlStateNormal];
+            () = msg![env; down_btn setBackgroundColor:btn_color];
+            () = msg![env; down_btn addTarget:delegate action:(env.objc.lookup_selector("deviceModelScrollDown").unwrap()) forControlEvents:UIControlEventTouchUpInside];
+            () = msg![env; menu_view addSubview:down_btn];
         }
     }
 
@@ -1610,5 +1662,7 @@ fn setup_quick_options(
         orientation_buttons: button_rows[1][..].try_into().unwrap(),
         device_model_btn,
         device_model_menu,
+        // AddItemsToArray
+        device_model_items,
     }
 }
