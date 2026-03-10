@@ -116,7 +116,8 @@ impl Options {
 
         if arg == "--fullscreen" {
             self.fullscreen = true;
-        } else if let Some(value) = arg.strip_prefix("--device-model=") { // ParseModelArg
+        } else if let Some(value) = arg.strip_prefix("--device-model=") {
+            // ParseModelArg
             self.device_model = Some(value.to_string());
         } else if arg == "--landscape-left" {
             self.initial_orientation = DeviceOrientation::LandscapeLeft;
