@@ -737,7 +737,7 @@ fn show_app_picker_gui(
             quick_options_device_model_open = !quick_options_device_model_open;
             () = msg![env; (quick_options_stuff.device_model_menu) setHidden:(!quick_options_device_model_open)];
             // ArrowSymbols
-            let arrow = if quick_options_device_model_open { "🔽" } else { "🔼" };
+            let arrow = if quick_options_device_model_open { "v" } else { "^" };
             let models = ["iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "iPhone 2G (Stable)"];
             let text = format!("{} {}", models[quick_options_device_model_idx], arrow);
             let text_ns = ns_string::from_rust_string(env, text);
@@ -760,7 +760,7 @@ fn show_app_picker_gui(
                 () = msg![env; (quick_options_stuff.device_model_menu) setHidden:true];
                 let models = ["iPhone 5C", "iPhone 5", "iPhone 4S", "iPhone 4", "iPhone 3GS", "iPhone 3G", "iPhone 2G (Stable)"];
                 // ArrowUp
-                let text = format!("{} 🔼", models[idx]);
+                let text = format!("{} ^", models[idx]);
                 let text_ns = ns_string::from_rust_string(env, text);
                 () = msg![env; (quick_options_stuff.device_model_btn) setTitle:text_ns forState:UIControlStateNormal];
                 release(env, text_ns);
@@ -1487,7 +1487,8 @@ fn setup_quick_options(
                 size: CGSize { width: 200.0, height: 30.0 },
             };
             let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeRoundedRect];
-            let text = ns_string::get_static_str(env, "iPhone 2G (Stable) 🔼");
+            // UseAsciiArrows
+            let text = ns_string::from_rust_string(env, "iPhone 2G (Stable) ^".to_string());
             () = msg![env; button setTitle:text forState:UIControlStateNormal];
             () = msg![env; button setFrame:btn_frame];
             let selector = env.objc.lookup_selector("deviceModelToggle").unwrap();
