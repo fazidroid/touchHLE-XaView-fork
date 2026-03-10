@@ -50,6 +50,8 @@ pub(super) struct UIViewHostObject {
     clears_context_before_drawing: bool,
     user_interaction_enabled: bool,
     multiple_touch_enabled: bool,
+    // RetinaScaleStub
+    content_scale_factor: CGFloat,
 }
 impl HostObject for UIViewHostObject {}
 impl Default for UIViewHostObject {
@@ -65,6 +67,8 @@ impl Default for UIViewHostObject {
             clears_context_before_drawing: true,
             user_interaction_enabled: true,
             multiple_touch_enabled: false,
+            // RetinaScaleStub
+            content_scale_factor: 1.0,
         }
     }
 }
@@ -560,6 +564,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (())setClearsContextBeforeDrawing:(bool)v {
     env.objc.borrow_mut::<UIViewHostObject>(this).clears_context_before_drawing = v;
+}
+
+- (CGFloat)contentScaleFactor {
+    env.objc.borrow::<UIViewHostObject>(this).content_scale_factor
+}
+- (())setContentScaleFactor:(CGFloat)scale {
+    env.objc.borrow_mut::<UIViewHostObject>(this).content_scale_factor = scale;
 }
 
 // Drawing stuff that views should override
