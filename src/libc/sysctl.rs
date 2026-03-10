@@ -112,18 +112,44 @@ fn sysctl(
                 if name0 == 6 && name1 == 1 {
                     let hw_machine: &[u8] = match model.as_str() {
                         // MatchHwMachine
-                        "iPod5,1" => b"iPod5,1", "iPod4,1" => b"iPod4,1", "iPod3,1" => b"iPod3,1", "iPod2,1" => b"iPod2,1", "iPod1,1" => b"iPod1,1",
-                        "iPad2,5" => b"iPad2,5", "iPad3,4" => b"iPad3,4", "iPad3,1" => b"iPad3,1", "iPad2,1" => b"iPad2,1", "iPad1,1" => b"iPad1,1",
-                        "iPhone5,3" => b"iPhone5,3", "iPhone5,1" => b"iPhone5,1", "iPhone4,1" => b"iPhone4,1", "iPhone3,1" => b"iPhone3,1", "iPhone2,1" => b"iPhone2,1", "iPhone1,2" => b"iPhone1,2",
+                        "iPod5,1" => b"iPod5,1",
+                        "iPod4,1" => b"iPod4,1",
+                        "iPod3,1" => b"iPod3,1",
+                        "iPod2,1" => b"iPod2,1",
+                        "iPod1,1" => b"iPod1,1",
+                        "iPad2,5" => b"iPad2,5",
+                        "iPad3,4" => b"iPad3,4",
+                        "iPad3,1" => b"iPad3,1",
+                        "iPad2,1" => b"iPad2,1",
+                        "iPad1,1" => b"iPad1,1",
+                        "iPhone5,3" => b"iPhone5,3",
+                        "iPhone5,1" => b"iPhone5,1",
+                        "iPhone4,1" => b"iPhone4,1",
+                        "iPhone3,1" => b"iPhone3,1",
+                        "iPhone2,1" => b"iPhone2,1",
+                        "iPhone1,2" => b"iPhone1,2",
                         _ => b"iPhone1,1",
                     };
                     val.1 = SysInfoType::String(hw_machine); // OverrideMachine
                 } else if name0 == 6 && name1 == 2 {
                     let hw_model: &[u8] = match model.as_str() {
                         // MatchHwModel
-                        "iPod5,1" => b"N78AP", "iPod4,1" => b"N81AP", "iPod3,1" => b"N18AP", "iPod2,1" => b"N72AP", "iPod1,1" => b"N45AP",
-                        "iPad2,5" => b"P105AP", "iPad3,4" => b"P101AP", "iPad3,1" => b"J1AP", "iPad2,1" => b"K93AP", "iPad1,1" => b"K48AP",
-                        "iPhone5,3" => b"N48AP", "iPhone5,1" => b"N41AP", "iPhone4,1" => b"N94AP", "iPhone3,1" => b"N90AP", "iPhone2,1" => b"N88AP", "iPhone1,2" => b"N82AP",
+                        "iPod5,1" => b"N78AP",
+                        "iPod4,1" => b"N81AP",
+                        "iPod3,1" => b"N18AP",
+                        "iPod2,1" => b"N72AP",
+                        "iPod1,1" => b"N45AP",
+                        "iPad2,5" => b"P105AP",
+                        "iPad3,4" => b"P101AP",
+                        "iPad3,1" => b"J1AP",
+                        "iPad2,1" => b"K93AP",
+                        "iPad1,1" => b"K48AP",
+                        "iPhone5,3" => b"N48AP",
+                        "iPhone5,1" => b"N41AP",
+                        "iPhone4,1" => b"N94AP",
+                        "iPhone3,1" => b"N90AP",
+                        "iPhone2,1" => b"N88AP",
+                        "iPhone1,2" => b"N82AP",
                         _ => b"M68AP",
                     };
                     val.1 = SysInfoType::String(hw_model); // OverrideModel
@@ -174,18 +200,44 @@ fn sysctlbyname(
                 if name_str == "hw.machine" {
                     let hw_machine: &[u8] = match model.as_str() {
                         // MatchHwMachine
-                        "iPod5,1" => b"iPod5,1", "iPod4,1" => b"iPod4,1", "iPod3,1" => b"iPod3,1", "iPod2,1" => b"iPod2,1", "iPod1,1" => b"iPod1,1",
-                        "iPad2,5" => b"iPad2,5", "iPad3,4" => b"iPad3,4", "iPad3,1" => b"iPad3,1", "iPad2,1" => b"iPad2,1", "iPad1,1" => b"iPad1,1",
-                        "iPhone5,3" => b"iPhone5,3", "iPhone5,1" => b"iPhone5,1", "iPhone4,1" => b"iPhone4,1", "iPhone3,1" => b"iPhone3,1", "iPhone2,1" => b"iPhone2,1", "iPhone1,2" => b"iPhone1,2",
+                        "iPod5,1" => b"iPod5,1",
+                        "iPod4,1" => b"iPod4,1",
+                        "iPod3,1" => b"iPod3,1",
+                        "iPod2,1" => b"iPod2,1",
+                        "iPod1,1" => b"iPod1,1",
+                        "iPad2,5" => b"iPad2,5",
+                        "iPad3,4" => b"iPad3,4",
+                        "iPad3,1" => b"iPad3,1",
+                        "iPad2,1" => b"iPad2,1",
+                        "iPad1,1" => b"iPad1,1",
+                        "iPhone5,3" => b"iPhone5,3",
+                        "iPhone5,1" => b"iPhone5,1",
+                        "iPhone4,1" => b"iPhone4,1",
+                        "iPhone3,1" => b"iPhone3,1",
+                        "iPhone2,1" => b"iPhone2,1",
+                        "iPhone1,2" => b"iPhone1,2",
                         _ => b"iPhone1,1",
                     };
                     val = SysInfoType::String(hw_machine); // OverrideMachine
                 } else if name_str == "hw.model" {
                     let hw_model: &[u8] = match model.as_str() {
                         // MatchHwModel
-                        "iPod5,1" => b"N78AP", "iPod4,1" => b"N81AP", "iPod3,1" => b"N18AP", "iPod2,1" => b"N72AP", "iPod1,1" => b"N45AP",
-                        "iPad2,5" => b"P105AP", "iPad3,4" => b"P101AP", "iPad3,1" => b"J1AP", "iPad2,1" => b"K93AP", "iPad1,1" => b"K48AP",
-                        "iPhone5,3" => b"N48AP", "iPhone5,1" => b"N41AP", "iPhone4,1" => b"N94AP", "iPhone3,1" => b"N90AP", "iPhone2,1" => b"N88AP", "iPhone1,2" => b"N82AP",
+                        "iPod5,1" => b"N78AP",
+                        "iPod4,1" => b"N81AP",
+                        "iPod3,1" => b"N18AP",
+                        "iPod2,1" => b"N72AP",
+                        "iPod1,1" => b"N45AP",
+                        "iPad2,5" => b"P105AP",
+                        "iPad3,4" => b"P101AP",
+                        "iPad3,1" => b"J1AP",
+                        "iPad2,1" => b"K93AP",
+                        "iPad1,1" => b"K48AP",
+                        "iPhone5,3" => b"N48AP",
+                        "iPhone5,1" => b"N41AP",
+                        "iPhone4,1" => b"N94AP",
+                        "iPhone3,1" => b"N90AP",
+                        "iPhone2,1" => b"N88AP",
+                        "iPhone1,2" => b"N82AP",
                         _ => b"M68AP",
                     };
                     val = SysInfoType::String(hw_model); // OverrideModel
