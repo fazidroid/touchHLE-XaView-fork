@@ -1779,14 +1779,28 @@ fn setup_quick_options(
 
             // TrackBackground
             let track_view: id = msg_class![env; UIView alloc];
-            () = msg![env; track_view initWithFrame:(CGRect { origin: CGPoint { x: 256.0, y: 0.0 }, size: CGSize { width: 24.0, height: visible_menu_height } })];
+            let track_frame = CGRect {
+                origin: CGPoint { x: 256.0, y: 0.0 },
+                size: CGSize {
+                    width: 24.0,
+                    height: visible_menu_height,
+                },
+            };
+            let track_view: id = msg![env; track_view initWithFrame:track_frame];
             let track_color: id = msg_class![env; UIColor blackColor];
             () = msg![env; track_view setBackgroundColor:track_color];
             () = msg![env; menu_view addSubview:track_view];
 
             // ScrollThumb
             let thumb_view: id = msg_class![env; UIView alloc];
-            () = msg![env; thumb_view initWithFrame:(CGRect { origin: CGPoint { x: 256.0, y: 0.0 }, size: CGSize { width: 24.0, height: 54.0 } })];
+            let thumb_frame = CGRect {
+                origin: CGPoint { x: 256.0, y: 0.0 },
+                size: CGSize {
+                    width: 24.0,
+                    height: 54.0,
+                },
+            };
+            let thumb_view: id = msg![env; thumb_view initWithFrame:thumb_frame];
             let thumb_color: id = msg_class![env; UIColor lightGrayColor];
             () = msg![env; thumb_view setBackgroundColor:thumb_color];
             () = msg![env; menu_view addSubview:thumb_view];
@@ -1795,7 +1809,14 @@ fn setup_quick_options(
             // TransparentButtons
             let clear_color: id = msg_class![env; UIColor clearColor];
             let up_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
-            () = msg![env; up_btn setFrame:(CGRect { origin: CGPoint { x: 256.0, y: 0.0 }, size: CGSize { width: 24.0, height: visible_menu_height / 2.0 } })];
+            let up_frame = CGRect {
+                origin: CGPoint { x: 256.0, y: 0.0 },
+                size: CGSize {
+                    width: 24.0,
+                    height: visible_menu_height / 2.0,
+                },
+            };
+            () = msg![env; up_btn setFrame:up_frame];
             () = msg![env; up_btn setTitle:(ns_string::from_rust_string(env, "^".to_string())) forState:UIControlStateNormal];
             () = msg![env; up_btn setBackgroundColor:clear_color];
             let title_color: id = msg_class![env; UIColor clearColor];
@@ -1804,7 +1825,17 @@ fn setup_quick_options(
             () = msg![env; menu_view addSubview:up_btn];
 
             let down_btn: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom];
-            () = msg![env; down_btn setFrame:(CGRect { origin: CGPoint { x: 256.0, y: visible_menu_height / 2.0 }, size: CGSize { width: 24.0, height: visible_menu_height / 2.0 } })];
+            let down_frame = CGRect {
+                origin: CGPoint {
+                    x: 256.0,
+                    y: visible_menu_height / 2.0,
+                },
+                size: CGSize {
+                    width: 24.0,
+                    height: visible_menu_height / 2.0,
+                },
+            };
+            () = msg![env; down_btn setFrame:down_frame];
             () = msg![env; down_btn setTitle:(ns_string::from_rust_string(env, "v".to_string())) forState:UIControlStateNormal];
             () = msg![env; down_btn setBackgroundColor:clear_color];
             () = msg![env; down_btn setTitleColor:title_color forState:UIControlStateNormal];
