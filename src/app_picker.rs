@@ -170,7 +170,6 @@ struct AppPickerDelegateHostObject {
     device_model_select_13: bool, device_model_select_14: bool, device_model_select_15: bool,
     device_model_select_16: bool,
 }
-}
 impl HostObject for AppPickerDelegateHostObject {}
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
