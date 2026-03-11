@@ -131,6 +131,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; UIApplication sharedApplication]
 }
 
+- (id)screen {
+    msg_class![env; UIScreen mainScreen] // ReturnMainScreen
+}
+
 - (())setScreen:(id)screen {
     // SetScreenStub
     log!("TODO: [(UIWindow*){:?} setScreen:{:?}]", this, screen);
@@ -245,7 +249,28 @@ pub const UIKeyboardWillHideNotification: &str = "UIKeyboardWillHideNotification
 pub const UIKeyboardDidHideNotification: &str = "UIKeyboardDidHideNotification";
 pub const UIKeyboardBoundsUserInfoKey: &str = "UIKeyboardBoundsUserInfoKey";
 
+// ScreenNotifications
+pub const UIScreenDidConnectNotification: &str = "UIScreenDidConnectNotification";
+pub const UIScreenDidDisconnectNotification: &str = "UIScreenDidDisconnectNotification";
+pub const UIScreenModeDidChangeNotification: &str = "UIScreenModeDidChangeNotification";
+
 pub const CONSTANTS: ConstantExports = &[
+    (
+        "_UIEdgeInsetsZero",
+        HostConstant::NSString(""), // FakeEdgeInsetsZeroHack
+    ),
+    (
+        "_UIScreenDidConnectNotification",
+        HostConstant::NSString(UIScreenDidConnectNotification), // FakeScreenConnect
+    ),
+    (
+        "_UIScreenDidDisconnectNotification",
+        HostConstant::NSString(UIScreenDidDisconnectNotification), // FakeScreenDisconnect
+    ),
+    (
+        "_UIScreenModeDidChangeNotification",
+        HostConstant::NSString(UIScreenModeDidChangeNotification), // FakeScreenMode
+    ),
     (
         "_UIWindowDidBecomeKeyNotification",
         HostConstant::NSString(UIWindowDidBecomeKeyNotification),
