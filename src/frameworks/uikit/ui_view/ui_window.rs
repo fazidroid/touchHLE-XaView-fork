@@ -136,8 +136,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())setScreen:(id)screen {
-    // SetScreenStub
-    log!("TODO: [(UIWindow*){:?} setScreen:{:?}]", this, screen);
+    // DisableExtDisplayTouch
+    () = msg![env; this setUserInteractionEnabled:false];
+    () = msg![env; this setAlpha:0.0f32];
 }
 
 - (())addSubview:(id)view {
