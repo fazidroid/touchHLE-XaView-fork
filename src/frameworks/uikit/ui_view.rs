@@ -608,6 +608,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)hitTest:(CGPoint)point
     withEvent:(id)event { // UIEvent* (possibly nil)
+    let hidden: bool = msg![env; this isHidden];
+    let alpha: CGFloat = msg![env; this alpha];
+    let interactible: bool = msg![env; this isUserInteractionEnabled];
+    if hidden || alpha < 0.01 || !interactible {
+        return nil; // IgnoreTouch
+    }
     if !msg![env; this pointInside:point withEvent:event] {
         return nil;
     }
