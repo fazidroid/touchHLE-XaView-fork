@@ -227,10 +227,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     let (width, height) = {
         let bounds: CGRect = msg![env; drawable bounds];
         let CGSize { width, height } = bounds.size;
+        let drawable_class = msg![env; drawable class];
+        let scale: CGFloat = if env.objc.class_has_method_named(drawable_class, "contentsScale") {
+            msg![env; drawable contentsScale] // FetchLayerScale
+        } else {
+            1.0
+        };
         assert!((0.0..(u32::MAX as f32)).contains(&width));
         assert!((0.0..(u32::MAX as f32)).contains(&height));
-        let scale_hack = env.options.scale_hack.get();
-        (width.round() as u32 * scale_hack, height.round() as u32 * scale_hack)
+        let scale_hack = env.options.scale_hack.get() as f32;
+        ((width * scale * scale_hack).round() as u32, (height * scale * scale_hack).round() as u32)
     };
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
