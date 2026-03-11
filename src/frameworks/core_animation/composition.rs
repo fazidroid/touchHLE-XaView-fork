@@ -130,13 +130,20 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
         })
         .collect();
 
-    let screen_bounds: CGRect = {
+    let (screen_bounds, screen_scale) = {
         let screen: id = msg_class![env; UIScreen mainScreen];
-        msg![env; screen bounds]
+        let bounds: CGRect = msg![env; screen bounds];
+        let screen_class = msg![env; screen class];
+        let scale: CGFloat = if env.objc.class_has_method_named(screen_class, "scale") {
+            msg![env; screen scale] // FetchScreenScale
+        } else {
+            1.0
+        };
+        (bounds, scale)
     };
     let scale_hack: u32 = env.options.scale_hack.get();
-    let fb_width = screen_bounds.size.width as u32 * scale_hack;
-    let fb_height = screen_bounds.size.height as u32 * scale_hack;
+    let fb_width = (screen_bounds.size.width * screen_scale).round() as u32 * scale_hack;
+    let fb_height = (screen_bounds.size.height * screen_scale).round() as u32 * scale_hack;
     let present_frame_args = (
         env.window().viewport(),
         env.window().rotation_matrix(),
