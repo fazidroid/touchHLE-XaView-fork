@@ -257,7 +257,7 @@ pub const UIScreenModeDidChangeNotification: &str = "UIScreenModeDidChangeNotifi
 pub const CONSTANTS: ConstantExports = &[
     (
         "_UIEdgeInsetsZero",
-        HostConstant::NSString(""), // FakeEdgeInsetsZeroHack
+        HostConstant::Bytes(&[0; 16]), // RealEdgeInsetsZero
     ),
     (
         "_UIScreenDidConnectNotification",
