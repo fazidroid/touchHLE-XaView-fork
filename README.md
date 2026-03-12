@@ -1,6 +1,6 @@
 XaView FORK:
 
-=Device selection in quick settings (iPod, iPad, iPhone), Asphalt 6 supports all of them besides that ones writed to be OpenGL ES 2.0 Only in graphic config (depends on versions)
+=Device selection in quick settings (iPod, iPad, iPhone) [UPD 12.03.26 09-14: All devices configs now supported!]
 
 =Retina and its scaling support
 
