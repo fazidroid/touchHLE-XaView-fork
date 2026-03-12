@@ -18,3 +18,8 @@ pub mod gl21compat {
 pub mod gles11 {
     include!(concat!(env!("OUT_DIR"), "/gles11.rs"));
 }
+// GlesTwoLib
+#[allow(warnings)]
+pub mod gles20 {
+    include!(concat!(env!("OUT_DIR"), "/gles20.rs"));
+}
