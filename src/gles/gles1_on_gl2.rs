@@ -403,7 +403,7 @@ impl GLESContext for GLES1OnGL2Context {
         "OpenGL ES 1.1 via touchHLE GLES1-on-GL2 layer"
     }
 
-    fn new(window: &mut Window) -> Result<Self, String> {
+    fn new(window: &mut Window, _options: &crate::options::Options) -> Result<Self, String> { // IgnoreOptions
         Ok(Self {
             gl_ctx: window.create_gl_context(GLVersion::GL21Compat)?,
             state: GLES1OnGL2State {

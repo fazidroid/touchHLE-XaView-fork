@@ -30,9 +30,14 @@ impl GLESContext for GLES1NativeContext {
         "Native OpenGL ES 1.1"
     }
 
-    fn new(window: &mut Window) -> Result<Self, String> {
+    fn new(window: &mut Window, options: &crate::options::Options) -> Result<Self, String> { // PassOptions
+        let version = if options.gles_version == 2 {
+            GLVersion::GLES20 // DynamicEsTwo
+        } else {
+            GLVersion::GLES11 // DynamicEsOne
+        };
         Ok(Self {
-            gl_ctx: window.create_gl_context(GLVersion::GLES11)?,
+            gl_ctx: window.create_gl_context(version)?,
             is_loaded: false,
         })
     }
