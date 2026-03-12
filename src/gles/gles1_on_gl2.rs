@@ -2044,6 +2044,89 @@ impl GLES for GLES1OnGL2<'_> {
         gl21::Translatef(fixed_to_float(x), fixed_to_float(y), fixed_to_float(z));
     }
 
+    // EsTwoCompat
+    unsafe fn CreateShader(&mut self, type_: GLenum) -> GLuint {
+        crate::gles::gl21compat_raw::CreateShader(type_)
+    }
+    unsafe fn ShaderSource(&mut self, shader: GLuint, count: GLsizei, string: *const *const std::ffi::c_char, length: *const GLint) {
+        crate::gles::gl21compat_raw::ShaderSource(shader, count, string, length)
+    }
+    unsafe fn CompileShader(&mut self, shader: GLuint) {
+        crate::gles::gl21compat_raw::CompileShader(shader)
+    }
+    unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint) {
+        crate::gles::gl21compat_raw::GetShaderiv(shader, pname, params)
+    }
+    unsafe fn GetShaderInfoLog(&mut self, shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char) {
+        crate::gles::gl21compat_raw::GetShaderInfoLog(shader, bufSize, length, infoLog)
+    }
+    unsafe fn CreateProgram(&mut self) -> GLuint {
+        crate::gles::gl21compat_raw::CreateProgram()
+    }
+    unsafe fn DeleteProgram(&mut self, program: GLuint) {
+        crate::gles::gl21compat_raw::DeleteProgram(program)
+    }
+    unsafe fn AttachShader(&mut self, program: GLuint, shader: GLuint) {
+        crate::gles::gl21compat_raw::AttachShader(program, shader)
+    }
+    unsafe fn BindAttribLocation(&mut self, program: GLuint, index: GLuint, name: *const std::ffi::c_char) {
+        crate::gles::gl21compat_raw::BindAttribLocation(program, index, name)
+    }
+    unsafe fn LinkProgram(&mut self, program: GLuint) {
+        crate::gles::gl21compat_raw::LinkProgram(program)
+    }
+    unsafe fn UseProgram(&mut self, program: GLuint) {
+        crate::gles::gl21compat_raw::UseProgram(program)
+    }
+    unsafe fn GetProgramiv(&mut self, program: GLuint, pname: GLenum, params: *mut GLint) {
+        crate::gles::gl21compat_raw::GetProgramiv(program, pname, params)
+    }
+    unsafe fn GetProgramInfoLog(&mut self, program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char) {
+        crate::gles::gl21compat_raw::GetProgramInfoLog(program, bufSize, length, infoLog)
+    }
+    unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid) {
+        crate::gles::gl21compat_raw::VertexAttribPointer(indx, size, type_, normalized, stride, ptr)
+    }
+    unsafe fn EnableVertexAttribArray(&mut self, index: GLuint) {
+        crate::gles::gl21compat_raw::EnableVertexAttribArray(index)
+    }
+    unsafe fn DisableVertexAttribArray(&mut self, index: GLuint) {
+        crate::gles::gl21compat_raw::DisableVertexAttribArray(index)
+    }
+    unsafe fn Uniform1i(&mut self, location: GLint, v0: GLint) {
+        crate::gles::gl21compat_raw::Uniform1i(location, v0)
+    }
+    unsafe fn Uniform1f(&mut self, location: GLint, v0: GLfloat) {
+        crate::gles::gl21compat_raw::Uniform1f(location, v0)
+    }
+    unsafe fn Uniform2f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat) {
+        crate::gles::gl21compat_raw::Uniform2f(location, v0, v1)
+    }
+    unsafe fn Uniform3f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat) {
+        crate::gles::gl21compat_raw::Uniform3f(location, v0, v1, v2)
+    }
+    unsafe fn Uniform4f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat) {
+        crate::gles::gl21compat_raw::Uniform4f(location, v0, v1, v2, v3)
+    }
+    unsafe fn UniformMatrix4fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) {
+        crate::gles::gl21compat_raw::UniformMatrix4fv(location, count, transpose, value)
+    }
+    unsafe fn GetUniformLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint {
+        crate::gles::gl21compat_raw::GetUniformLocation(program, name)
+    }
+    unsafe fn GetAttribLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint {
+        crate::gles::gl21compat_raw::GetAttribLocation(program, name)
+    }
+    unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) {
+        crate::gles::gl21compat_raw::GetActiveUniform(program, index, bufSize, length, size, type_, name)
+    }
+    unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) {
+        crate::gles::gl21compat_raw::GetActiveAttrib(program, index, bufSize, length, size, type_, name)
+    }
+    unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) {
+        crate::gles::gl21compat_raw::BlendColor(red, green, blue, alpha)
+    }
+
     // OES_framebuffer_object -> EXT_framebuffer_object
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint) {
         gl21::GenFramebuffersEXT(n, framebuffers)
