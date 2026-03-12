@@ -751,6 +751,89 @@ impl GLES for GLES1Native<'_> {
         gles11::Translatex(x, y, z)
     }
 
+    // EsTwoNative
+    unsafe fn CreateShader(&mut self, type_: GLenum) -> GLuint {
+        gles11::CreateShader(type_)
+    }
+    unsafe fn ShaderSource(&mut self, shader: GLuint, count: GLsizei, string: *const *const std::ffi::c_char, length: *const GLint) {
+        gles11::ShaderSource(shader, count, string, length)
+    }
+    unsafe fn CompileShader(&mut self, shader: GLuint) {
+        gles11::CompileShader(shader)
+    }
+    unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint) {
+        gles11::GetShaderiv(shader, pname, params)
+    }
+    unsafe fn GetShaderInfoLog(&mut self, shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char) {
+        gles11::GetShaderInfoLog(shader, bufSize, length, infoLog)
+    }
+    unsafe fn CreateProgram(&mut self) -> GLuint {
+        gles11::CreateProgram()
+    }
+    unsafe fn DeleteProgram(&mut self, program: GLuint) {
+        gles11::DeleteProgram(program)
+    }
+    unsafe fn AttachShader(&mut self, program: GLuint, shader: GLuint) {
+        gles11::AttachShader(program, shader)
+    }
+    unsafe fn BindAttribLocation(&mut self, program: GLuint, index: GLuint, name: *const std::ffi::c_char) {
+        gles11::BindAttribLocation(program, index, name)
+    }
+    unsafe fn LinkProgram(&mut self, program: GLuint) {
+        gles11::LinkProgram(program)
+    }
+    unsafe fn UseProgram(&mut self, program: GLuint) {
+        gles11::UseProgram(program)
+    }
+    unsafe fn GetProgramiv(&mut self, program: GLuint, pname: GLenum, params: *mut GLint) {
+        gles11::GetProgramiv(program, pname, params)
+    }
+    unsafe fn GetProgramInfoLog(&mut self, program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char) {
+        gles11::GetProgramInfoLog(program, bufSize, length, infoLog)
+    }
+    unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid) {
+        gles11::VertexAttribPointer(indx, size, type_, normalized, stride, ptr)
+    }
+    unsafe fn EnableVertexAttribArray(&mut self, index: GLuint) {
+        gles11::EnableVertexAttribArray(index)
+    }
+    unsafe fn DisableVertexAttribArray(&mut self, index: GLuint) {
+        gles11::DisableVertexAttribArray(index)
+    }
+    unsafe fn Uniform1i(&mut self, location: GLint, v0: GLint) {
+        gles11::Uniform1i(location, v0)
+    }
+    unsafe fn Uniform1f(&mut self, location: GLint, v0: GLfloat) {
+        gles11::Uniform1f(location, v0)
+    }
+    unsafe fn Uniform2f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat) {
+        gles11::Uniform2f(location, v0, v1)
+    }
+    unsafe fn Uniform3f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat) {
+        gles11::Uniform3f(location, v0, v1, v2)
+    }
+    unsafe fn Uniform4f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat) {
+        gles11::Uniform4f(location, v0, v1, v2, v3)
+    }
+    unsafe fn UniformMatrix4fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) {
+        gles11::UniformMatrix4fv(location, count, transpose, value)
+    }
+    unsafe fn GetUniformLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint {
+        gles11::GetUniformLocation(program, name)
+    }
+    unsafe fn GetAttribLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint {
+        gles11::GetAttribLocation(program, name)
+    }
+    unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) {
+        gles11::GetActiveUniform(program, index, bufSize, length, size, type_, name)
+    }
+    unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) {
+        gles11::GetActiveAttrib(program, index, bufSize, length, size, type_, name)
+    }
+    unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) {
+        gles11::BlendColor(red, green, blue, alpha)
+    }
+
     // OES_framebuffer_object -> EXT_framebuffer_object
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint) {
         gles11::GenFramebuffersOES(n, framebuffers)

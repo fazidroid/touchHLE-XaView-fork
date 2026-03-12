@@ -391,6 +391,35 @@ pub trait GLES {
     unsafe fn Translatef(&mut self, x: GLfloat, y: GLfloat, z: GLfloat);
     unsafe fn Translatex(&mut self, x: GLfixed, y: GLfixed, z: GLfixed);
 
+    // EsTwoSupport
+    unsafe fn CreateShader(&mut self, type_: GLenum) -> GLuint;
+    unsafe fn ShaderSource(&mut self, shader: GLuint, count: GLsizei, string: *const *const std::ffi::c_char, length: *const GLint);
+    unsafe fn CompileShader(&mut self, shader: GLuint);
+    unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint);
+    unsafe fn GetShaderInfoLog(&mut self, shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char);
+    unsafe fn CreateProgram(&mut self) -> GLuint;
+    unsafe fn DeleteProgram(&mut self, program: GLuint);
+    unsafe fn AttachShader(&mut self, program: GLuint, shader: GLuint);
+    unsafe fn BindAttribLocation(&mut self, program: GLuint, index: GLuint, name: *const std::ffi::c_char);
+    unsafe fn LinkProgram(&mut self, program: GLuint);
+    unsafe fn UseProgram(&mut self, program: GLuint);
+    unsafe fn GetProgramiv(&mut self, program: GLuint, pname: GLenum, params: *mut GLint);
+    unsafe fn GetProgramInfoLog(&mut self, program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char);
+    unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid);
+    unsafe fn EnableVertexAttribArray(&mut self, index: GLuint);
+    unsafe fn DisableVertexAttribArray(&mut self, index: GLuint);
+    unsafe fn Uniform1i(&mut self, location: GLint, v0: GLint);
+    unsafe fn Uniform1f(&mut self, location: GLint, v0: GLfloat);
+    unsafe fn Uniform2f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat);
+    unsafe fn Uniform3f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat);
+    unsafe fn Uniform4f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat);
+    unsafe fn UniformMatrix4fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
+    unsafe fn GetUniformLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint;
+    unsafe fn GetAttribLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint;
+    unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char);
+    unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char);
+    unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat);
+
     // OES_framebuffer_object (incomplete)
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint);
     unsafe fn GenRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *mut GLuint);
