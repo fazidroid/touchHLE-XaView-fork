@@ -148,7 +148,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
     host_obj.api = api;
     host_obj.gles_ctx = Some(gles1_ins);
-    drop(host_obj);
 
     env.window.as_mut().unwrap().set_share_with_current_context(false);
 
@@ -176,7 +175,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
     host_obj.api = api;
     host_obj.gles_ctx = Some(gles1_ins);
-    drop(host_obj);
 
     this
 }
