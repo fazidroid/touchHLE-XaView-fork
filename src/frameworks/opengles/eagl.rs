@@ -112,16 +112,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithAPI:(EAGLRenderingAPI)api sharegroup:(id)group {
-    if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
-        log!(
-            "TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil", // UnsupportedApi
-            api,
-            group
-        );
-        return nil;
-    }
+        if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
+            log!(
+                "TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil", // UnsupportedApi
+                api,
+                group
+            );
+            return nil;
+        }
+        
+        if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
+            log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
+            return nil; // RejectEsTwo
+        }
 
-    if group == nil {
+        if group == nil {
         return msg![env; this initWithAPI:api];
     }
 
@@ -156,15 +161,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithAPI:(EAGLRenderingAPI)api {
-    if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
-        log!(
-            "TODO: App requested EAGL initWithAPI:{}, returning nil", // UnsupportedApi
-            api
-        );
-        return nil;
-    }
+        if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
+            log!(
+                "TODO: App requested EAGL initWithAPI:{}, returning nil", // UnsupportedApi
+                api
+            );
+            return nil;
+        }
+        
+        if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
+            log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
+            return nil; // RejectEsTwo
+        }
 
-    let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
+        let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     let mut gles1_ins = create_gles1_ctx(window, &env.options);
 
     {
