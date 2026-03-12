@@ -284,9 +284,13 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                             b"PowerVR MBXLite with VGPLite"
                         }
                         gles11::VERSION => {
+                            if env.options.gles_version == 1 {
+                            b"OpenGL ES 1.1 (touchHLE)" // RealEs1
+                        } else {
                             b"OpenGL ES 2.0 (touchHLE)" // FakeEs2
                         }
-                        0x8B8C => {
+                    }
+                    0x8B8C => {
                             b"OpenGL ES GLSL ES 1.00" // GlslVersion
                         }
                         gles11::EXTENSIONS => {
