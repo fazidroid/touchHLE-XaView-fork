@@ -1494,6 +1494,33 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
     }
 }
 
+// Es2Stubs
+fn glCreateShader(_env: &mut Environment, _type: GLenum) -> GLuint { 1 }
+fn glShaderSource(_env: &mut Environment, _shader: GLuint, _count: GLsizei, _string: ConstVoidPtr, _length: ConstPtr<GLint>) {}
+fn glCompileShader(_env: &mut Environment, _shader: GLuint) {}
+fn glGetShaderiv(_env: &mut Environment, _shader: GLuint, _pname: GLenum, _params: MutPtr<GLint>) {}
+fn glGetShaderInfoLog(_env: &mut Environment, _shader: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {}
+fn glCreateProgram(_env: &mut Environment) -> GLuint { 1 }
+fn glAttachShader(_env: &mut Environment, _program: GLuint, _shader: GLuint) {}
+fn glBindAttribLocation(_env: &mut Environment, _program: GLuint, _index: GLuint, _name: ConstVoidPtr) {}
+fn glLinkProgram(_env: &mut Environment, _program: GLuint) {}
+fn glUseProgram(_env: &mut Environment, _program: GLuint) {}
+fn glGetProgramiv(_env: &mut Environment, _program: GLuint, _pname: GLenum, _params: MutPtr<GLint>) {}
+fn glGetProgramInfoLog(_env: &mut Environment, _program: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {}
+fn glVertexAttribPointer(_env: &mut Environment, _indx: GLuint, _size: GLint, _type: GLenum, _normalized: GLboolean, _stride: GLsizei, _ptr: ConstVoidPtr) {}
+fn glEnableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
+fn glDisableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
+fn glUniform1i(_env: &mut Environment, _location: GLint, _x: GLint) {}
+fn glUniform1f(_env: &mut Environment, _location: GLint, _x: GLfloat) {}
+fn glUniform2f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat) {}
+fn glUniform3f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat, _z: GLfloat) {}
+fn glUniform4f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat, _z: GLfloat, _w: GLfloat) {}
+fn glUniformMatrix4fv(_env: &mut Environment, _location: GLint, _count: GLsizei, _transpose: GLboolean, _value: ConstPtr<GLfloat>) {}
+fn glGetUniformLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint { 0 }
+fn glGetAttribLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint { 0 }
+fn glGetActiveUniform(_env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _size: MutPtr<GLint>, _type: MutPtr<GLenum>, _name: MutVoidPtr) {}
+fn glGetActiveAttrib(_env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _size: MutPtr<GLint>, _type: MutPtr<GLenum>, _name: MutVoidPtr) {}
+
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
     export_c_func!(glGetError()),
@@ -1660,6 +1687,32 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetBufferParameteriv(_, _, _)),
     export_c_func!(glMapBufferOES(_, _)),
     export_c_func!(glUnmapBufferOES(_)),
+    // Es2Exports
+    export_c_func!(glCreateShader(_)),
+    export_c_func!(glShaderSource(_, _, _, _, _)),
+    export_c_func!(glCompileShader(_)),
+    export_c_func!(glGetShaderiv(_, _, _, _)),
+    export_c_func!(glGetShaderInfoLog(_, _, _, _, _)),
+    export_c_func!(glCreateProgram()),
+    export_c_func!(glAttachShader(_, _, _)),
+    export_c_func!(glBindAttribLocation(_, _, _, _)),
+    export_c_func!(glLinkProgram(_, _)),
+    export_c_func!(glUseProgram(_, _)),
+    export_c_func!(glGetProgramiv(_, _, _, _)),
+    export_c_func!(glGetProgramInfoLog(_, _, _, _, _)),
+    export_c_func!(glVertexAttribPointer(_, _, _, _, _, _, _)),
+    export_c_func!(glEnableVertexAttribArray(_, _)),
+    export_c_func!(glDisableVertexAttribArray(_, _)),
+    export_c_func!(glUniform1i(_, _, _)),
+    export_c_func!(glUniform1f(_, _, _)),
+    export_c_func!(glUniform2f(_, _, _, _)),
+    export_c_func!(glUniform3f(_, _, _, _, _)),
+    export_c_func!(glUniform4f(_, _, _, _, _, _)),
+    export_c_func!(glUniformMatrix4fv(_, _, _, _, _)),
+    export_c_func!(glGetUniformLocation(_, _, _)),
+    export_c_func!(glGetAttribLocation(_, _, _)),
+    export_c_func!(glGetActiveUniform(_, _, _, _, _, _, _, _)),
+    export_c_func!(glGetActiveAttrib(_, _, _, _, _, _, _, _)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {

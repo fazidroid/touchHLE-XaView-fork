@@ -60,6 +60,7 @@ const kEAGLRenderingAPIOpenGLES2: EAGLRenderingAPI = 2;
 const kEAGLRenderingAPIOpenGLES3: EAGLRenderingAPI = 3;
 
 pub(super) struct EAGLContextHostObject {
+    api: EAGLRenderingAPI, // Es2Support
     pub(super) gles_ctx: Option<Box<dyn GLESContext>>,
     /// Mapping of OpenGL ES renderbuffer names to `EAGLDrawable` instances
     /// (always `CAEAGLLayer*`). Retains the instance so it won't dangle.
@@ -78,6 +79,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)alloc {
     let host_object = Box::new(EAGLContextHostObject {
+        api: kEAGLRenderingAPIOpenGLES1, // DefaultApi
         gles_ctx: None,
         renderbuffer_drawable_bindings: Rc::new(RefCell::new(HashMap::new())),
         fps_counter: None,
@@ -110,9 +112,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithAPI:(EAGLRenderingAPI)api sharegroup:(id)group {
-    if api != kEAGLRenderingAPIOpenGLES1 {
+    if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
         log!(
-            "TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil as we only support API 1 for now",
+            "TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil", // UnsupportedApi
             api,
             group
         );
@@ -143,7 +145,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
     }
 
-    env.objc.borrow_mut::<EAGLContextHostObject>(this).gles_ctx = Some(gles1_ins);
+    let mut host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
+    host_obj.api = api;
+    host_obj.gles_ctx = Some(gles1_ins);
+    drop(host_obj);
 
     env.window.as_mut().unwrap().set_share_with_current_context(false);
 
@@ -152,9 +157,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithAPI:(EAGLRenderingAPI)api {
-    if api != kEAGLRenderingAPIOpenGLES1 {
+    if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
         log!(
-            "TODO: App requested EAGL initWithAPI:{}, returning nil as we only support API 1 for now",
+            "TODO: App requested EAGL initWithAPI:{}, returning nil", // UnsupportedApi
             api
         );
         return nil;
@@ -168,14 +173,16 @@ pub const CLASSES: ClassExports = objc_classes! {
         log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
     }
 
-    env.objc.borrow_mut::<EAGLContextHostObject>(this).gles_ctx = Some(gles1_ins);
+    let mut host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
+    host_obj.api = api;
+    host_obj.gles_ctx = Some(gles1_ins);
+    drop(host_obj);
 
     this
 }
 
 - (EAGLRenderingAPI)API {
-    // TODO: support later API versions
-    kEAGLRenderingAPIOpenGLES1
+    env.objc.borrow::<EAGLContextHostObject>(this).api // ReturnStoredApi
 }
 
 - (id)sharegroup {
