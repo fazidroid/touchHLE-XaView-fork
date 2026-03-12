@@ -52,7 +52,7 @@ pub const CONSTANTS: ConstantExports = &[
     ),
 ];
 
-type EAGLRenderingAPI = u32;
+pub(super) type EAGLRenderingAPI = u32; // MakeTypePub
 const kEAGLRenderingAPIOpenGLES1: EAGLRenderingAPI = 1;
 #[allow(dead_code)]
 const kEAGLRenderingAPIOpenGLES2: EAGLRenderingAPI = 2;
@@ -60,7 +60,7 @@ const kEAGLRenderingAPIOpenGLES2: EAGLRenderingAPI = 2;
 const kEAGLRenderingAPIOpenGLES3: EAGLRenderingAPI = 3;
 
 pub(super) struct EAGLContextHostObject {
-    api: EAGLRenderingAPI, // Es2Support
+    pub(super) api: EAGLRenderingAPI, // Es2Support
     pub(super) gles_ctx: Option<Box<dyn GLESContext>>,
     /// Mapping of OpenGL ES renderbuffer names to `EAGLDrawable` instances
     /// (always `CAEAGLLayer*`). Retains the instance so it won't dangle.
