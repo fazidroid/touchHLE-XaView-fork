@@ -271,10 +271,15 @@ fn glFlush(env: &mut Environment) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Flush() })
 }
 fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
-    let res = if let Some(&str) = env.framework_state.opengles.strings_cache.get(&name) {
+    let is_es2 = env.framework_state.opengles.current_ctx_for_thread(env.current_thread)
+        .map(|ctx| env.objc.borrow::<EAGLContextHostObject>(ctx).api == 2)
+        .unwrap_or(false); // CheckApiVer
+    
+    let cache_key = if is_es2 { name | 0x20000 } else { name }; // CacheKey
+
+    let res = if let Some(&str) = env.framework_state.opengles.strings_cache.get(&cache_key) {
         str
     } else {
-        let gles_version = env.options.gles_version; // CopyVer
         let new_str = with_ctx_and_mem(env, move |_gles, mem| {
             // Those values are extracted from the iPod touch 2nd gen, iOS 4.2.1
             let s: &[u8] = match name {
@@ -285,10 +290,10 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                             b"PowerVR MBXLite with VGPLite"
                         }
                         gles11::VERSION => {
-                        if gles_version == 1 {
-                            b"OpenGL ES-CM 1.1 (touchHLE)" // RealEs1
+                        if is_es2 {
+                            b"OpenGL ES 2.0 (touchHLE)" // RealEs2
                         } else {
-                            b"OpenGL ES 2.0 (touchHLE)" // FakeEs2
+                            b"OpenGL ES-CM 1.1 (touchHLE)" // RealEs1
                         }
                     }
                     0x8B8C => {
@@ -304,7 +309,7 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
         env.framework_state
             .opengles
             .strings_cache
-            .insert(name, new_str);
+            .insert(cache_key, new_str);
         new_str
     };
     log_dbg!("glGetString({}) => {:?}", name, res);
@@ -1543,8 +1548,12 @@ fn glAttachShader(_env: &mut Environment, _program: GLuint, _shader: GLuint) {}
 fn glBindAttribLocation(_env: &mut Environment, _program: GLuint, _index: GLuint, _name: ConstVoidPtr) {}
 fn glLinkProgram(_env: &mut Environment, _program: GLuint) {}
 fn glUseProgram(_env: &mut Environment, _program: GLuint) {}
-fn glGetProgramiv(env: &mut Environment, _program: GLuint, _pname: GLenum, params: MutPtr<GLint>) {
-    env.mem.write(params, 1); // StatusTrue
+fn glGetProgramiv(env: &mut Environment, _program: GLuint, pname: GLenum, params: MutPtr<GLint>) {
+    if pname == 0x8B86 || pname == 0x8B89 {
+        env.mem.write(params, 0); // ZeroCount
+    } else {
+        env.mem.write(params, 1); // StatusTrue
+    }
 }
 fn glGetProgramInfoLog(env: &mut Environment, _program: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {
     if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
