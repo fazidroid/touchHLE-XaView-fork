@@ -110,32 +110,37 @@ private:
     }
   }
 
-  bool MemoryWriteExclusive8(VAddr, std::uint8_t, std::uint8_t) override {
-    std::fprintf(stderr, "MemoryWriteExclusive8: TODO");
-    abort();
+  bool MemoryWriteExclusive8(VAddr addr, std::uint8_t value, std::uint8_t expected) override {
+    if (MemoryRead8(addr) != expected) {
+      std::fprintf(stderr, "MemoryWriteExclusive8: expected %u, got %u\n", expected, MemoryRead8(addr));
+      abort();
+    }
+    MemoryWrite8(addr, value);
+    return true;
   }
-  bool MemoryWriteExclusive16(VAddr, std::uint16_t, std::uint16_t) override {
-    std::fprintf(stderr, "MemoryWriteExclusive16: TODO");
-    abort();
+  bool MemoryWriteExclusive16(VAddr addr, std::uint16_t value, std::uint16_t expected) override {
+    if (MemoryRead16(addr) != expected) {
+      std::fprintf(stderr, "MemoryWriteExclusive16: expected %u, got %u\n", expected, MemoryRead16(addr));
+      abort();
+    }
+    MemoryWrite16(addr, value);
+    return true;
   }
-  bool MemoryWriteExclusive32(VAddr addr, std::uint32_t value,
-                              std::uint32_t expected) override {
-    // As long as we stay single threaded on the host side,
-    // this implementation is OK
-    // TODO: revisit once (if) we switch to a host multi-threading
+  bool MemoryWriteExclusive32(VAddr addr, std::uint32_t value, std::uint32_t expected) override {
     if (MemoryRead32(addr) != expected) {
-      // TODO: implement CAS mechanism or similar
-      // (be aware that implementation may need to be platform specific!)
-      std::fprintf(stderr, "MemoryWriteExclusive32: expected %u, got %u\n",
-                   expected, MemoryRead32(addr));
+      std::fprintf(stderr, "MemoryWriteExclusive32: expected %u, got %u\n", expected, MemoryRead32(addr));
       abort();
     }
     MemoryWrite32(addr, value);
     return true;
   }
-  bool MemoryWriteExclusive64(VAddr, std::uint64_t, std::uint64_t) override {
-    std::fprintf(stderr, "MemoryWriteExclusive64: TODO");
-    abort();
+  bool MemoryWriteExclusive64(VAddr addr, std::uint64_t value, std::uint64_t expected) override {
+    if (MemoryRead64(addr) != expected) {
+      std::fprintf(stderr, "MemoryWriteExclusive64: expected %llu, got %llu\n", (unsigned long long)expected, (unsigned long long)MemoryRead64(addr));
+      abort();
+    }
+    MemoryWrite64(addr, value);
+    return true;
   }
 
   void InterpreterFallback(std::uint32_t, size_t) override {
