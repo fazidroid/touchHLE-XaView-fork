@@ -113,8 +113,8 @@ private:
   bool MemoryWriteExclusive8(VAddr addr, std::uint8_t value,
                              std::uint8_t expected) override {
     if (MemoryRead8(addr) != expected) {
-      std::fprintf(stderr, "MemoryWriteExclusive8: expected %u, got %u\n", expected,
-                   MemoryRead8(addr));
+      std::fprintf(stderr, "MemoryWriteExclusive8: expected %u, got %u\n",
+                   expected, MemoryRead8(addr));
       abort();
     }
     MemoryWrite8(addr, value);
@@ -143,8 +143,7 @@ private:
   bool MemoryWriteExclusive64(VAddr addr, std::uint64_t value,
                               std::uint64_t expected) override {
     if (MemoryRead64(addr) != expected) {
-      std::fprintf(stderr,
-                   "MemoryWriteExclusive64: expected %llu, got %llu\n",
+      std::fprintf(stderr, "MemoryWriteExclusive64: expected %llu, got %llu\n",
                    (unsigned long long)expected,
                    (unsigned long long)MemoryRead64(addr));
       abort();
