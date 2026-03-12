@@ -1597,158 +1597,217 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
     }
 }
 
-// Es2Stubs
-fn glCreateShader(_env: &mut Environment, _type: GLenum) -> GLuint {
-    1
+// EsTwoGuest
+fn glCreateShader(env: &mut Environment, type_: GLenum) -> GLuint {
+    with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateShader(type_) })
 }
 fn glShaderSource(
-    _env: &mut Environment,
-    _shader: GLuint,
-    _count: GLsizei,
-    _string: ConstVoidPtr,
-    _length: ConstPtr<GLint>,
+    env: &mut Environment,
+    shader: GLuint,
+    count: GLsizei,
+    string: ConstVoidPtr,
+    length: ConstPtr<GLint>,
 ) {
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let count_usize = count as usize;
+        let mut host_strings: Vec<*const std::ffi::c_char> = Vec::with_capacity(count_usize);
+        let mut host_lengths: Vec<GLint> = Vec::with_capacity(count_usize);
+
+        let string_arr = mem.ptr_at(string.cast::<ConstVoidPtr>(), count_usize);
+        let length_arr = if length.is_null() { std::ptr::null() } else { mem.ptr_at(length, count_usize) };
+
+        for i in 0..count_usize {
+            let guest_str_ptr = *string_arr.add(i);
+            let host_str_ptr = mem.unchecked_ptr_at(guest_str_ptr.cast::<u8>(), 0).cast();
+            host_strings.push(host_str_ptr);
+
+            if !length_arr.is_null() {
+                host_lengths.push(*length_arr.add(i));
+            }
+        }
+
+        let lengths_ptr = if host_lengths.is_empty() { std::ptr::null() } else { host_lengths.as_ptr() };
+        gles.ShaderSource(shader, count, host_strings.as_ptr(), lengths_ptr);
+    })
 }
-fn glCompileShader(_env: &mut Environment, _shader: GLuint) {}
-fn glGetShaderiv(env: &mut Environment, _shader: GLuint, _pname: GLenum, params: MutPtr<GLint>) {
-    env.mem.write(params, 1); // StatusTrue
+fn glCompileShader(env: &mut Environment, shader: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.CompileShader(shader) })
+}
+fn glGetShaderiv(env: &mut Environment, shader: GLuint, pname: GLenum, params: MutPtr<GLint>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let params_ptr = mem.ptr_at_mut(params, 1);
+        gles.GetShaderiv(shader, pname, params_ptr);
+    })
 }
 fn glGetShaderInfoLog(
     env: &mut Environment,
-    _shader: GLuint,
-    _bufSize: GLsizei,
+    shader: GLuint,
+    bufSize: GLsizei,
     length: MutPtr<GLsizei>,
-    _infoLog: MutVoidPtr,
+    infoLog: MutVoidPtr,
 ) {
-    if !length.is_null() {
-        env.mem.write(length, 0);
-    } // ZeroLength
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
+        let infoLog_ptr = if infoLog.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(infoLog.cast(), bufSize as usize) };
+        gles.GetShaderInfoLog(shader, bufSize, length_ptr, infoLog_ptr.cast());
+    })
 }
-fn glCreateProgram(_env: &mut Environment) -> GLuint {
-    1
+fn glCreateProgram(env: &mut Environment) -> GLuint {
+    with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateProgram() })
 }
-fn glDeleteProgram(_env: &mut Environment, _program: GLuint) {} // DeleteProgramStub
-fn glAttachShader(_env: &mut Environment, _program: GLuint, _shader: GLuint) {}
+fn glDeleteProgram(env: &mut Environment, program: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.DeleteProgram(program) })
+}
+fn glAttachShader(env: &mut Environment, program: GLuint, shader: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.AttachShader(program, shader) })
+}
 fn glBindAttribLocation(
-    _env: &mut Environment,
-    _program: GLuint,
-    _index: GLuint,
-    _name: ConstVoidPtr,
+    env: &mut Environment,
+    program: GLuint,
+    index: GLuint,
+    name: ConstVoidPtr,
 ) {
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
+        gles.BindAttribLocation(program, index, host_name);
+    })
 }
-fn glLinkProgram(_env: &mut Environment, _program: GLuint) {}
-fn glUseProgram(_env: &mut Environment, _program: GLuint) {}
-fn glGetProgramiv(env: &mut Environment, _program: GLuint, pname: GLenum, params: MutPtr<GLint>) {
-    if pname == 0x8B86 || pname == 0x8B89 {
-        env.mem.write(params, 0); // ZeroCount
-    } else {
-        env.mem.write(params, 1); // StatusTrue
-    }
+fn glLinkProgram(env: &mut Environment, program: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.LinkProgram(program) })
+}
+fn glUseProgram(env: &mut Environment, program: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.UseProgram(program) })
+}
+fn glGetProgramiv(env: &mut Environment, program: GLuint, pname: GLenum, params: MutPtr<GLint>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let params_ptr = mem.ptr_at_mut(params, 1);
+        gles.GetProgramiv(program, pname, params_ptr);
+    })
 }
 fn glGetProgramInfoLog(
     env: &mut Environment,
-    _program: GLuint,
-    _bufSize: GLsizei,
+    program: GLuint,
+    bufSize: GLsizei,
     length: MutPtr<GLsizei>,
-    _infoLog: MutVoidPtr,
+    infoLog: MutVoidPtr,
 ) {
-    if !length.is_null() {
-        env.mem.write(length, 0);
-    } // ZeroLength
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
+        let infoLog_ptr = if infoLog.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(infoLog.cast(), bufSize as usize) };
+        gles.GetProgramInfoLog(program, bufSize, length_ptr, infoLog_ptr.cast());
+    })
 }
 fn glVertexAttribPointer(
-    _env: &mut Environment,
-    _indx: GLuint,
-    _size: GLint,
-    _type: GLenum,
-    _normalized: GLboolean,
-    _stride: GLsizei,
-    _ptr: ConstVoidPtr,
+    env: &mut Environment,
+    indx: GLuint,
+    size: GLint,
+    type_: GLenum,
+    normalized: GLboolean,
+    stride: GLsizei,
+    ptr: ConstVoidPtr,
 ) {
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let ptr_host = translate_pointer_or_offset_to_host(gles, mem, ptr, gles11::ARRAY_BUFFER_BINDING);
+        gles.VertexAttribPointer(indx, size, type_, normalized, stride, ptr_host);
+    })
 }
-fn glEnableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
-fn glDisableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
-fn glUniform1i(_env: &mut Environment, _location: GLint, _x: GLint) {}
-fn glUniform1f(_env: &mut Environment, _location: GLint, _x: GLfloat) {}
-fn glUniform2f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat) {}
-fn glUniform3f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat, _z: GLfloat) {}
+fn glEnableVertexAttribArray(env: &mut Environment, index: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.EnableVertexAttribArray(index) })
+}
+fn glDisableVertexAttribArray(env: &mut Environment, index: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.DisableVertexAttribArray(index) })
+}
+fn glUniform1i(env: &mut Environment, location: GLint, x: GLint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1i(location, x) })
+}
+fn glUniform1f(env: &mut Environment, location: GLint, x: GLfloat) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1f(location, x) })
+}
+fn glUniform2f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform2f(location, x, y) })
+}
+fn glUniform3f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat, z: GLfloat) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform3f(location, x, y, z) })
+}
 fn glUniform4f(
-    _env: &mut Environment,
-    _location: GLint,
-    _x: GLfloat,
-    _y: GLfloat,
-    _z: GLfloat,
-    _w: GLfloat,
+    env: &mut Environment,
+    location: GLint,
+    x: GLfloat,
+    y: GLfloat,
+    z: GLfloat,
+    w: GLfloat,
 ) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform4f(location, x, y, z, w) })
 }
 fn glUniformMatrix4fv(
-    _env: &mut Environment,
-    _location: GLint,
-    _count: GLsizei,
-    _transpose: GLboolean,
-    _value: ConstPtr<GLfloat>,
+    env: &mut Environment,
+    location: GLint,
+    count: GLsizei,
+    transpose: GLboolean,
+    value: ConstPtr<GLfloat>,
 ) {
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let value_ptr = mem.ptr_at(value, (count * 16) as usize);
+        gles.UniformMatrix4fv(location, count, transpose, value_ptr);
+    })
 }
-fn glGetUniformLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint {
-    0
+fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
+    with_ctx_and_mem_no_skip(env, |gles, mem| unsafe {
+        let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
+        gles.GetUniformLocation(program, host_name)
+    })
 }
-fn glGetAttribLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint {
-    0
+fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
+    with_ctx_and_mem_no_skip(env, |gles, mem| unsafe {
+        let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
+        gles.GetAttribLocation(program, host_name)
+    })
 }
 fn glGetActiveUniform(
     env: &mut Environment,
-    _program: GLuint,
-    _index: GLuint,
-    _bufSize: GLsizei,
+    program: GLuint,
+    index: GLuint,
+    bufSize: GLsizei,
     length: MutPtr<GLsizei>,
     size: MutPtr<GLint>,
     type_: MutPtr<GLenum>,
     name: MutVoidPtr,
 ) {
-    if !length.is_null() {
-        env.mem.write(length, 0);
-    } // ZeroLength
-    if !size.is_null() {
-        env.mem.write(size, 0);
-    } // ZeroSize
-    if !type_.is_null() {
-        env.mem.write(type_, 0);
-    } // ZeroType
-    if !name.is_null() {
-        env.mem.write(name.cast::<u8>(), 0);
-    } // EmptyName
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
+        let size_ptr = if size.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(size, 1) };
+        let type_ptr = if type_.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(type_, 1) };
+        let name_ptr = if name.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(name.cast(), bufSize as usize) };
+        gles.GetActiveUniform(program, index, bufSize, length_ptr, size_ptr, type_ptr, name_ptr.cast());
+    })
 }
 fn glGetActiveAttrib(
     env: &mut Environment,
-    _program: GLuint,
-    _index: GLuint,
-    _bufSize: GLsizei,
+    program: GLuint,
+    index: GLuint,
+    bufSize: GLsizei,
     length: MutPtr<GLsizei>,
     size: MutPtr<GLint>,
     type_: MutPtr<GLenum>,
     name: MutVoidPtr,
 ) {
-    if !length.is_null() {
-        env.mem.write(length, 0);
-    } // ZeroLength
-    if !size.is_null() {
-        env.mem.write(size, 0);
-    } // ZeroSize
-    if !type_.is_null() {
-        env.mem.write(type_, 0);
-    } // ZeroType
-    if !name.is_null() {
-        env.mem.write(name.cast::<u8>(), 0);
-    } // EmptyName
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
+        let size_ptr = if size.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(size, 1) };
+        let type_ptr = if type_.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(type_, 1) };
+        let name_ptr = if name.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(name.cast(), bufSize as usize) };
+        gles.GetActiveAttrib(program, index, bufSize, length_ptr, size_ptr, type_ptr, name_ptr.cast());
+    })
 }
 fn glBlendColor(
-    _env: &mut Environment,
-    _red: GLfloat,
-    _green: GLfloat,
-    _blue: GLfloat,
-    _alpha: GLfloat,
+    env: &mut Environment,
+    red: GLfloat,
+    green: GLfloat,
+    blue: GLfloat,
+    alpha: GLfloat,
 ) {
-} // BlendColorStub
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.BlendColor(red, green, blue, alpha) })
+} // BlendColorReal
 
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
