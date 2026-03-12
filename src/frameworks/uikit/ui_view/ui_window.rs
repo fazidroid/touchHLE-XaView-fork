@@ -136,9 +136,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())setScreen:(id)_screen {
-    // DisableExtDisplayTouch
-    () = msg![env; this setUserInteractionEnabled:false];
-    () = msg![env; this setAlpha:0.0f32];
+    // DropExternalWindow
+    let list = &mut env.framework_state.uikit.ui_view.ui_window.windows;
+    if let Some(idx) = list.iter().position(|&w| w == this) {
+        list.remove(idx);
+    }
 }
 
 - (())addSubview:(id)view {
