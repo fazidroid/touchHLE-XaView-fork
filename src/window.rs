@@ -171,6 +171,8 @@ pub enum BatteryState {
 pub enum GLVersion {
     /// OpenGL ES 1.1
     GLES11,
+    /// OpenGL ES 2.0
+    GLES20, // AddEsTwo
     /// OpenGL 2.1 compatibility profile
     GL21Compat,
 }
@@ -264,7 +266,11 @@ impl Window {
             // It's important to set context version BEFORE window creation
             // ref. https://wiki.libsdl.org/SDL2/SDL_GLattr
             let attr = video_ctx.gl_attr();
-            attr.set_context_version(1, 1);
+            if options.gles_version == 2 {
+                attr.set_context_version(2, 0); // SetEsTwo
+            } else {
+                attr.set_context_version(1, 1); // SetEsOne
+            }
             attr.set_context_profile(sdl2::video::GLProfile::GLES);
 
             // Disable blocking of event loop when app is paused.
@@ -323,7 +329,11 @@ impl Window {
             // Sanity check
             let gl_attr = video_ctx.gl_attr();
             debug_assert_eq!(gl_attr.context_profile(), sdl2::video::GLProfile::GLES);
-            debug_assert_eq!(gl_attr.context_version(), (1, 1));
+            if options.gles_version == 2 {
+                debug_assert_eq!(gl_attr.context_version(), (2, 0)); // CheckEsTwo
+            } else {
+                debug_assert_eq!(gl_attr.context_version(), (1, 1)); // CheckEsOne
+            }
         }
 
         if let Some(icon) = icon {
@@ -1138,6 +1148,10 @@ impl Window {
         match version {
             GLVersion::GLES11 => {
                 attr.set_context_version(1, 1);
+                attr.set_context_profile(sdl2::video::GLProfile::GLES);
+            }
+            GLVersion::GLES20 => {
+                attr.set_context_version(2, 0); // SetEsTwo
                 attr.set_context_profile(sdl2::video::GLProfile::GLES);
             }
             GLVersion::GL21Compat => {
