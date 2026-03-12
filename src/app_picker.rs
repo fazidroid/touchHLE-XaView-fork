@@ -626,7 +626,11 @@ fn show_app_picker_gui(
     update_quick_option_buttons(
         env,
         &quick_options_stuff.gles_version_buttons,
-        if quick_options_gles_version == 1 { 0 } else { 1 }, // UpdateEsBtns
+        if quick_options_gles_version == 1 {
+            0
+        } else {
+            1
+        }, // UpdateEsBtns
     );
 
     () = msg![env; window makeKeyAndVisible];
@@ -770,10 +774,12 @@ fn show_app_picker_gui(
             };
         } else if std::mem::take(&mut host_obj.gles_version_1) {
             quick_options_gles_version = 1;
-            update_quick_option_buttons(env, &quick_options_stuff.gles_version_buttons, 0); // SetEsOne
+            update_quick_option_buttons(env, &quick_options_stuff.gles_version_buttons, 0);
+            // SetEsOne
         } else if std::mem::take(&mut host_obj.gles_version_2) {
             quick_options_gles_version = 2;
-            update_quick_option_buttons(env, &quick_options_stuff.gles_version_buttons, 1); // SetEsTwo
+            update_quick_option_buttons(env, &quick_options_stuff.gles_version_buttons, 1);
+            // SetEsTwo
         } else if std::mem::take(&mut host_obj.device_model_toggle) {
             quick_options_device_model_open = !quick_options_device_model_open;
             () = msg![env; (quick_options_stuff.device_model_menu) setHidden:(!quick_options_device_model_open)];
@@ -1594,10 +1600,7 @@ fn setup_quick_options(
         RowKind::Label("Use analog sticks for tilt controls"),
         RowKind::Switch("analogStickTiltControls:", true),
         RowKind::Label("OpenGL ES Version"),
-        RowKind::Buttons(&[
-            ("ES 1.1", "glesVersion1"),
-            ("ES 2.0", "glesVersion2"),
-        ]),
+        RowKind::Buttons(&[("ES 1.1", "glesVersion1"), ("ES 2.0", "glesVersion2")]),
         RowKind::Label("Device model"),
         RowKind::DeviceModelDropdown,
         // ---- (divider for stuff skipped below)
