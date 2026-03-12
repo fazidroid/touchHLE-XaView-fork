@@ -178,6 +178,8 @@ struct AppPickerDelegateHostObject {
     // AddScrollFlags
     device_model_scroll_up: bool,
     device_model_scroll_down: bool,
+    gles_version_1: bool, // SelectEsOne
+    gles_version_2: bool, // SelectEsTwo
 }
 impl HostObject for AppPickerDelegateHostObject {}
 
@@ -286,6 +288,8 @@ const CLASSES: ClassExports = objc_classes! {
 - (())deviceModel16 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_select_16 = true; }
 - (())deviceModelScrollUp { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_scroll_up = true; }
 - (())deviceModelScrollDown { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).device_model_scroll_down = true; }
+- (())glesVersion1 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).gles_version_1 = true; } // HandleEsOne
+- (())glesVersion2 { env.objc.borrow_mut::<AppPickerDelegateHostObject>(this).gles_version_2 = true; } // HandleEsTwo
 
 - (())openFileManager {
     // Assert (see above).
@@ -579,6 +583,7 @@ fn show_app_picker_gui(
     let mut quick_options_device_model_open = false;
     // ScrollOffsetState
     let mut quick_options_device_model_scroll: isize = 0;
+    let mut quick_options_gles_version = 2; // InitEsVersion
 
     fn update_quick_option_buttons(env: &mut Environment, buttons: &[id], selected_idx: usize) {
         for (idx, &button) in buttons.iter().enumerate() {
@@ -617,6 +622,11 @@ fn show_app_picker_gui(
         env,
         &quick_options_stuff.orientation_buttons,
         quick_options_orientation,
+    );
+    update_quick_option_buttons(
+        env,
+        &quick_options_stuff.gles_version_buttons,
+        if quick_options_gles_version == 1 { 0 } else { 1 }, // UpdateEsBtns
     );
 
     () = msg![env; window makeKeyAndVisible];
@@ -758,6 +768,12 @@ fn show_app_picker_gui(
                 false => None,
                 true => Some(()),
             };
+        } else if std::mem::take(&mut host_obj.gles_version_1) {
+            quick_options_gles_version = 1;
+            update_quick_option_buttons(env, &quick_options_stuff.gles_version_buttons, 0); // SetEsOne
+        } else if std::mem::take(&mut host_obj.gles_version_2) {
+            quick_options_gles_version = 2;
+            update_quick_option_buttons(env, &quick_options_stuff.gles_version_buttons, 1); // SetEsTwo
         } else if std::mem::take(&mut host_obj.device_model_toggle) {
             quick_options_device_model_open = !quick_options_device_model_open;
             () = msg![env; (quick_options_stuff.device_model_menu) setHidden:(!quick_options_device_model_open)];
@@ -932,6 +948,11 @@ fn show_app_picker_gui(
     }
     if quick_options_network {
         option_args.push("--allow-network-access".to_string());
+    }
+    if quick_options_gles_version == 1 {
+        option_args.push("--gles-version=1".to_string()); // PushEsOne
+    } else {
+        option_args.push("--gles-version=2".to_string()); // PushEsTwo
     }
 
     let m_args = [
@@ -1480,6 +1501,7 @@ struct QuickOptionsStuff {
     main_view: id,
     scale_hack_buttons: [id; 5],
     orientation_buttons: [id; 3],
+    gles_version_buttons: [id; 2], // EsBtnArray
     // DropdownMainBtn
     device_model_btn: id,
     device_model_menu: id,
@@ -1571,6 +1593,11 @@ fn setup_quick_options(
         RowKind::Switch("network:", false),
         RowKind::Label("Use analog sticks for tilt controls"),
         RowKind::Switch("analogStickTiltControls:", true),
+        RowKind::Label("OpenGL ES Version"),
+        RowKind::Buttons(&[
+            ("ES 1.1", "glesVersion1"),
+            ("ES 2.0", "glesVersion2"),
+        ]),
         RowKind::Label("Device model"),
         RowKind::DeviceModelDropdown,
         // ---- (divider for stuff skipped below)
@@ -1848,6 +1875,7 @@ fn setup_quick_options(
         main_view,
         scale_hack_buttons: button_rows[0][..].try_into().unwrap(),
         orientation_buttons: button_rows[1][..].try_into().unwrap(),
+        gles_version_buttons: button_rows[2][..].try_into().unwrap(), // AssignEsBtns
         device_model_btn,
         device_model_menu,
         // AddItemsToArray

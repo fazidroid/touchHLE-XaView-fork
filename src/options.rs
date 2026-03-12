@@ -62,6 +62,7 @@ pub struct Options {
     pub dumping_options: DumpingOptions,
     pub dumping_file: PathBuf,
     pub ignore_gl_errors: bool,
+    pub gles_version: u32,
 }
 
 impl Default for Options {
@@ -95,6 +96,7 @@ impl Default for Options {
             dumping_options: Default::default(),
             dumping_file: crate::paths::user_data_base_path().join("DUMP.txt"),
             ignore_gl_errors: false,
+            gles_version: 2, // DefaultEsVer
         }
     }
 }
@@ -253,6 +255,8 @@ impl Options {
             self.dumping_file = crate::paths::user_data_base_path().join(path);
         } else if arg == "--ignore-gl-errors" {
             self.ignore_gl_errors = true;
+        } else if let Some(val) = arg.strip_prefix("--gles-version=") {
+            self.gles_version = val.parse().unwrap_or(2); // ParseEsVer
         } else {
             return Ok(false);
         };
