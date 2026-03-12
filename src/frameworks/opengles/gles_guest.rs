@@ -220,6 +220,13 @@ fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
                 // TODO: This is an OpenGL ES 2.0 extension, not supported yet
                 mem.write(params, 1 as _);
             }
+            0x8869 => mem.write(params, 16), // MaxVertexAttribs
+            0x8DFB => mem.write(params, 128), // MaxVertexUniforms
+            0x8DFC => mem.write(params, 8), // MaxVaryingVectors
+            0x8B4D => mem.write(params, 8), // MaxCombinedTextures
+            0x8B4C => mem.write(params, 8), // MaxVertexTextures
+            0x8872 => mem.write(params, 8), // MaxTextureUnits
+            0x8DFD => mem.write(params, 16), // MaxFragmentUniforms
             _ => {
                 let params = mem.ptr_at_mut(params, 16 /* upper bound */);
                 unsafe { gles.GetIntegerv(pname, params) };
@@ -270,20 +277,23 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
         let new_str = with_ctx_and_mem(env, |_gles, mem| {
             // Those values are extracted from the iPod touch 2nd gen, iOS 4.2.1
             let s: &[u8] = match name {
-                gles11::VENDOR => {
-                    b"Imagination Technologies"
-                }
-                gles11::RENDERER => {
-                    b"PowerVR MBXLite with VGPLite"
-                }
-                gles11::VERSION => {
-                    b"OpenGL ES-CM 1.1 (76)"
-                }
-                gles11::EXTENSIONS => {
-                    b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
-                }
-                _ => unreachable!(),
-            };
+                        gles11::VENDOR => {
+                            b"Imagination Technologies"
+                        }
+                        gles11::RENDERER => {
+                            b"PowerVR MBXLite with VGPLite"
+                        }
+                        gles11::VERSION => {
+                            b"OpenGL ES 2.0 (touchHLE)" // FakeEs2
+                        }
+                        0x8B8C => {
+                            b"OpenGL ES GLSL ES 1.00" // GlslVersion
+                        }
+                        gles11::EXTENSIONS => {
+                            b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
+                        }
+                        _ => unreachable!(),
+                    };
             mem.alloc_and_write_cstr(s).cast_const()
         });
         env.framework_state
@@ -1498,15 +1508,23 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
 fn glCreateShader(_env: &mut Environment, _type: GLenum) -> GLuint { 1 }
 fn glShaderSource(_env: &mut Environment, _shader: GLuint, _count: GLsizei, _string: ConstVoidPtr, _length: ConstPtr<GLint>) {}
 fn glCompileShader(_env: &mut Environment, _shader: GLuint) {}
-fn glGetShaderiv(_env: &mut Environment, _shader: GLuint, _pname: GLenum, _params: MutPtr<GLint>) {}
-fn glGetShaderInfoLog(_env: &mut Environment, _shader: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {}
+fn glGetShaderiv(env: &mut Environment, _shader: GLuint, _pname: GLenum, params: MutPtr<GLint>) {
+    env.mem.write(params, 1); // StatusTrue
+}
+fn glGetShaderInfoLog(env: &mut Environment, _shader: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {
+    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
+}
 fn glCreateProgram(_env: &mut Environment) -> GLuint { 1 }
 fn glAttachShader(_env: &mut Environment, _program: GLuint, _shader: GLuint) {}
 fn glBindAttribLocation(_env: &mut Environment, _program: GLuint, _index: GLuint, _name: ConstVoidPtr) {}
 fn glLinkProgram(_env: &mut Environment, _program: GLuint) {}
 fn glUseProgram(_env: &mut Environment, _program: GLuint) {}
-fn glGetProgramiv(_env: &mut Environment, _program: GLuint, _pname: GLenum, _params: MutPtr<GLint>) {}
-fn glGetProgramInfoLog(_env: &mut Environment, _program: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {}
+fn glGetProgramiv(env: &mut Environment, _program: GLuint, _pname: GLenum, params: MutPtr<GLint>) {
+    env.mem.write(params, 1); // StatusTrue
+}
+fn glGetProgramInfoLog(env: &mut Environment, _program: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {
+    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
+}
 fn glVertexAttribPointer(_env: &mut Environment, _indx: GLuint, _size: GLint, _type: GLenum, _normalized: GLboolean, _stride: GLsizei, _ptr: ConstVoidPtr) {}
 fn glEnableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
 fn glDisableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
@@ -1518,8 +1536,18 @@ fn glUniform4f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloa
 fn glUniformMatrix4fv(_env: &mut Environment, _location: GLint, _count: GLsizei, _transpose: GLboolean, _value: ConstPtr<GLfloat>) {}
 fn glGetUniformLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint { 0 }
 fn glGetAttribLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint { 0 }
-fn glGetActiveUniform(_env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _size: MutPtr<GLint>, _type: MutPtr<GLenum>, _name: MutVoidPtr) {}
-fn glGetActiveAttrib(_env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, _length: MutPtr<GLsizei>, _size: MutPtr<GLint>, _type: MutPtr<GLenum>, _name: MutVoidPtr) {}
+fn glGetActiveUniform(env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, size: MutPtr<GLint>, type_: MutPtr<GLenum>, name: MutVoidPtr) {
+    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
+    if !size.is_null() { env.mem.write(size, 0); } // ZeroSize
+    if !type_.is_null() { env.mem.write(type_, 0); } // ZeroType
+    if !name.is_null() { env.mem.write(name.cast::<u8>(), 0); } // EmptyName
+}
+fn glGetActiveAttrib(env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, size: MutPtr<GLint>, type_: MutPtr<GLenum>, name: MutVoidPtr) {
+    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
+    if !size.is_null() { env.mem.write(size, 0); } // ZeroSize
+    if !type_.is_null() { env.mem.write(type_, 0); } // ZeroType
+    if !name.is_null() { env.mem.write(name.cast::<u8>(), 0); } // EmptyName
+}
 
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
