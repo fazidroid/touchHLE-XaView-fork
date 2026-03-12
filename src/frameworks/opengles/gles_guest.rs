@@ -1566,6 +1566,7 @@ fn glGetActiveAttrib(env: &mut Environment, _program: GLuint, _index: GLuint, _b
     if !type_.is_null() { env.mem.write(type_, 0); } // ZeroType
     if !name.is_null() { env.mem.write(name.cast::<u8>(), 0); } // EmptyName
 }
+fn glBlendColor(_env: &mut Environment, _red: GLfloat, _green: GLfloat, _blue: GLfloat, _alpha: GLfloat) {} // BlendColorStub
 
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
@@ -1592,6 +1593,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glBlendFunc(_, _)),
     export_c_func!(glBlendEquationOES(_)),
     export_c_func!(glBlendEquation(_)),
+    export_c_func!(glBlendColor(_, _, _, _)),
     export_c_func!(glColorMask(_, _, _, _)),
     export_c_func!(glClipPlanef(_, _)),
     export_c_func!(glClipPlanex(_, _)),
