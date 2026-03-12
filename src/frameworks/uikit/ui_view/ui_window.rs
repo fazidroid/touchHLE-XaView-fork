@@ -135,7 +135,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; UIScreen mainScreen] // ReturnMainScreen
 }
 
-- (())setScreen:(id)screen {
+- (())setScreen:(id)_screen {
     // DisableExtDisplayTouch
     () = msg![env; this setUserInteractionEnabled:false];
     () = msg![env; this setAlpha:0.0f32];
