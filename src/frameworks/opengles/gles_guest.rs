@@ -1533,6 +1533,7 @@ fn glGetShaderInfoLog(env: &mut Environment, _shader: GLuint, _bufSize: GLsizei,
     if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
 }
 fn glCreateProgram(_env: &mut Environment) -> GLuint { 1 }
+fn glDeleteProgram(_env: &mut Environment, _program: GLuint) {} // DeleteProgramStub
 fn glAttachShader(_env: &mut Environment, _program: GLuint, _shader: GLuint) {}
 fn glBindAttribLocation(_env: &mut Environment, _program: GLuint, _index: GLuint, _name: ConstVoidPtr) {}
 fn glLinkProgram(_env: &mut Environment, _program: GLuint) {}
@@ -1759,6 +1760,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetShaderiv(_, _, _)),
     export_c_func!(glGetShaderInfoLog(_, _, _, _)),
     export_c_func!(glCreateProgram()),
+    export_c_func!(glDeleteProgram(_)),
     export_c_func!(glAttachShader(_, _)),
     export_c_func!(glBindAttribLocation(_, _, _)),
     export_c_func!(glLinkProgram(_)),
