@@ -173,7 +173,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (bool)createFileAtPath:(id)path // NSString*
                 contents:(id)data // NSData*
               attributes:(id)attributes { // NSDictionary*
-    // IgnoreAttributes
+    let _ = attributes; // IgnoreAttributes
     if data == nil {
         let empty: id = msg_class![env; NSData new];
         let res: bool = msg![env; empty writeToFile:path atomically:false];
@@ -237,7 +237,7 @@ pub const CLASSES: ClassExports = objc_classes! {
   withIntermediateDirectories:(bool)with_intermediates
                    attributes:(id)attributes // NSDictionary*
                         error:(MutPtr<id>)error { // NSError**
-    // IgnoreAttributes
+    let _ = attributes; // IgnoreAttributes
 
     let path_str = ns_string::to_rust_string(env, path); // TODO: avoid copy
     let res = if with_intermediates {
@@ -251,7 +251,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             true
         }
         Err(err) => {
-            // IgnoreErrorAssert
+            let _ = error; // IgnoreErrorAssert
             log!(
                 "Warning: createDirectoryAtPath {} failed with {:?}, returning false",
                 path_str,
@@ -359,12 +359,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     let data = match env.fs.read(GuestPath::new(src.as_ref())) {
         Ok(d) => d,
         Err(_) => {
-            // IgnoreErrorAssert
+            let _ = error; // IgnoreErrorAssert
             return false;
         }
     };
     if env.fs.write(GuestPath::new(dst.as_ref()), &data).is_err() {
-        // IgnoreErrorAssert
+        let _ = error; // IgnoreErrorAssert
         return false;
     }
     true
@@ -392,7 +392,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfItemAtPath:(id)path // NSString *
                        error:(MutPtr<id>)error { // NSError **
-    // IgnoreErrorAssert
+    let _ = error; // IgnoreErrorAssert
 
     // TODO: other attributes
     log_once!("Warning: NSFileManager attributesOfItemAtPath:error: returns only NSFileType, NSFileModificationDate and NSFileSize attributes!");
@@ -410,7 +410,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     // TODO: other attributes
     log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
 
-    // IgnoreErrorAssert
+    let _ = error; // IgnoreErrorAssert
 
     let dict = msg_class![env; NSMutableDictionary new];
 
