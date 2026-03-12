@@ -145,7 +145,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
     }
 
-    let mut host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
+    let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
     host_obj.api = api;
     host_obj.gles_ctx = Some(gles1_ins);
     drop(host_obj);
@@ -173,7 +173,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
     }
 
-    let mut host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
+    let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
     host_obj.api = api;
     host_obj.gles_ctx = Some(gles1_ins);
     drop(host_obj);
