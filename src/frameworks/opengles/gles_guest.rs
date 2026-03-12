@@ -274,7 +274,8 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
     let res = if let Some(&str) = env.framework_state.opengles.strings_cache.get(&name) {
         str
     } else {
-        let new_str = with_ctx_and_mem(env, |_gles, mem| {
+        let gles_version = env.options.gles_version; // CopyVer
+        let new_str = with_ctx_and_mem(env, move |_gles, mem| {
             // Those values are extracted from the iPod touch 2nd gen, iOS 4.2.1
             let s: &[u8] = match name {
                         gles11::VENDOR => {
@@ -284,7 +285,7 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                             b"PowerVR MBXLite with VGPLite"
                         }
                         gles11::VERSION => {
-                            if env.options.gles_version == 1 {
+                            if gles_version == 1 {
                             b"OpenGL ES 1.1 (touchHLE)" // RealEs1
                         } else {
                             b"OpenGL ES 2.0 (touchHLE)" // FakeEs2
