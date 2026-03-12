@@ -120,7 +120,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             );
             return nil;
         }
-        
+
         if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
             log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
             return nil; // RejectEsTwo
@@ -168,7 +168,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             );
             return nil;
         }
-        
+
         if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
             log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
             return nil; // RejectEsTwo

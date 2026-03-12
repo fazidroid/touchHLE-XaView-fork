@@ -220,13 +220,13 @@ fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
                 // TODO: This is an OpenGL ES 2.0 extension, not supported yet
                 mem.write(params, 1 as _);
             }
-            0x8869 => mem.write(params, 16), // MaxVertexAttribs
+            0x8869 => mem.write(params, 16),  // MaxVertexAttribs
             0x8DFB => mem.write(params, 128), // MaxVertexUniforms
-            0x8DFC => mem.write(params, 8), // MaxVaryingVectors
-            0x8B4D => mem.write(params, 8), // MaxCombinedTextures
-            0x8B4C => mem.write(params, 8), // MaxVertexTextures
-            0x8872 => mem.write(params, 8), // MaxTextureUnits
-            0x8DFD => mem.write(params, 16), // MaxFragmentUniforms
+            0x8DFC => mem.write(params, 8),   // MaxVaryingVectors
+            0x8B4D => mem.write(params, 8),   // MaxCombinedTextures
+            0x8B4C => mem.write(params, 8),   // MaxVertexTextures
+            0x8872 => mem.write(params, 8),   // MaxTextureUnits
+            0x8DFD => mem.write(params, 16),  // MaxFragmentUniforms
             _ => {
                 let params = mem.ptr_at_mut(params, 16 /* upper bound */);
                 unsafe { gles.GetIntegerv(pname, params) };
@@ -271,10 +271,13 @@ fn glFlush(env: &mut Environment) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Flush() })
 }
 fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
-    let is_es2 = env.framework_state.opengles.current_ctx_for_thread(env.current_thread)
+    let is_es2 = env
+        .framework_state
+        .opengles
+        .current_ctx_for_thread(env.current_thread)
         .map(|ctx| env.objc.borrow::<EAGLContextHostObject>(ctx).api == 2)
         .unwrap_or(false); // CheckApiVer
-    
+
     let cache_key = if is_es2 { name | 0x20000 } else { name }; // CacheKey
 
     let res = if let Some(&str) = env.framework_state.opengles.strings_cache.get(&cache_key) {
@@ -331,7 +334,9 @@ fn glBlendFunc(env: &mut Environment, sfactor: GLenum, dfactor: GLenum) {
 fn glBlendEquationOES(env: &mut Environment, mode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.BlendEquationOES(mode) })
 }
-fn glBlendEquation(env: &mut Environment, mode: GLenum) { glBlendEquationOES(env, mode) } // BlendAlias
+fn glBlendEquation(env: &mut Environment, mode: GLenum) {
+    glBlendEquationOES(env, mode)
+} // BlendAlias
 fn glColorMask(
     env: &mut Environment,
     red: GLboolean,
@@ -1393,21 +1398,81 @@ fn glGenerateMipmapOES(env: &mut Environment, target: GLenum) {
 }
 
 // FboAliases
-fn glBindFramebuffer(env: &mut Environment, target: GLenum, framebuffer: GLuint) { glBindFramebufferOES(env, target, framebuffer) }
-fn glGenFramebuffers(env: &mut Environment, n: GLsizei, framebuffers: MutPtr<GLuint>) { glGenFramebuffersOES(env, n, framebuffers) }
-fn glDeleteFramebuffers(env: &mut Environment, n: GLsizei, framebuffers: ConstPtr<GLuint>) { glDeleteFramebuffersOES(env, n, framebuffers) }
-fn glCheckFramebufferStatus(env: &mut Environment, target: GLenum) -> GLenum { glCheckFramebufferStatusOES(env, target) }
-fn glFramebufferRenderbuffer(env: &mut Environment, target: GLenum, attachment: GLenum, renderbuffertarget: GLenum, renderbuffer: GLuint) { glFramebufferRenderbufferOES(env, target, attachment, renderbuffertarget, renderbuffer) }
-fn glFramebufferTexture2D(env: &mut Environment, target: GLenum, attachment: GLenum, textarget: GLenum, texture: GLuint, level: i32) { glFramebufferTexture2DOES(env, target, attachment, textarget, texture, level) }
-fn glIsFramebuffer(env: &mut Environment, framebuffer: GLuint) -> GLboolean { glIsFramebufferOES(env, framebuffer) }
-fn glBindRenderbuffer(env: &mut Environment, target: GLenum, renderbuffer: GLuint) { glBindRenderbufferOES(env, target, renderbuffer) }
-fn glGenRenderbuffers(env: &mut Environment, n: GLsizei, renderbuffers: MutPtr<GLuint>) { glGenRenderbuffersOES(env, n, renderbuffers) }
-fn glDeleteRenderbuffers(env: &mut Environment, n: GLsizei, renderbuffers: ConstPtr<GLuint>) { glDeleteRenderbuffersOES(env, n, renderbuffers) }
-fn glIsRenderbuffer(env: &mut Environment, renderbuffer: GLuint) -> GLboolean { glIsRenderbufferOES(env, renderbuffer) }
-fn glRenderbufferStorage(env: &mut Environment, target: GLenum, internalformat: GLenum, width: GLsizei, height: GLsizei) { glRenderbufferStorageOES(env, target, internalformat, width, height) }
-fn glGetFramebufferAttachmentParameteriv(env: &mut Environment, target: GLenum, attachment: GLenum, pname: GLenum, params: MutPtr<GLint>) { glGetFramebufferAttachmentParameterivOES(env, target, attachment, pname, params) }
-fn glGetRenderbufferParameteriv(env: &mut Environment, target: GLenum, pname: GLenum, params: MutPtr<GLint>) { glGetRenderbufferParameterivOES(env, target, pname, params) }
-fn glGenerateMipmap(env: &mut Environment, target: GLenum) { glGenerateMipmapOES(env, target) }
+fn glBindFramebuffer(env: &mut Environment, target: GLenum, framebuffer: GLuint) {
+    glBindFramebufferOES(env, target, framebuffer)
+}
+fn glGenFramebuffers(env: &mut Environment, n: GLsizei, framebuffers: MutPtr<GLuint>) {
+    glGenFramebuffersOES(env, n, framebuffers)
+}
+fn glDeleteFramebuffers(env: &mut Environment, n: GLsizei, framebuffers: ConstPtr<GLuint>) {
+    glDeleteFramebuffersOES(env, n, framebuffers)
+}
+fn glCheckFramebufferStatus(env: &mut Environment, target: GLenum) -> GLenum {
+    glCheckFramebufferStatusOES(env, target)
+}
+fn glFramebufferRenderbuffer(
+    env: &mut Environment,
+    target: GLenum,
+    attachment: GLenum,
+    renderbuffertarget: GLenum,
+    renderbuffer: GLuint,
+) {
+    glFramebufferRenderbufferOES(env, target, attachment, renderbuffertarget, renderbuffer)
+}
+fn glFramebufferTexture2D(
+    env: &mut Environment,
+    target: GLenum,
+    attachment: GLenum,
+    textarget: GLenum,
+    texture: GLuint,
+    level: i32,
+) {
+    glFramebufferTexture2DOES(env, target, attachment, textarget, texture, level)
+}
+fn glIsFramebuffer(env: &mut Environment, framebuffer: GLuint) -> GLboolean {
+    glIsFramebufferOES(env, framebuffer)
+}
+fn glBindRenderbuffer(env: &mut Environment, target: GLenum, renderbuffer: GLuint) {
+    glBindRenderbufferOES(env, target, renderbuffer)
+}
+fn glGenRenderbuffers(env: &mut Environment, n: GLsizei, renderbuffers: MutPtr<GLuint>) {
+    glGenRenderbuffersOES(env, n, renderbuffers)
+}
+fn glDeleteRenderbuffers(env: &mut Environment, n: GLsizei, renderbuffers: ConstPtr<GLuint>) {
+    glDeleteRenderbuffersOES(env, n, renderbuffers)
+}
+fn glIsRenderbuffer(env: &mut Environment, renderbuffer: GLuint) -> GLboolean {
+    glIsRenderbufferOES(env, renderbuffer)
+}
+fn glRenderbufferStorage(
+    env: &mut Environment,
+    target: GLenum,
+    internalformat: GLenum,
+    width: GLsizei,
+    height: GLsizei,
+) {
+    glRenderbufferStorageOES(env, target, internalformat, width, height)
+}
+fn glGetFramebufferAttachmentParameteriv(
+    env: &mut Environment,
+    target: GLenum,
+    attachment: GLenum,
+    pname: GLenum,
+    params: MutPtr<GLint>,
+) {
+    glGetFramebufferAttachmentParameterivOES(env, target, attachment, pname, params)
+}
+fn glGetRenderbufferParameteriv(
+    env: &mut Environment,
+    target: GLenum,
+    pname: GLenum,
+    params: MutPtr<GLint>,
+) {
+    glGetRenderbufferParameterivOES(env, target, pname, params)
+}
+fn glGenerateMipmap(env: &mut Environment, target: GLenum) {
+    glGenerateMipmapOES(env, target)
+}
 
 fn glGetBufferParameteriv(
     env: &mut Environment,
@@ -1533,19 +1598,44 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
 }
 
 // Es2Stubs
-fn glCreateShader(_env: &mut Environment, _type: GLenum) -> GLuint { 1 }
-fn glShaderSource(_env: &mut Environment, _shader: GLuint, _count: GLsizei, _string: ConstVoidPtr, _length: ConstPtr<GLint>) {}
+fn glCreateShader(_env: &mut Environment, _type: GLenum) -> GLuint {
+    1
+}
+fn glShaderSource(
+    _env: &mut Environment,
+    _shader: GLuint,
+    _count: GLsizei,
+    _string: ConstVoidPtr,
+    _length: ConstPtr<GLint>,
+) {
+}
 fn glCompileShader(_env: &mut Environment, _shader: GLuint) {}
 fn glGetShaderiv(env: &mut Environment, _shader: GLuint, _pname: GLenum, params: MutPtr<GLint>) {
     env.mem.write(params, 1); // StatusTrue
 }
-fn glGetShaderInfoLog(env: &mut Environment, _shader: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {
-    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
+fn glGetShaderInfoLog(
+    env: &mut Environment,
+    _shader: GLuint,
+    _bufSize: GLsizei,
+    length: MutPtr<GLsizei>,
+    _infoLog: MutVoidPtr,
+) {
+    if !length.is_null() {
+        env.mem.write(length, 0);
+    } // ZeroLength
 }
-fn glCreateProgram(_env: &mut Environment) -> GLuint { 1 }
+fn glCreateProgram(_env: &mut Environment) -> GLuint {
+    1
+}
 fn glDeleteProgram(_env: &mut Environment, _program: GLuint) {} // DeleteProgramStub
 fn glAttachShader(_env: &mut Environment, _program: GLuint, _shader: GLuint) {}
-fn glBindAttribLocation(_env: &mut Environment, _program: GLuint, _index: GLuint, _name: ConstVoidPtr) {}
+fn glBindAttribLocation(
+    _env: &mut Environment,
+    _program: GLuint,
+    _index: GLuint,
+    _name: ConstVoidPtr,
+) {
+}
 fn glLinkProgram(_env: &mut Environment, _program: GLuint) {}
 fn glUseProgram(_env: &mut Environment, _program: GLuint) {}
 fn glGetProgramiv(env: &mut Environment, _program: GLuint, pname: GLenum, params: MutPtr<GLint>) {
@@ -1555,33 +1645,110 @@ fn glGetProgramiv(env: &mut Environment, _program: GLuint, pname: GLenum, params
         env.mem.write(params, 1); // StatusTrue
     }
 }
-fn glGetProgramInfoLog(env: &mut Environment, _program: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, _infoLog: MutVoidPtr) {
-    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
+fn glGetProgramInfoLog(
+    env: &mut Environment,
+    _program: GLuint,
+    _bufSize: GLsizei,
+    length: MutPtr<GLsizei>,
+    _infoLog: MutVoidPtr,
+) {
+    if !length.is_null() {
+        env.mem.write(length, 0);
+    } // ZeroLength
 }
-fn glVertexAttribPointer(_env: &mut Environment, _indx: GLuint, _size: GLint, _type: GLenum, _normalized: GLboolean, _stride: GLsizei, _ptr: ConstVoidPtr) {}
+fn glVertexAttribPointer(
+    _env: &mut Environment,
+    _indx: GLuint,
+    _size: GLint,
+    _type: GLenum,
+    _normalized: GLboolean,
+    _stride: GLsizei,
+    _ptr: ConstVoidPtr,
+) {
+}
 fn glEnableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
 fn glDisableVertexAttribArray(_env: &mut Environment, _index: GLuint) {}
 fn glUniform1i(_env: &mut Environment, _location: GLint, _x: GLint) {}
 fn glUniform1f(_env: &mut Environment, _location: GLint, _x: GLfloat) {}
 fn glUniform2f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat) {}
 fn glUniform3f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat, _z: GLfloat) {}
-fn glUniform4f(_env: &mut Environment, _location: GLint, _x: GLfloat, _y: GLfloat, _z: GLfloat, _w: GLfloat) {}
-fn glUniformMatrix4fv(_env: &mut Environment, _location: GLint, _count: GLsizei, _transpose: GLboolean, _value: ConstPtr<GLfloat>) {}
-fn glGetUniformLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint { 0 }
-fn glGetAttribLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint { 0 }
-fn glGetActiveUniform(env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, size: MutPtr<GLint>, type_: MutPtr<GLenum>, name: MutVoidPtr) {
-    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
-    if !size.is_null() { env.mem.write(size, 0); } // ZeroSize
-    if !type_.is_null() { env.mem.write(type_, 0); } // ZeroType
-    if !name.is_null() { env.mem.write(name.cast::<u8>(), 0); } // EmptyName
+fn glUniform4f(
+    _env: &mut Environment,
+    _location: GLint,
+    _x: GLfloat,
+    _y: GLfloat,
+    _z: GLfloat,
+    _w: GLfloat,
+) {
 }
-fn glGetActiveAttrib(env: &mut Environment, _program: GLuint, _index: GLuint, _bufSize: GLsizei, length: MutPtr<GLsizei>, size: MutPtr<GLint>, type_: MutPtr<GLenum>, name: MutVoidPtr) {
-    if !length.is_null() { env.mem.write(length, 0); } // ZeroLength
-    if !size.is_null() { env.mem.write(size, 0); } // ZeroSize
-    if !type_.is_null() { env.mem.write(type_, 0); } // ZeroType
-    if !name.is_null() { env.mem.write(name.cast::<u8>(), 0); } // EmptyName
+fn glUniformMatrix4fv(
+    _env: &mut Environment,
+    _location: GLint,
+    _count: GLsizei,
+    _transpose: GLboolean,
+    _value: ConstPtr<GLfloat>,
+) {
 }
-fn glBlendColor(_env: &mut Environment, _red: GLfloat, _green: GLfloat, _blue: GLfloat, _alpha: GLfloat) {} // BlendColorStub
+fn glGetUniformLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint {
+    0
+}
+fn glGetAttribLocation(_env: &mut Environment, _program: GLuint, _name: ConstVoidPtr) -> GLint {
+    0
+}
+fn glGetActiveUniform(
+    env: &mut Environment,
+    _program: GLuint,
+    _index: GLuint,
+    _bufSize: GLsizei,
+    length: MutPtr<GLsizei>,
+    size: MutPtr<GLint>,
+    type_: MutPtr<GLenum>,
+    name: MutVoidPtr,
+) {
+    if !length.is_null() {
+        env.mem.write(length, 0);
+    } // ZeroLength
+    if !size.is_null() {
+        env.mem.write(size, 0);
+    } // ZeroSize
+    if !type_.is_null() {
+        env.mem.write(type_, 0);
+    } // ZeroType
+    if !name.is_null() {
+        env.mem.write(name.cast::<u8>(), 0);
+    } // EmptyName
+}
+fn glGetActiveAttrib(
+    env: &mut Environment,
+    _program: GLuint,
+    _index: GLuint,
+    _bufSize: GLsizei,
+    length: MutPtr<GLsizei>,
+    size: MutPtr<GLint>,
+    type_: MutPtr<GLenum>,
+    name: MutVoidPtr,
+) {
+    if !length.is_null() {
+        env.mem.write(length, 0);
+    } // ZeroLength
+    if !size.is_null() {
+        env.mem.write(size, 0);
+    } // ZeroSize
+    if !type_.is_null() {
+        env.mem.write(type_, 0);
+    } // ZeroType
+    if !name.is_null() {
+        env.mem.write(name.cast::<u8>(), 0);
+    } // EmptyName
+}
+fn glBlendColor(
+    _env: &mut Environment,
+    _red: GLfloat,
+    _green: GLfloat,
+    _blue: GLfloat,
+    _alpha: GLfloat,
+) {
+} // BlendColorStub
 
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
