@@ -1640,6 +1640,7 @@ fn glGetShaderiv(env: &mut Environment, shader: GLuint, pname: GLenum, params: M
         gles.GetShaderiv(shader, pname, params_ptr);
     })
 }
+// ShaderInfoFix
 fn glGetShaderInfoLog(
     env: &mut Environment,
     shader: GLuint,
@@ -1649,7 +1650,7 @@ fn glGetShaderInfoLog(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
-        let infoLog_ptr: *mut std::ffi::c_char = if infoLog.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(infoLog.cast(), bufSize as u32).cast() };
+        let infoLog_ptr: *mut std::ffi::c_char = if infoLog.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(infoLog.cast::<u8>(), bufSize as u32).cast() };
         gles.GetShaderInfoLog(shader, bufSize, length_ptr, infoLog_ptr);
     })
 }
@@ -1685,6 +1686,7 @@ fn glGetProgramiv(env: &mut Environment, program: GLuint, pname: GLenum, params:
         gles.GetProgramiv(program, pname, params_ptr);
     })
 }
+// ProgramInfoFix
 fn glGetProgramInfoLog(
     env: &mut Environment,
     program: GLuint,
@@ -1694,7 +1696,7 @@ fn glGetProgramInfoLog(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
-        let infoLog_ptr: *mut std::ffi::c_char = if infoLog.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(infoLog.cast(), bufSize as u32).cast() };
+        let infoLog_ptr: *mut std::ffi::c_char = if infoLog.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(infoLog.cast::<u8>(), bufSize as u32).cast() };
         gles.GetProgramInfoLog(program, bufSize, length_ptr, infoLog_ptr);
     })
 }
@@ -1764,6 +1766,7 @@ fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPt
         gles.GetAttribLocation(program, host_name)
     })
 }
+// ActiveUniformFix
 fn glGetActiveUniform(
     env: &mut Environment,
     program: GLuint,
@@ -1778,10 +1781,11 @@ fn glGetActiveUniform(
         let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
         let size_ptr = if size.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(size, 1) };
         let type_ptr = if type_.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(type_, 1) };
-        let name_ptr: *mut std::ffi::c_char = if name.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(name.cast(), bufSize as u32).cast() };
+        let name_ptr: *mut std::ffi::c_char = if name.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(name.cast::<u8>(), bufSize as u32).cast() };
         gles.GetActiveUniform(program, index, bufSize, length_ptr, size_ptr, type_ptr, name_ptr);
     })
 }
+// ActiveAttribFix
 fn glGetActiveAttrib(
     env: &mut Environment,
     program: GLuint,
@@ -1796,7 +1800,7 @@ fn glGetActiveAttrib(
         let length_ptr = if length.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(length, 1) };
         let size_ptr = if size.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(size, 1) };
         let type_ptr = if type_.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(type_, 1) };
-        let name_ptr: *mut std::ffi::c_char = if name.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(name.cast(), bufSize as u32).cast() };
+        let name_ptr: *mut std::ffi::c_char = if name.is_null() { std::ptr::null_mut() } else { mem.ptr_at_mut(name.cast::<u8>(), bufSize as u32).cast() };
         gles.GetActiveAttrib(program, index, bufSize, length_ptr, size_ptr, type_ptr, name_ptr);
     })
 }
