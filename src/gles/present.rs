@@ -75,7 +75,8 @@ pub unsafe fn present_frame(
     if is_gles2 {
         if ES2_PROG == 0 {
             let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
-            let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    if (color.a > 0.0) {\n        gl_FragColor = color;\n    } else {\n        gl_FragColor = texture2D(tex, v_texCoord);\n    }\n}\0";
+            // PresentShaderFix
+            let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = mix(texColor, vec4(color.rgb, 1.0), color.a);\n}\0";
             let vs = gles.CreateShader(0x8B31);
             let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
             let vs_len = [vs_src.len() as GLint - 1];
