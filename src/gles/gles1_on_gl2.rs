@@ -2105,9 +2105,20 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn Uniform3f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat) {
         crate::gles::gl21compat_raw::Uniform3f(location, v0, v1, v2)
     }
+    // UniformCompatArrays
     unsafe fn Uniform4f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat) {
         crate::gles::gl21compat_raw::Uniform4f(location, v0, v1, v2, v3)
     }
+    unsafe fn Uniform1fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { crate::gles::gl21compat_raw::Uniform1fv(location, count, value) }
+    unsafe fn Uniform2fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { crate::gles::gl21compat_raw::Uniform2fv(location, count, value) }
+    unsafe fn Uniform3fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { crate::gles::gl21compat_raw::Uniform3fv(location, count, value) }
+    unsafe fn Uniform4fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { crate::gles::gl21compat_raw::Uniform4fv(location, count, value) }
+    unsafe fn Uniform1iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { crate::gles::gl21compat_raw::Uniform1iv(location, count, value) }
+    unsafe fn Uniform2iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { crate::gles::gl21compat_raw::Uniform2iv(location, count, value) }
+    unsafe fn Uniform3iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { crate::gles::gl21compat_raw::Uniform3iv(location, count, value) }
+    unsafe fn Uniform4iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { crate::gles::gl21compat_raw::Uniform4iv(location, count, value) }
+    unsafe fn UniformMatrix2fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) { crate::gles::gl21compat_raw::UniformMatrix2fv(location, count, transpose, value) }
+    unsafe fn UniformMatrix3fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) { crate::gles::gl21compat_raw::UniformMatrix3fv(location, count, transpose, value) }
     unsafe fn UniformMatrix4fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) {
         crate::gles::gl21compat_raw::UniformMatrix4fv(location, count, transpose, value)
     }

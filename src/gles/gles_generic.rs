@@ -412,7 +412,18 @@ pub trait GLES {
     unsafe fn Uniform1f(&mut self, location: GLint, v0: GLfloat);
     unsafe fn Uniform2f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat);
     unsafe fn Uniform3f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat);
+    // UniformArraySupport
     unsafe fn Uniform4f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat);
+    unsafe fn Uniform1fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat);
+    unsafe fn Uniform2fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat);
+    unsafe fn Uniform3fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat);
+    unsafe fn Uniform4fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat);
+    unsafe fn Uniform1iv(&mut self, location: GLint, count: GLsizei, value: *const GLint);
+    unsafe fn Uniform2iv(&mut self, location: GLint, count: GLsizei, value: *const GLint);
+    unsafe fn Uniform3iv(&mut self, location: GLint, count: GLsizei, value: *const GLint);
+    unsafe fn Uniform4iv(&mut self, location: GLint, count: GLsizei, value: *const GLint);
+    unsafe fn UniformMatrix2fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
+    unsafe fn UniformMatrix3fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
     unsafe fn UniformMatrix4fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
     unsafe fn GetUniformLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint;
     unsafe fn GetAttribLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint;
