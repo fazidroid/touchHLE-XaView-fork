@@ -2090,12 +2090,21 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid) {
         crate::gles::gl21compat_raw::VertexAttribPointer(indx, size, type_, normalized, stride, ptr)
     }
-    unsafe fn EnableVertexAttribArray(&mut self, index: GLuint) {
-        crate::gles::gl21compat_raw::EnableVertexAttribArray(index)
-    }
     unsafe fn DisableVertexAttribArray(&mut self, index: GLuint) {
         crate::gles::gl21compat_raw::DisableVertexAttribArray(index)
     }
+    unsafe fn EnableVertexAttribArray(&mut self, index: GLuint) {
+        crate::gles::gl21compat_raw::EnableVertexAttribArray(index)
+    }
+    // AddAttribCompat
+    unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat) { crate::gles::gl21compat_raw::VertexAttrib1f(indx, x) }
+    unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat) { crate::gles::gl21compat_raw::VertexAttrib2f(indx, x, y) }
+    unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) { crate::gles::gl21compat_raw::VertexAttrib3f(indx, x, y, z) }
+    unsafe fn VertexAttrib4f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) { crate::gles::gl21compat_raw::VertexAttrib4f(indx, x, y, z, w) }
+    unsafe fn VertexAttrib1fv(&mut self, indx: GLuint, values: *const GLfloat) { crate::gles::gl21compat_raw::VertexAttrib1fv(indx, values) }
+    unsafe fn VertexAttrib2fv(&mut self, indx: GLuint, values: *const GLfloat) { crate::gles::gl21compat_raw::VertexAttrib2fv(indx, values) }
+    unsafe fn VertexAttrib3fv(&mut self, indx: GLuint, values: *const GLfloat) { crate::gles::gl21compat_raw::VertexAttrib3fv(indx, values) }
+    unsafe fn VertexAttrib4fv(&mut self, indx: GLuint, values: *const GLfloat) { crate::gles::gl21compat_raw::VertexAttrib4fv(indx, values) }
     unsafe fn Uniform1i(&mut self, location: GLint, v0: GLint) {
         crate::gles::gl21compat_raw::Uniform1i(location, v0)
     }

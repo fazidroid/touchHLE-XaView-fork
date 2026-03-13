@@ -821,12 +821,21 @@ impl GLES for GLES1Native<'_> {
     unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid) {
         touchHLE_gl_bindings::gles20::VertexAttribPointer(indx, size, type_, normalized, stride, ptr)
     }
-    unsafe fn EnableVertexAttribArray(&mut self, index: GLuint) {
-        touchHLE_gl_bindings::gles20::EnableVertexAttribArray(index)
-    }
     unsafe fn DisableVertexAttribArray(&mut self, index: GLuint) {
         touchHLE_gl_bindings::gles20::DisableVertexAttribArray(index)
     }
+    unsafe fn EnableVertexAttribArray(&mut self, index: GLuint) {
+        touchHLE_gl_bindings::gles20::EnableVertexAttribArray(index)
+    }
+    // AddAttribNative
+    unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib1f(indx, x) }
+    unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib2f(indx, x, y) }
+    unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib3f(indx, x, y, z) }
+    unsafe fn VertexAttrib4f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib4f(indx, x, y, z, w) }
+    unsafe fn VertexAttrib1fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib1fv(indx, values) }
+    unsafe fn VertexAttrib2fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib2fv(indx, values) }
+    unsafe fn VertexAttrib3fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib3fv(indx, values) }
+    unsafe fn VertexAttrib4fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib4fv(indx, values) }
     unsafe fn Uniform1i(&mut self, location: GLint, v0: GLint) {
         touchHLE_gl_bindings::gles20::Uniform1i(location, v0)
     }

@@ -409,6 +409,15 @@ pub trait GLES {
     unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid);
     unsafe fn EnableVertexAttribArray(&mut self, index: GLuint);
     unsafe fn DisableVertexAttribArray(&mut self, index: GLuint);
+    // AddAttribTrait
+    unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat);
+    unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat);
+    unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat);
+    unsafe fn VertexAttrib4f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat);
+    unsafe fn VertexAttrib1fv(&mut self, indx: GLuint, values: *const GLfloat);
+    unsafe fn VertexAttrib2fv(&mut self, indx: GLuint, values: *const GLfloat);
+    unsafe fn VertexAttrib3fv(&mut self, indx: GLuint, values: *const GLfloat);
+    unsafe fn VertexAttrib4fv(&mut self, indx: GLuint, values: *const GLfloat);
     unsafe fn Uniform1i(&mut self, location: GLint, v0: GLint);
     unsafe fn Uniform1f(&mut self, location: GLint, v0: GLfloat);
     unsafe fn Uniform2f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat);
