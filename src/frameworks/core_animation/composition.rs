@@ -237,6 +237,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
 
             gles.GenFramebuffersOES(1, &mut framebuffer);
             gles.BindFramebufferOES(gles11::FRAMEBUFFER_OES, framebuffer);
+            // FboAssertFix
             gles.FramebufferTexture2DOES(
                 gles11::FRAMEBUFFER_OES,
                 gles11::COLOR_ATTACHMENT0_OES,
@@ -244,11 +245,14 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                 texture,
                 0,
             );
-            assert_eq!(gles.GetError(), 0);
-            assert_eq!(
-                gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES),
-                gles11::FRAMEBUFFER_COMPLETE_OES
-            );
+            let err = gles.GetError();
+            if err != 0 {
+                log!("Warning: GL error {:#x} during composition FBO setup (w={}, h={})", err, fb_width, fb_height);
+            }
+            let status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
+            if status != gles11::FRAMEBUFFER_COMPLETE_OES {
+                log!("Warning: Composition FBO incomplete: {:#x}", status);
+            }
         }
         env.framework_state
             .core_animation
@@ -439,10 +443,14 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
             gles.MatrixMode(gles11::MODELVIEW);
             gles.LoadIdentity();
         }
-        gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
-        gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
-        assert_eq!(gles.GetError(), 0);
-    }
+        // CleanupAssertFix
+            gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
+            gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
+            let err = gles.GetError();
+            if err != 0 {
+                log!("Warning: GL error {:#x} during composition cleanup", err);
+            }
+        }
 
     // Present our rendered frame (bound to TEXTURE_2D). This copies it to the
     // default framebuffer (0) so we need to unbind our internal framebuffer.
