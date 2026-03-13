@@ -43,8 +43,8 @@ struct MiscGlObjects {
     rounded_tex_coord_buffer: GLuint,
     index_buffer: GLuint,
     shader_program: GLuint,
-    pos_attr: GLuint,
-    tex_attr: GLuint,
+    pos_attr: GLint, // TypeFix
+    tex_attr: GLint,
     mvp_uni: GLint,
     color_uni: GLint,
     use_tex_uni: GLint,
@@ -179,6 +179,9 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
     let scale_hack: u32 = env.options.scale_hack.get();
     let fb_width = (screen_bounds.size.width * screen_scale).round() as u32 * scale_hack;
     let fb_height = (screen_bounds.size.height * screen_scale).round() as u32 * scale_hack;
+    if fb_width == 0 || fb_height == 0 {
+        return new_recomposite_next; // BypassZeroSize
+    }
     let present_frame_args = (
         env.window().viewport(),
         env.window().rotation_matrix(),
@@ -359,8 +362,8 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                     let col_name = c"color".as_ptr();
                     let use_name = c"useTex".as_ptr();
                     (
-                        gles.GetAttribLocation(shader_program, pos_name) as GLuint,
-                        gles.GetAttribLocation(shader_program, tex_name) as GLuint,
+                        gles.GetAttribLocation(shader_program, pos_name),
+                        gles.GetAttribLocation(shader_program, tex_name),
                         gles.GetUniformLocation(shader_program, mvp_name),
                         gles.GetUniformLocation(shader_program, col_name),
                         gles.GetUniformLocation(shader_program, use_name),
@@ -579,9 +582,11 @@ unsafe fn composite_layer_recursive(
         let radius = host_obj.corner_radius;
         if radius == 0.0 {
             if env.options.gles_version == 2 {
-                gles.EnableVertexAttribArray(misc.pos_attr);
-                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
-                gles.VertexAttribPointer(misc.pos_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                if misc.pos_attr >= 0 { // SafeAttrSquare
+                    gles.EnableVertexAttribArray(misc.pos_attr as GLuint);
+                    gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
+                    gles.VertexAttribPointer(misc.pos_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                }
             } else {
                 gles.Disable(gles11::TEXTURE_2D);
                 gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
@@ -598,17 +603,21 @@ unsafe fn composite_layer_recursive(
             );
 
             if env.options.gles_version == 2 {
-                gles.DisableVertexAttribArray(misc.pos_attr);
+                if misc.pos_attr >= 0 { gles.DisableVertexAttribArray(misc.pos_attr as GLuint); } // SafeAttrSquareDis
             }
         } else {
             if env.options.gles_version == 2 {
                 gles.ActiveTexture(gles11::TEXTURE0);
                 gles.BindTexture(gles11::TEXTURE_2D, misc.rounded_corner_texture);
-                gles.EnableVertexAttribArray(misc.tex_attr);
-                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_tex_coord_buffer);
-                gles.VertexAttribPointer(misc.tex_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
-                gles.EnableVertexAttribArray(misc.pos_attr);
-                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_vertex_buffer);
+                if misc.tex_attr >= 0 { // SafeAttrRound
+                    gles.EnableVertexAttribArray(misc.tex_attr as GLuint);
+                    gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_tex_coord_buffer);
+                    gles.VertexAttribPointer(misc.tex_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                }
+                if misc.pos_attr >= 0 {
+                    gles.EnableVertexAttribArray(misc.pos_attr as GLuint);
+                    gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_vertex_buffer);
+                }
             } else {
                 gles.Enable(gles11::TEXTURE_2D);
                 gles.BindTexture(gles11::TEXTURE_2D, misc.rounded_corner_texture);
@@ -640,7 +649,7 @@ unsafe fn composite_layer_recursive(
             );
 
             if env.options.gles_version == 2 {
-                gles.VertexAttribPointer(misc.pos_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                if misc.pos_attr >= 0 { gles.VertexAttribPointer(misc.pos_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid); } // SafeAttrRoundPtr
             } else {
                 gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
             }
@@ -653,8 +662,8 @@ unsafe fn composite_layer_recursive(
             );
 
             if env.options.gles_version == 2 {
-                gles.DisableVertexAttribArray(misc.pos_attr);
-                gles.DisableVertexAttribArray(misc.tex_attr);
+                if misc.pos_attr >= 0 { gles.DisableVertexAttribArray(misc.pos_attr as GLuint); } // SafeAttrRoundDis
+                if misc.tex_attr >= 0 { gles.DisableVertexAttribArray(misc.tex_attr as GLuint); }
             }
         };
 
@@ -750,20 +759,24 @@ unsafe fn composite_layer_recursive(
         }
 
         if env.options.gles_version == 2 {
-            gles.EnableVertexAttribArray(misc.pos_attr);
-            gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
-            gles.VertexAttribPointer(misc.pos_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+            if misc.pos_attr >= 0 { // SafeAttrTex
+                gles.EnableVertexAttribArray(misc.pos_attr as GLuint);
+                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
+                gles.VertexAttribPointer(misc.pos_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+            }
 
-            gles.EnableVertexAttribArray(misc.tex_attr);
-            gles.BindBuffer(
-                gles11::ARRAY_BUFFER,
-                if host_obj.contents != nil {
-                    misc.basic_square_buffer
-                } else {
-                    misc.flipped_square_buffer
-                },
-            );
-            gles.VertexAttribPointer(misc.tex_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+            if misc.tex_attr >= 0 {
+                gles.EnableVertexAttribArray(misc.tex_attr as GLuint);
+                gles.BindBuffer(
+                    gles11::ARRAY_BUFFER,
+                    if host_obj.contents != nil {
+                        misc.basic_square_buffer
+                    } else {
+                        misc.flipped_square_buffer
+                    },
+                );
+                gles.VertexAttribPointer(misc.tex_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+            }
 
             gles.ActiveTexture(gles11::TEXTURE0);
         } else {
@@ -792,8 +805,8 @@ unsafe fn composite_layer_recursive(
         );
 
         if env.options.gles_version == 2 {
-            gles.DisableVertexAttribArray(misc.pos_attr);
-            gles.DisableVertexAttribArray(misc.tex_attr);
+            if misc.pos_attr >= 0 { gles.DisableVertexAttribArray(misc.pos_attr as GLuint); } // SafeAttrTexDis
+            if misc.tex_attr >= 0 { gles.DisableVertexAttribArray(misc.tex_attr as GLuint); }
         }
     }
     std::mem::drop(gles);
