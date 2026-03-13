@@ -1732,6 +1732,7 @@ fn glUniform2f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat) {
 fn glUniform3f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat, z: GLfloat) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform3f(location, x, y, z) })
 }
+// GuestUniformArrays
 fn glUniform4f(
     env: &mut Environment,
     location: GLint,
@@ -1741,6 +1742,36 @@ fn glUniform4f(
     w: GLfloat,
 ) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform4f(location, x, y, z, w) })
+}
+fn glUniform1fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 1) as u32); gles.Uniform1fv(location, count, ptr); })
+}
+fn glUniform2fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 2) as u32); gles.Uniform2fv(location, count, ptr); })
+}
+fn glUniform3fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 3) as u32); gles.Uniform3fv(location, count, ptr); })
+}
+fn glUniform4fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 4) as u32); gles.Uniform4fv(location, count, ptr); })
+}
+fn glUniform1iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 1) as u32); gles.Uniform1iv(location, count, ptr); })
+}
+fn glUniform2iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 2) as u32); gles.Uniform2iv(location, count, ptr); })
+}
+fn glUniform3iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 3) as u32); gles.Uniform3iv(location, count, ptr); })
+}
+fn glUniform4iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 4) as u32); gles.Uniform4iv(location, count, ptr); })
+}
+fn glUniformMatrix2fv(env: &mut Environment, location: GLint, count: GLsizei, transpose: GLboolean, value: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 4) as u32); gles.UniformMatrix2fv(location, count, transpose, ptr); })
+}
+fn glUniformMatrix3fv(env: &mut Environment, location: GLint, count: GLsizei, transpose: GLboolean, value: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 9) as u32); gles.UniformMatrix3fv(location, count, transpose, ptr); })
 }
 fn glUniformMatrix4fv(
     env: &mut Environment,
@@ -2019,7 +2050,18 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glUniform1f(_, _)),
     export_c_func!(glUniform2f(_, _, _)),
     export_c_func!(glUniform3f(_, _, _, _)),
+    // ExportUniformArrays
     export_c_func!(glUniform4f(_, _, _, _, _)),
+    export_c_func!(glUniform1fv(_, _, _)),
+    export_c_func!(glUniform2fv(_, _, _)),
+    export_c_func!(glUniform3fv(_, _, _)),
+    export_c_func!(glUniform4fv(_, _, _)),
+    export_c_func!(glUniform1iv(_, _, _)),
+    export_c_func!(glUniform2iv(_, _, _)),
+    export_c_func!(glUniform3iv(_, _, _)),
+    export_c_func!(glUniform4iv(_, _, _)),
+    export_c_func!(glUniformMatrix2fv(_, _, _, _)),
+    export_c_func!(glUniformMatrix3fv(_, _, _, _)),
     export_c_func!(glUniformMatrix4fv(_, _, _, _)),
     export_c_func!(glGetUniformLocation(_, _)),
     export_c_func!(glGetAttribLocation(_, _)),
