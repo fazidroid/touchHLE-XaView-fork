@@ -44,23 +44,7 @@ impl FpsCounter {
 /// virtual cursor is also drawn if it should be currently visible.
 ///
 /// The provided context must be current.
-// ThreadLocalPresentFix
-#[derive(Clone)]
-struct PresentState {
-    prog: gles11::types::GLuint,
-    vbo: gles11::types::GLuint,
-    pos: gles11::types::GLint,
-    tex: gles11::types::GLint,
-    mat: gles11::types::GLint,
-    col: gles11::types::GLint,
-    sampler: gles11::types::GLint,
-}
-
-// ConstThreadLocalFix
-thread_local! {
-    static ES2_STATE: std::cell::RefCell<Option<PresentState>> = const { std::cell::RefCell::new(None) };
-}
-
+// ContextSafePresentFix
 pub unsafe fn present_frame(
     gles: &mut dyn GLES,
     viewport: (u32, u32, u32, u32),
@@ -130,70 +114,51 @@ pub unsafe fn present_frame(
     let matrix = Matrix::<4>::from(&rotation_matrix);
 
     if is_gles2 {
-        let mut state_opt = None;
-        ES2_STATE.with(|s| state_opt = s.borrow().clone());
+        let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
+        let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = vec4(mix(texColor.rgb, color.rgb, color.a) + vec3(0.0, 0.2, 0.0), 1.0);\n}\0";
+        
+        let vs = gles.CreateShader(0x8B31);
+        let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
+        let vs_len = [vs_src.len() as GLint - 1];
+        gles.ShaderSource(vs, 1, vs_ptr.as_ptr(), vs_len.as_ptr());
+        gles.CompileShader(vs);
+        
+        let fs = gles.CreateShader(0x8B30);
+        let fs_ptr = [fs_src.as_ptr() as *const std::ffi::c_char];
+        let fs_len = [fs_src.len() as GLint - 1];
+        gles.ShaderSource(fs, 1, fs_ptr.as_ptr(), fs_len.as_ptr());
+        gles.CompileShader(fs);
+        
+        let prog = gles.CreateProgram();
+        gles.AttachShader(prog, vs);
+        gles.AttachShader(prog, fs);
+        gles.LinkProgram(prog);
+        
+        let pos = gles.GetAttribLocation(prog, c"position".as_ptr() as *const _);
+        let tex = gles.GetAttribLocation(prog, c"texCoord".as_ptr() as *const _);
+        let mat = gles.GetUniformLocation(prog, c"texMatrix".as_ptr() as *const _);
+        let col = gles.GetUniformLocation(prog, c"color".as_ptr() as *const _);
+        let sampler = gles.GetUniformLocation(prog, c"tex".as_ptr() as *const _);
 
-        if state_opt.is_none() {
-            let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
-            let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = vec4(mix(texColor.rgb, color.rgb, color.a) + vec3(0.0, 0.2, 0.0), 1.0);\n}\0";
-            
-            let vs = gles.CreateShader(0x8B31);
-            let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
-            let vs_len = [vs_src.len() as GLint - 1];
-            gles.ShaderSource(vs, 1, vs_ptr.as_ptr(), vs_len.as_ptr());
-            gles.CompileShader(vs);
-            
-            let fs = gles.CreateShader(0x8B30);
-            let fs_ptr = [fs_src.as_ptr() as *const std::ffi::c_char];
-            let fs_len = [fs_src.len() as GLint - 1];
-            gles.ShaderSource(fs, 1, fs_ptr.as_ptr(), fs_len.as_ptr());
-            gles.CompileShader(fs);
-            
-            let prog = gles.CreateProgram();
-            gles.AttachShader(prog, vs);
-            gles.AttachShader(prog, fs);
-            gles.LinkProgram(prog);
-            
-            let pos = gles.GetAttribLocation(prog, c"position".as_ptr() as *const _);
-            let tex = gles.GetAttribLocation(prog, c"texCoord".as_ptr() as *const _);
-            let mat = gles.GetUniformLocation(prog, c"texMatrix".as_ptr() as *const _);
-            let col = gles.GetUniformLocation(prog, c"color".as_ptr() as *const _);
-            let sampler = gles.GetUniformLocation(prog, c"tex".as_ptr() as *const _);
-
-            let mut vbo = 0;
-            gles.GenBuffers(1, std::ptr::addr_of_mut!(vbo));
-            gles.BindBuffer(gles11::ARRAY_BUFFER, vbo);
-            let mut data = [0.0f32; 24];
-            data[0..12].copy_from_slice(&vertices);
-            data[12..24].copy_from_slice(&tex_coords);
-            gles.BufferData(gles11::ARRAY_BUFFER, (24 * 4) as _, data.as_ptr() as *const _, gles11::STATIC_DRAW);
-
-            let new_state = PresentState { prog, vbo, pos, tex, mat, col, sampler };
-            ES2_STATE.with(|s| *s.borrow_mut() = Some(new_state.clone()));
-            state_opt = Some(new_state);
-        }
-
-        let state = state_opt.unwrap();
-
-        gles.UseProgram(state.prog);
-        gles.Uniform4f(state.col, 0.0, 0.0, 0.0, 0.0);
-        gles.UniformMatrix4fv(state.mat, 1, 0, matrix.columns().as_ptr() as *const _);
+        gles.UseProgram(prog);
+        gles.Uniform4f(col, 0.0, 0.0, 0.0, 0.0);
+        gles.UniformMatrix4fv(mat, 1, 0, matrix.columns().as_ptr() as *const _);
 
         let mut active_tex: GLint = 0;
         gles.GetIntegerv(gles11::ACTIVE_TEXTURE, &mut active_tex);
         let tex_unit = active_tex - gles11::TEXTURE0 as GLint;
-        if state.sampler >= 0 {
-            gles.Uniform1i(state.sampler, tex_unit);
+        if sampler >= 0 {
+            gles.Uniform1i(sampler, tex_unit);
         }
 
-        gles.BindBuffer(gles11::ARRAY_BUFFER, state.vbo);
-        if state.pos >= 0 {
-            gles.EnableVertexAttribArray(state.pos as GLuint);
-            gles.VertexAttribPointer(state.pos as GLuint, 2, gles11::FLOAT, 0, 0, std::ptr::null());
+        gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
+        if pos >= 0 {
+            gles.EnableVertexAttribArray(pos as GLuint);
+            gles.VertexAttribPointer(pos as GLuint, 2, gles11::FLOAT, 0, 0, vertices.as_ptr() as *const _);
         }
-        if state.tex >= 0 {
-            gles.EnableVertexAttribArray(state.tex as GLuint);
-            gles.VertexAttribPointer(state.tex as GLuint, 2, gles11::FLOAT, 0, 0, (12 * 4) as *const _);
+        if tex >= 0 {
+            gles.EnableVertexAttribArray(tex as GLuint);
+            gles.VertexAttribPointer(tex as GLuint, 2, gles11::FLOAT, 0, 0, tex_coords.as_ptr() as *const _);
         }
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);
 
@@ -209,19 +174,22 @@ pub unsafe fn present_frame(
                 cursor_vertices[i] = (cursor_vertices[i] * radius + x) / (vw as f32 / 2.0) - 1.0;
                 cursor_vertices[i + 1] = 1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
             }
-            gles.Uniform4f(state.col, 0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
-            if state.tex >= 0 { gles.DisableVertexAttribArray(state.tex as GLuint); }
-            gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
-            if state.pos >= 0 {
-                gles.VertexAttribPointer(state.pos as GLuint, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
+            gles.Uniform4f(col, 0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
+            if tex >= 0 { gles.DisableVertexAttribArray(tex as GLuint); }
+            if pos >= 0 {
+                gles.VertexAttribPointer(pos as GLuint, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
             }
             gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         }
 
-        if state.pos >= 0 { gles.DisableVertexAttribArray(state.pos as GLuint); }
-        if state.tex >= 0 { gles.DisableVertexAttribArray(state.tex as GLuint); }
+        if pos >= 0 { gles.DisableVertexAttribArray(pos as GLuint); }
+        if tex >= 0 { gles.DisableVertexAttribArray(tex as GLuint); }
         
         gles.UseProgram(old_prog as GLuint);
+        gles.DeleteProgram(prog);
+        gles.DeleteShader(vs);
+        gles.DeleteShader(fs);
+
         gles.BindBuffer(gles11::ARRAY_BUFFER, old_array_buf as GLuint);
         gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, old_elem_buf as GLuint);
         if old_cull != 0 { gles.Enable(gles11::CULL_FACE); }
