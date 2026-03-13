@@ -75,7 +75,7 @@ pub unsafe fn present_frame(
         gles.GetBooleanv(gles11::COLOR_WRITEMASK, old_color_mask.as_mut_ptr() as *mut _);
         gles.GetBooleanv(gles11::DEPTH_WRITEMASK, &mut old_depth_mask);
         
-        // Выключаем ВСЕ массивы атрибутов игры, чтобы драйвер не крашился при DrawArrays
+        // Выключаем ВСЕ массивы
         for i in 0..8 {
             let mut status: GLint = 0;
             gles.GetVertexAttribiv(i, 0x8622 /* VERTEX_ATTRIB_ARRAY_ENABLED */, &mut status);
@@ -94,8 +94,8 @@ pub unsafe fn present_frame(
 
     gles.Viewport(viewport.0 as _, viewport.1 as _, viewport.2 as _, viewport.3 as _);
     
-    // ВИЗУАЛЬНЫЙ ЛОГ: Очищаем фон темно-красным. 
-    // Если экран красный — отрисовка текстуры провалилась.
+    // ВИЗУАЛЬНЫЙ ЛОГ: темно-красным
+    // ЕслиКрасный отрисовка текстуры провалилась
     if is_gles2 {
         gles.ClearColor(0.2, 0.0, 0.0, 1.0);
     } else {
@@ -120,8 +120,7 @@ pub unsafe fn present_frame(
     if is_gles2 {
         if ES2_PROG == 0 {
             let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
-            // ВИЗУАЛЬНЫЙ ЛОГ: Примешиваем зеленый цвет. 
-            // Красный фон + зеленый квад = желтый/зеленый экран. Это докажет, что DrawArrays сработал!
+            // ВИЗУАЛЬНЫЙ ЛОГ зеленый цвет. 
             let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = mix(texColor, vec4(color.rgb, 1.0), color.a) + vec4(0.0, 0.2, 0.0, 0.0);\n}\0";
             let vs = gles.CreateShader(0x8B31);
             let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
