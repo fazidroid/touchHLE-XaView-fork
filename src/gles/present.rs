@@ -56,8 +56,9 @@ struct PresentState {
     sampler: gles11::types::GLint,
 }
 
+// ConstThreadLocalFix
 thread_local! {
-    static ES2_STATE: std::cell::RefCell<Option<PresentState>> = std::cell::RefCell::new(None);
+    static ES2_STATE: std::cell::RefCell<Option<PresentState>> = const { std::cell::RefCell::new(None) };
 }
 
 pub unsafe fn present_frame(
