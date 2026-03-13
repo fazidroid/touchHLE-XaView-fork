@@ -44,7 +44,22 @@ impl FpsCounter {
 /// virtual cursor is also drawn if it should be currently visible.
 ///
 /// The provided context must be current.
-// RobustPresentFrame
+// ThreadLocalPresentFix
+#[derive(Clone)]
+struct PresentState {
+    prog: gles11::types::GLuint,
+    vbo: gles11::types::GLuint,
+    pos: gles11::types::GLint,
+    tex: gles11::types::GLint,
+    mat: gles11::types::GLint,
+    col: gles11::types::GLint,
+    sampler: gles11::types::GLint,
+}
+
+thread_local! {
+    static ES2_STATE: std::cell::RefCell<Option<PresentState>> = std::cell::RefCell::new(None);
+}
+
 pub unsafe fn present_frame(
     gles: &mut dyn GLES,
     viewport: (u32, u32, u32, u32),
@@ -113,114 +128,97 @@ pub unsafe fn present_frame(
     let tex_coords: [f32; 12] = [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
     let matrix = Matrix::<4>::from(&rotation_matrix);
 
-    static mut ES2_PROG: GLuint = 0;
-    static mut ES2_POS: GLint = 0;
-    static mut ES2_TEX: GLint = 0;
-    static mut ES2_MAT: GLint = 0;
-    static mut ES2_COL: GLint = 0;
-    static mut ES2_TEX_SAMPLER: GLint = 0;
-    static mut ES2_VBO: GLuint = 0;
-
     if is_gles2 {
-        if ES2_PROG == 0 {
+        let mut state_opt = None;
+        ES2_STATE.with(|s| state_opt = s.borrow().clone());
+
+        if state_opt.is_none() {
             let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
             let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = vec4(mix(texColor.rgb, color.rgb, color.a) + vec3(0.0, 0.2, 0.0), 1.0);\n}\0";
+            
             let vs = gles.CreateShader(0x8B31);
             let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
             let vs_len = [vs_src.len() as GLint - 1];
             gles.ShaderSource(vs, 1, vs_ptr.as_ptr(), vs_len.as_ptr());
             gles.CompileShader(vs);
+            
             let fs = gles.CreateShader(0x8B30);
             let fs_ptr = [fs_src.as_ptr() as *const std::ffi::c_char];
             let fs_len = [fs_src.len() as GLint - 1];
             gles.ShaderSource(fs, 1, fs_ptr.as_ptr(), fs_len.as_ptr());
             gles.CompileShader(fs);
-            ES2_PROG = gles.CreateProgram();
-            gles.AttachShader(ES2_PROG, vs);
-            gles.AttachShader(ES2_PROG, fs);
-            gles.LinkProgram(ES2_PROG);
-            ES2_POS = gles.GetAttribLocation(ES2_PROG, c"position".as_ptr() as *const _);
-            ES2_TEX = gles.GetAttribLocation(ES2_PROG, c"texCoord".as_ptr() as *const _);
-            ES2_MAT = gles.GetUniformLocation(ES2_PROG, c"texMatrix".as_ptr() as *const _);
-            ES2_COL = gles.GetUniformLocation(ES2_PROG, c"color".as_ptr() as *const _);
-            ES2_TEX_SAMPLER = gles.GetUniformLocation(ES2_PROG, c"tex".as_ptr() as *const _);
+            
+            let prog = gles.CreateProgram();
+            gles.AttachShader(prog, vs);
+            gles.AttachShader(prog, fs);
+            gles.LinkProgram(prog);
+            
+            let pos = gles.GetAttribLocation(prog, c"position".as_ptr() as *const _);
+            let tex = gles.GetAttribLocation(prog, c"texCoord".as_ptr() as *const _);
+            let mat = gles.GetUniformLocation(prog, c"texMatrix".as_ptr() as *const _);
+            let col = gles.GetUniformLocation(prog, c"color".as_ptr() as *const _);
+            let sampler = gles.GetUniformLocation(prog, c"tex".as_ptr() as *const _);
 
-            // StaticMutRefFix
-            gles.GenBuffers(1, std::ptr::addr_of_mut!(ES2_VBO));
-            gles.BindBuffer(gles11::ARRAY_BUFFER, ES2_VBO);
+            let mut vbo = 0;
+            gles.GenBuffers(1, std::ptr::addr_of_mut!(vbo));
+            gles.BindBuffer(gles11::ARRAY_BUFFER, vbo);
             let mut data = [0.0f32; 24];
             data[0..12].copy_from_slice(&vertices);
             data[12..24].copy_from_slice(&tex_coords);
             gles.BufferData(gles11::ARRAY_BUFFER, (24 * 4) as _, data.as_ptr() as *const _, gles11::STATIC_DRAW);
+
+            let new_state = PresentState { prog, vbo, pos, tex, mat, col, sampler };
+            ES2_STATE.with(|s| *s.borrow_mut() = Some(new_state.clone()));
+            state_opt = Some(new_state);
         }
-        gles.UseProgram(ES2_PROG);
-        gles.Uniform4f(ES2_COL, 0.0, 0.0, 0.0, 0.0);
-        gles.UniformMatrix4fv(ES2_MAT, 1, 0, matrix.columns().as_ptr() as *const _);
+
+        let state = state_opt.unwrap();
+
+        gles.UseProgram(state.prog);
+        gles.Uniform4f(state.col, 0.0, 0.0, 0.0, 0.0);
+        gles.UniformMatrix4fv(state.mat, 1, 0, matrix.columns().as_ptr() as *const _);
 
         let mut active_tex: GLint = 0;
         gles.GetIntegerv(gles11::ACTIVE_TEXTURE, &mut active_tex);
         let tex_unit = active_tex - gles11::TEXTURE0 as GLint;
-        if ES2_TEX_SAMPLER >= 0 {
-            gles.Uniform1i(ES2_TEX_SAMPLER, tex_unit);
+        if state.sampler >= 0 {
+            gles.Uniform1i(state.sampler, tex_unit);
         }
 
-        // ZeroPtrFix
-        gles.BindBuffer(gles11::ARRAY_BUFFER, ES2_VBO);
-        if ES2_POS >= 0 {
-            gles.EnableVertexAttribArray(ES2_POS as GLuint);
-            gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, std::ptr::null());
+        gles.BindBuffer(gles11::ARRAY_BUFFER, state.vbo);
+        if state.pos >= 0 {
+            gles.EnableVertexAttribArray(state.pos as GLuint);
+            gles.VertexAttribPointer(state.pos as GLuint, 2, gles11::FLOAT, 0, 0, std::ptr::null());
         }
-        if ES2_TEX >= 0 {
-            gles.EnableVertexAttribArray(ES2_TEX as GLuint);
-            gles.VertexAttribPointer(ES2_TEX as GLuint, 2, gles11::FLOAT, 0, 0, (12 * 4) as *const _);
+        if state.tex >= 0 {
+            gles.EnableVertexAttribArray(state.tex as GLuint);
+            gles.VertexAttribPointer(state.tex as GLuint, 2, gles11::FLOAT, 0, 0, (12 * 4) as *const _);
         }
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);
-    } else {
-        gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
-        gles.EnableClientState(gles11::VERTEX_ARRAY);
-        gles.VertexPointer(2, gles11::FLOAT, 0, vertices.as_ptr() as *const GLvoid);
-        gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
-        gles.TexCoordPointer(2, gles11::FLOAT, 0, tex_coords.as_ptr() as *const GLvoid);
-        gles.MatrixMode(gles11::TEXTURE);
-        gles.LoadMatrixf(matrix.columns().as_ptr() as *const _);
-        gles.Enable(gles11::TEXTURE_2D);
-        gles.DrawArrays(gles11::TRIANGLES, 0, 6);
-        gles.LoadIdentity();
-    }
 
-    if let Some((x, y, pressed)) = virtual_cursor_visible_at {
-        let (vx, vy, vw, vh) = viewport;
-        let x = x - vx as f32;
-        let y = y - vy as f32;
-        gles.Enable(gles11::BLEND);
-        gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
-        let radius = 10.0;
-        let mut cursor_vertices = vertices;
-        for i in (0..cursor_vertices.len()).step_by(2) {
-            cursor_vertices[i] = (cursor_vertices[i] * radius + x) / (vw as f32 / 2.0) - 1.0;
-            cursor_vertices[i + 1] = 1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
-        }
-        if is_gles2 {
-            gles.Uniform4f(ES2_COL, 0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
-            if ES2_TEX >= 0 { gles.DisableVertexAttribArray(ES2_TEX as GLuint); }
+        if let Some((x, y, pressed)) = virtual_cursor_visible_at {
+            let (vx, vy, vw, vh) = viewport;
+            let x = x - vx as f32;
+            let y = y - vy as f32;
+            gles.Enable(gles11::BLEND);
+            gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
+            let radius = 10.0;
+            let mut cursor_vertices = vertices;
+            for i in (0..cursor_vertices.len()).step_by(2) {
+                cursor_vertices[i] = (cursor_vertices[i] * radius + x) / (vw as f32 / 2.0) - 1.0;
+                cursor_vertices[i + 1] = 1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
+            }
+            gles.Uniform4f(state.col, 0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
+            if state.tex >= 0 { gles.DisableVertexAttribArray(state.tex as GLuint); }
             gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
-            if ES2_POS >= 0 {
-                gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
+            if state.pos >= 0 {
+                gles.VertexAttribPointer(state.pos as GLuint, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
             }
             gles.DrawArrays(gles11::TRIANGLES, 0, 6);
-        } else {
-            gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
-            gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
-            gles.Disable(gles11::TEXTURE_2D);
-            gles.Color4f(0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
-            gles.VertexPointer(2, gles11::FLOAT, 0, cursor_vertices.as_ptr() as *const GLvoid);
-            gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         }
-    }
-    
-    if is_gles2 {
-        if ES2_POS >= 0 { gles.DisableVertexAttribArray(ES2_POS as GLuint); }
-        if ES2_TEX >= 0 { gles.DisableVertexAttribArray(ES2_TEX as GLuint); }
+
+        if state.pos >= 0 { gles.DisableVertexAttribArray(state.pos as GLuint); }
+        if state.tex >= 0 { gles.DisableVertexAttribArray(state.tex as GLuint); }
         
         gles.UseProgram(old_prog as GLuint);
         gles.BindBuffer(gles11::ARRAY_BUFFER, old_array_buf as GLuint);
@@ -237,6 +235,36 @@ pub unsafe fn present_frame(
             if old_attribs[i as usize] != 0 {
                 gles.EnableVertexAttribArray(i);
             }
+        }
+    } else {
+        gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
+        gles.EnableClientState(gles11::VERTEX_ARRAY);
+        gles.VertexPointer(2, gles11::FLOAT, 0, vertices.as_ptr() as *const GLvoid);
+        gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
+        gles.TexCoordPointer(2, gles11::FLOAT, 0, tex_coords.as_ptr() as *const GLvoid);
+        gles.MatrixMode(gles11::TEXTURE);
+        gles.LoadMatrixf(matrix.columns().as_ptr() as *const _);
+        gles.Enable(gles11::TEXTURE_2D);
+        gles.DrawArrays(gles11::TRIANGLES, 0, 6);
+        gles.LoadIdentity();
+
+        if let Some((x, y, pressed)) = virtual_cursor_visible_at {
+            let (vx, vy, vw, vh) = viewport;
+            let x = x - vx as f32;
+            let y = y - vy as f32;
+            gles.Enable(gles11::BLEND);
+            gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
+            let radius = 10.0;
+            let mut cursor_vertices = vertices;
+            for i in (0..cursor_vertices.len()).step_by(2) {
+                cursor_vertices[i] = (cursor_vertices[i] * radius + x) / (vw as f32 / 2.0) - 1.0;
+                cursor_vertices[i + 1] = 1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
+            }
+            gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
+            gles.Disable(gles11::TEXTURE_2D);
+            gles.Color4f(0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
+            gles.VertexPointer(2, gles11::FLOAT, 0, cursor_vertices.as_ptr() as *const GLvoid);
+            gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         }
     }
 }
