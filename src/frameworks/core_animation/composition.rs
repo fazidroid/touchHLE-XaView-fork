@@ -333,29 +333,34 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
             }
 
             // EsTwoShaderInit
+            // EsTwoShaderInitFix
             let shader_program = if env.options.gles_version == 2 {
-                let vs = compile_shader(gles.as_mut(), 0x8B31 /* VERTEX_SHADER */, VERTEX_SHADER);
-                let fs = compile_shader(gles.as_mut(), 0x8B30 /* FRAGMENT_SHADER */, FRAG_SHADER);
-                let prog = gles.CreateProgram();
-                gles.AttachShader(prog, vs);
-                gles.AttachShader(prog, fs);
-                gles.LinkProgram(prog);
-                prog
+                unsafe {
+                    let vs = compile_shader(gles.as_mut(), 0x8B31 /* VERTEX_SHADER */, VERTEX_SHADER);
+                    let fs = compile_shader(gles.as_mut(), 0x8B30 /* FRAGMENT_SHADER */, FRAG_SHADER);
+                    let prog = gles.CreateProgram();
+                    gles.AttachShader(prog, vs);
+                    gles.AttachShader(prog, fs);
+                    gles.LinkProgram(prog);
+                    prog
+                }
             } else { 0 };
 
             let (pos_attr, tex_attr, mvp_uni, color_uni, use_tex_uni) = if env.options.gles_version == 2 {
-                let pos_name = "position\0".as_ptr() as *const std::ffi::c_char;
-                let tex_name = "texCoord\0".as_ptr() as *const std::ffi::c_char;
-                let mvp_name = "mvp\0".as_ptr() as *const std::ffi::c_char;
-                let col_name = "color\0".as_ptr() as *const std::ffi::c_char;
-                let use_name = "useTex\0".as_ptr() as *const std::ffi::c_char;
-                (
-                    gles.GetAttribLocation(shader_program, pos_name) as GLuint,
-                    gles.GetAttribLocation(shader_program, tex_name) as GLuint,
-                    gles.GetUniformLocation(shader_program, mvp_name),
-                    gles.GetUniformLocation(shader_program, col_name),
-                    gles.GetUniformLocation(shader_program, use_name),
-                )
+                unsafe {
+                    let pos_name = "position\0".as_ptr() as *const std::ffi::c_char;
+                    let tex_name = "texCoord\0".as_ptr() as *const std::ffi::c_char;
+                    let mvp_name = "mvp\0".as_ptr() as *const std::ffi::c_char;
+                    let col_name = "color\0".as_ptr() as *const std::ffi::c_char;
+                    let use_name = "useTex\0".as_ptr() as *const std::ffi::c_char;
+                    (
+                        gles.GetAttribLocation(shader_program, pos_name) as GLuint,
+                        gles.GetAttribLocation(shader_program, tex_name) as GLuint,
+                        gles.GetUniformLocation(shader_program, mvp_name),
+                        gles.GetUniformLocation(shader_program, col_name),
+                        gles.GetUniformLocation(shader_program, use_name),
+                    )
+                }
             } else { (0, 0, 0, 0, 0) };
 
             MiscGlObjects {
