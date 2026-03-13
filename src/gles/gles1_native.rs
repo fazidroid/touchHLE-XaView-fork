@@ -47,6 +47,7 @@ impl GLESContext for GLES1NativeContext {
         })
     }
 
+    // MakeCurrentFix
     fn make_current<'gl_ctx, 'win: 'gl_ctx>(
         &'gl_ctx mut self,
         window: &'win mut Window,
@@ -54,6 +55,7 @@ impl GLESContext for GLES1NativeContext {
         if self.gl_ctx.is_current() && self.is_loaded {
             return Box::new(GLES1Native {
                 _gl_lifetime: PhantomData,
+                is_gles2: self.is_gles2,
             });
         }
 
@@ -61,13 +63,16 @@ impl GLESContext for GLES1NativeContext {
             window.make_gl_context_current(&self.gl_ctx);
         }
         gles11::load_with(|s| window.gl_get_proc_address(s));
-        touchHLE_gl_bindings::gles20::load_with(|s| window.gl_get_proc_address(s)); // GlesTwoLoad
+        // Загрузка ES2 (если она у тебя пропала из-за отката файла)
+        touchHLE_gl_bindings::gles20::load_with(|s| window.gl_get_proc_address(s));
         self.is_loaded = true;
         Box::new(GLES1Native {
             _gl_lifetime: PhantomData,
+            is_gles2: self.is_gles2,
         })
     }
 
+    // MakeCurrentUncheckedFix
     unsafe fn make_current_unchecked_for_window<'gl_ctx>(
         &'gl_ctx mut self,
         make_current_fn: &mut dyn FnMut(&GLContext),
@@ -76,21 +81,26 @@ impl GLESContext for GLES1NativeContext {
         if self.gl_ctx.is_current() && self.is_loaded {
             return Box::new(GLES1Native {
                 _gl_lifetime: PhantomData,
+                is_gles2: self.is_gles2,
             });
         }
 
         make_current_fn(&self.gl_ctx);
+        // Не забываем передавать загрузчик для ES2
         gles11::load_with(&mut *loader_fn);
-        touchHLE_gl_bindings::gles20::load_with(loader_fn); // GlesTwoLoadUnchecked
+        touchHLE_gl_bindings::gles20::load_with(loader_fn);
         self.is_loaded = true;
         Box::new(GLES1Native {
             _gl_lifetime: PhantomData,
+            is_gles2: self.is_gles2,
         })
     }
 }
 
+// GlesNativeStructFix
 pub struct GLES1Native<'gl_ctx> {
     _gl_lifetime: PhantomData<&'gl_ctx ()>,
+    is_gles2: bool,
 }
 
 impl GLES for GLES1Native<'_> {
