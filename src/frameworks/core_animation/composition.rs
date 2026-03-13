@@ -34,22 +34,57 @@ pub(super) struct State {
     misc_gl_objects: Option<MiscGlObjects>,
 }
 
+// ShaderMiscStruct
 struct MiscGlObjects {
-    /// Texture containing a single rounded corner.
     rounded_corner_texture: GLuint,
-    /// [BASIC_SQUARE_POINTS], used as both vertex and texture co-ords for
-    /// drawing simple textured quads.
     basic_square_buffer: GLuint,
-    /// [FLIPPED_SQUARE_POINTS], used as texture co-ords for some textured
-    /// quads.
     flipped_square_buffer: GLuint,
-    /// 9-patch rounded corner texture co-ords (always the same).
     rounded_vertex_buffer: GLuint,
-    /// 9-patch rounded corner vertex co-ords (varies with ratio of corner
-    /// radius to overall rectangle size).
     rounded_tex_coord_buffer: GLuint,
-    /// Index buffer for 9-patch (first 6 elements can be used for square).
     index_buffer: GLuint,
+    shader_program: GLuint,
+    pos_attr: GLuint,
+    tex_attr: GLuint,
+    mvp_uni: GLint,
+    color_uni: GLint,
+    use_tex_uni: GLint,
+}
+
+const VERTEX_SHADER: &str = "
+attribute vec4 position;
+attribute vec2 texCoord;
+varying vec2 v_texCoord;
+uniform mat4 mvp;
+void main() {
+    gl_Position = mvp * position;
+    v_texCoord = texCoord;
+}
+";
+
+const FRAG_SHADER: &str = "
+precision mediump float;
+varying vec2 v_texCoord;
+uniform vec4 color;
+uniform sampler2D tex;
+uniform int useTex;
+void main() {
+    if (useTex == 1) {
+        gl_FragColor = color * texture2D(tex, v_texCoord);
+    } else {
+        gl_FragColor = color;
+    }
+}
+";
+
+unsafe fn compile_shader(gles: &mut dyn GLES, type_: GLenum, source: &str) -> GLuint {
+    let shader = gles.CreateShader(type_);
+    let src_ptr = source.as_ptr() as *const std::ffi::c_char;
+    let len = source.len() as GLint;
+    let src_ptr_array = [src_ptr];
+    let len_array = [len];
+    gles.ShaderSource(shader, 1, src_ptr_array.as_ptr(), len_array.as_ptr());
+    gles.CompileShader(shader);
+    shader
 }
 
 unsafe fn load_matrix(gles: &mut dyn GLES, matrix: Matrix<4>) {
@@ -240,13 +275,18 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
             unsafe {
                 gles.GenTextures(1, &mut rounded_corner_texture);
                 gles.BindTexture(gles11::TEXTURE_2D, rounded_corner_texture);
-                // GENERATE_MIPMAP must be set before the texture upload.
-                gles.TexParameteri(
-                    gles11::TEXTURE_2D,
-                    gles11::GENERATE_MIPMAP,
-                    gles11::TRUE as _,
-                );
-                upload_rgba8_pixels(gles.as_mut(), image.pixels(), (dimension as _, dimension as _));
+                // EsTwoMipmap
+                if env.options.gles_version == 2 {
+                    upload_rgba8_pixels(gles.as_mut(), image.pixels(), (dimension as _, dimension as _));
+                    gles.GenerateMipmapOES(gles11::TEXTURE_2D);
+                } else {
+                    gles.TexParameteri(
+                        gles11::TEXTURE_2D,
+                        gles11::GENERATE_MIPMAP,
+                        gles11::TRUE as _,
+                    );
+                    upload_rgba8_pixels(gles.as_mut(), image.pixels(), (dimension as _, dimension as _));
+                }
                 gles.TexParameteri(
                     gles11::TEXTURE_2D,
                     gles11::TEXTURE_MIN_FILTER,
@@ -292,6 +332,32 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                 gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
             }
 
+            // EsTwoShaderInit
+            let shader_program = if env.options.gles_version == 2 {
+                let vs = compile_shader(gles.as_mut(), 0x8B31 /* VERTEX_SHADER */, VERTEX_SHADER);
+                let fs = compile_shader(gles.as_mut(), 0x8B30 /* FRAGMENT_SHADER */, FRAG_SHADER);
+                let prog = gles.CreateProgram();
+                gles.AttachShader(prog, vs);
+                gles.AttachShader(prog, fs);
+                gles.LinkProgram(prog);
+                prog
+            } else { 0 };
+
+            let (pos_attr, tex_attr, mvp_uni, color_uni, use_tex_uni) = if env.options.gles_version == 2 {
+                let pos_name = "position\0".as_ptr() as *const std::ffi::c_char;
+                let tex_name = "texCoord\0".as_ptr() as *const std::ffi::c_char;
+                let mvp_name = "mvp\0".as_ptr() as *const std::ffi::c_char;
+                let col_name = "color\0".as_ptr() as *const std::ffi::c_char;
+                let use_name = "useTex\0".as_ptr() as *const std::ffi::c_char;
+                (
+                    gles.GetAttribLocation(shader_program, pos_name) as GLuint,
+                    gles.GetAttribLocation(shader_program, tex_name) as GLuint,
+                    gles.GetUniformLocation(shader_program, mvp_name),
+                    gles.GetUniformLocation(shader_program, col_name),
+                    gles.GetUniformLocation(shader_program, use_name),
+                )
+            } else { (0, 0, 0, 0, 0) };
+
             MiscGlObjects {
                 rounded_corner_texture,
                 basic_square_buffer,
@@ -299,48 +365,51 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                 rounded_vertex_buffer,
                 rounded_tex_coord_buffer,
                 index_buffer,
+                shader_program,
+                pos_attr,
+                tex_attr,
+                mvp_uni,
+                color_uni,
+                use_tex_uni,
             }
         });
 
-    // Clear the framebuffer and set up state to prepare for rendering
+    // EsTwoRenderSetup
+    let projection_matrix = Matrix::from(&Matrix::scale_2d(
+        2.0 / screen_bounds.size.width,
+        -2.0 / screen_bounds.size.height,
+    ))
+    .multiply(&Matrix::translate_3d(-1.0, 1.0, 0.0));
+
     unsafe {
         gles.Viewport(0, 0, fb_width as _, fb_height as _);
         gles.ClearColor(0.0, 0.0, 0.0, 1.0);
         gles.Clear(gles11::COLOR_BUFFER_BIT);
-        gles.Color4f(1.0, 1.0, 1.0, 1.0);
 
-        gles.MatrixMode(gles11::PROJECTION);
-        // Scale down screen-space to normalized device co-ordinates, shift the
-        // origin to be at the top-left rather than the center, and flip the
-        // Y axis (OpenGL's points up, Core Animation's points down).
-        // Using the projection matrix for this is more convenient than adding
-        // an extra multiply to composite_layer_recursive.
-        load_matrix(
-            gles.as_mut(),
-            Matrix::from(&Matrix::scale_2d(
-                2.0 / screen_bounds.size.width,
-                -2.0 / screen_bounds.size.height,
-            ))
-            .multiply(&Matrix::translate_3d(-1.0, 1.0, 0.0)),
-        );
-        gles.MatrixMode(gles11::MODELVIEW);
-        gles.LoadIdentity();
+        if env.options.gles_version == 2 {
+            gles.UseProgram(misc_gl_objects.shader_program);
+            gles.Uniform1i(misc_gl_objects.use_tex_uni, 0);
+        } else {
+            gles.Color4f(1.0, 1.0, 1.0, 1.0);
+            gles.MatrixMode(gles11::PROJECTION);
+            load_matrix(gles.as_mut(), projection_matrix.clone());
+            gles.MatrixMode(gles11::MODELVIEW);
+            gles.LoadIdentity();
+        }
 
         // One index buffer to rule them all
         gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, misc_gl_objects.index_buffer);
     }
     std::mem::drop(gles);
 
-    // Assumes the windows in the list are ordered back-to-front.
-    // TODO: this may not be correct once we support windowLevel.
     for root_layer in window_layers {
-        // Here's where the actual drawing happens
         unsafe {
             composite_layer_recursive(
                 env,
                 &mut animation_state,
                 root_layer,
                 cumulative_transform,
+                projection_matrix.clone(),
                 opacity,
             );
         }
@@ -350,15 +419,19 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
     let window = env.window.as_mut().unwrap();
     let mut gles = window.make_internal_gl_ctx_current();
 
-    // Clean up some GL state
+    // EsTwoCleanUp
     unsafe {
         gles.Viewport(0, 0, fb_width as _, fb_height as _);
-        gles.Color4f(1.0, 1.0, 1.0, 1.0);
-        gles.Disable(gles11::BLEND);
-        gles.MatrixMode(gles11::PROJECTION);
-        gles.LoadIdentity();
-        gles.MatrixMode(gles11::MODELVIEW);
-        gles.LoadIdentity();
+        if env.options.gles_version == 2 {
+            gles.UseProgram(0);
+        } else {
+            gles.Color4f(1.0, 1.0, 1.0, 1.0);
+            gles.Disable(gles11::BLEND);
+            gles.MatrixMode(gles11::PROJECTION);
+            gles.LoadIdentity();
+            gles.MatrixMode(gles11::MODELVIEW);
+            gles.LoadIdentity();
+        }
         gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
         gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
         assert_eq!(gles.GetError(), 0);
@@ -411,11 +484,13 @@ fn display_layers(env: &mut Environment, root_layer: id) {
 }
 
 /// Traverses the layer tree and draws each layer.
+// EsTwoRecursive
 unsafe fn composite_layer_recursive(
     env: &mut Environment,
     animation_state: &mut animation::State,
     layer: id,
     cumulative_transform: Matrix<4>,
+    projection_matrix: Matrix<4>,
     opacity: CGFloat,
 ) {
     // TODO: this can't handle zPosition among other things, but it is not
@@ -442,15 +517,19 @@ unsafe fn composite_layer_recursive(
             <Matrix<4> as From<_>>::from(host_obj.superlayer_to_layer_transform())
                 .multiply(&cumulative_transform);
 
-        // Reposition and scale the unit quad (see ARRAY_BUFFER binding)
-        // so it will have the right size in this layer's co-ordinate space.
-        gles.MatrixMode(gles11::MODELVIEW);
-        load_matrix(
-            gles.as_mut(),
-            Matrix::<4>::from(&Matrix::scale_2d(bounds.size.width, bounds.size.height))
-                .multiply(&Matrix::translate_3d(bounds.origin.x, bounds.origin.y, 0.0))
-                .multiply(&cumulative_transform),
-        );
+        // EsTwoMatrixMath
+        let mv = Matrix::<4>::from(&Matrix::scale_2d(bounds.size.width, bounds.size.height))
+            .multiply(&Matrix::translate_3d(bounds.origin.x, bounds.origin.y, 0.0))
+            .multiply(&cumulative_transform);
+
+        let mvp = mv.multiply(&projection_matrix);
+        if env.options.gles_version == 2 {
+            let misc = env.framework_state.core_animation.composition.misc_gl_objects.as_ref().unwrap();
+            gles.UniformMatrix4fv(misc.mvp_uni, 1, 0 /* FALSE */, mvp.columns().as_ptr() as *const _);
+        } else {
+            gles.MatrixMode(gles11::MODELVIEW);
+            load_matrix(gles.as_mut(), mv);
+        }
 
         cumulative_transform
     };
@@ -465,24 +544,36 @@ unsafe fn composite_layer_recursive(
             .as_ref()
             .unwrap();
 
+        // EsTwoBgRender
         let CGColorHostObject { r, g, b, a, .. } = background_color;
-        gles.Color4f(
-            r * a * opacity,
-            g * a * opacity,
-            b * a * opacity,
-            a * opacity,
-        );
+        let r_c = r * a * opacity;
+        let g_c = g * a * opacity;
+        let b_c = b * a * opacity;
+        let a_c = a * opacity;
+
+        if env.options.gles_version == 2 {
+            gles.Uniform4f(misc.color_uni, r_c, g_c, b_c, a_c);
+            gles.Uniform1i(misc.use_tex_uni, if host_obj.corner_radius == 0.0 { 0 } else { 1 });
+        } else {
+            gles.Color4f(r_c, g_c, b_c, a_c);
+        }
+
         gles.Enable(gles11::BLEND);
         gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
 
         let radius = host_obj.corner_radius;
         if radius == 0.0 {
-            gles.Disable(gles11::TEXTURE_2D);
-            gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
-
-            gles.EnableClientState(gles11::VERTEX_ARRAY);
-            gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
-            gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+            if env.options.gles_version == 2 {
+                gles.EnableVertexAttribArray(misc.pos_attr);
+                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
+                gles.VertexAttribPointer(misc.pos_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+            } else {
+                gles.Disable(gles11::TEXTURE_2D);
+                gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
+                gles.EnableClientState(gles11::VERTEX_ARRAY);
+                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
+                gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+            }
 
             gles.DrawElements(
                 gles11::TRIANGLES,
@@ -490,15 +581,29 @@ unsafe fn composite_layer_recursive(
                 gles11::UNSIGNED_BYTE,
                 0 as *const GLvoid,
             );
-        } else {
-            gles.Enable(gles11::TEXTURE_2D);
-            gles.BindTexture(gles11::TEXTURE_2D, misc.rounded_corner_texture);
-            gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
-            gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_tex_coord_buffer);
-            gles.TexCoordPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
 
-            gles.EnableClientState(gles11::VERTEX_ARRAY);
-            gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_vertex_buffer);
+            if env.options.gles_version == 2 {
+                gles.DisableVertexAttribArray(misc.pos_attr);
+            }
+        } else {
+            if env.options.gles_version == 2 {
+                gles.ActiveTexture(gles11::TEXTURE0);
+                gles.BindTexture(gles11::TEXTURE_2D, misc.rounded_corner_texture);
+                gles.EnableVertexAttribArray(misc.tex_attr);
+                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_tex_coord_buffer);
+                gles.VertexAttribPointer(misc.tex_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                gles.EnableVertexAttribArray(misc.pos_attr);
+                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_vertex_buffer);
+            } else {
+                gles.Enable(gles11::TEXTURE_2D);
+                gles.BindTexture(gles11::TEXTURE_2D, misc.rounded_corner_texture);
+                gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
+                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_tex_coord_buffer);
+                gles.TexCoordPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+                gles.EnableClientState(gles11::VERTEX_ARRAY);
+                gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_vertex_buffer);
+            }
+
             upload_slice(
                 gles.as_mut(),
                 gles11::ARRAY_BUFFER,
@@ -518,7 +623,12 @@ unsafe fn composite_layer_recursive(
                 ),
                 gles11::DYNAMIC_DRAW,
             );
-            gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+
+            if env.options.gles_version == 2 {
+                gles.VertexAttribPointer(misc.pos_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+            } else {
+                gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+            }
 
             gles.DrawElements(
                 gles11::TRIANGLES,
@@ -526,6 +636,11 @@ unsafe fn composite_layer_recursive(
                 gles11::UNSIGNED_BYTE,
                 0 as *const GLvoid,
             );
+
+            if env.options.gles_version == 2 {
+                gles.DisableVertexAttribArray(misc.pos_attr);
+                gles.DisableVertexAttribArray(misc.tex_attr);
+            }
         };
 
         true
@@ -595,7 +710,7 @@ unsafe fn composite_layer_recursive(
             .gles_texture_is_up_to_date = true;
     }
 
-    // Draw texture, if any
+    // EsTwoTexRender
     if need_texture {
         let misc = env
             .framework_state
@@ -605,7 +720,13 @@ unsafe fn composite_layer_recursive(
             .as_ref()
             .unwrap();
 
-        gles.Color4f(opacity, opacity, opacity, opacity);
+        if env.options.gles_version == 2 {
+            gles.Uniform4f(misc.color_uni, opacity, opacity, opacity, opacity);
+            gles.Uniform1i(misc.use_tex_uni, 1);
+        } else {
+            gles.Color4f(opacity, opacity, opacity, opacity);
+        }
+
         if opacity == 1.0 && host_obj.opaque && !have_background {
             gles.Disable(gles11::BLEND);
         } else {
@@ -613,41 +734,63 @@ unsafe fn composite_layer_recursive(
             gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
         }
 
-        gles.EnableClientState(gles11::VERTEX_ARRAY);
-        gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
-        gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+        if env.options.gles_version == 2 {
+            gles.EnableVertexAttribArray(misc.pos_attr);
+            gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
+            gles.VertexAttribPointer(misc.pos_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
 
-        gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
-        // Normal images will have top-to-bottom row order, but OpenGL ES
-        // expects bottom-to-top, so flip the UVs in that case.
-        gles.BindBuffer(
-            gles11::ARRAY_BUFFER,
-            if host_obj.contents != nil {
-                misc.basic_square_buffer
-            } else {
-                misc.flipped_square_buffer
-            },
-        );
-        gles.TexCoordPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
-        gles.Enable(gles11::TEXTURE_2D);
+            gles.EnableVertexAttribArray(misc.tex_attr);
+            gles.BindBuffer(
+                gles11::ARRAY_BUFFER,
+                if host_obj.contents != nil {
+                    misc.basic_square_buffer
+                } else {
+                    misc.flipped_square_buffer
+                },
+            );
+            gles.VertexAttribPointer(misc.tex_attr, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+
+            gles.ActiveTexture(gles11::TEXTURE0);
+        } else {
+            gles.EnableClientState(gles11::VERTEX_ARRAY);
+            gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
+            gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+
+            gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
+            gles.BindBuffer(
+                gles11::ARRAY_BUFFER,
+                if host_obj.contents != nil {
+                    misc.basic_square_buffer
+                } else {
+                    misc.flipped_square_buffer
+                },
+            );
+            gles.TexCoordPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
+            gles.Enable(gles11::TEXTURE_2D);
+        }
+
         gles.DrawElements(
             gles11::TRIANGLES,
             SQUARE_INDICES.len() as _,
             gles11::UNSIGNED_BYTE,
             0 as *const GLvoid,
         );
+
+        if env.options.gles_version == 2 {
+            gles.DisableVertexAttribArray(misc.pos_attr);
+            gles.DisableVertexAttribArray(misc.tex_attr);
+        }
     }
     std::mem::drop(gles);
 
-    // avoid holding mutable borrow while recursing
     let original_host_obj = env.objc.borrow_mut::<CALayerHostObject>(layer);
     for &child_layer in &original_host_obj.sublayers.clone() {
-        // TODO: clipping/masksToBounds support
         composite_layer_recursive(
             env,
             animation_state,
             child_layer,
             cumulative_transform,
+            projection_matrix.clone(),
             opacity,
         )
     }
