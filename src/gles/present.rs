@@ -44,7 +44,7 @@ impl FpsCounter {
 /// virtual cursor is also drawn if it should be currently visible.
 ///
 /// The provided context must be current.
-// EsTwoPresentFrame
+// SafePresentFix
 pub unsafe fn present_frame(
     gles: &mut dyn GLES,
     viewport: (u32, u32, u32, u32),
@@ -66,10 +66,11 @@ pub unsafe fn present_frame(
     let matrix = Matrix::<4>::from(&rotation_matrix);
 
     static mut ES2_PROG: GLuint = 0;
-    static mut ES2_POS: GLuint = 0;
-    static mut ES2_TEX: GLuint = 0;
+    static mut ES2_POS: GLint = 0;
+    static mut ES2_TEX: GLint = 0;
     static mut ES2_MAT: GLint = 0;
     static mut ES2_COL: GLint = 0;
+    static mut ES2_TEX_SAMPLER: GLint = 0;
 
     if is_gles2 {
         if ES2_PROG == 0 {
@@ -85,24 +86,35 @@ pub unsafe fn present_frame(
             let fs_len = [fs_src.len() as GLint - 1];
             gles.ShaderSource(fs, 1, fs_ptr.as_ptr(), fs_len.as_ptr());
             gles.CompileShader(fs);
-            // ShaderCstrPresent
             ES2_PROG = gles.CreateProgram();
             gles.AttachShader(ES2_PROG, vs);
             gles.AttachShader(ES2_PROG, fs);
             gles.LinkProgram(ES2_PROG);
-            ES2_POS = gles.GetAttribLocation(ES2_PROG, c"position".as_ptr() as *const _) as GLuint;
-            ES2_TEX = gles.GetAttribLocation(ES2_PROG, c"texCoord".as_ptr() as *const _) as GLuint;
+            ES2_POS = gles.GetAttribLocation(ES2_PROG, c"position".as_ptr() as *const _);
+            ES2_TEX = gles.GetAttribLocation(ES2_PROG, c"texCoord".as_ptr() as *const _);
             ES2_MAT = gles.GetUniformLocation(ES2_PROG, c"texMatrix".as_ptr() as *const _);
             ES2_COL = gles.GetUniformLocation(ES2_PROG, c"color".as_ptr() as *const _);
+            ES2_TEX_SAMPLER = gles.GetUniformLocation(ES2_PROG, c"tex".as_ptr() as *const _);
         }
         gles.UseProgram(ES2_PROG);
         gles.Uniform4f(ES2_COL, 0.0, 0.0, 0.0, 0.0);
         gles.UniformMatrix4fv(ES2_MAT, 1, 0, matrix.columns().as_ptr() as *const _);
-        gles.EnableVertexAttribArray(ES2_POS);
-        gles.VertexAttribPointer(ES2_POS, 2, gles11::FLOAT, 0, 0, vertices.as_ptr() as *const _);
-        gles.EnableVertexAttribArray(ES2_TEX);
-        gles.VertexAttribPointer(ES2_TEX, 2, gles11::FLOAT, 0, 0, tex_coords.as_ptr() as *const _);
-        gles.ActiveTexture(gles11::TEXTURE0);
+
+        let mut active_tex: GLint = 0;
+        gles.GetIntegerv(gles11::ACTIVE_TEXTURE, &mut active_tex);
+        let tex_unit = active_tex - gles11::TEXTURE0 as GLint;
+        if ES2_TEX_SAMPLER >= 0 {
+            gles.Uniform1i(ES2_TEX_SAMPLER, tex_unit);
+        }
+
+        if ES2_POS >= 0 {
+            gles.EnableVertexAttribArray(ES2_POS as GLuint);
+            gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, vertices.as_ptr() as *const _);
+        }
+        if ES2_TEX >= 0 {
+            gles.EnableVertexAttribArray(ES2_TEX as GLuint);
+            gles.VertexAttribPointer(ES2_TEX as GLuint, 2, gles11::FLOAT, 0, 0, tex_coords.as_ptr() as *const _);
+        }
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);
     } else {
         gles.EnableClientState(gles11::VERTEX_ARRAY);
@@ -130,10 +142,12 @@ pub unsafe fn present_frame(
         }
         if is_gles2 {
             gles.Uniform4f(ES2_COL, 0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
-            gles.DisableVertexAttribArray(ES2_TEX);
-            gles.VertexAttribPointer(ES2_POS, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
+            if ES2_TEX >= 0 { gles.DisableVertexAttribArray(ES2_TEX as GLuint); }
+            if ES2_POS >= 0 {
+                gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
+            }
             gles.DrawArrays(gles11::TRIANGLES, 0, 6);
-            gles.DisableVertexAttribArray(ES2_POS);
+            if ES2_POS >= 0 { gles.DisableVertexAttribArray(ES2_POS as GLuint); }
             gles.UseProgram(0);
         } else {
             gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
@@ -143,8 +157,8 @@ pub unsafe fn present_frame(
             gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         }
     } else if is_gles2 {
-        gles.DisableVertexAttribArray(ES2_POS);
-        gles.DisableVertexAttribArray(ES2_TEX);
+        if ES2_POS >= 0 { gles.DisableVertexAttribArray(ES2_POS as GLuint); }
+        if ES2_TEX >= 0 { gles.DisableVertexAttribArray(ES2_TEX as GLuint); }
         gles.UseProgram(0);
     }
 }
