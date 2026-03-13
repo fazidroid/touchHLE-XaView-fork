@@ -1603,6 +1603,7 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
 fn glCreateShader(env: &mut Environment, type_: GLenum) -> GLuint {
     with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateShader(type_) })
 }
+// ShaderSourcePatch
 fn glShaderSource(
     env: &mut Environment,
     shader: GLuint,
@@ -1611,30 +1612,53 @@ fn glShaderSource(
     length: ConstPtr<GLint>,
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
-        let count_u32 = count as u32;
         let count_usize = count as usize;
-        let mut host_strings: Vec<*const std::ffi::c_char> = Vec::with_capacity(count_usize);
-        let mut host_lengths: Vec<GLint> = Vec::with_capacity(count_usize);
+        let string_arr = mem.ptr_at(string.cast::<ConstVoidPtr>(), count as u32);
+        let length_arr = if length.is_null() { std::ptr::null() } else { mem.ptr_at(length, count as u32) };
 
-        let string_arr = mem.ptr_at(string.cast::<ConstVoidPtr>(), count_u32);
-        let length_arr = if length.is_null() { std::ptr::null() } else { mem.ptr_at(length, count_u32) };
-
+        let mut full_source = String::new();
         for i in 0..count_usize {
             let guest_str_ptr = *string_arr.add(i);
-            let host_str_ptr = mem.unchecked_ptr_at(guest_str_ptr.cast::<u8>(), 0).cast();
-            host_strings.push(host_str_ptr);
-
-            if !length_arr.is_null() {
-                host_lengths.push(*length_arr.add(i));
-            }
+            let host_str_ptr = mem.unchecked_ptr_at(guest_str_ptr.cast::<u8>(), 0).cast::<std::ffi::c_char>();
+            let str_len = if !length_arr.is_null() && *length_arr.add(i) >= 0 {
+                *length_arr.add(i) as usize
+            } else {
+                std::ffi::CStr::from_ptr(host_str_ptr).to_bytes().len()
+            };
+            let slice = std::slice::from_raw_parts(host_str_ptr as *const u8, str_len);
+            full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
-        let lengths_ptr = if host_lengths.is_empty() { std::ptr::null() } else { host_lengths.as_ptr() };
-        gles.ShaderSource(shader, count, host_strings.as_ptr(), lengths_ptr);
+        if env.options.gles_version == 2 && full_source.contains("gl_FragColor") && !full_source.contains("precision ") {
+            full_source = format!("precision mediump float;\n{}", full_source);
+        }
+
+        let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
+        let c_source_ptr = c_source.as_ptr();
+        let c_len = c_source.as_bytes().len() as GLint;
+        let c_source_array = [c_source_ptr];
+        let c_len_array = [c_len];
+        gles.ShaderSource(shader, 1, c_source_array.as_ptr(), c_len_array.as_ptr());
     })
 }
+// CompileShaderLog
 fn glCompileShader(env: &mut Environment, shader: GLuint) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.CompileShader(shader) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.CompileShader(shader);
+        if env.options.gles_version == 2 {
+            let mut status = 0;
+            gles.GetShaderiv(shader, 0x8B81 /* GL_COMPILE_STATUS */, &mut status);
+            if status == 0 {
+                let mut log_len = 0;
+                gles.GetShaderiv(shader, 0x8B84 /* GL_INFO_LOG_LENGTH */, &mut log_len);
+                if log_len > 0 {
+                    let mut log_buf = vec![0u8; log_len as usize];
+                    gles.GetShaderInfoLog(shader, log_len, std::ptr::null_mut(), log_buf.as_mut_ptr() as *mut _);
+                    println!("SHADER COMPILE ERROR: {}", String::from_utf8_lossy(&log_buf));
+                }
+            }
+        }
+    })
 }
 fn glGetShaderiv(env: &mut Environment, shader: GLuint, pname: GLenum, params: MutPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
@@ -1676,8 +1700,24 @@ fn glBindAttribLocation(
         gles.BindAttribLocation(program, index, host_name);
     })
 }
+// LinkProgramLog
 fn glLinkProgram(env: &mut Environment, program: GLuint) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.LinkProgram(program) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.LinkProgram(program);
+        if env.options.gles_version == 2 {
+            let mut status = 0;
+            gles.GetProgramiv(program, 0x8B82 /* GL_LINK_STATUS */, &mut status);
+            if status == 0 {
+                let mut log_len = 0;
+                gles.GetProgramiv(program, 0x8B84 /* GL_INFO_LOG_LENGTH */, &mut log_len);
+                if log_len > 0 {
+                    let mut log_buf = vec![0u8; log_len as usize];
+                    gles.GetProgramInfoLog(program, log_len, std::ptr::null_mut(), log_buf.as_mut_ptr() as *mut _);
+                    println!("PROGRAM LINK ERROR: {}", String::from_utf8_lossy(&log_buf));
+                }
+            }
+        }
+    })
 }
 fn glUseProgram(env: &mut Environment, program: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.UseProgram(program) })
