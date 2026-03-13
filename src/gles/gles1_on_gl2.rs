@@ -2137,6 +2137,10 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) {
         crate::gles::gl21compat_raw::BlendColor(red, green, blue, alpha)
     }
+    // AddAttribCompat
+    unsafe fn GetVertexAttribiv(&mut self, index: GLuint, pname: GLenum, params: *mut GLint) {
+        crate::gles::gl21compat_raw::GetVertexAttribiv(index, pname, params)
+    }
 
     // OES_framebuffer_object -> EXT_framebuffer_object
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint) {

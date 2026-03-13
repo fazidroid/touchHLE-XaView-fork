@@ -430,6 +430,8 @@ pub trait GLES {
     unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char);
     unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char);
     unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat);
+    // AddAttribTrait
+    unsafe fn GetVertexAttribiv(&mut self, index: GLuint, pname: GLenum, params: *mut GLint);
 
     // OES_framebuffer_object (incomplete)
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint);

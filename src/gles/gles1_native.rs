@@ -868,6 +868,10 @@ impl GLES for GLES1Native<'_> {
     unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) {
         touchHLE_gl_bindings::gles20::BlendColor(red, green, blue, alpha)
     }
+    // AddAttribNative
+    unsafe fn GetVertexAttribiv(&mut self, index: GLuint, pname: GLenum, params: *mut GLint) {
+        touchHLE_gl_bindings::gles20::GetVertexAttribiv(index, pname, params)
+    }
 
     // OES_framebuffer_object -> EXT_framebuffer_object
     // EsTwoFboGen
