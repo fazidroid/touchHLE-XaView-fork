@@ -1643,6 +1643,11 @@ fn glShaderSource(
         gles.ShaderSource(shader, 1, c_source_array.as_ptr(), c_len_array.as_ptr());
     })
 }
+// GuestDeleteShaderImpl
+fn glDeleteShader(env: &mut Environment, shader: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.DeleteShader(shader) })
+}
+
 // CompileShaderBorrowFix
 fn glCompileShader(env: &mut Environment, shader: GLuint) {
     let is_gles2 = env.options.gles_version == 2;
@@ -2081,6 +2086,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glCreateShader(_)),
     export_c_func!(glShaderSource(_, _, _, _)),
     export_c_func!(glCompileShader(_)),
+    export_c_func!(glDeleteShader(_)), // GuestDeleteShader
     export_c_func!(glGetShaderiv(_, _, _)),
     export_c_func!(glGetShaderInfoLog(_, _, _, _)),
     export_c_func!(glCreateProgram()),
