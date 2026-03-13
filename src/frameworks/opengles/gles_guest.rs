@@ -1626,7 +1626,8 @@ fn glShaderSource(
             } else {
                 std::ffi::CStr::from_ptr(host_str_ptr).to_bytes().len()
             };
-            let slice = std::slice::from_raw_parts(host_str_ptr as *const u8, str_len);
+            // UnnecessaryCastFix
+            let slice = std::slice::from_raw_parts(host_str_ptr.cast::<u8>(), str_len);
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
