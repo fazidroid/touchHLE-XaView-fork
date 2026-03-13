@@ -85,14 +85,15 @@ pub unsafe fn present_frame(
             let fs_len = [fs_src.len() as GLint - 1];
             gles.ShaderSource(fs, 1, fs_ptr.as_ptr(), fs_len.as_ptr());
             gles.CompileShader(fs);
+            // ShaderCstrPresent
             ES2_PROG = gles.CreateProgram();
             gles.AttachShader(ES2_PROG, vs);
             gles.AttachShader(ES2_PROG, fs);
             gles.LinkProgram(ES2_PROG);
-            ES2_POS = gles.GetAttribLocation(ES2_PROG, "position\0".as_ptr() as *const _) as GLuint;
-            ES2_TEX = gles.GetAttribLocation(ES2_PROG, "texCoord\0".as_ptr() as *const _) as GLuint;
-            ES2_MAT = gles.GetUniformLocation(ES2_PROG, "texMatrix\0".as_ptr() as *const _);
-            ES2_COL = gles.GetUniformLocation(ES2_PROG, "color\0".as_ptr() as *const _);
+            ES2_POS = gles.GetAttribLocation(ES2_PROG, c"position".as_ptr() as *const _) as GLuint;
+            ES2_TEX = gles.GetAttribLocation(ES2_PROG, c"texCoord".as_ptr() as *const _) as GLuint;
+            ES2_MAT = gles.GetUniformLocation(ES2_PROG, c"texMatrix".as_ptr() as *const _);
+            ES2_COL = gles.GetUniformLocation(ES2_PROG, c"color".as_ptr() as *const _);
         }
         gles.UseProgram(ES2_PROG);
         gles.Uniform4f(ES2_COL, 0.0, 0.0, 0.0, 0.0);
