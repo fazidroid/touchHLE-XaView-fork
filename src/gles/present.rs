@@ -145,7 +145,8 @@ pub unsafe fn present_frame(
             ES2_COL = gles.GetUniformLocation(ES2_PROG, c"color".as_ptr() as *const _);
             ES2_TEX_SAMPLER = gles.GetUniformLocation(ES2_PROG, c"tex".as_ptr() as *const _);
 
-            gles.GenBuffers(1, &mut ES2_VBO);
+            // StaticMutRefFix
+            gles.GenBuffers(1, std::ptr::addr_of_mut!(ES2_VBO));
             gles.BindBuffer(gles11::ARRAY_BUFFER, ES2_VBO);
             let mut data = [0.0f32; 24];
             data[0..12].copy_from_slice(&vertices);
@@ -163,10 +164,11 @@ pub unsafe fn present_frame(
             gles.Uniform1i(ES2_TEX_SAMPLER, tex_unit);
         }
 
+        // ZeroPtrFix
         gles.BindBuffer(gles11::ARRAY_BUFFER, ES2_VBO);
         if ES2_POS >= 0 {
             gles.EnableVertexAttribArray(ES2_POS as GLuint);
-            gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const _);
+            gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, std::ptr::null());
         }
         if ES2_TEX >= 0 {
             gles.EnableVertexAttribArray(ES2_TEX as GLuint);
