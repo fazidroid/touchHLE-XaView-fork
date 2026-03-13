@@ -1743,8 +1743,9 @@ fn glUniform4f(
 ) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform4f(location, x, y, z, w) })
 }
+// IdentityOpFixOne
 fn glUniform1fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
-    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 1) as u32); gles.Uniform1fv(location, count, ptr); })
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, count as u32); gles.Uniform1fv(location, count, ptr); })
 }
 fn glUniform2fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 2) as u32); gles.Uniform2fv(location, count, ptr); })
@@ -1755,8 +1756,9 @@ fn glUniform3fv(env: &mut Environment, location: GLint, count: GLsizei, value: C
 fn glUniform4fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 4) as u32); gles.Uniform4fv(location, count, ptr); })
 }
+// IdentityOpFixTwo
 fn glUniform1iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
-    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 1) as u32); gles.Uniform1iv(location, count, ptr); })
+    with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, count as u32); gles.Uniform1iv(location, count, ptr); })
 }
 fn glUniform2iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe { let ptr = mem.ptr_at(value, (count * 2) as u32); gles.Uniform2iv(location, count, ptr); })
