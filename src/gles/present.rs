@@ -54,13 +54,16 @@ pub unsafe fn present_frame(
     use gles11::types::*;
     let is_gles2 = gles.is_gles2();
 
-    // Бекапим стейт игры, чтобы не сломать ей рендер на следующем кадре!
+    // 1. БЕКАПИМ КРИТИЧЕСКИЙ СТЕЙТ ИГРЫ
     let mut old_prog: GLint = 0;
     let mut old_array_buf: GLint = 0;
     let mut old_cull: GLboolean = 0;
     let mut old_depth: GLboolean = 0;
     let mut old_scissor: GLboolean = 0;
     let mut old_blend: GLboolean = 0;
+    let mut old_color_mask = [0u8; 4];
+    let mut old_depth_mask: GLboolean = 0;
+    let mut old_attribs = [0u8; 8];
 
     if is_gles2 {
         gles.GetIntegerv(0x8B8D, &mut old_prog); // CURRENT_PROGRAM
@@ -69,8 +72,20 @@ pub unsafe fn present_frame(
         gles.GetBooleanv(gles11::DEPTH_TEST, &mut old_depth);
         gles.GetBooleanv(gles11::SCISSOR_TEST, &mut old_scissor);
         gles.GetBooleanv(gles11::BLEND, &mut old_blend);
+        gles.GetBooleanv(gles11::COLOR_WRITEMASK, old_color_mask.as_mut_ptr() as *mut _);
+        gles.GetBooleanv(gles11::DEPTH_WRITEMASK, &mut old_depth_mask);
         
-        // Отключаем всё, что может обрезать наш кадр
+        // Выключаем ВСЕ массивы атрибутов игры, чтобы драйвер не крашился при DrawArrays
+        for i in 0..8 {
+            let mut status: GLint = 0;
+            gles.GetVertexAttribiv(i, 0x8622 /* VERTEX_ATTRIB_ARRAY_ENABLED */, &mut status);
+            old_attribs[i as usize] = status as u8;
+            gles.DisableVertexAttribArray(i);
+        }
+
+        // Жестко форсируем разрешение записи на экран
+        gles.ColorMask(1, 1, 1, 1);
+        gles.DepthMask(1);
         gles.Disable(gles11::CULL_FACE);
         gles.Disable(gles11::DEPTH_TEST);
         gles.Disable(gles11::SCISSOR_TEST);
@@ -78,7 +93,14 @@ pub unsafe fn present_frame(
     }
 
     gles.Viewport(viewport.0 as _, viewport.1 as _, viewport.2 as _, viewport.3 as _);
-    gles.ClearColor(0.0, 0.0, 0.0, 1.0);
+    
+    // ВИЗУАЛЬНЫЙ ЛОГ: Очищаем фон темно-красным. 
+    // Если экран красный — отрисовка текстуры провалилась.
+    if is_gles2 {
+        gles.ClearColor(0.2, 0.0, 0.0, 1.0);
+    } else {
+        gles.ClearColor(0.0, 0.0, 0.0, 1.0);
+    }
     gles.Clear(gles11::COLOR_BUFFER_BIT | gles11::DEPTH_BUFFER_BIT | gles11::STENCIL_BUFFER_BIT);
     gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
 
@@ -98,6 +120,8 @@ pub unsafe fn present_frame(
     if is_gles2 {
         if ES2_PROG == 0 {
             let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
+            // ВИЗУАЛЬНЫЙ ЛОГ: Примешиваем зеленый цвет. 
+            // Красный фон + зеленый квад = желтый/зеленый экран. Это докажет, что DrawArrays сработал!
             let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = mix(texColor, vec4(color.rgb, 1.0), color.a) + vec4(0.0, 0.2, 0.0, 0.0);\n}\0";
             let vs = gles.CreateShader(0x8B31);
             let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
@@ -179,16 +203,23 @@ pub unsafe fn present_frame(
         }
     }
     
+    // 2. ВОССТАНАВЛИВАЕМ СТЕЙТ
     if is_gles2 {
         if ES2_POS >= 0 { gles.DisableVertexAttribArray(ES2_POS as GLuint); }
         if ES2_TEX >= 0 { gles.DisableVertexAttribArray(ES2_TEX as GLuint); }
         
-        // Восстанавливаем стейт игры
         gles.UseProgram(old_prog as GLuint);
         gles.BindBuffer(gles11::ARRAY_BUFFER, old_array_buf as GLuint);
         if old_cull != 0 { gles.Enable(gles11::CULL_FACE); }
         if old_depth != 0 { gles.Enable(gles11::DEPTH_TEST); }
         if old_scissor != 0 { gles.Enable(gles11::SCISSOR_TEST); }
         if old_blend != 0 { gles.Enable(gles11::BLEND); }
+        gles.ColorMask(old_color_mask[0], old_color_mask[1], old_color_mask[2], old_color_mask[3]);
+        gles.DepthMask(old_depth_mask);
+        for i in 0..8 {
+            if old_attribs[i as usize] != 0 {
+                gles.EnableVertexAttribArray(i);
+            }
+        }
     }
 }
