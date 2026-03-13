@@ -348,11 +348,12 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
 
             let (pos_attr, tex_attr, mvp_uni, color_uni, use_tex_uni) = if env.options.gles_version == 2 {
                 unsafe {
-                    let pos_name = "position\0".as_ptr() as *const std::ffi::c_char;
-                    let tex_name = "texCoord\0".as_ptr() as *const std::ffi::c_char;
-                    let mvp_name = "mvp\0".as_ptr() as *const std::ffi::c_char;
-                    let col_name = "color\0".as_ptr() as *const std::ffi::c_char;
-                    let use_name = "useTex\0".as_ptr() as *const std::ffi::c_char;
+                    // ShaderCstrFix
+                    let pos_name = c"position".as_ptr();
+                    let tex_name = c"texCoord".as_ptr();
+                    let mvp_name = c"mvp".as_ptr();
+                    let col_name = c"color".as_ptr();
+                    let use_name = c"useTex".as_ptr();
                     (
                         gles.GetAttribLocation(shader_program, pos_name) as GLuint,
                         gles.GetAttribLocation(shader_program, tex_name) as GLuint,
@@ -391,13 +392,14 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
         gles.ClearColor(0.0, 0.0, 0.0, 1.0);
         gles.Clear(gles11::COLOR_BUFFER_BIT);
 
+        // CloneCopyFix
         if env.options.gles_version == 2 {
             gles.UseProgram(misc_gl_objects.shader_program);
             gles.Uniform1i(misc_gl_objects.use_tex_uni, 0);
         } else {
             gles.Color4f(1.0, 1.0, 1.0, 1.0);
             gles.MatrixMode(gles11::PROJECTION);
-            load_matrix(gles.as_mut(), projection_matrix.clone());
+            load_matrix(gles.as_mut(), projection_matrix);
             gles.MatrixMode(gles11::MODELVIEW);
             gles.LoadIdentity();
         }
@@ -414,7 +416,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
                 &mut animation_state,
                 root_layer,
                 cumulative_transform,
-                projection_matrix.clone(),
+                projection_matrix,
                 opacity,
             );
         }
@@ -788,6 +790,7 @@ unsafe fn composite_layer_recursive(
     }
     std::mem::drop(gles);
 
+    // CloneCopyRecursive
     let original_host_obj = env.objc.borrow_mut::<CALayerHostObject>(layer);
     for &child_layer in &original_host_obj.sublayers.clone() {
         composite_layer_recursive(
@@ -795,7 +798,7 @@ unsafe fn composite_layer_recursive(
             animation_state,
             child_layer,
             cumulative_transform,
-            projection_matrix.clone(),
+            projection_matrix,
             opacity,
         )
     }
