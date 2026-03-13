@@ -1603,7 +1603,7 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
 fn glCreateShader(env: &mut Environment, type_: GLenum) -> GLuint {
     with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateShader(type_) })
 }
-// ShaderSourcePatch
+// ShaderSourceBorrowFix
 fn glShaderSource(
     env: &mut Environment,
     shader: GLuint,
@@ -1611,6 +1611,7 @@ fn glShaderSource(
     string: ConstVoidPtr,
     length: ConstPtr<GLint>,
 ) {
+    let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let count_usize = count as usize;
         let string_arr = mem.ptr_at(string.cast::<ConstVoidPtr>(), count as u32);
@@ -1629,7 +1630,7 @@ fn glShaderSource(
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
-        if env.options.gles_version == 2 && full_source.contains("gl_FragColor") && !full_source.contains("precision ") {
+        if is_gles2 && full_source.contains("gl_FragColor") && !full_source.contains("precision ") {
             full_source = format!("precision mediump float;\n{}", full_source);
         }
 
@@ -1641,11 +1642,12 @@ fn glShaderSource(
         gles.ShaderSource(shader, 1, c_source_array.as_ptr(), c_len_array.as_ptr());
     })
 }
-// CompileShaderLog
+// CompileShaderBorrowFix
 fn glCompileShader(env: &mut Environment, shader: GLuint) {
+    let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.CompileShader(shader);
-        if env.options.gles_version == 2 {
+        if is_gles2 {
             let mut status = 0;
             gles.GetShaderiv(shader, 0x8B81 /* GL_COMPILE_STATUS */, &mut status);
             if status == 0 {
@@ -1700,11 +1702,12 @@ fn glBindAttribLocation(
         gles.BindAttribLocation(program, index, host_name);
     })
 }
-// LinkProgramLog
+// LinkProgramBorrowFix
 fn glLinkProgram(env: &mut Environment, program: GLuint) {
+    let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.LinkProgram(program);
-        if env.options.gles_version == 2 {
+        if is_gles2 {
             let mut status = 0;
             gles.GetProgramiv(program, 0x8B82 /* GL_LINK_STATUS */, &mut status);
             if status == 0 {
