@@ -1575,6 +1575,7 @@ fn glUnmapBufferOES(env: &mut Environment, target: GLenum) -> GLboolean {
 /// It prevents divisions by zero in levels where fog is used and both
 /// values are set to 10000.
 // FogBypassEsTwo
+// FogBypassEsTwo
 unsafe fn clamp_fog_state_values(gles: &mut dyn GLES) -> Option<(f32, f32)> {
     if gles.is_gles2() { return None; }
     let mut fogEnabled: GLboolean = 0;
