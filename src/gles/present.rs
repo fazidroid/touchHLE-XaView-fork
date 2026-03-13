@@ -44,7 +44,7 @@ impl FpsCounter {
 /// virtual cursor is also drawn if it should be currently visible.
 ///
 /// The provided context must be current.
-// VisualLogAndRestoreFix
+// RobustPresentFrame
 pub unsafe fn present_frame(
     gles: &mut dyn GLES,
     viewport: (u32, u32, u32, u32),
@@ -54,55 +54,58 @@ pub unsafe fn present_frame(
     use gles11::types::*;
     let is_gles2 = gles.is_gles2();
 
-    // 1. БЕКАПИМ КРИТИЧЕСКИЙ СТЕЙТ ИГРЫ
     let mut old_prog: GLint = 0;
     let mut old_array_buf: GLint = 0;
+    let mut old_elem_buf: GLint = 0;
     let mut old_cull: GLboolean = 0;
     let mut old_depth: GLboolean = 0;
     let mut old_scissor: GLboolean = 0;
     let mut old_blend: GLboolean = 0;
+    let mut old_stencil: GLboolean = 0;
+    let mut old_dither: GLboolean = 0;
     let mut old_color_mask = [0u8; 4];
     let mut old_depth_mask: GLboolean = 0;
     let mut old_attribs = [0u8; 8];
 
     if is_gles2 {
-        gles.GetIntegerv(0x8B8D, &mut old_prog); // CURRENT_PROGRAM
-        gles.GetIntegerv(0x8894, &mut old_array_buf); // ARRAY_BUFFER_BINDING
+        gles.GetIntegerv(0x8B8D, &mut old_prog);
+        gles.GetIntegerv(0x8894, &mut old_array_buf);
+        gles.GetIntegerv(0x8895, &mut old_elem_buf);
         gles.GetBooleanv(gles11::CULL_FACE, &mut old_cull);
         gles.GetBooleanv(gles11::DEPTH_TEST, &mut old_depth);
         gles.GetBooleanv(gles11::SCISSOR_TEST, &mut old_scissor);
         gles.GetBooleanv(gles11::BLEND, &mut old_blend);
+        gles.GetBooleanv(gles11::STENCIL_TEST, &mut old_stencil);
+        gles.GetBooleanv(gles11::DITHER, &mut old_dither);
         gles.GetBooleanv(gles11::COLOR_WRITEMASK, old_color_mask.as_mut_ptr() as *mut _);
         gles.GetBooleanv(gles11::DEPTH_WRITEMASK, &mut old_depth_mask);
         
-        // Выключаем ВСЕ массивы
         for i in 0..8 {
             let mut status: GLint = 0;
-            gles.GetVertexAttribiv(i, 0x8622 /* VERTEX_ATTRIB_ARRAY_ENABLED */, &mut status);
+            gles.GetVertexAttribiv(i, 0x8622, &mut status);
             old_attribs[i as usize] = status as u8;
             gles.DisableVertexAttribArray(i);
         }
 
-        // Жестко форсируем разрешение записи на экран
         gles.ColorMask(1, 1, 1, 1);
         gles.DepthMask(1);
         gles.Disable(gles11::CULL_FACE);
         gles.Disable(gles11::DEPTH_TEST);
         gles.Disable(gles11::SCISSOR_TEST);
         gles.Disable(gles11::BLEND);
+        gles.Disable(gles11::STENCIL_TEST);
+        gles.Disable(gles11::DITHER);
+        gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
     }
 
     gles.Viewport(viewport.0 as _, viewport.1 as _, viewport.2 as _, viewport.3 as _);
     
-    // ВИЗУАЛЬНЫЙ ЛОГ: темно-красным
-    // ЕслиКрасный отрисовка текстуры провалилась
     if is_gles2 {
         gles.ClearColor(0.2, 0.0, 0.0, 1.0);
     } else {
         gles.ClearColor(0.0, 0.0, 0.0, 1.0);
     }
     gles.Clear(gles11::COLOR_BUFFER_BIT | gles11::DEPTH_BUFFER_BIT | gles11::STENCIL_BUFFER_BIT);
-    gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
 
     let vertices: [f32; 12] = [
         -1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
@@ -116,12 +119,12 @@ pub unsafe fn present_frame(
     static mut ES2_MAT: GLint = 0;
     static mut ES2_COL: GLint = 0;
     static mut ES2_TEX_SAMPLER: GLint = 0;
+    static mut ES2_VBO: GLuint = 0;
 
     if is_gles2 {
         if ES2_PROG == 0 {
             let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
-            // ВИЗУАЛЬНЫЙ ЛОГ зеленый цвет. 
-            let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = mix(texColor, vec4(color.rgb, 1.0), color.a) + vec4(0.0, 0.2, 0.0, 0.0);\n}\0";
+            let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = vec4(mix(texColor.rgb, color.rgb, color.a) + vec3(0.0, 0.2, 0.0), 1.0);\n}\0";
             let vs = gles.CreateShader(0x8B31);
             let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
             let vs_len = [vs_src.len() as GLint - 1];
@@ -141,6 +144,13 @@ pub unsafe fn present_frame(
             ES2_MAT = gles.GetUniformLocation(ES2_PROG, c"texMatrix".as_ptr() as *const _);
             ES2_COL = gles.GetUniformLocation(ES2_PROG, c"color".as_ptr() as *const _);
             ES2_TEX_SAMPLER = gles.GetUniformLocation(ES2_PROG, c"tex".as_ptr() as *const _);
+
+            gles.GenBuffers(1, &mut ES2_VBO);
+            gles.BindBuffer(gles11::ARRAY_BUFFER, ES2_VBO);
+            let mut data = [0.0f32; 24];
+            data[0..12].copy_from_slice(&vertices);
+            data[12..24].copy_from_slice(&tex_coords);
+            gles.BufferData(gles11::ARRAY_BUFFER, (24 * 4) as _, data.as_ptr() as *const _, gles11::STATIC_DRAW);
         }
         gles.UseProgram(ES2_PROG);
         gles.Uniform4f(ES2_COL, 0.0, 0.0, 0.0, 0.0);
@@ -153,16 +163,18 @@ pub unsafe fn present_frame(
             gles.Uniform1i(ES2_TEX_SAMPLER, tex_unit);
         }
 
+        gles.BindBuffer(gles11::ARRAY_BUFFER, ES2_VBO);
         if ES2_POS >= 0 {
             gles.EnableVertexAttribArray(ES2_POS as GLuint);
-            gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, vertices.as_ptr() as *const _);
+            gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const _);
         }
         if ES2_TEX >= 0 {
             gles.EnableVertexAttribArray(ES2_TEX as GLuint);
-            gles.VertexAttribPointer(ES2_TEX as GLuint, 2, gles11::FLOAT, 0, 0, tex_coords.as_ptr() as *const _);
+            gles.VertexAttribPointer(ES2_TEX as GLuint, 2, gles11::FLOAT, 0, 0, (12 * 4) as *const _);
         }
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);
     } else {
+        gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
         gles.EnableClientState(gles11::VERTEX_ARRAY);
         gles.VertexPointer(2, gles11::FLOAT, 0, vertices.as_ptr() as *const GLvoid);
         gles.EnableClientState(gles11::TEXTURE_COORD_ARRAY);
@@ -189,11 +201,13 @@ pub unsafe fn present_frame(
         if is_gles2 {
             gles.Uniform4f(ES2_COL, 0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
             if ES2_TEX >= 0 { gles.DisableVertexAttribArray(ES2_TEX as GLuint); }
+            gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
             if ES2_POS >= 0 {
                 gles.VertexAttribPointer(ES2_POS as GLuint, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
             }
             gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         } else {
+            gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
             gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
             gles.Disable(gles11::TEXTURE_2D);
             gles.Color4f(0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
@@ -202,17 +216,19 @@ pub unsafe fn present_frame(
         }
     }
     
-    // 2. ВОССТАНАВЛИВАЕМ СТЕЙТ
     if is_gles2 {
         if ES2_POS >= 0 { gles.DisableVertexAttribArray(ES2_POS as GLuint); }
         if ES2_TEX >= 0 { gles.DisableVertexAttribArray(ES2_TEX as GLuint); }
         
         gles.UseProgram(old_prog as GLuint);
         gles.BindBuffer(gles11::ARRAY_BUFFER, old_array_buf as GLuint);
+        gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, old_elem_buf as GLuint);
         if old_cull != 0 { gles.Enable(gles11::CULL_FACE); }
         if old_depth != 0 { gles.Enable(gles11::DEPTH_TEST); }
         if old_scissor != 0 { gles.Enable(gles11::SCISSOR_TEST); }
         if old_blend != 0 { gles.Enable(gles11::BLEND); }
+        if old_stencil != 0 { gles.Enable(gles11::STENCIL_TEST); }
+        if old_dither != 0 { gles.Enable(gles11::DITHER); }
         gles.ColorMask(old_color_mask[0], old_color_mask[1], old_color_mask[2], old_color_mask[3]);
         gles.DepthMask(old_depth_mask);
         for i in 0..8 {
