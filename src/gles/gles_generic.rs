@@ -395,6 +395,7 @@ pub trait GLES {
     unsafe fn CreateShader(&mut self, type_: GLenum) -> GLuint;
     unsafe fn ShaderSource(&mut self, shader: GLuint, count: GLsizei, string: *const *const std::ffi::c_char, length: *const GLint);
     unsafe fn CompileShader(&mut self, shader: GLuint);
+    unsafe fn DeleteShader(&mut self, shader: GLuint); // AddDeleteShader
     unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint);
     unsafe fn GetShaderInfoLog(&mut self, shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char);
     unsafe fn CreateProgram(&mut self) -> GLuint;

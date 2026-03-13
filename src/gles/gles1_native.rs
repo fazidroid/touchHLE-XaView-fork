@@ -785,6 +785,9 @@ impl GLES for GLES1Native<'_> {
     unsafe fn CompileShader(&mut self, shader: GLuint) {
         touchHLE_gl_bindings::gles20::CompileShader(shader)
     }
+    unsafe fn DeleteShader(&mut self, shader: GLuint) { // NativeDeleteShader
+        touchHLE_gl_bindings::gles20::DeleteShader(shader)
+    }
     unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint) {
         touchHLE_gl_bindings::gles20::GetShaderiv(shader, pname, params)
     }

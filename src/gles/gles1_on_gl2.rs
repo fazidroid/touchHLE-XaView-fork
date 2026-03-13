@@ -2054,6 +2054,9 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn CompileShader(&mut self, shader: GLuint) {
         crate::gles::gl21compat_raw::CompileShader(shader)
     }
+    unsafe fn DeleteShader(&mut self, shader: GLuint) { // CompatDeleteShader
+        crate::gles::gl21compat_raw::DeleteShader(shader)
+    }
     unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint) {
         crate::gles::gl21compat_raw::GetShaderiv(shader, pname, params)
     }
