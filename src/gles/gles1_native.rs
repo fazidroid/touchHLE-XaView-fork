@@ -21,17 +21,21 @@ use crate::window::{GLContext, GLVersion, Window};
 use std::ffi::CStr;
 use std::marker::PhantomData;
 
+// FboStructFix
 pub struct GLES1NativeContext {
     gl_ctx: GLContext,
     is_loaded: bool,
+    is_gles2: bool,
 }
 impl GLESContext for GLES1NativeContext {
     fn description() -> &'static str {
         "Native OpenGL ES 1.1"
     }
 
+    // FboNewFix
     fn new(window: &mut Window, options: &crate::options::Options) -> Result<Self, String> { // PassOptions
-        let version = if options.gles_version == 2 {
+        let is_gles2 = options.gles_version == 2;
+        let version = if is_gles2 {
             GLVersion::GLES20 // DynamicEsTwo
         } else {
             GLVersion::GLES11 // DynamicEsOne
@@ -39,6 +43,7 @@ impl GLESContext for GLES1NativeContext {
         Ok(Self {
             gl_ctx: window.create_gl_context(version)?,
             is_loaded: false,
+            is_gles2,
         })
     }
 
@@ -842,11 +847,12 @@ impl GLES for GLES1Native<'_> {
     }
 
     // OES_framebuffer_object -> EXT_framebuffer_object
+    // EsTwoFboGen
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint) {
-        gles11::GenFramebuffersOES(n, framebuffers)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GenFramebuffers(n, framebuffers) } else { gles11::GenFramebuffersOES(n, framebuffers) }
     }
     unsafe fn GenRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *mut GLuint) {
-        gles11::GenRenderbuffersOES(n, renderbuffers)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GenRenderbuffers(n, renderbuffers) } else { gles11::GenRenderbuffersOES(n, renderbuffers) }
     }
     unsafe fn IsFramebufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
         gles11::IsFramebufferOES(renderbuffer)
@@ -854,11 +860,12 @@ impl GLES for GLES1Native<'_> {
     unsafe fn IsRenderbufferOES(&mut self, renderbuffer: GLuint) -> GLboolean {
         gles11::IsRenderbufferOES(renderbuffer)
     }
+    // EsTwoFboRest
     unsafe fn BindFramebufferOES(&mut self, target: GLenum, framebuffer: GLuint) {
-        gles11::BindFramebufferOES(target, framebuffer)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BindFramebuffer(target, framebuffer) } else { gles11::BindFramebufferOES(target, framebuffer) }
     }
     unsafe fn BindRenderbufferOES(&mut self, target: GLenum, renderbuffer: GLuint) {
-        gles11::BindRenderbufferOES(target, renderbuffer)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BindRenderbuffer(target, renderbuffer) } else { gles11::BindRenderbufferOES(target, renderbuffer) }
     }
     unsafe fn RenderbufferStorageOES(
         &mut self,
@@ -867,7 +874,7 @@ impl GLES for GLES1Native<'_> {
         width: GLsizei,
         height: GLsizei,
     ) {
-        gles11::RenderbufferStorageOES(target, internalformat, width, height)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::RenderbufferStorage(target, internalformat, width, height) } else { gles11::RenderbufferStorageOES(target, internalformat, width, height) }
     }
     unsafe fn FramebufferRenderbufferOES(
         &mut self,
@@ -876,7 +883,7 @@ impl GLES for GLES1Native<'_> {
         renderbuffertarget: GLenum,
         renderbuffer: GLuint,
     ) {
-        gles11::FramebufferRenderbufferOES(target, attachment, renderbuffertarget, renderbuffer)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::FramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer) } else { gles11::FramebufferRenderbufferOES(target, attachment, renderbuffertarget, renderbuffer) }
     }
     unsafe fn FramebufferTexture2DOES(
         &mut self,
@@ -886,7 +893,7 @@ impl GLES for GLES1Native<'_> {
         texture: GLuint,
         level: i32,
     ) {
-        gles11::FramebufferTexture2DOES(target, attachment, textarget, texture, level)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::FramebufferTexture2D(target, attachment, textarget, texture, level) } else { gles11::FramebufferTexture2DOES(target, attachment, textarget, texture, level) }
     }
     unsafe fn GetFramebufferAttachmentParameterivOES(
         &mut self,
@@ -895,7 +902,7 @@ impl GLES for GLES1Native<'_> {
         pname: GLenum,
         params: *mut GLint,
     ) {
-        gles11::GetFramebufferAttachmentParameterivOES(target, attachment, pname, params)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetFramebufferAttachmentParameteriv(target, attachment, pname, params) } else { gles11::GetFramebufferAttachmentParameterivOES(target, attachment, pname, params) }
     }
     unsafe fn GetRenderbufferParameterivOES(
         &mut self,
@@ -903,19 +910,19 @@ impl GLES for GLES1Native<'_> {
         pname: GLenum,
         params: *mut GLint,
     ) {
-        gles11::GetRenderbufferParameterivOES(target, pname, params)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetRenderbufferParameteriv(target, pname, params) } else { gles11::GetRenderbufferParameterivOES(target, pname, params) }
     }
     unsafe fn CheckFramebufferStatusOES(&mut self, target: GLenum) -> GLenum {
-        gles11::CheckFramebufferStatusOES(target)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::CheckFramebufferStatus(target) } else { gles11::CheckFramebufferStatusOES(target) }
     }
     unsafe fn DeleteFramebuffersOES(&mut self, n: GLsizei, framebuffers: *const GLuint) {
-        gles11::DeleteFramebuffersOES(n, framebuffers)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DeleteFramebuffers(n, framebuffers) } else { gles11::DeleteFramebuffersOES(n, framebuffers) }
     }
     unsafe fn DeleteRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *const GLuint) {
-        gles11::DeleteRenderbuffersOES(n, renderbuffers)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DeleteRenderbuffers(n, renderbuffers) } else { gles11::DeleteRenderbuffersOES(n, renderbuffers) }
     }
     unsafe fn GenerateMipmapOES(&mut self, target: GLenum) {
-        gles11::GenerateMipmapOES(target)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GenerateMipmap(target) } else { gles11::GenerateMipmapOES(target) }
     }
     unsafe fn GetBufferParameteriv(&mut self, target: GLenum, pname: GLenum, params: *mut GLint) {
         gles11::GetBufferParameteriv(target, pname, params)
