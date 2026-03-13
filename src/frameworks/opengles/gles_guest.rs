@@ -1765,11 +1765,39 @@ fn glVertexAttribPointer(
         gles.VertexAttribPointer(indx, size, type_, normalized, stride, ptr_host);
     })
 }
+fn glDisableVertexAttribArray(env: &mut Environment, index: GLuint) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.DisableVertexAttribArray(index)
+    })
+}
 fn glEnableVertexAttribArray(env: &mut Environment, index: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.EnableVertexAttribArray(index) })
 }
-fn glDisableVertexAttribArray(env: &mut Environment, index: GLuint) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.DisableVertexAttribArray(index) })
+
+// ImplAttribGuest
+fn glVertexAttrib1f(env: &mut Environment, indx: GLuint, x: GLfloat) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.VertexAttrib1f(indx, x) })
+}
+fn glVertexAttrib2f(env: &mut Environment, indx: GLuint, x: GLfloat, y: GLfloat) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.VertexAttrib2f(indx, x, y) })
+}
+fn glVertexAttrib3f(env: &mut Environment, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.VertexAttrib3f(indx, x, y, z) })
+}
+fn glVertexAttrib4f(env: &mut Environment, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) {
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.VertexAttrib4f(indx, x, y, z, w) })
+}
+fn glVertexAttrib1fv(env: &mut Environment, indx: GLuint, values: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { gles.VertexAttrib1fv(indx, mem.ptr_at(values, 1)) })
+}
+fn glVertexAttrib2fv(env: &mut Environment, indx: GLuint, values: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { gles.VertexAttrib2fv(indx, mem.ptr_at(values, 2)) })
+}
+fn glVertexAttrib3fv(env: &mut Environment, indx: GLuint, values: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { gles.VertexAttrib3fv(indx, mem.ptr_at(values, 3)) })
+}
+fn glVertexAttrib4fv(env: &mut Environment, indx: GLuint, values: ConstPtr<GLfloat>) {
+    with_ctx_and_mem(env, |gles, mem| unsafe { gles.VertexAttrib4fv(indx, mem.ptr_at(values, 4)) })
 }
 fn glUniform1i(env: &mut Environment, location: GLint, x: GLint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1i(location, x) })
@@ -2098,8 +2126,17 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetProgramiv(_, _, _)),
     export_c_func!(glGetProgramInfoLog(_, _, _, _)),
     export_c_func!(glVertexAttribPointer(_, _, _, _, _, _)),
-    export_c_func!(glEnableVertexAttribArray(_)),
     export_c_func!(glDisableVertexAttribArray(_)),
+    export_c_func!(glEnableVertexAttribArray(_)),
+    // ExportAttribGuest
+    export_c_func!(glVertexAttrib1f(_, _, _)),
+    export_c_func!(glVertexAttrib2f(_, _, _, _)),
+    export_c_func!(glVertexAttrib3f(_, _, _, _, _)),
+    export_c_func!(glVertexAttrib4f(_, _, _, _, _, _)),
+    export_c_func!(glVertexAttrib1fv(_, _, _)),
+    export_c_func!(glVertexAttrib2fv(_, _, _)),
+    export_c_func!(glVertexAttrib3fv(_, _, _)),
+    export_c_func!(glVertexAttrib4fv(_, _, _)),
     export_c_func!(glUniform1i(_, _)),
     export_c_func!(glUniform1f(_, _)),
     export_c_func!(glUniform2f(_, _, _)),
