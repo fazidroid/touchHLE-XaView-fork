@@ -635,37 +635,41 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     // will go to the default framebuffer (the window).
     gles.DeleteFramebuffersOES(1, &src_framebuffer);
 
-    // Reset various things that could affect the quad or virtual cursor we're
-    // going to draw. Back up the old state while doing so, so it can be
-    // restored later. The app's subsequent drawing will be messed up if we
-    // don't restore it.
+    // EsTwoBackupBypass
+    let is_gles2 = gles.is_gles2();
     let old_arrays = {
         let mut old_arrays = [gles11::FALSE; gles1_on_gl2::ARRAYS.len()];
-        for (is_enabled, info) in old_arrays.iter_mut().zip(gles1_on_gl2::ARRAYS.iter()) {
-            gles.GetBooleanv(info.name, is_enabled);
-            gles.DisableClientState(info.name);
+        if !is_gles2 {
+            for (is_enabled, info) in old_arrays.iter_mut().zip(gles1_on_gl2::ARRAYS.iter()) {
+                gles.GetBooleanv(info.name, is_enabled);
+                gles.DisableClientState(info.name);
+            }
         }
         old_arrays
     };
     let old_capabilities = {
         let mut old_capabilities = [gles11::FALSE; gles1_on_gl2::CAPABILITIES.len()];
-        for (is_enabled, &name) in old_capabilities
-            .iter_mut()
-            .zip(gles1_on_gl2::CAPABILITIES.iter())
-        {
-            gles.GetBooleanv(name, is_enabled);
-            gles.Disable(name);
+        if !is_gles2 {
+            for (is_enabled, &name) in old_capabilities
+                .iter_mut()
+                .zip(gles1_on_gl2::CAPABILITIES.iter())
+            {
+                gles.GetBooleanv(name, is_enabled);
+                gles.Disable(name);
+            }
         }
         old_capabilities
     };
-    let old_matrix_mode: GLenum = get_int(gles, gles11::MATRIX_MODE) as _;
-    for mode in [gles11::MODELVIEW, gles11::PROJECTION, gles11::TEXTURE] {
-        gles.MatrixMode(mode);
-        gles.PushMatrix();
-        gles.LoadIdentity();
+    let old_matrix_mode: GLenum = if !is_gles2 { get_int(gles, gles11::MATRIX_MODE) as _ } else { 0 };
+    let old_color: [GLfloat; 4] = if !is_gles2 { get_floats(gles, gles11::CURRENT_COLOR) } else { [0.0; 4] };
+    if !is_gles2 {
+        for mode in [gles11::MODELVIEW, gles11::PROJECTION, gles11::TEXTURE] {
+            gles.MatrixMode(mode);
+            gles.PushMatrix();
+            gles.LoadIdentity();
+        }
+        gles.Color4f(1.0, 1.0, 1.0, 1.0);
     }
-    let old_color: [GLfloat; 4] = get_floats(gles, gles11::CURRENT_COLOR);
-    gles.Color4f(1.0, 1.0, 1.0, 1.0);
 
     // Back up other things that will be modified while drawing.
     let old_viewport: (GLint, GLint, GLsizei, GLsizei) = {
@@ -705,30 +709,32 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     // Clean up the texture
     gles.DeleteTextures(1, &texture);
 
-    // Restore all the state saved before rendering
-    for (&is_enabled, info) in old_arrays.iter().zip(gles1_on_gl2::ARRAYS.iter()) {
-        match is_enabled {
-            gles11::TRUE => gles.EnableClientState(info.name),
-            gles11::FALSE => gles.DisableClientState(info.name),
-            _ => unreachable!(),
+    // EsTwoRestoreBypass
+    if !is_gles2 {
+        for (&is_enabled, info) in old_arrays.iter().zip(gles1_on_gl2::ARRAYS.iter()) {
+            match is_enabled {
+                gles11::TRUE => gles.EnableClientState(info.name),
+                gles11::FALSE => gles.DisableClientState(info.name),
+                _ => unreachable!(),
+            }
         }
-    }
-    for (&is_enabled, &name) in old_capabilities
-        .iter()
-        .zip(gles1_on_gl2::CAPABILITIES.iter())
-    {
-        match is_enabled {
-            gles11::TRUE => gles.Enable(name),
-            gles11::FALSE => gles.Disable(name),
-            _ => unreachable!(),
+        for (&is_enabled, &name) in old_capabilities
+            .iter()
+            .zip(gles1_on_gl2::CAPABILITIES.iter())
+        {
+            match is_enabled {
+                gles11::TRUE => gles.Enable(name),
+                gles11::FALSE => gles.Disable(name),
+                _ => unreachable!(),
+            }
         }
+        for mode in [gles11::MODELVIEW, gles11::PROJECTION, gles11::TEXTURE] {
+            gles.MatrixMode(mode);
+            gles.PopMatrix();
+        }
+        gles.MatrixMode(old_matrix_mode);
+        gles.Color4f(old_color[0], old_color[1], old_color[2], old_color[3]);
     }
-    for mode in [gles11::MODELVIEW, gles11::PROJECTION, gles11::TEXTURE] {
-        gles.MatrixMode(mode);
-        gles.PopMatrix();
-    }
-    gles.MatrixMode(old_matrix_mode);
-    gles.Color4f(old_color[0], old_color[1], old_color[2], old_color[3]);
     gles.Viewport(
         old_viewport.0,
         old_viewport.1,
