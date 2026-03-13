@@ -70,9 +70,9 @@ pub trait GLESContext {
 /// of the correct size as documented in the OpenGL ES spec.
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::too_many_arguments)] // not our fault :(
+// EsTwoCheckTrait
 pub trait GLES {
-    /// Get some string describing the underlying driver. For OpenGL this is
-    /// `GL_VENDOR`, `GL_RENDERER` and `GL_VERSION`.
+    fn is_gles2(&self) -> bool { false }
     unsafe fn driver_description(&self) -> String;
     // Generic state manipulation
     unsafe fn GetError(&mut self) -> GLenum;

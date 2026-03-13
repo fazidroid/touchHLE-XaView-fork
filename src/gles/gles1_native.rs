@@ -103,7 +103,9 @@ pub struct GLES1Native<'gl_ctx> {
     is_gles2: bool,
 }
 
+// EsTwoCheckImpl
 impl GLES for GLES1Native<'_> {
+    fn is_gles2(&self) -> bool { self.is_gles2 }
     unsafe fn driver_description(&self) -> String {
         let version = CStr::from_ptr(gles11::GetString(gles11::VERSION) as *const _);
         let vendor = CStr::from_ptr(gles11::GetString(gles11::VENDOR) as *const _);
