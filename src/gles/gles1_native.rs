@@ -142,14 +142,15 @@ impl GLES for GLES1Native<'_> {
     unsafe fn DisableClientState(&mut self, array: GLenum) {
         gles11::DisableClientState(array)
     }
+    // RouteGettersState
     unsafe fn GetBooleanv(&mut self, pname: GLenum, params: *mut GLboolean) {
-        gles11::GetBooleanv(pname, params)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetBooleanv(pname, params) } else { gles11::GetBooleanv(pname, params) }
     }
     unsafe fn GetFloatv(&mut self, pname: GLenum, params: *mut GLfloat) {
-        gles11::GetFloatv(pname, params)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetFloatv(pname, params) } else { gles11::GetFloatv(pname, params) }
     }
     unsafe fn GetIntegerv(&mut self, pname: GLenum, params: *mut GLint) {
-        gles11::GetIntegerv(pname, params)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetIntegerv(pname, params) } else { gles11::GetIntegerv(pname, params) }
     }
     unsafe fn GetTexEnviv(&mut self, target: GLenum, pname: GLenum, params: *mut GLint) {
         gles11::GetTexEnviv(target, pname, params)
@@ -158,22 +159,19 @@ impl GLES for GLES1Native<'_> {
         gles11::GetTexEnvfv(target, pname, params)
     }
     unsafe fn GetPointerv(&mut self, pname: GLenum, params: *mut *const GLvoid) {
-        // The second argument to glGetPointerv must be a mutable pointer,
-        // but gl_generator generates the wrong signature by mistake, see
-        // https://github.com/brendanzab/gl-rs/issues/541
         gles11::GetPointerv(pname, params as *mut _ as *const _)
     }
     unsafe fn Hint(&mut self, target: GLenum, mode: GLenum) {
-        gles11::Hint(target, mode)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Hint(target, mode) } else { gles11::Hint(target, mode) }
     }
     unsafe fn Finish(&mut self) {
-        gles11::Finish()
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Finish() } else { gles11::Finish() }
     }
     unsafe fn Flush(&mut self) {
-        gles11::Flush()
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Flush() } else { gles11::Flush() }
     }
     unsafe fn GetString(&mut self, name: GLenum) -> *const GLubyte {
-        gles11::GetString(name)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetString(name) } else { gles11::GetString(name) }
     }
 
     // Other state manipulation
@@ -183,11 +181,12 @@ impl GLES for GLES1Native<'_> {
     unsafe fn AlphaFuncx(&mut self, func: GLenum, ref_: GLclampx) {
         gles11::AlphaFuncx(func, ref_)
     }
+    // RouteOtherState
     unsafe fn BlendFunc(&mut self, sfactor: GLenum, dfactor: GLenum) {
-        gles11::BlendFunc(sfactor, dfactor)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BlendFunc(sfactor, dfactor) } else { gles11::BlendFunc(sfactor, dfactor) }
     }
     unsafe fn BlendEquationOES(&mut self, mode: GLenum) {
-        gles11::BlendEquationOES(mode);
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BlendEquation(mode) } else { gles11::BlendEquationOES(mode) }
     }
     unsafe fn ColorMask(
         &mut self,
@@ -196,7 +195,7 @@ impl GLES for GLES1Native<'_> {
         blue: GLboolean,
         alpha: GLboolean,
     ) {
-        gles11::ColorMask(red, green, blue, alpha)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::ColorMask(red, green, blue, alpha) } else { gles11::ColorMask(red, green, blue, alpha) }
     }
     unsafe fn ClipPlanef(&mut self, plane: GLenum, equation: *const GLfloat) {
         gles11::ClipPlanef(plane, equation)
@@ -205,31 +204,31 @@ impl GLES for GLES1Native<'_> {
         gles11::ClipPlanex(plane, equation)
     }
     unsafe fn CullFace(&mut self, mode: GLenum) {
-        gles11::CullFace(mode)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::CullFace(mode) } else { gles11::CullFace(mode) }
     }
     unsafe fn DepthFunc(&mut self, func: GLenum) {
-        gles11::DepthFunc(func)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DepthFunc(func) } else { gles11::DepthFunc(func) }
     }
     unsafe fn DepthMask(&mut self, flag: GLboolean) {
-        gles11::DepthMask(flag)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DepthMask(flag) } else { gles11::DepthMask(flag) }
     }
     unsafe fn FrontFace(&mut self, mode: GLenum) {
-        gles11::FrontFace(mode)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::FrontFace(mode) } else { gles11::FrontFace(mode) }
     }
     unsafe fn DepthRangef(&mut self, near: GLclampf, far: GLclampf) {
-        gles11::DepthRangef(near, far)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DepthRangef(near, far) } else { gles11::DepthRangef(near, far) }
     }
     unsafe fn DepthRangex(&mut self, near: GLclampx, far: GLclampx) {
         gles11::DepthRangex(near, far)
     }
     unsafe fn PolygonOffset(&mut self, factor: GLfloat, units: GLfloat) {
-        gles11::PolygonOffset(factor, units)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::PolygonOffset(factor, units) } else { gles11::PolygonOffset(factor, units) }
     }
     unsafe fn PolygonOffsetx(&mut self, factor: GLfixed, units: GLfixed) {
         gles11::PolygonOffsetx(factor, units)
     }
     unsafe fn SampleCoverage(&mut self, value: GLclampf, invert: GLboolean) {
-        gles11::SampleCoverage(value, invert)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::SampleCoverage(value, invert) } else { gles11::SampleCoverage(value, invert) }
     }
     unsafe fn SampleCoveragex(&mut self, value: GLclampx, invert: GLboolean) {
         gles11::SampleCoveragex(value, invert)
@@ -244,19 +243,19 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 { touchHLE_gl_bindings::gles20::Viewport(x, y, width, height) } else { gles11::Viewport(x, y, width, height) }
     }
     unsafe fn LineWidth(&mut self, val: GLfloat) {
-        gles11::LineWidth(val)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::LineWidth(val) } else { gles11::LineWidth(val) }
     }
     unsafe fn LineWidthx(&mut self, val: GLfixed) {
         gles11::LineWidthx(val)
     }
     unsafe fn StencilFunc(&mut self, func: GLenum, ref_: GLint, mask: GLuint) {
-        gles11::StencilFunc(func, ref_, mask);
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::StencilFunc(func, ref_, mask) } else { gles11::StencilFunc(func, ref_, mask) }
     }
     unsafe fn StencilOp(&mut self, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
-        gles11::StencilOp(sfail, dpfail, dppass);
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::StencilOp(sfail, dpfail, dppass) } else { gles11::StencilOp(sfail, dpfail, dppass) }
     }
     unsafe fn StencilMask(&mut self, mask: GLuint) {
-        gles11::StencilMask(mask);
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::StencilMask(mask) } else { gles11::StencilMask(mask) }
     }
     unsafe fn LogicOp(&mut self, opcode: GLenum) {
         gles11::LogicOp(opcode);
@@ -332,19 +331,19 @@ impl GLES for GLES1Native<'_> {
         gles11::Materialxv(face, pname, params)
     }
 
-    // Buffers
+    // RouteBuffersFix
     unsafe fn IsBuffer(&mut self, buffer: GLuint) -> GLboolean {
-        gles11::IsBuffer(buffer)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::IsBuffer(buffer) } else { gles11::IsBuffer(buffer) }
     }
     unsafe fn GenBuffers(&mut self, n: GLsizei, buffers: *mut GLuint) {
-        gles11::GenBuffers(n, buffers)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GenBuffers(n, buffers) } else { gles11::GenBuffers(n, buffers) }
     }
     unsafe fn DeleteBuffers(&mut self, n: GLsizei, buffers: *const GLuint) {
-        gles11::DeleteBuffers(n, buffers)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DeleteBuffers(n, buffers) } else { gles11::DeleteBuffers(n, buffers) }
     }
     unsafe fn BindBuffer(&mut self, target: GLenum, buffer: GLuint) {
         assert!(target == gles11::ARRAY_BUFFER || target == gles11::ELEMENT_ARRAY_BUFFER);
-        gles11::BindBuffer(target, buffer)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BindBuffer(target, buffer) } else { gles11::BindBuffer(target, buffer) }
     }
     unsafe fn BufferData(
         &mut self,
@@ -354,7 +353,7 @@ impl GLES for GLES1Native<'_> {
         usage: GLenum,
     ) {
         assert!(target == gles11::ARRAY_BUFFER || target == gles11::ELEMENT_ARRAY_BUFFER);
-        gles11::BufferData(target, size, data, usage)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BufferData(target, size, data, usage) } else { gles11::BufferData(target, size, data, usage) }
     }
 
     unsafe fn BufferSubData(
@@ -365,7 +364,7 @@ impl GLES for GLES1Native<'_> {
         data: *const GLvoid,
     ) {
         assert!(target == gles11::ARRAY_BUFFER || target == gles11::ELEMENT_ARRAY_BUFFER);
-        gles11::BufferSubData(target, offset, size, data)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BufferSubData(target, offset, size, data) } else { gles11::BufferSubData(target, offset, size, data) }
     }
 
     // Non-pointers
@@ -464,8 +463,9 @@ impl GLES for GLES1Native<'_> {
     }
 
     // Textures
+    // RouteTexturesFix
     unsafe fn PixelStorei(&mut self, pname: GLenum, param: GLint) {
-        gles11::PixelStorei(pname, param)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::PixelStorei(pname, param) } else { gles11::PixelStorei(pname, param) }
     }
     unsafe fn ReadPixels(
         &mut self,
@@ -477,13 +477,13 @@ impl GLES for GLES1Native<'_> {
         type_: GLenum,
         pixels: *mut GLvoid,
     ) {
-        gles11::ReadPixels(x, y, width, height, format, type_, pixels)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::ReadPixels(x, y, width, height, format, type_, pixels) } else { gles11::ReadPixels(x, y, width, height, format, type_, pixels) }
     }
     unsafe fn GenTextures(&mut self, n: GLsizei, textures: *mut GLuint) {
-        gles11::GenTextures(n, textures)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GenTextures(n, textures) } else { gles11::GenTextures(n, textures) }
     }
     unsafe fn DeleteTextures(&mut self, n: GLsizei, textures: *const GLuint) {
-        gles11::DeleteTextures(n, textures)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DeleteTextures(n, textures) } else { gles11::DeleteTextures(n, textures) }
     }
     unsafe fn ActiveTexture(&mut self, texture: GLenum) {
         if self.is_gles2 { touchHLE_gl_bindings::gles20::ActiveTexture(texture) } else { gles11::ActiveTexture(texture) }
@@ -599,6 +599,7 @@ impl GLES for GLES1Native<'_> {
             gles11::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
         }
     }
+    // RouteCopyTex
     unsafe fn CopyTexImage2D(
         &mut self,
         target: GLenum,
@@ -610,7 +611,7 @@ impl GLES for GLES1Native<'_> {
         height: GLsizei,
         border: GLint,
     ) {
-        gles11::CopyTexImage2D(target, level, internalformat, x, y, width, height, border)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::CopyTexImage2D(target, level, internalformat, x, y, width, height, border) } else { gles11::CopyTexImage2D(target, level, internalformat, x, y, width, height, border) }
     }
     unsafe fn CopyTexSubImage2D(
         &mut self,
@@ -623,7 +624,7 @@ impl GLES for GLES1Native<'_> {
         width: GLsizei,
         height: GLsizei,
     ) {
-        gles11::CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height) } else { gles11::CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height) }
     }
     unsafe fn TexEnvf(&mut self, target: GLenum, pname: GLenum, param: GLfloat) {
         gles11::TexEnvf(target, pname, param)
@@ -954,8 +955,9 @@ impl GLES for GLES1Native<'_> {
     unsafe fn GenerateMipmapOES(&mut self, target: GLenum) {
         if self.is_gles2 { touchHLE_gl_bindings::gles20::GenerateMipmap(target) } else { gles11::GenerateMipmapOES(target) }
     }
+    // RouteGetBuffer
     unsafe fn GetBufferParameteriv(&mut self, target: GLenum, pname: GLenum, params: *mut GLint) {
-        gles11::GetBufferParameteriv(target, pname, params)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetBufferParameteriv(target, pname, params) } else { gles11::GetBufferParameteriv(target, pname, params) }
     }
     unsafe fn MapBufferOES(&mut self, target: GLenum, access: GLenum) -> *mut GLvoid {
         gles11::MapBufferOES(target, access)
