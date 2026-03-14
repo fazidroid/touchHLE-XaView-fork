@@ -1122,7 +1122,6 @@ fn glTexImage2D(
     type_: GLenum,
     pixels: ConstVoidPtr,
 ) {
-    let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let pixels = if pixels.is_null() {
             std::ptr::null()
@@ -1142,12 +1141,6 @@ fn glTexImage2D(
             type_,
             pixels,
         );
-        if is_gles2 {
-            // NpotClampFix
-            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
-            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
-            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
-        }
     })
 }
 fn glTexSubImage2D(
@@ -1182,7 +1175,6 @@ fn glCompressedTexImage2D(
     image_size: GLsizei,
     data: ConstVoidPtr,
 ) {
-    let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let data = mem
             .ptr_at(data.cast::<u8>(), image_size.try_into().unwrap())
@@ -1197,12 +1189,6 @@ fn glCompressedTexImage2D(
             image_size,
             data,
         );
-        if is_gles2 {
-            // NpotClampFix
-            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
-            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
-            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
-        }
     })
 }
 fn glCopyTexImage2D(
