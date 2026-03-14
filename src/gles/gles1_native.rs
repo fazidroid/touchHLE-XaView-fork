@@ -122,16 +122,16 @@ impl GLES for GLES1Native<'_> {
 
     // Generic state manipulation
     unsafe fn GetError(&mut self) -> GLenum {
-        gles11::GetError()
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetError() } else { gles11::GetError() }
     }
     unsafe fn Enable(&mut self, cap: GLenum) {
-        gles11::Enable(cap)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Enable(cap) } else { gles11::Enable(cap) }
     }
     unsafe fn IsEnabled(&mut self, cap: GLenum) -> GLboolean {
-        gles11::IsEnabled(cap)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::IsEnabled(cap) } else { gles11::IsEnabled(cap) }
     }
     unsafe fn Disable(&mut self, cap: GLenum) {
-        gles11::Disable(cap)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Disable(cap) } else { gles11::Disable(cap) }
     }
     unsafe fn ClientActiveTexture(&mut self, texture: GLenum) {
         gles11::ClientActiveTexture(texture);
@@ -238,10 +238,10 @@ impl GLES for GLES1Native<'_> {
         gles11::ShadeModel(mode)
     }
     unsafe fn Scissor(&mut self, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-        gles11::Scissor(x, y, width, height)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Scissor(x, y, width, height) } else { gles11::Scissor(x, y, width, height) }
     }
     unsafe fn Viewport(&mut self, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-        gles11::Viewport(x, y, width, height)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Viewport(x, y, width, height) } else { gles11::Viewport(x, y, width, height) }
     }
     unsafe fn LineWidth(&mut self, val: GLfloat) {
         gles11::LineWidth(val)
@@ -419,7 +419,7 @@ impl GLES for GLES1Native<'_> {
 
     // Drawing
     unsafe fn DrawArrays(&mut self, mode: GLenum, first: GLint, count: GLsizei) {
-        gles11::DrawArrays(mode, first, count)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DrawArrays(mode, first, count) } else { gles11::DrawArrays(mode, first, count) }
     }
     unsafe fn DrawElements(
         &mut self,
@@ -428,12 +428,12 @@ impl GLES for GLES1Native<'_> {
         type_: GLenum,
         indices: *const GLvoid,
     ) {
-        gles11::DrawElements(mode, count, type_, indices)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::DrawElements(mode, count, type_, indices) } else { gles11::DrawElements(mode, count, type_, indices) }
     }
 
     // Clearing
     unsafe fn Clear(&mut self, mask: GLbitfield) {
-        gles11::Clear(mask)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::Clear(mask) } else { gles11::Clear(mask) }
     }
     unsafe fn ClearColor(
         &mut self,
@@ -442,7 +442,7 @@ impl GLES for GLES1Native<'_> {
         blue: GLclampf,
         alpha: GLclampf,
     ) {
-        gles11::ClearColor(red, green, blue, alpha)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::ClearColor(red, green, blue, alpha) } else { gles11::ClearColor(red, green, blue, alpha) }
     }
     unsafe fn ClearColorx(
         &mut self,
@@ -486,19 +486,19 @@ impl GLES for GLES1Native<'_> {
         gles11::DeleteTextures(n, textures)
     }
     unsafe fn ActiveTexture(&mut self, texture: GLenum) {
-        gles11::ActiveTexture(texture)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::ActiveTexture(texture) } else { gles11::ActiveTexture(texture) }
     }
     unsafe fn IsTexture(&mut self, texture: GLuint) -> GLboolean {
-        gles11::IsTexture(texture)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::IsTexture(texture) } else { gles11::IsTexture(texture) }
     }
     unsafe fn BindTexture(&mut self, target: GLenum, texture: GLuint) {
-        gles11::BindTexture(target, texture)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::BindTexture(target, texture) } else { gles11::BindTexture(target, texture) }
     }
     unsafe fn TexParameteri(&mut self, target: GLenum, pname: GLenum, param: GLint) {
-        gles11::TexParameteri(target, pname, param)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::TexParameteri(target, pname, param) } else { gles11::TexParameteri(target, pname, param) }
     }
     unsafe fn TexParameterf(&mut self, target: GLenum, pname: GLenum, param: GLfloat) {
-        gles11::TexParameterf(target, pname, param)
+        if self.is_gles2 { touchHLE_gl_bindings::gles20::TexParameterf(target, pname, param) } else { gles11::TexParameterf(target, pname, param) }
     }
     unsafe fn TexParameterx(&mut self, target: GLenum, pname: GLenum, param: GLfixed) {
         gles11::TexParameterx(target, pname, param)
@@ -534,17 +534,12 @@ impl GLES for GLES1Native<'_> {
             // https://android-review.googlesource.com/c/platform/external/qemu/+/974666
             internalformat = gles11::BGRA_EXT as GLint
         }
-        gles11::TexImage2D(
-            target,
-            level,
-            internalformat,
-            width,
-            height,
-            border,
-            format,
-            type_,
-            pixels,
-        )
+        // RouteTexImageGles
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels)
+        } else {
+            gles11::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels)
+        }
     }
     unsafe fn TexSubImage2D(
         &mut self,
@@ -597,16 +592,12 @@ impl GLES for GLES1Native<'_> {
             unimplemented!("CompressedTexImage2D internalformat: {:#x}", internalformat);
         }
         log_dbg!("Directly supported texture format: {:#x}", internalformat);
-        gles11::CompressedTexImage2D(
-            target,
-            level,
-            internalformat,
-            width,
-            height,
-            border,
-            image_size,
-            data.as_ptr() as *const _,
-        );
+        // RouteCompTexGles
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
+        } else {
+            gles11::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
+        }
     }
     unsafe fn CopyTexImage2D(
         &mut self,
