@@ -1101,11 +1101,12 @@ fn glTexImage2D(
             pixels,
         );
         if is_gles2 {
-            // TextureCompleteFix
-            gles.TexParameteri(target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
-            gles.TexParameteri(target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
-            gles.TexParameteri(target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
-            gles.TexParameteri(target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
+            // FixCubemapTarget
+            let p_target = if target >= 0x8515 && target <= 0x851A { 0x8513 } else { target };
+            gles.TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
+            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         }
     })
 }
@@ -1157,11 +1158,12 @@ fn glCompressedTexImage2D(
             data,
         );
         if is_gles2 {
-            // TextureCompleteFix
-            gles.TexParameteri(target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
-            gles.TexParameteri(target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
-            gles.TexParameteri(target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
-            gles.TexParameteri(target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
+            // FixCubemapTarget
+            let p_target = if target >= 0x8515 && target <= 0x851A { 0x8513 } else { target };
+            gles.TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
+            gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         }
     })
 }
@@ -1654,8 +1656,8 @@ fn glShaderSource(
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
-        if is_gles2 && full_source.contains("gl_FragColor") && !full_source.contains("precision ") {
-                    // ShaderVersionFix
+        // FixFragmentDetect
+                if is_gles2 && !full_source.contains("gl_Position") && !full_source.contains("precision ") {
                     if let Some(pos) = full_source.find("#version") {
                         let end_line = full_source[pos..].find('\n').unwrap_or(0) + pos;
                         full_source.insert_str(end_line + 1, "precision mediump float;\n");
