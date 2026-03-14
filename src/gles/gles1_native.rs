@@ -414,16 +414,16 @@ impl GLES for GLES1Native<'_> {
         pointer: *const GLvoid,
     ) {
         if self.is_gles2 {
-            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
-            touchHLE_gl_bindings::gles20::VertexAttribPointer(2, size, type_, n, stride, pointer);
+            // FixPointerNorm
+            let n = if type_ == 0x1401 || type_ == 0x1401 { 1 } else { 0 };
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(2, size, type_, n as _, stride, pointer);
         } else {
             gles11::ColorPointer(size, type_, stride, pointer)
         }
     }
     unsafe fn NormalPointer(&mut self, type_: GLenum, stride: GLsizei, pointer: *const GLvoid) {
         if self.is_gles2 {
-            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
-            touchHLE_gl_bindings::gles20::VertexAttribPointer(1, 3, type_, n, stride, pointer);
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(1, 3, type_, 0, stride, pointer);
         } else {
             gles11::NormalPointer(type_, stride, pointer)
         }
@@ -436,8 +436,7 @@ impl GLES for GLES1Native<'_> {
         pointer: *const GLvoid,
     ) {
         if self.is_gles2 {
-            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
-            touchHLE_gl_bindings::gles20::VertexAttribPointer(3, size, type_, n, stride, pointer);
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(3, size, type_, 0, stride, pointer);
         } else {
             gles11::TexCoordPointer(size, type_, stride, pointer)
         }
@@ -450,8 +449,7 @@ impl GLES for GLES1Native<'_> {
         pointer: *const GLvoid,
     ) {
         if self.is_gles2 {
-            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
-            touchHLE_gl_bindings::gles20::VertexAttribPointer(0, size, type_, n, stride, pointer);
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(0, size, type_, 0, stride, pointer);
         } else {
             gles11::VertexPointer(size, type_, stride, pointer)
         }
