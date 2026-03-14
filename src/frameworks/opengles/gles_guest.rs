@@ -1102,7 +1102,7 @@ fn glTexImage2D(
         );
         if is_gles2 {
             // FixCubemapTarget
-            let p_target = if target >= 0x8515 && target <= 0x851A { 0x8513 } else { target };
+            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
             gles.TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
@@ -1159,7 +1159,7 @@ fn glCompressedTexImage2D(
         );
         if is_gles2 {
             // FixCubemapTarget
-            let p_target = if target >= 0x8515 && target <= 0x851A { 0x8513 } else { target };
+            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
             gles.TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
