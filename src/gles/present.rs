@@ -133,6 +133,9 @@ pub unsafe fn present_frame(
         let prog = gles.CreateProgram();
         gles.AttachShader(prog, vs);
         gles.AttachShader(prog, fs);
+        // SafeAttribLocation
+        gles.BindAttribLocation(prog, 6, c"position".as_ptr() as *const _);
+        gles.BindAttribLocation(prog, 7, c"texCoord".as_ptr() as *const _);
         gles.LinkProgram(prog);
         
         let pos = gles.GetAttribLocation(prog, c"position".as_ptr() as *const _);
