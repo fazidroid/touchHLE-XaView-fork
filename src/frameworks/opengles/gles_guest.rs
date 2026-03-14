@@ -303,8 +303,12 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                             b"OpenGL ES GLSL ES 1.00" // GlslVersion
                         }
                         gles11::EXTENSIONS => {
-                            // DisableMsaaExt
-                            b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat "
+                            // SafeExtensionsFix
+                            if is_es2 {
+                                b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_framebuffer_object GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat "
+                            } else {
+                                b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
+                            }
                         }
                         _ => unreachable!(),
                     };
@@ -983,22 +987,39 @@ fn glBindTexture(env: &mut Environment, target: GLenum, texture: GLuint) {
     })
 }
 fn glTexParameteri(env: &mut Environment, target: GLenum, pname: GLenum, param: GLint) {
-    // So long as we haven't implemented glDrawTexOES yet, we can just ignore
-    // this parameter, because it doesn't do anything for normal texture use.
     if pname == gles11::TEXTURE_CROP_RECT_OES {
         return;
     }
+    // StripMipmapsFix
+    let mut p = param;
+    if env.options.gles_version == 2 && pname == gles11::TEXTURE_MIN_FILTER {
+        if p == gles11::NEAREST_MIPMAP_NEAREST as GLint || p == gles11::NEAREST_MIPMAP_LINEAR as GLint {
+            p = gles11::NEAREST as GLint;
+        }
+        if p == gles11::LINEAR_MIPMAP_NEAREST as GLint || p == gles11::LINEAR_MIPMAP_LINEAR as GLint {
+            p = gles11::LINEAR as GLint;
+        }
+    }
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.TexParameteri(target, pname, param)
+        gles.TexParameteri(target, pname, p)
     })
 }
 fn glTexParameterf(env: &mut Environment, target: GLenum, pname: GLenum, param: GLfloat) {
-    // See above.
     if pname == gles11::TEXTURE_CROP_RECT_OES {
         return;
     }
+    // StripMipmapsFix
+    let mut p = param;
+    if env.options.gles_version == 2 && pname == gles11::TEXTURE_MIN_FILTER {
+        if p == gles11::NEAREST_MIPMAP_NEAREST as GLfloat || p == gles11::NEAREST_MIPMAP_LINEAR as GLfloat {
+            p = gles11::NEAREST as GLfloat;
+        }
+        if p == gles11::LINEAR_MIPMAP_NEAREST as GLfloat || p == gles11::LINEAR_MIPMAP_LINEAR as GLfloat {
+            p = gles11::LINEAR as GLfloat;
+        }
+    }
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.TexParameterf(target, pname, param)
+        gles.TexParameterf(target, pname, p)
     })
 }
 fn glTexParameterx(env: &mut Environment, target: GLenum, pname: GLenum, param: GLfixed) {
@@ -1656,17 +1677,20 @@ fn glShaderSource(
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
-        // FixFragmentDetect
-                if is_gles2 && !full_source.contains("gl_Position") && !full_source.contains("precision ") {
-                    if let Some(pos) = full_source.find("#version") {
-                        let end_line = full_source[pos..].find('\n').unwrap_or(0) + pos;
-                        full_source.insert_str(end_line + 1, "precision mediump float;\n");
-                    } else {
-                        full_source = format!("precision mediump float;\n{}", full_source);
-                    }
+        if is_gles2 {
+            // InjectPrecisionAll
+            if !full_source.contains("precision ") {
+                let inject = "precision highp float;\n";
+                if let Some(pos) = full_source.find("#version") {
+                    let end_line = full_source[pos..].find('\n').unwrap_or(0) + pos;
+                    full_source.insert_str(end_line + 1, inject);
+                } else {
+                    full_source = format!("{}{}", inject, full_source);
                 }
+            }
+        }
 
-                let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
+        let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
         let c_source_ptr = c_source.as_ptr();
         let c_len = c_source.as_bytes().len() as GLint;
         let c_source_array = [c_source_ptr];
