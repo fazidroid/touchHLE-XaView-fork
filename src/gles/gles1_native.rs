@@ -136,11 +136,32 @@ impl GLES for GLES1Native<'_> {
     unsafe fn ClientActiveTexture(&mut self, texture: GLenum) {
         gles11::ClientActiveTexture(texture);
     }
+    // AliasClientState
     unsafe fn EnableClientState(&mut self, array: GLenum) {
-        gles11::EnableClientState(array)
+        if self.is_gles2 {
+            match array {
+                gles11::VERTEX_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(0),
+                gles11::NORMAL_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(1),
+                gles11::COLOR_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(2),
+                gles11::TEXTURE_COORD_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(3),
+                _ => {}
+            }
+        } else {
+            gles11::EnableClientState(array)
+        }
     }
     unsafe fn DisableClientState(&mut self, array: GLenum) {
-        gles11::DisableClientState(array)
+        if self.is_gles2 {
+            match array {
+                gles11::VERTEX_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(0),
+                gles11::NORMAL_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(1),
+                gles11::COLOR_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(2),
+                gles11::TEXTURE_COORD_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(3),
+                _ => {}
+            }
+        } else {
+            gles11::DisableClientState(array)
+        }
     }
     // RouteGettersState
     unsafe fn GetBooleanv(&mut self, pname: GLenum, params: *mut GLboolean) {
@@ -384,7 +405,7 @@ impl GLES for GLES1Native<'_> {
         gles11::Normal3x(nx, ny, nz)
     }
 
-    // Pointers
+    // AliasPointersFix
     unsafe fn ColorPointer(
         &mut self,
         size: GLint,
@@ -392,10 +413,20 @@ impl GLES for GLES1Native<'_> {
         stride: GLsizei,
         pointer: *const GLvoid,
     ) {
-        gles11::ColorPointer(size, type_, stride, pointer)
+        if self.is_gles2 {
+            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(2, size, type_, n, stride, pointer);
+        } else {
+            gles11::ColorPointer(size, type_, stride, pointer)
+        }
     }
     unsafe fn NormalPointer(&mut self, type_: GLenum, stride: GLsizei, pointer: *const GLvoid) {
-        gles11::NormalPointer(type_, stride, pointer)
+        if self.is_gles2 {
+            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(1, 3, type_, n, stride, pointer);
+        } else {
+            gles11::NormalPointer(type_, stride, pointer)
+        }
     }
     unsafe fn TexCoordPointer(
         &mut self,
@@ -404,7 +435,12 @@ impl GLES for GLES1Native<'_> {
         stride: GLsizei,
         pointer: *const GLvoid,
     ) {
-        gles11::TexCoordPointer(size, type_, stride, pointer)
+        if self.is_gles2 {
+            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(3, size, type_, n, stride, pointer);
+        } else {
+            gles11::TexCoordPointer(size, type_, stride, pointer)
+        }
     }
     unsafe fn VertexPointer(
         &mut self,
@@ -413,7 +449,12 @@ impl GLES for GLES1Native<'_> {
         stride: GLsizei,
         pointer: *const GLvoid,
     ) {
-        gles11::VertexPointer(size, type_, stride, pointer)
+        if self.is_gles2 {
+            let n = if type_ == gles11::FLOAT || type_ == gles11::FIXED { gles11::FALSE } else { gles11::TRUE };
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(0, size, type_, n, stride, pointer);
+        } else {
+            gles11::VertexPointer(size, type_, stride, pointer)
+        }
     }
 
     // Drawing
