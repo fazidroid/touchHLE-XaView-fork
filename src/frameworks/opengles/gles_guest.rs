@@ -990,6 +990,10 @@ fn glTexParameteri(env: &mut Environment, target: GLenum, pname: GLenum, param: 
     if pname == gles11::TEXTURE_CROP_RECT_OES {
         return;
     }
+    // IgnoreAppleEnumFix
+    if env.options.gles_version == 2 {
+        if pname == 0x813D || pname == 0x8191 { return; }
+    }
     // StripMipmapsFix
     let mut p = param;
     if env.options.gles_version == 2 && pname == gles11::TEXTURE_MIN_FILTER {
@@ -1007,6 +1011,10 @@ fn glTexParameteri(env: &mut Environment, target: GLenum, pname: GLenum, param: 
 fn glTexParameterf(env: &mut Environment, target: GLenum, pname: GLenum, param: GLfloat) {
     if pname == gles11::TEXTURE_CROP_RECT_OES {
         return;
+    }
+    // IgnoreAppleEnumFix
+    if env.options.gles_version == 2 {
+        if pname == 0x813D || pname == 0x8191 { return; }
     }
     // StripMipmapsFix
     let mut p = param;
@@ -1102,6 +1110,9 @@ fn glTexImage2D(
     pixels: ConstVoidPtr,
 ) {
     let is_gles2 = env.options.gles_version == 2;
+    // BgraFboFix
+    let p_intfmt = if is_gles2 && internalformat == 0x80E1 { 0x1908 } else { internalformat };
+    let p_fmt = if is_gles2 && format == 0x80E1 { 0x1908 } else { format };
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let pixels = if pixels.is_null() {
             std::ptr::null()
@@ -1113,11 +1124,11 @@ fn glTexImage2D(
         gles.TexImage2D(
             target,
             level,
-            internalformat,
+            p_intfmt,
             width,
             height,
             border,
-            format,
+            p_fmt,
             type_,
             pixels,
         );
@@ -1678,16 +1689,18 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            // InjectPrecisionAll
-            if !full_source.contains("precision ") {
-                let inject = "precision highp float;\n";
-                if let Some(pos) = full_source.find("#version") {
-                    let end_line = full_source[pos..].find('\n').unwrap_or(0) + pos;
-                    full_source.insert_str(end_line + 1, inject);
-                } else {
-                    full_source = format!("{}{}", inject, full_source);
-                }
+            // CleanPrecisionFix
+            let mut s = full_source.replace("precision lowp float;", "")
+                .replace("precision mediump float;", "")
+                .replace("precision highp float;", "");
+            let inject = "precision highp float;\n";
+            if let Some(pos) = s.find("#version") {
+                let end_line = s[pos..].find('\n').unwrap_or(0) + pos;
+                s.insert_str(end_line + 1, inject);
+            } else {
+                s = format!("{}{}", inject, s);
             }
+            full_source = s;
         }
 
         let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
