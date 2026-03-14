@@ -852,11 +852,7 @@ impl GLES for GLES1Native<'_> {
         touchHLE_gl_bindings::gles20::BindAttribLocation(program, index, name)
     }
     unsafe fn LinkProgram(&mut self, program: GLuint) {
-        // ForceStandardAttribs
-        let p = c"position".as_ptr() as *const _;
-        let t = c"texCoord".as_ptr() as *const _;
-        touchHLE_gl_bindings::gles20::BindAttribLocation(program, 0, p);
-        touchHLE_gl_bindings::gles20::BindAttribLocation(program, 3, t);
+        // RevertAttribHack
         touchHLE_gl_bindings::gles20::LinkProgram(program)
     }
     unsafe fn UseProgram(&mut self, program: GLuint) {
