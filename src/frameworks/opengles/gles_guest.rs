@@ -1308,8 +1308,14 @@ fn glRenderbufferStorageOES(
     // apply scale hack: give the app a larger framebuffer than it asked for
     let factor = env.options.scale_hack.get() as GLsizei;
     let (width, height) = (width * factor, height * factor);
+    // DepthFormatFix
+    let safe_format = if env.options.gles_version == 2 && internalformat == 0x81A5 {
+        0x81A6 
+    } else {
+        internalformat
+    };
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.RenderbufferStorageOES(target, internalformat, width, height)
+        gles.RenderbufferStorageOES(target, safe_format, width, height)
     })
 }
 
@@ -1649,10 +1655,16 @@ fn glShaderSource(
         }
 
         if is_gles2 && full_source.contains("gl_FragColor") && !full_source.contains("precision ") {
-            full_source = format!("precision mediump float;\n{}", full_source);
-        }
+                    // ShaderVersionFix
+                    if let Some(pos) = full_source.find("#version") {
+                        let end_line = full_source[pos..].find('\n').unwrap_or(0) + pos;
+                        full_source.insert_str(end_line + 1, "precision mediump float;\n");
+                    } else {
+                        full_source = format!("precision mediump float;\n{}", full_source);
+                    }
+                }
 
-        let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
+                let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
         let c_source_ptr = c_source.as_ptr();
         let c_len = c_source.as_bytes().len() as GLint;
         let c_source_array = [c_source_ptr];
