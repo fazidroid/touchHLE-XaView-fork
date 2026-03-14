@@ -1333,12 +1333,16 @@ fn glRenderbufferStorageOES(
     width: GLsizei,
     height: GLsizei,
 ) {
-    // apply scale hack: give the app a larger framebuffer than it asked for
     let factor = env.options.scale_hack.get() as GLsizei;
     let (width, height) = (width * factor, height * factor);
-    // RestoreDepthFormat
+    // DowngradeDepthFormat
+    let fmt = if env.options.gles_version == 2 && (internalformat == 0x81A6 || internalformat == 0x88F0) {
+        0x81A5
+    } else {
+        internalformat
+    };
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.RenderbufferStorageOES(target, internalformat, width, height)
+        gles.RenderbufferStorageOES(target, fmt, width, height)
     })
 }
 
