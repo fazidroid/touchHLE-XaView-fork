@@ -303,7 +303,7 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                             b"OpenGL ES GLSL ES 1.00" // GlslVersion
                         }
                         gles11::EXTENSIONS => {
-                            // SafeExtensionsFix
+                            // SafeExtensionsEsTwo
                             if is_es2 {
                                 b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_framebuffer_object GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat "
                             } else {
@@ -990,11 +990,10 @@ fn glTexParameteri(env: &mut Environment, target: GLenum, pname: GLenum, param: 
     if pname == gles11::TEXTURE_CROP_RECT_OES {
         return;
     }
-    // IgnoreAppleEnumFix
+    // StripAppleEnums
     if env.options.gles_version == 2 && (pname == 0x813D || pname == 0x8191) {
         return;
     }
-    // StripMipmapsFix
     let mut p = param;
     if env.options.gles_version == 2 && pname == gles11::TEXTURE_MIN_FILTER {
         if p == gles11::NEAREST_MIPMAP_NEAREST as GLint || p == gles11::NEAREST_MIPMAP_LINEAR as GLint {
@@ -1012,11 +1011,10 @@ fn glTexParameterf(env: &mut Environment, target: GLenum, pname: GLenum, param: 
     if pname == gles11::TEXTURE_CROP_RECT_OES {
         return;
     }
-    // IgnoreAppleEnumFix
+    // StripAppleEnums
     if env.options.gles_version == 2 && (pname == 0x813D || pname == 0x8191) {
         return;
     }
-    // StripMipmapsFix
     let mut p = param;
     if env.options.gles_version == 2 && pname == gles11::TEXTURE_MIN_FILTER {
         if p == gles11::NEAREST_MIPMAP_NEAREST as GLfloat || p == gles11::NEAREST_MIPMAP_LINEAR as GLfloat {
@@ -1110,7 +1108,6 @@ fn glTexImage2D(
     pixels: ConstVoidPtr,
 ) {
     let is_gles2 = env.options.gles_version == 2;
-    // RestoreTextureFormats
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let pixels = if pixels.is_null() {
             std::ptr::null()
@@ -1131,10 +1128,8 @@ fn glTexImage2D(
             pixels,
         );
         if is_gles2 {
-            // FixCubemapTarget
+            // NpotClampFix
             let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
-            gles.TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
-            gles.TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         }
@@ -1188,10 +1183,8 @@ fn glCompressedTexImage2D(
             data,
         );
         if is_gles2 {
-            // FixCubemapTarget
+            // NpotClampFix
             let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
-            gles.TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
-            gles.TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
             gles.TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         }
@@ -1682,17 +1675,18 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            // SafePrecisionInject
-            if !full_source.contains("precision ") {
-                let inject = "precision mediump float;\n";
-                if let Some(pos) = full_source.find("#version") {
-                    if let Some(nl) = full_source[pos..].find('\n') {
-                        full_source.insert_str(pos + nl + 1, inject);
-                    }
-                } else {
-                    full_source.insert_str(0, inject);
-                }
+            // MacroPrecisionInject
+            let mut s = full_source.replace("precision lowp float;", "")
+                .replace("precision mediump float;", "")
+                .replace("precision highp float;", "");
+            let inject = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
+            if let Some(pos) = s.find("#version") {
+                let end_line = s[pos..].find('\n').unwrap_or(0) + pos;
+                s.insert_str(end_line + 1, inject);
+            } else {
+                s.insert_str(0, inject);
             }
+            full_source = s;
         }
 
         let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
