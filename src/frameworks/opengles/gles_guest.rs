@@ -308,7 +308,7 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                         gles11::EXTENSIONS => {
                             // SafeExtensionsEsTwo
                             if is_es2 {
-                                b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_element_index_uint GL_OES_framebuffer_object GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat "
+                                b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_element_index_uint GL_OES_framebuffer_object GL_OES_packed_depth_stencil GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_half_float "
                             } else {
                                 b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
                             }
@@ -1362,6 +1362,8 @@ fn glFramebufferRenderbufferOES(
     renderbuffertarget: GLenum,
     renderbuffer: GLuint,
 ) {
+    // IgnoreStencilFix
+    if env.options.gles_version == 2 && attachment == 0x8D20 { return; }
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.FramebufferRenderbufferOES(target, attachment, renderbuffertarget, renderbuffer)
     })
@@ -1670,12 +1672,12 @@ fn glShaderSource(
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
-        if is_gles2 && shader_type == 0x8B30 {
-            // FragmentShaderOnlyFix
+        if is_gles2 {
+            // NukePrecisionFix
+            let inject = "#define lowp\n#define mediump\n#define highp\nprecision highp float;\n";
             let mut s = full_source.replace("precision lowp float;", "")
                 .replace("precision mediump float;", "")
                 .replace("precision highp float;", "");
-            let inject = "precision mediump float;\n";
             if let Some(pos) = s.find("#version") {
                 let end_line = s[pos..].find('\n').unwrap_or(0) + pos;
                 s.insert_str(end_line + 1, inject);
