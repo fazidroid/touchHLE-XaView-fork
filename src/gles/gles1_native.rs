@@ -536,7 +536,13 @@ impl GLES for GLES1Native<'_> {
         }
         // RouteTexImageGles
         if self.is_gles2 {
-            touchHLE_gl_bindings::gles20::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels)
+            touchHLE_gl_bindings::gles20::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels);
+            // ForceCompleteTexture
+            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         } else {
             gles11::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels)
         }
@@ -595,6 +601,12 @@ impl GLES for GLES1Native<'_> {
         // RouteCompTexGles
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
+            // ForceCompleteTexture
+            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
+            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         } else {
             gles11::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
         }
