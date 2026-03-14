@@ -139,7 +139,7 @@ fn panic_on_gl_errors(gles: &mut dyn GLES) {
 // Generic state manipulation
 fn glGetError(env: &mut Environment) -> GLenum {
     let ignore_gl_errors = env.options.ignore_gl_errors;
-    let is_gles2 = env.options.gles_version == 2;
+    // RestoreErrorLogic
     with_ctx_and_mem(env, |gles, _mem| {
         let err = unsafe { gles.GetError() };
         if err != 0 {
@@ -151,8 +151,6 @@ fn glGetError(env: &mut Environment) -> GLenum {
             }
             log!("Warning: glGetError() returned {:#x}", err);
         }
-        // ForceNoErrorEsTwo
-        if is_gles2 { return 0; }
         err
     })
 }
@@ -1673,16 +1671,16 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            // NukePrecisionFix
-            let inject = "#define lowp\n#define mediump\n#define highp\nprecision highp float;\n";
-            let mut s = full_source.replace("precision lowp float;", "")
-                .replace("precision mediump float;", "")
-                .replace("precision highp float;", "");
-            if let Some(pos) = s.find("#version") {
-                let end_line = s[pos..].find('\n').unwrap_or(0) + pos;
-                s.insert_str(end_line + 1, inject);
-            } else {
-                s.insert_str(0, inject);
+            // SmartPrecisionInject
+            let mut s = full_source.clone();
+            if !s.contains("precision ") {
+                let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
+                if let Some(pos) = s.find("#version") {
+                    let nl = s[pos..].find('\n').unwrap_or(0);
+                    s.insert_str(pos + nl + 1, inject);
+                } else {
+                    s.insert_str(0, inject);
+                }
             }
             full_source = s;
         }
