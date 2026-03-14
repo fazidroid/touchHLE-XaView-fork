@@ -150,6 +150,8 @@ fn glGetError(env: &mut Environment) -> GLenum {
             }
             log!("Warning: glGetError() returned {:#x}", err);
         }
+        // ForceNoErrorEsTwo
+        if env.options.gles_version == 2 { return 0; }
         err
     })
 }
@@ -1675,11 +1677,11 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            // MacroPrecisionInject
+            // SimplePrecisionInject
             let mut s = full_source.replace("precision lowp float;", "")
                 .replace("precision mediump float;", "")
                 .replace("precision highp float;", "");
-            let inject = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
+            let inject = "precision mediump float;\n";
             if let Some(pos) = s.find("#version") {
                 let end_line = s[pos..].find('\n').unwrap_or(0) + pos;
                 s.insert_str(end_line + 1, inject);
@@ -2134,8 +2136,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glBindFramebufferOES(_, _)),
     export_c_func!(glBindRenderbufferOES(_, _)),
     export_c_func!(glRenderbufferStorageOES(_, _, _, _)),
-    export_c_func!(glRenderbufferStorageMultisampleAPPLE(_, _, _, _, _)),
-    export_c_func!(glResolveMultisampleFramebufferAPPLE()),
+    // RemoveMsaaExports
     export_c_func!(glDiscardFramebufferEXT(_, _, _)),
     export_c_func!(glFramebufferRenderbufferOES(_, _, _, _)),
     export_c_func!(glFramebufferTexture2DOES(_, _, _, _, _)),
