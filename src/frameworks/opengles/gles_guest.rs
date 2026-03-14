@@ -1079,6 +1079,7 @@ fn glTexImage2D(
     type_: GLenum,
     pixels: ConstVoidPtr,
 ) {
+    let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let pixels = if pixels.is_null() {
             std::ptr::null()
@@ -1098,7 +1099,7 @@ fn glTexImage2D(
             type_,
             pixels,
         );
-        if env.options.gles_version == 2 {
+        if is_gles2 {
             // TextureCompleteFix
             gles.TexParameteri(target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
@@ -1139,6 +1140,7 @@ fn glCompressedTexImage2D(
     image_size: GLsizei,
     data: ConstVoidPtr,
 ) {
+    let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let data = mem
             .ptr_at(data.cast::<u8>(), image_size.try_into().unwrap())
@@ -1153,7 +1155,7 @@ fn glCompressedTexImage2D(
             image_size,
             data,
         );
-        if env.options.gles_version == 2 {
+        if is_gles2 {
             // TextureCompleteFix
             gles.TexParameteri(target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
             gles.TexParameteri(target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
