@@ -1342,22 +1342,6 @@ fn glRenderbufferStorageOES(
     })
 }
 
-fn glRenderbufferStorageMultisampleAPPLE(
-    env: &mut Environment,
-    target: GLenum,
-    _samples: GLsizei,
-    internalformat: GLenum,
-    width: GLsizei,
-    height: GLsizei,
-) {
-    // MsaaFallbackStub
-    glRenderbufferStorageOES(env, target, internalformat, width, height)
-}
-
-fn glResolveMultisampleFramebufferAPPLE(_env: &mut Environment) {
-    // NoopResolveStub
-}
-
 fn glDiscardFramebufferEXT(
     _env: &mut Environment,
     _target: GLenum,
