@@ -1758,7 +1758,7 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         if is_gles2 {
-            // BindGameloftAttribs Apple
+            // AppleGameloftAttribs
             let n0 = [c"position", c"a_position", c"aPosition", c"inPosition", c"rm_Vertex"];
             for n in n0 { gles.BindAttribLocation(program, 0, n.as_ptr() as _); }
             let n1 = [c"normal", c"a_normal", c"aNormal", c"inNormal", c"rm_Normal"];
@@ -1767,6 +1767,8 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
             for n in n2 { gles.BindAttribLocation(program, 2, n.as_ptr() as _); }
             let n3 = [c"texCoord", c"texcoord", c"a_texCoord", c"aTexCoord", c"inTexCoord", c"rm_TexCoord0"];
             for n in n3 { gles.BindAttribLocation(program, 3, n.as_ptr() as _); }
+            let n4 = [c"texCoord1", c"a_texCoord1", c"aTexCoord1", c"inTexCoord1", c"rm_TexCoord1"];
+            for n in n4 { gles.BindAttribLocation(program, 4, n.as_ptr() as _); }
         }
         gles.LinkProgram(program);
         if is_gles2 {
