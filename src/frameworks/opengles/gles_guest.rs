@@ -991,8 +991,8 @@ fn glTexParameteri(env: &mut Environment, target: GLenum, pname: GLenum, param: 
         return;
     }
     // IgnoreAppleEnumFix
-    if env.options.gles_version == 2 {
-        if pname == 0x813D || pname == 0x8191 { return; }
+    if env.options.gles_version == 2 && (pname == 0x813D || pname == 0x8191) {
+        return;
     }
     // StripMipmapsFix
     let mut p = param;
@@ -1013,8 +1013,8 @@ fn glTexParameterf(env: &mut Environment, target: GLenum, pname: GLenum, param: 
         return;
     }
     // IgnoreAppleEnumFix
-    if env.options.gles_version == 2 {
-        if pname == 0x813D || pname == 0x8191 { return; }
+    if env.options.gles_version == 2 && (pname == 0x813D || pname == 0x8191) {
+        return;
     }
     // StripMipmapsFix
     let mut p = param;
