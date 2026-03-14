@@ -1110,9 +1110,7 @@ fn glTexImage2D(
     pixels: ConstVoidPtr,
 ) {
     let is_gles2 = env.options.gles_version == 2;
-    // BgraFboFix
-    let p_intfmt = if is_gles2 && internalformat == 0x80E1 { 0x1908 } else { internalformat };
-    let p_fmt = if is_gles2 && format == 0x80E1 { 0x1908 } else { format };
+    // RestoreTextureFormats
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let pixels = if pixels.is_null() {
             std::ptr::null()
@@ -1124,11 +1122,11 @@ fn glTexImage2D(
         gles.TexImage2D(
             target,
             level,
-            p_intfmt,
+            internalformat,
             width,
             height,
             border,
-            p_fmt,
+            format,
             type_,
             pixels,
         );
@@ -1342,14 +1340,9 @@ fn glRenderbufferStorageOES(
     // apply scale hack: give the app a larger framebuffer than it asked for
     let factor = env.options.scale_hack.get() as GLsizei;
     let (width, height) = (width * factor, height * factor);
-    // DepthFormatFix
-    let safe_format = if env.options.gles_version == 2 && internalformat == 0x81A5 {
-        0x81A6 
-    } else {
-        internalformat
-    };
+    // RestoreDepthFormat
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.RenderbufferStorageOES(target, safe_format, width, height)
+        gles.RenderbufferStorageOES(target, internalformat, width, height)
     })
 }
 
@@ -1689,18 +1682,17 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            // CleanPrecisionFix
-            let mut s = full_source.replace("precision lowp float;", "")
-                .replace("precision mediump float;", "")
-                .replace("precision highp float;", "");
-            let inject = "precision highp float;\n";
-            if let Some(pos) = s.find("#version") {
-                let end_line = s[pos..].find('\n').unwrap_or(0) + pos;
-                s.insert_str(end_line + 1, inject);
-            } else {
-                s = format!("{}{}", inject, s);
+            // SafePrecisionInject
+            if !full_source.contains("precision ") {
+                let inject = "precision mediump float;\n";
+                if let Some(pos) = full_source.find("#version") {
+                    if let Some(nl) = full_source[pos..].find('\n') {
+                        full_source.insert_str(pos + nl + 1, inject);
+                    }
+                } else {
+                    full_source.insert_str(0, inject);
+                }
             }
-            full_source = s;
         }
 
         let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
