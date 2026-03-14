@@ -415,7 +415,7 @@ impl GLES for GLES1Native<'_> {
     ) {
         if self.is_gles2 {
             // FixPointerNorm
-            let n = if type_ == 0x1401 || type_ == 0x1401 { 1 } else { 0 };
+            let n = if type_ == 0x1401 { 1 } else { 0 };
             touchHLE_gl_bindings::gles20::VertexAttribPointer(2, size, type_, n as _, stride, pointer);
         } else {
             gles11::ColorPointer(size, type_, stride, pointer)
