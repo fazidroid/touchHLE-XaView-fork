@@ -139,9 +139,11 @@ fn panic_on_gl_errors(gles: &mut dyn GLES) {
 // Generic state manipulation
 fn glGetError(env: &mut Environment) -> GLenum {
     let ignore_gl_errors = env.options.ignore_gl_errors;
-    // RestoreErrorLogic
+    let is_gles2 = env.options.gles_version == 2;
+    // BypassErrorsEsTwo
     with_ctx_and_mem(env, |gles, _mem| {
         let err = unsafe { gles.GetError() };
+        if is_gles2 { return 0; }
         if err != 0 {
             if ignore_gl_errors {
                 log_once!(
