@@ -146,7 +146,7 @@ impl GLES for GLES1Native<'_> {
                 gles11::TEXTURE_COORD_ARRAY => {
                     let mut ct = 0;
                     gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
-                    let attr = if ct == gles11::TEXTURE1 { 4 } else { 3 };
+                    let attr = if ct == gles11::TEXTURE1 as GLint { 4 } else { 3 };
                     touchHLE_gl_bindings::gles20::EnableVertexAttribArray(attr);
                 },
                 _ => {}
@@ -164,7 +164,7 @@ impl GLES for GLES1Native<'_> {
                 gles11::TEXTURE_COORD_ARRAY => {
                     let mut ct = 0;
                     gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
-                    let attr = if ct == gles11::TEXTURE1 { 4 } else { 3 };
+                    let attr = if ct == gles11::TEXTURE1 as GLint { 4 } else { 3 };
                     touchHLE_gl_bindings::gles20::DisableVertexAttribArray(attr);
                 },
                 _ => {}
@@ -448,7 +448,7 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 {
             let mut ct = 0;
             gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
-            let attr = if ct == gles11::TEXTURE1 { 4 } else { 3 };
+            let attr = if ct == gles11::TEXTURE1 as GLint { 4 } else { 3 };
             touchHLE_gl_bindings::gles20::VertexAttribPointer(attr, size, type_, 0, stride, pointer);
         } else {
             gles11::TexCoordPointer(size, type_, stride, pointer)
