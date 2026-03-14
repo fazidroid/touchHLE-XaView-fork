@@ -1097,7 +1097,14 @@ fn glTexImage2D(
             format,
             type_,
             pixels,
-        )
+        );
+        if env.options.gles_version == 2 {
+            // TextureCompleteFix
+            gles.TexParameteri(target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
+            gles.TexParameteri(target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
+        }
     })
 }
 fn glTexSubImage2D(
@@ -1145,7 +1152,14 @@ fn glCompressedTexImage2D(
             border,
             image_size,
             data,
-        )
+        );
+        if env.options.gles_version == 2 {
+            // TextureCompleteFix
+            gles.TexParameteri(target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
+            gles.TexParameteri(target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
+            gles.TexParameteri(target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
+        }
     })
 }
 fn glCopyTexImage2D(

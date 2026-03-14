@@ -629,6 +629,17 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         gles11::TEXTURE_MIN_FILTER,
         gles11::LINEAR as _,
     );
+    // TextureCompleteFix
+    gles.TexParameteri(
+        gles11::TEXTURE_2D,
+        gles11::TEXTURE_WRAP_S,
+        gles11::CLAMP_TO_EDGE as _,
+    );
+    gles.TexParameteri(
+        gles11::TEXTURE_2D,
+        gles11::TEXTURE_WRAP_T,
+        gles11::CLAMP_TO_EDGE as _,
+    );
 
     // Clean up the framebuffer object since we no longer need it.
     // This also sets the framebuffer bindings back to zero, so rendering
