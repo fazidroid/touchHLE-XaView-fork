@@ -143,7 +143,12 @@ impl GLES for GLES1Native<'_> {
                 gles11::VERTEX_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(0),
                 gles11::NORMAL_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(1),
                 gles11::COLOR_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(2),
-                gles11::TEXTURE_COORD_ARRAY => touchHLE_gl_bindings::gles20::EnableVertexAttribArray(3),
+                gles11::TEXTURE_COORD_ARRAY => {
+                    let mut ct = 0;
+                    gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
+                    let attr = if ct == gles11::TEXTURE1 { 4 } else { 3 };
+                    touchHLE_gl_bindings::gles20::EnableVertexAttribArray(attr);
+                },
                 _ => {}
             }
         } else {
@@ -156,7 +161,12 @@ impl GLES for GLES1Native<'_> {
                 gles11::VERTEX_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(0),
                 gles11::NORMAL_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(1),
                 gles11::COLOR_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(2),
-                gles11::TEXTURE_COORD_ARRAY => touchHLE_gl_bindings::gles20::DisableVertexAttribArray(3),
+                gles11::TEXTURE_COORD_ARRAY => {
+                    let mut ct = 0;
+                    gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
+                    let attr = if ct == gles11::TEXTURE1 { 4 } else { 3 };
+                    touchHLE_gl_bindings::gles20::DisableVertexAttribArray(attr);
+                },
                 _ => {}
             }
         } else {
@@ -436,7 +446,10 @@ impl GLES for GLES1Native<'_> {
         pointer: *const GLvoid,
     ) {
         if self.is_gles2 {
-            touchHLE_gl_bindings::gles20::VertexAttribPointer(3, size, type_, 0, stride, pointer);
+            let mut ct = 0;
+            gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
+            let attr = if ct == gles11::TEXTURE1 { 4 } else { 3 };
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(attr, size, type_, 0, stride, pointer);
         } else {
             gles11::TexCoordPointer(size, type_, stride, pointer)
         }
@@ -599,12 +612,9 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
             touchHLE_gl_bindings::gles20::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels);
-            // ForceCompleteTexture
+            // SafeDefaultFilter
             let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
             touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         } else {
             gles11::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels)
         }
@@ -668,12 +678,9 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
             touchHLE_gl_bindings::gles20::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
-            // ForceCompleteTexture
+            // SafeDefaultFilter
             let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
             touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MAG_FILTER, gles11::LINEAR as _);
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_S, gles11::CLAMP_TO_EDGE as _);
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_WRAP_T, gles11::CLAMP_TO_EDGE as _);
         } else {
             gles11::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
         }
