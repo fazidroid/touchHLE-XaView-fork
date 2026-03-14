@@ -1030,12 +1030,24 @@ fn glTexParameterf(env: &mut Environment, target: GLenum, pname: GLenum, param: 
     })
 }
 fn glTexParameterx(env: &mut Environment, target: GLenum, pname: GLenum, param: GLfixed) {
-    // See above.
     if pname == gles11::TEXTURE_CROP_RECT_OES {
         return;
     }
+    // StripAppleEnums Fixed
+    if env.options.gles_version == 2 && (pname == 0x813D || pname == 0x8191) {
+        return;
+    }
+    let mut p = param;
+    if env.options.gles_version == 2 && pname == gles11::TEXTURE_MIN_FILTER {
+        if p == gles11::NEAREST_MIPMAP_NEAREST as GLfixed || p == gles11::NEAREST_MIPMAP_LINEAR as GLfixed {
+            p = gles11::NEAREST as GLfixed;
+        }
+        if p == gles11::LINEAR_MIPMAP_NEAREST as GLfixed || p == gles11::LINEAR_MIPMAP_LINEAR as GLfixed {
+            p = gles11::LINEAR as GLfixed;
+        }
+    }
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.TexParameterx(target, pname, param)
+        gles.TexParameterx(target, pname, p)
     })
 }
 fn glTexParameteriv(env: &mut Environment, target: GLenum, pname: GLenum, params: ConstPtr<GLint>) {
@@ -1333,14 +1345,9 @@ fn glRenderbufferStorageOES(
 ) {
     let factor = env.options.scale_hack.get() as GLsizei;
     let (width, height) = (width * factor, height * factor);
-    // DowngradeDepthFormat
-    let fmt = if env.options.gles_version == 2 && (internalformat == 0x81A6 || internalformat == 0x88F0) {
-        0x81A5
-    } else {
-        internalformat
-    };
+    // RestoreCleanDepth
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.RenderbufferStorageOES(target, fmt, width, height)
+        gles.RenderbufferStorageOES(target, internalformat, width, height)
     })
 }
 
@@ -1762,6 +1769,17 @@ fn glBindAttribLocation(
 fn glLinkProgram(env: &mut Environment, program: GLuint) {
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
+        if is_gles2 {
+            // BindGameloftAttribs Apple
+            let n0 = [c"position", c"a_position", c"aPosition", c"inPosition", c"rm_Vertex"];
+            for n in n0 { gles.BindAttribLocation(program, 0, n.as_ptr() as _); }
+            let n1 = [c"normal", c"a_normal", c"aNormal", c"inNormal", c"rm_Normal"];
+            for n in n1 { gles.BindAttribLocation(program, 1, n.as_ptr() as _); }
+            let n2 = [c"color", c"a_color", c"aColor", c"inColor", c"rm_Color"];
+            for n in n2 { gles.BindAttribLocation(program, 2, n.as_ptr() as _); }
+            let n3 = [c"texCoord", c"texcoord", c"a_texCoord", c"aTexCoord", c"inTexCoord", c"rm_TexCoord0"];
+            for n in n3 { gles.BindAttribLocation(program, 3, n.as_ptr() as _); }
+        }
         gles.LinkProgram(program);
         if is_gles2 {
             let mut status = 0;
