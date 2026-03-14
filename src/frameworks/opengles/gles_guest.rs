@@ -308,7 +308,7 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                         gles11::EXTENSIONS => {
                             // SafeExtensionsEsTwo
                             if is_es2 {
-                                b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_framebuffer_object GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat "
+                                b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_element_index_uint GL_OES_framebuffer_object GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat "
                             } else {
                                 b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
                             }
@@ -1643,6 +1643,11 @@ fn glShaderSource(
 ) {
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
+        let mut shader_type = 0;
+        if is_gles2 {
+            gles.GetShaderiv(shader, 0x8B4F, &mut shader_type);
+        }
+
         let count_usize = count as usize;
         let string_arr = mem.ptr_at(string.cast::<ConstVoidPtr>(), count as u32);
         let length_arr = if length.is_null() { std::ptr::null() } else { mem.ptr_at(length, count as u32) };
@@ -1661,8 +1666,8 @@ fn glShaderSource(
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
-        if is_gles2 {
-            // SimplePrecisionInject
+        if is_gles2 && shader_type == 0x8B30 {
+            // FragmentShaderOnlyFix
             let mut s = full_source.replace("precision lowp float;", "")
                 .replace("precision mediump float;", "")
                 .replace("precision highp float;", "");
