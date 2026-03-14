@@ -534,10 +534,32 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 { touchHLE_gl_bindings::gles20::BindTexture(target, texture) } else { gles11::BindTexture(target, texture) }
     }
     unsafe fn TexParameteri(&mut self, target: GLenum, pname: GLenum, param: GLint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::TexParameteri(target, pname, param) } else { gles11::TexParameteri(target, pname, param) }
+        // StripMipmapsNative
+        if self.is_gles2 {
+            if pname == 0x8191 || pname == 0x813D { return; }
+            let mut p = param;
+            if pname == gles11::TEXTURE_MIN_FILTER {
+                if p == 0x2700 || p == 0x2701 { p = 0x2600; }
+                if p == 0x2702 || p == 0x2703 { p = 0x2601; }
+            }
+            touchHLE_gl_bindings::gles20::TexParameteri(target, pname, p)
+        } else {
+            gles11::TexParameteri(target, pname, param)
+        }
     }
     unsafe fn TexParameterf(&mut self, target: GLenum, pname: GLenum, param: GLfloat) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::TexParameterf(target, pname, param) } else { gles11::TexParameterf(target, pname, param) }
+        // StripMipmapsNative
+        if self.is_gles2 {
+            if pname == 0x8191 || pname == 0x813D { return; }
+            let mut p = param;
+            if pname == gles11::TEXTURE_MIN_FILTER {
+                if p == 0x2700 as f32 || p == 0x2701 as f32 { p = 0x2600 as f32; }
+                if p == 0x2702 as f32 || p == 0x2703 as f32 { p = 0x2601 as f32; }
+            }
+            touchHLE_gl_bindings::gles20::TexParameterf(target, pname, p)
+        } else {
+            gles11::TexParameterf(target, pname, param)
+        }
     }
     unsafe fn TexParameterx(&mut self, target: GLenum, pname: GLenum, param: GLfixed) {
         gles11::TexParameterx(target, pname, param)
@@ -575,6 +597,7 @@ impl GLES for GLES1Native<'_> {
         }
         // RouteTexImageGles
         if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
             touchHLE_gl_bindings::gles20::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels);
             // ForceCompleteTexture
             let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
@@ -598,9 +621,13 @@ impl GLES for GLES1Native<'_> {
         type_: GLenum,
         pixels: *const GLvoid,
     ) {
-        gles11::TexSubImage2D(
-            target, level, xoffset, yoffset, width, height, format, type_, pixels,
-        )
+        // RouteSubImageFix
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
+            touchHLE_gl_bindings::gles20::TexSubImage2D(target, level, xoffset, yoffset, width, height, format, type_, pixels)
+        } else {
+            gles11::TexSubImage2D(target, level, xoffset, yoffset, width, height, format, type_, pixels)
+        }
     }
     unsafe fn CompressedTexImage2D(
         &mut self,
@@ -639,6 +666,7 @@ impl GLES for GLES1Native<'_> {
         log_dbg!("Directly supported texture format: {:#x}", internalformat);
         // RouteCompTexGles
         if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
             touchHLE_gl_bindings::gles20::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
             // ForceCompleteTexture
             let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
