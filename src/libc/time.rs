@@ -719,7 +719,7 @@ fn strftime(
                 res.extend_from_slice(formatted_second.as_bytes());
             }
             _ => {
-                // If it's something unknown, just safely skip or log, but don't panic
+                // SkipUnknownFormat
                 log_once!("Warning: strftime unimplemented specifier '{}'", specifier as char);
             }
         }
