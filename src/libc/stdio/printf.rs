@@ -1184,19 +1184,25 @@ fn vfprintf(env: &mut Environment, stream: MutPtr<FILE>, format: ConstPtr<u8>, a
     let res = printf_inner::<false, _>(env, |mem, idx| mem.read(format + idx), arg);
     // TODO: I/O error handling
     match env.mem.read(stream).fd {
-        STDIN_FILENO => panic!("Unexpected file descriptor"),
-        STDOUT_FILENO => _ = std::io::stdout().write_all(&res),
-        STDERR_FILENO => _ = std::io::stderr().write_all(&res),
+        STDIN_FILENO => {
+            log_dbg!("Warning: Unexpected write to STDIN in vfprintf");
+        }
+        STDOUT_FILENO => {
+            let _ = std::io::stdout().write_all(&res);
+        }
+        STDERR_FILENO => {
+            let _ = std::io::stderr().write_all(&res);
+        }
         _ => {
             let buf = env.mem.alloc_and_write_cstr(res.as_slice());
-            let _ = fwrite(
+            let _result = fwrite(
                 env,
                 buf.cast_const().cast(),
                 1,
                 res.len() as GuestUSize,
                 stream,
             );
-            // BypassFwriteAssert
+            // BYPASS: Never panic on failed fwrite. Games log to dead endpoints all the time.
             env.mem.free(buf.cast());
         }
     }
