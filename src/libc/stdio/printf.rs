@@ -181,11 +181,11 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 assert!(length_modifier.is_none());
                 let c: u8 = args.next(env);
                 if pad_width > 1 && !left_justified {
-                    res.extend(std::iter::repeat(pad_char as u8).take((pad_width - 1) as usize));
+                    res.extend(std::iter::repeat_n(pad_char as u8, (pad_width - 1) as usize));
                 }
                 res.push(c);
                 if pad_width > 1 && left_justified {
-                    res.extend(std::iter::repeat(b' ').take((pad_width - 1) as usize));
+                    res.extend(std::iter::repeat_n(b' ', (pad_width - 1) as usize));
                 }
             }
             // Apple extension? Seemingly works in both NSLog and printf.
@@ -196,11 +196,11 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 let c: unichar = args.next(env);
                 let c = char::from_u32(c.into()).unwrap();
                 if pad_width > 1 && !left_justified {
-                    res.extend(std::iter::repeat(pad_char as u8).take((pad_width - 1) as usize));
+                    res.extend(std::iter::repeat_n(pad_char as u8, (pad_width - 1) as usize));
                 }
                 write!(&mut res, "{c}").unwrap();
                 if pad_width > 1 && left_justified {
-                    res.extend(std::iter::repeat(b' ').take((pad_width - 1) as usize));
+                    res.extend(std::iter::repeat_n(b' ', (pad_width - 1) as usize));
                 }
             }
             b's' => {
