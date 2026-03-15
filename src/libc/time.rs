@@ -720,7 +720,7 @@ fn strftime(
             }
             _ => {
                 // SkipUnknownFormat
-                log_once!("Warning: strftime unimplemented specifier '{}'", specifier as char);
+                log_once!("Warning: strftime unimplemented specifier");
             }
         }
     }
