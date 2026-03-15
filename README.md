@@ -1,10 +1,12 @@
 XaView FORK:
 
-OpenGL ES 2.0: Partically 🕐 (Asphalt 6 many graphic issues, Asphalt 7 working but bkack screen, no render)
+OpenGL ES 2.0: Partically 🕐 (Asphalt 7 good as i see, but Asphalt 6 have graphical issues (depends on version)
 
 =Device selection in quick settings (iPod, iPad, iPhone) [UPD 12.03.26 09-14: All devices configs now supported!]
 
 =Retina and its scaling support
+
+=Asphalt 7 (IOS 4.0) support: 🕐 (1.0.0 working but races not startup, im fixing it)
 
 =Asphalt 6 support: ✅
 
