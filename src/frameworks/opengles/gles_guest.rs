@@ -308,7 +308,7 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                         gles11::EXTENSIONS => {
                             // SafeExtensionsEsTwo
                             if is_es2 {
-                                b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_element_index_uint GL_OES_framebuffer_object GL_OES_packed_depth_stencil GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_half_float "
+                                b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_depth24 GL_OES_element_index_uint GL_OES_framebuffer_object GL_OES_packed_depth_stencil GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_half_float "
                             } else {
                                 b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
                             }
@@ -1339,6 +1339,21 @@ fn glRenderbufferStorageOES(
     })
 }
 
+// RestoreMsaaFunctions
+fn glRenderbufferStorageMultisampleAPPLE(
+    env: &mut Environment,
+    target: GLenum,
+    _samples: GLsizei,
+    internalformat: GLenum,
+    width: GLsizei,
+    height: GLsizei,
+) {
+    glRenderbufferStorageOES(env, target, internalformat, width, height)
+}
+
+fn glResolveMultisampleFramebufferAPPLE(_env: &mut Environment) {
+}
+
 fn glDiscardFramebufferEXT(
     _env: &mut Environment,
     _target: GLenum,
@@ -2138,7 +2153,9 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glBindFramebufferOES(_, _)),
     export_c_func!(glBindRenderbufferOES(_, _)),
     export_c_func!(glRenderbufferStorageOES(_, _, _, _)),
-    // RemoveMsaaExports
+    // RestoreMsaaExports
+    export_c_func!(glRenderbufferStorageMultisampleAPPLE(_, _, _, _, _)),
+    export_c_func!(glResolveMultisampleFramebufferAPPLE()),
     export_c_func!(glDiscardFramebufferEXT(_, _, _)),
     export_c_func!(glFramebufferRenderbufferOES(_, _, _, _)),
     export_c_func!(glFramebufferTexture2DOES(_, _, _, _, _)),
