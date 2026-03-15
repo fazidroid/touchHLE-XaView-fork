@@ -1202,7 +1202,7 @@ fn vfprintf(env: &mut Environment, stream: MutPtr<FILE>, format: ConstPtr<u8>, a
                 res.len() as GuestUSize,
                 stream,
             );
-            // BYPASS: Never panic on failed fwrite. Games log to dead endpoints all the time.
+            // BYPASS
             env.mem.free(buf.cast());
         }
     }
