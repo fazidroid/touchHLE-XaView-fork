@@ -503,13 +503,13 @@ fn div(_env: &mut Environment, numer: i32, denom: i32) -> u64 {
     (quot as u32 as u64) | ((rem as u32 as u64) << 32)
 }
 
-fn __Block_copy(_env: &mut Environment, block: ConstVoidPtr) -> ConstVoidPtr {
-    // BypassBlockCopy
+fn _Block_copy(_env: &mut Environment, block: ConstVoidPtr) -> ConstVoidPtr {
+    // FixBlockCopyName
     block
 }
 
-fn __Block_release(_env: &mut Environment, _block: ConstVoidPtr) {
-    // BypassBlockRelease
+fn _Block_release(_env: &mut Environment, _block: ConstVoidPtr) {
+    // FixBlockReleaseName
 }
 
 fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoidPtr) {
@@ -523,8 +523,8 @@ fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoid
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(__Block_copy(_)),
-    export_c_func!(__Block_release(_)),
+    export_c_func!(_Block_copy(_)),
+    export_c_func!(_Block_release(_)),
     export_c_func!(dispatch_once(_, _)),
     export_c_func!(malloc(_)),
     export_c_func!(malloc_size(_)),
