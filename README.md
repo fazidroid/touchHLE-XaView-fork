@@ -1,6 +1,20 @@
 XaView FORK:
 
-OpenGL ES 2.0: Partically 🕐 (Asphalt 7 working perfect, but Asphalt 6 have graphical issues (depends on version)
+OpenGL ES 2.0: Partically ✅
+
+ES 2.0 Asphalt 7: Fully working
+
+ES 2.0 Asphalt 6: 1.0.2 Demo (Debug shaders)
+
+iPhone: 1.1.6, 1.3.2, 1.3.3j, 1.3.4f, 1.3.7y, 1.3.8h ; iPad: 1.1.8a, 1.2.6, 1.4.6, 1.5.0x, 1.5.1h (Missing buttons, screens, textures)
+
+iPhone: 1.0.0p ; iPad: 1.0.0p (Missing buttons, screens, textures, invisible buttons in main menu)
+
+---
+
+Audi RS3: 1.0.0, 1.0.1 (Missing buttons, screens, textures)
+
+///
 
 =Device selection in quick settings (iPod, iPad, iPhone)
 
