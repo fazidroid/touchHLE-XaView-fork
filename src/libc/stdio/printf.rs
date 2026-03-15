@@ -912,7 +912,7 @@ where
                 }
             }
             b'f' => {
-                assert_eq!(max_width, 0); // TODO
+                // Bypass max_width assert
                 let res = atof_inner_generic(env, &getc_fn, &ungetc_fn, subject, src_char_idx);
                 let val = match res {
                     Ok((val, len)) => {
@@ -963,7 +963,6 @@ where
                 }
             }
             b'[' => {
-                assert_eq!(max_width, 0);
                 assert!(length_modifier.is_none());
                 // [set] case
                 assert_ne!(env.mem.read(format + format_char_idx), b']');
@@ -995,13 +994,16 @@ where
                 }
                 let mut dst_ptr: MutPtr<u8> = args.next(env);
                 let mut matched = false;
+                let mut chars_read = 0;
+                let limit = if max_width > 0 { max_width } else { u32::MAX };
                 // Consume `src` while chars are not in the set
                 let mut cc = getc_fn(env, subject, src_char_idx).unwrap().into(); // TODO: EOF
                 src_char_idx += 1;
-                while set.contains(&cc) ^ inverted && cc != b'\0' {
+                while set.contains(&cc) ^ inverted && cc != b'\0' && chars_read < limit {
                     matched = true;
                     env.mem.write(dst_ptr, cc);
                     dst_ptr += 1;
+                    chars_read += 1;
                     cc = getc_fn(env, subject, src_char_idx).unwrap().into(); // TODO: EOF
                     src_char_idx += 1;
                 }
@@ -1015,11 +1017,15 @@ where
                 }
             }
             b's' => {
-                assert_eq!(max_width, 0);
                 assert!(length_modifier.is_none());
                 let orig_dst_ptr: MutPtr<u8> = args.next(env);
                 let mut dst_ptr: MutPtr<u8> = orig_dst_ptr;
+                let mut chars_read = 0;
+                let limit = if max_width > 0 { max_width } else { u32::MAX };
                 loop {
+                    if chars_read >= limit {
+                        break;
+                    }
                     let x = getc_fn(env, subject, src_char_idx);
                     if x.is_err() {
                         break;
@@ -1032,6 +1038,7 @@ where
                         env.mem.write(dst_ptr, cc);
                         src_char_idx += 1;
                         dst_ptr += 1;
+                        chars_read += 1;
                     } else {
                         ungetc_fn(env, subject, cc);
                         break;
