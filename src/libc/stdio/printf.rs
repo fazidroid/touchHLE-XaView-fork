@@ -176,26 +176,32 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
         match specifier {
             // Integer specifiers
             b'c' => {
+                // FixCharPadding
                 assert!(!prepend_sign);
-                assert!(!left_justified);
-                // TODO: support length modifier
                 assert!(length_modifier.is_none());
                 let c: u8 = args.next(env);
-                assert!(pad_char == ' ' && pad_width == 0); // TODO
+                if pad_width > 1 && !left_justified {
+                    for _ in 1..pad_width { res.push(pad_char as u8); }
+                }
                 res.push(c);
+                if pad_width > 1 && left_justified {
+                    for _ in 1..pad_width { res.push(b' '); }
+                }
             }
             // Apple extension? Seemingly works in both NSLog and printf.
             b'C' => {
+                // FixWideCharPadding
                 assert!(!prepend_sign);
-                assert!(!left_justified);
                 assert!(length_modifier.is_none());
                 let c: unichar = args.next(env);
-                // TODO
-                assert!(pad_char == ' ' && pad_width == 0);
-                // This will panic if it's a surrogate! This isn't good if
-                // targeting UTF-16 ([NSString stringWithFormat:] etc).
                 let c = char::from_u32(c.into()).unwrap();
+                if pad_width > 1 && !left_justified {
+                    for _ in 1..pad_width { res.push(pad_char as u8); }
+                }
                 write!(&mut res, "{c}").unwrap();
+                if pad_width > 1 && left_justified {
+                    for _ in 1..pad_width { res.push(b' '); }
+                }
             }
             b's' => {
                 assert!(!prepend_sign);
