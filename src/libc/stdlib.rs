@@ -527,7 +527,14 @@ fn SecItemCopyMatching(_env: &mut Environment, _query: ConstVoidPtr, _result: Mu
     -25300
 }
 
+fn objc_getClass(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
+    // LinkObjcClass
+    let name_str = env.mem.cstr_at_utf8(name).unwrap();
+    env.objc.link_class(name_str, false, &mut env.mem).cast()
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(objc_getClass(_, _)),
     export_c_func!(SecItemCopyMatching(_, _)),
     export_c_func!(_Block_copy(_)),
     export_c_func!(_Block_release(_)),
