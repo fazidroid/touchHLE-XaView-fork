@@ -542,7 +542,17 @@ fn OSMemoryBarrier(_env: &mut Environment) {
     // BypassMemoryBarrier
 }
 
+fn __umodsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
+    // ImplUmodsi3
+    if b == 0 {
+        0
+    } else {
+        a % b
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(__umodsi3(_, _)),
     export_c_func!(OSMemoryBarrier()),
     export_c_func!(class_getInstanceSize(_)),
     export_c_func!(objc_getClass(_)),
