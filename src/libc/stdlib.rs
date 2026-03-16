@@ -635,7 +635,19 @@ fn __divsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
     if b == 0 { 0 } else { a.wrapping_div(b) }
 }
 
+fn CFUUIDCreate(_env: &mut Environment, _alloc: ConstVoidPtr) -> MutVoidPtr {
+    // FakeUUIDCreate
+    crate::mem::Ptr::null()
+}
+
+fn CFUUIDCreateString(_env: &mut Environment, _alloc: ConstVoidPtr, _uuid: ConstVoidPtr) -> MutVoidPtr {
+    // FakeUUIDString
+    crate::mem::Ptr::null()
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(CFUUIDCreate(_)),
+    export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
     export_c_func!(__divsi3(_, _)),
     export_c_func!(__fixdfdi(_)),
