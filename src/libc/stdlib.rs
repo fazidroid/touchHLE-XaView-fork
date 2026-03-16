@@ -538,7 +538,12 @@ fn class_getInstanceSize(_env: &mut Environment, _cls: ConstVoidPtr) -> GuestUSi
     1024
 }
 
+fn OSMemoryBarrier(_env: &mut Environment) {
+    // BypassMemoryBarrier
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(OSMemoryBarrier()),
     export_c_func!(class_getInstanceSize(_)),
     export_c_func!(objc_getClass(_)),
     export_c_func!(SecItemCopyMatching(_, _)),
