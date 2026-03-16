@@ -100,18 +100,31 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
     // only wants a small part of it.
 
     let mut stat = stat::default();
+    
+    // FakeBasicStatInfo
+    stat.st_dev = 1;
+    stat.st_ino = fd as ino_t;
+    stat.st_nlink = 1;
+    stat.st_uid = 501;
+    stat.st_gid = 20;
+    stat.st_blksize = 4096;
 
     match file.file {
         GuestFile::File(_) | GuestFile::IpaBundleFile(_) | GuestFile::ResourceFile(_) => {
-            stat.st_mode |= S_IFREG;
+            // FakeRegPerms
+            stat.st_mode |= S_IFREG | 0o644;
 
             // TODO: use `std::fs::metadata()` instead
 
             // Obtain file size
             stat.st_size = file.file.stream_len().unwrap().try_into().unwrap();
+            
+            // CalcFakeBlocks
+            stat.st_blocks = ((stat.st_size + 4095) / 4096 * 8) as blkcnt_t;
         }
         GuestFile::Directory => {
-            stat.st_mode |= S_IFDIR;
+            // FakeDirPerms
+            stat.st_mode |= S_IFDIR | 0o755;
 
             // TODO: st_size
         }
