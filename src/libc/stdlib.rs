@@ -605,7 +605,31 @@ fn __umoddi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
     if b == 0 { 0 } else { a.wrapping_rem(b) }
 }
 
+fn __fixdfdi(_env: &mut Environment, a: f64) -> i64 {
+    // DoubleToInt64
+    a as i64
+}
+
+fn __fixunsdfdi(_env: &mut Environment, a: f64) -> u64 {
+    // DoubleToUint64
+    a as u64
+}
+
+fn __fixsfdi(_env: &mut Environment, a: f32) -> i64 {
+    // FloatToInt64
+    a as i64
+}
+
+fn __fixunssfdi(_env: &mut Environment, a: f32) -> u64 {
+    // FloatToUint64
+    a as u64
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(__fixdfdi(_)),
+    export_c_func!(__fixunsdfdi(_)),
+    export_c_func!(__fixsfdi(_)),
+    export_c_func!(__fixunssfdi(_)),
     export_c_func!(__floatdidf(_)),
     export_c_func!(__floatundidf(_)),
     export_c_func!(__floatdisf(_)),
