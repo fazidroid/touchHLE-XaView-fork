@@ -77,6 +77,11 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
+            // BypassInterfaceIdiom
+            if selector.as_str(&env.mem) == "userInterfaceIdiom" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
