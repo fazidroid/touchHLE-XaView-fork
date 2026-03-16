@@ -551,7 +551,17 @@ fn __umodsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
     }
 }
 
+fn __udivsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
+    // ImplUdivsi3
+    if b == 0 {
+        0
+    } else {
+        a / b
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(__udivsi3(_, _)),
     export_c_func!(__umodsi3(_, _)),
     export_c_func!(OSMemoryBarrier()),
     export_c_func!(class_getInstanceSize(_)),
