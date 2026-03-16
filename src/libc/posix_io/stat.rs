@@ -99,15 +99,16 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
     // struct with many kinds of data in it. This code is assuming the caller
     // only wants a small part of it.
 
-    let mut stat = stat::default();
-    
     // FakeBasicStatInfo
-    stat.st_dev = 1;
-    stat.st_ino = fd as ino_t;
-    stat.st_nlink = 1;
-    stat.st_uid = 501;
-    stat.st_gid = 20;
-    stat.st_blksize = 4096;
+    let mut stat = stat {
+        st_dev: 1,
+        st_ino: fd as ino_t,
+        st_nlink: 1,
+        st_uid: 501,
+        st_gid: 20,
+        st_blksize: 4096,
+        ..Default::default()
+    };
 
     match file.file {
         GuestFile::File(_) | GuestFile::IpaBundleFile(_) | GuestFile::ResourceFile(_) => {
