@@ -976,6 +976,33 @@ int test_pthread_mutex_recursive_trylock() {
   return 0;
 }
 
+int second_thread_thread_size_res = -1;
+
+void *second_thread(void *arg) {
+  size_t stack_size = pthread_get_stacksize_np(pthread_self());
+  if (stack_size == 512 * 1024) {
+    second_thread_thread_size_res = 0;
+  }
+  return NULL;
+}
+
+int test_pthread_get_stacksize_np() {
+  size_t stack_size = pthread_get_stacksize_np(pthread_self());
+  if (stack_size != 1024 * 1024 - getpagesize()) {
+    return -1;
+  }
+
+  pthread_t p;
+  if (pthread_create(&p, NULL, second_thread, NULL) != 0)
+    return -2;
+  if (pthread_join(p, NULL) != 0)
+    return -3;
+  if (second_thread_thread_size_res != 0)
+    return -4;
+
+  return 0;
+}
+
 int test_strncpy() {
   char *src = "test\0abcd";
   char dst[10];
@@ -3689,6 +3716,7 @@ struct {
     FUNC_DEF(test_getcwd_chdir),
     FUNC_DEF(test_synchronized),
     FUNC_DEF(test_read_directory_as_fd),
+    FUNC_DEF(test_pthread_get_stacksize_np),
 #endif
     FUNC_DEF(test_qsort),
     FUNC_DEF(test_vsnprintf),
