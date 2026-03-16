@@ -528,7 +528,7 @@ fn SecItemCopyMatching(_env: &mut Environment, _query: ConstVoidPtr, _result: Mu
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(SecItemCopyMatching(_, _, _)),
+    export_c_func!(SecItemCopyMatching(_, _)),
     export_c_func!(_Block_copy(_)),
     export_c_func!(_Block_release(_)),
     export_c_func!(dispatch_once(_, _)),
