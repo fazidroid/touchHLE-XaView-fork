@@ -18,7 +18,7 @@ use crate::Environment;
 // Below values corresponds to the original iPhone.
 // Reference https://www.mail-archive.com/misc@openbsd.org/msg80988.html
 // Numerical values are from xnu/bsd/sys/sysctl.h
-static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 16] = [
+static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 17] = [
     // Generic CPU, I/O
     ((6,1), "hw.machine" , String(b"iPhone1,1")),
     ((6,2), "hw.model" , String(b"M68AP")),
@@ -37,6 +37,7 @@ static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 16] = [
     ((1,3), "kern.osversion" , String(b"7A341")),
     ((1,10), "kern.hostname" , String(b"touchHLE")), // this is arbitrary
     ((1,4), "kern.version" , String(b"Darwin Kernel Version 10.0.0d3: Wed May 13 22:11:58 PDT 2009; root:xnu-1357.2.89~4/RELEASE_ARM_S5L8900X")),
+    ((1,65), "kern.osversion_65" , String(b"7A341")), // FakeKernOsVersion65
 ];
 
 static STRING_MAP: LazyLock<HashMap<&str, SysInfoType>> = LazyLock::new(|| {
