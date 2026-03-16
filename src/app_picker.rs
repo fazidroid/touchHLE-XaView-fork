@@ -577,8 +577,8 @@ fn show_app_picker_gui(
     let mut quick_options_orientation: Option<DeviceOrientation> = None;
     let mut quick_options_analog_stick_tilt_controls = true;
     let mut quick_options_network = false;
-    // DefaultIndex
-    let mut quick_options_device_model_idx = 6;
+    // FixDefaultModel
+    let mut quick_options_device_model_idx = 19;
     // DropdownClosed
     let mut quick_options_device_model_open = false;
     // ScrollOffsetState
