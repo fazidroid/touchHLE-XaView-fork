@@ -533,7 +533,13 @@ fn objc_getClass(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
     env.objc.link_class(&name_str, false, &mut env.mem).cast()
 }
 
+fn class_getInstanceSize(_env: &mut Environment, _cls: ConstVoidPtr) -> GuestUSize {
+    // FakeInstanceSize
+    1024
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(class_getInstanceSize(_)),
     export_c_func!(objc_getClass(_)),
     export_c_func!(SecItemCopyMatching(_, _)),
     export_c_func!(_Block_copy(_)),
