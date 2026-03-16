@@ -99,33 +99,19 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
     // struct with many kinds of data in it. This code is assuming the caller
     // only wants a small part of it.
 
-    // FakeBasicStatInfo
-    let mut stat = stat {
-        st_dev: 1,
-        st_ino: fd as ino_t,
-        st_nlink: 1,
-        st_uid: 501,
-        st_gid: 20,
-        st_blksize: 4096,
-        ..Default::default()
-    };
+    let mut stat = stat::default();
 
     match file.file {
         GuestFile::File(_) | GuestFile::IpaBundleFile(_) | GuestFile::ResourceFile(_) => {
-            // FakeRegPerms
-            stat.st_mode |= S_IFREG | 0o644;
+            stat.st_mode |= S_IFREG;
 
             // TODO: use `std::fs::metadata()` instead
 
             // Obtain file size
             stat.st_size = file.file.stream_len().unwrap().try_into().unwrap();
-            
-            // CalcFakeBlocks
-            stat.st_blocks = ((stat.st_size + 4095) / 4096 * 8) as blkcnt_t;
         }
         GuestFile::Directory => {
-            // FakeDirPerms
-            stat.st_mode |= S_IFDIR | 0o755;
+            stat.st_mode |= S_IFDIR;
 
             // TODO: st_size
         }
