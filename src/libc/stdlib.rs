@@ -560,7 +560,61 @@ fn __udivsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
     }
 }
 
+fn __floatdidf(_env: &mut Environment, a: i64) -> f64 {
+    // IntToDouble
+    a as f64
+}
+
+fn __floatundidf(_env: &mut Environment, a: u64) -> f64 {
+    // UintToDouble
+    a as f64
+}
+
+fn __floatdisf(_env: &mut Environment, a: i64) -> f32 {
+    // IntToFloat
+    a as f32
+}
+
+fn __floatundisf(_env: &mut Environment, a: u64) -> f32 {
+    // UintToFloat
+    a as f32
+}
+
+fn __muldi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
+    // Multiply64
+    a.wrapping_mul(b)
+}
+
+fn __divdi3(_env: &mut Environment, a: i64, b: i64) -> i64 {
+    // Divide64
+    if b == 0 { 0 } else { a.wrapping_div(b) }
+}
+
+fn __udivdi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
+    // UnsignedDivide64
+    if b == 0 { 0 } else { a.wrapping_div(b) }
+}
+
+fn __moddi3(_env: &mut Environment, a: i64, b: i64) -> i64 {
+    // Modulo64
+    if b == 0 { 0 } else { a.wrapping_rem(b) }
+}
+
+fn __umoddi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
+    // UnsignedModulo64
+    if b == 0 { 0 } else { a.wrapping_rem(b) }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(__floatdidf(_)),
+    export_c_func!(__floatundidf(_)),
+    export_c_func!(__floatdisf(_)),
+    export_c_func!(__floatundisf(_)),
+    export_c_func!(__muldi3(_, _)),
+    export_c_func!(__divdi3(_, _)),
+    export_c_func!(__udivdi3(_, _)),
+    export_c_func!(__moddi3(_, _)),
+    export_c_func!(__umoddi3(_, _)),
     export_c_func!(__udivsi3(_, _)),
     export_c_func!(__umodsi3(_, _)),
     export_c_func!(OSMemoryBarrier()),
