@@ -645,7 +645,13 @@ fn CFUUIDCreateString(_env: &mut Environment, _alloc: ConstVoidPtr, _uuid: Const
     crate::mem::Ptr::null()
 }
 
+fn class_respondsToSelector(_env: &mut Environment, _cls: ConstVoidPtr, _sel: ConstVoidPtr) -> bool {
+    // FakeRespondsToSelector
+    false
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
