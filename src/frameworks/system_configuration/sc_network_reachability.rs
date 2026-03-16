@@ -54,6 +54,12 @@ fn SCNetworkReachabilityCreateWithName(
         log!("Applying game-specific hack for Cut the Rope: SCNetworkReachabilityCreateWithName(\"chillingo-crystal.appspot.com\") returns NULL");
         return Ptr::null();
     }
+    
+    // GameloftLiveBypass
+    if env.mem.cstr_at_utf8(name).unwrap().contains("gameloft.com") {
+        return Ptr::null();
+    }
+
     let isa = env
         .objc
         .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
