@@ -625,7 +625,19 @@ fn __fixunssfdi(_env: &mut Environment, a: f32) -> u64 {
     a as u64
 }
 
+fn __modsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
+    // SignedModulo32
+    if b == 0 { 0 } else { a.wrapping_rem(b) }
+}
+
+fn __divsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
+    // SignedDivide32
+    if b == 0 { 0 } else { a.wrapping_div(b) }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(__modsi3(_, _)),
+    export_c_func!(__divsi3(_, _)),
     export_c_func!(__fixdfdi(_)),
     export_c_func!(__fixunsdfdi(_)),
     export_c_func!(__fixsfdi(_)),
