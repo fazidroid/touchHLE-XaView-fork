@@ -17,6 +17,7 @@
 
 #![allow(non_camel_case_types)]
 
+pub mod arm;
 pub mod core_types;
 pub mod host;
 pub mod init;
