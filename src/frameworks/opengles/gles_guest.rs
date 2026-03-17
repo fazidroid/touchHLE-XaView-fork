@@ -409,10 +409,20 @@ fn glSampleCoveragex(env: &mut Environment, value: GLclampx, invert: GLboolean) 
 fn glShadeModel(env: &mut Environment, mode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.ShadeModel(mode) })
 }
+fn get_retina_factor(env: &mut Environment) -> f32 {
+    let layer = crate::frameworks::core_animation::ca_eagl_layer::find_fullscreen_eagl_layer(env);
+    if layer != crate::objc::nil {
+        let layer_class = crate::objc::msg![env; layer class];
+        if env.objc.class_has_method_named(layer_class, "contentsScale") {
+            let scale: crate::frameworks::core_graphics::CGFloat = crate::objc::msg![env; layer contentsScale]; // FetchLayerScaleHack
+            return scale as f32;
+        }
+    }
+    1.0
+}
+
 fn glScissor(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-    // apply scale hack: assume framebuffer's size is larger than the app thinks
-    // and scale scissor appropriately
-    let factor = env.options.scale_hack.get() as GLsizei;
+    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLsizei; // ApplyScaleHack
     let (x, y) = (x * factor, y * factor);
     let (width, height) = (width * factor, height * factor);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
@@ -420,9 +430,7 @@ fn glScissor(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: 
     })
 }
 fn glViewport(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-    // apply scale hack: assume framebuffer's size is larger than the app thinks
-    // and scale viewport appropriately
-    let factor = env.options.scale_hack.get() as GLsizei;
+    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLsizei; // ApplyScaleHack
     let (x, y) = (x * factor, y * factor);
     let (width, height) = (width * factor, height * factor);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
@@ -1331,7 +1339,7 @@ fn glRenderbufferStorageOES(
     width: GLsizei,
     height: GLsizei,
 ) {
-    let factor = env.options.scale_hack.get() as GLsizei;
+    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLsizei; // ApplyScaleHack
     let (width, height) = (width * factor, height * factor);
     // RestoreCleanDepth
     with_ctx_and_mem(env, |gles, _mem| unsafe {
@@ -1407,14 +1415,12 @@ fn glGetRenderbufferParameterivOES(
     pname: GLenum,
     params: MutPtr<GLint>,
 ) {
-    let factor = env.options.scale_hack.get() as GLint;
+    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLint; // ApplyScaleHack
     with_ctx_and_mem(env, |gles, mem| {
         let params = mem.ptr_at_mut(params, 1);
         unsafe { gles.GetRenderbufferParameterivOES(target, pname, params) };
-        // apply scale hack: scale down the reported size of the framebuffer,
-        // assuming the framebuffer's true size is larger than it should be
         if pname == gles11::RENDERBUFFER_WIDTH_OES || pname == gles11::RENDERBUFFER_HEIGHT_OES {
-            unsafe { params.write_unaligned(params.read_unaligned() / factor) }
+            unsafe { params.write_unaligned(params.read_unaligned() / factor) } // DownscaleReportedSize
         }
     })
 }
