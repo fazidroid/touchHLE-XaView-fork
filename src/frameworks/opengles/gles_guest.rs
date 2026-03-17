@@ -414,11 +414,8 @@ fn get_smart_retina_scale(env: &mut Environment, w: GLsizei, h: GLsizei) -> f32 
     if let Some(ctx) = current_ctx {
         let host_obj = env.objc.borrow::<EAGLContextHostObject>(*ctx);
         let r_scale = host_obj.retina_scale;
-        if r_scale > 1.0 {
-            if (w == 480 && h == 320) || (w == 320 && h == 480) || 
-               (w == 1024 && h == 768) || (w == 768 && h == 1024) {
-                return r_scale; // SmartScaleApply
-            }
+        if r_scale > 1.0 && ((w == 480 && h == 320) || (w == 320 && h == 480) || (w == 1024 && h == 768) || (w == 768 && h == 1024)) {
+            return r_scale; // SmartScaleApply
         }
     }
     1.0 // SmartScaleIgnore
