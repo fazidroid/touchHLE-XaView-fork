@@ -409,27 +409,35 @@ fn glSampleCoveragex(env: &mut Environment, value: GLclampx, invert: GLboolean) 
 fn glShadeModel(env: &mut Environment, mode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.ShadeModel(mode) })
 }
-fn get_retina_factor(env: &mut Environment) -> f32 {
+fn get_smart_retina_scale(env: &mut Environment, w: GLsizei, h: GLsizei) -> f32 {
     let current_ctx = env.framework_state.opengles.current_ctx_for_thread(env.current_thread);
     if let Some(ctx) = current_ctx {
         let host_obj = env.objc.borrow::<EAGLContextHostObject>(*ctx);
-        return host_obj.retina_scale; // DirectRetinaScale
+        let r_scale = host_obj.retina_scale;
+        if r_scale > 1.0 {
+            if (w == 480 && h == 320) || (w == 320 && h == 480) || 
+               (w == 1024 && h == 768) || (w == 768 && h == 1024) {
+                return r_scale; // SmartScaleApply
+            }
+        }
     }
-    1.0
+    1.0 // SmartScaleIgnore
 }
 
 fn glScissor(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLsizei; // ApplyScaleHack
-    let (x, y) = (x * factor, y * factor);
-    let (width, height) = (width * factor, height * factor);
+    let r_scale = get_smart_retina_scale(env, width, height);
+    let scale_total = env.options.scale_hack.get() as f32 * r_scale;
+    let (x, y) = ((x as f32 * scale_total).round() as GLint, (y as f32 * scale_total).round() as GLint); // ApplyScaleHack
+    let (width, height) = ((width as f32 * scale_total).round() as GLsizei, (height as f32 * scale_total).round() as GLsizei);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.Scissor(x, y, width, height)
     })
 }
 fn glViewport(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLsizei; // ApplyScaleHack
-    let (x, y) = (x * factor, y * factor);
-    let (width, height) = (width * factor, height * factor);
+    let r_scale = get_smart_retina_scale(env, width, height);
+    let scale_total = env.options.scale_hack.get() as f32 * r_scale;
+    let (x, y) = ((x as f32 * scale_total).round() as GLint, (y as f32 * scale_total).round() as GLint); // ApplyScaleHack
+    let (width, height) = ((width as f32 * scale_total).round() as GLsizei, (height as f32 * scale_total).round() as GLsizei);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.Viewport(x, y, width, height)
     })
@@ -1336,8 +1344,9 @@ fn glRenderbufferStorageOES(
     width: GLsizei,
     height: GLsizei,
 ) {
-    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLsizei; // ApplyScaleHack
-    let (width, height) = (width * factor, height * factor);
+    let r_scale = get_smart_retina_scale(env, width, height);
+    let scale_total = env.options.scale_hack.get() as f32 * r_scale;
+    let (width, height) = ((width as f32 * scale_total).round() as GLsizei, (height as f32 * scale_total).round() as GLsizei); // ApplyScaleHack
     // RestoreCleanDepth
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.RenderbufferStorageOES(target, internalformat, width, height)
@@ -1412,7 +1421,7 @@ fn glGetRenderbufferParameterivOES(
     pname: GLenum,
     params: MutPtr<GLint>,
 ) {
-    let factor = (env.options.scale_hack.get() as f32 * get_retina_factor(env)).round() as GLint; // ApplyScaleHack
+    let factor = env.options.scale_hack.get() as GLint; // RevertToOriginal
     with_ctx_and_mem(env, |gles, mem| {
         let params = mem.ptr_at_mut(params, 1);
         unsafe { gles.GetRenderbufferParameterivOES(target, pname, params) };
