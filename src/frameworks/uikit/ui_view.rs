@@ -569,13 +569,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (CGFloat)contentScaleFactor {
-    let layer = env.objc.borrow::<UIViewHostObject>(this).layer;
-    let layer_class = msg![env; layer class];
-    if env.objc.class_has_method_named(layer_class, "contentsScale") {
-        msg![env; layer contentsScale] // SyncScaleLayerGet
-    } else {
-        env.objc.borrow::<UIViewHostObject>(this).content_scale_factor
-    }
+    env.objc.borrow::<UIViewHostObject>(this).content_scale_factor
 }
 - (())setContentScaleFactor:(CGFloat)scale {
     env.objc.borrow_mut::<UIViewHostObject>(this).content_scale_factor = scale;
