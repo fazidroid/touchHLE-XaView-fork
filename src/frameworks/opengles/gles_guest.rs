@@ -412,7 +412,7 @@ fn glShadeModel(env: &mut Environment, mode: GLenum) {
 fn get_retina_factor(env: &mut Environment) -> f32 {
     let current_ctx = env.framework_state.opengles.current_ctx_for_thread(env.current_thread);
     if let Some(ctx) = current_ctx {
-        let host_obj = env.objc.borrow::<EAGLContextHostObject>(ctx);
+        let host_obj = env.objc.borrow::<EAGLContextHostObject>(*ctx);
         return host_obj.retina_scale; // DirectRetinaScale
     }
     1.0
