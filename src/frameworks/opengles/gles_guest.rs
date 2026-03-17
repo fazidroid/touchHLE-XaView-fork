@@ -410,13 +410,10 @@ fn glShadeModel(env: &mut Environment, mode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.ShadeModel(mode) })
 }
 fn get_retina_factor(env: &mut Environment) -> f32 {
-    let layer = crate::frameworks::core_animation::ca_eagl_layer::find_fullscreen_eagl_layer(env);
-    if layer != crate::objc::nil {
-        let layer_class = crate::objc::msg![env; layer class];
-        if env.objc.class_has_method_named(layer_class, "contentsScale") {
-            let scale: crate::frameworks::core_graphics::CGFloat = crate::objc::msg![env; layer contentsScale]; // FetchLayerScaleHack
-            return scale as f32;
-        }
+    let current_ctx = env.framework_state.opengles.current_ctx_for_thread(env.current_thread);
+    if let Some(ctx) = current_ctx {
+        let host_obj = env.objc.borrow::<EAGLContextHostObject>(ctx);
+        return host_obj.retina_scale; // DirectRetinaScale
     }
     1.0
 }

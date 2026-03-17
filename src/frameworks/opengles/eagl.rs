@@ -68,6 +68,7 @@ pub(super) struct EAGLContextHostObject {
     fps_counter: Option<FpsCounter>,
     next_frame_due: Option<Instant>,
     pub mapped_buffers: HashMap<GLuint, (MutPtr<GLvoid>, *mut GLvoid)>,
+    pub retina_scale: f32, // StoreRetinaScale
 }
 impl HostObject for EAGLContextHostObject {}
 
@@ -85,6 +86,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         fps_counter: None,
         next_frame_due: None,
         mapped_buffers: HashMap::new(),
+        retina_scale: 1.0, // InitRetinaScale
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
@@ -239,15 +241,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     let internalformat = gles11::RGBA8_OES;
 
-    let (width, height) = {
-        let bounds: CGRect = msg![env; drawable bounds];
-        let CGSize { width, height } = bounds.size;
+    let scale: CGFloat = {
         let drawable_class = msg![env; drawable class];
-        let scale: CGFloat = if env.objc.class_has_method_named(drawable_class, "contentsScale") {
+        if env.objc.class_has_method_named(drawable_class, "contentsScale") {
             msg![env; drawable contentsScale] // FetchLayerScale
         } else {
             1.0
-        };
+        }
+    };
+    env.objc.borrow_mut::<EAGLContextHostObject>(this).retina_scale = scale as f32; // SyncRetinaScale
+
+    let (width, height) = {
+        let bounds: CGRect = msg![env; drawable bounds];
+        let CGSize { width, height } = bounds.size;
         assert!((0.0..(u32::MAX as f32)).contains(&width));
         assert!((0.0..(u32::MAX as f32)).contains(&height));
         let scale_hack = env.options.scale_hack.get() as f32;
