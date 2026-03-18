@@ -64,6 +64,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         mach::arm::task::FUNCTIONS,
         mach::host::FUNCTIONS,
         mach::init::FUNCTIONS,
+        mach::mach_port::FUNCTIONS,
         mach::semaphore::FUNCTIONS,
         mach::thread_info::FUNCTIONS,
         mach::time::FUNCTIONS,

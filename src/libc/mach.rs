@@ -21,6 +21,7 @@ pub mod arm;
 pub mod core_types;
 pub mod host;
 pub mod init;
+pub mod mach_port;
 pub mod port;
 pub mod semaphore;
 pub mod thread_info;
