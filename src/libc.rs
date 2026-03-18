@@ -66,6 +66,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         mach::semaphore::FUNCTIONS,
         mach::thread_info::FUNCTIONS,
         mach::time::FUNCTIONS,
+        mach::vm_map::FUNCTIONS,
         math::FUNCTIONS,
         mmap::FUNCTIONS,
         net::if_::FUNCTIONS,
@@ -116,5 +117,6 @@ pub struct State {
     time: time::State,
     errno: errno::State,
     clocale: clocale::State,
+    mach_vm: mach::vm_map::State,
     mmap: mmap::State,
 }
