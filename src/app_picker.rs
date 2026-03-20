@@ -1546,18 +1546,20 @@ fn setup_quick_options(
     {
         let button_frame = CGRect {
             origin: CGPoint {
-                x: main_frame.size.width - 45.0, // ShiftLeftX
-                y: 30.0, // ShiftDownY
+                x: main_frame.size.width - 40.0, // TopRightX
+                y: 0.0, // TopRightY
             },
             size: CGSize {
-                width: 35.0, // IncreaseHitWidth
-                height: 35.0, // IncreaseHitHeight
+                width: 40.0, // HitAreaWidth
+                height: 40.0, // HitAreaHeight
             },
         };
 
-        let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeRoundedRect];
+        let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom]; // CustomBtnType
         let text = ns_string::get_static_str(env, "×");
         () = msg![env; button setTitle:text forState:UIControlStateNormal];
+        let text_color: id = msg_class![env; UIColor blackColor]; // TextColorBlack
+        () = msg![env; button setTitleColor:text_color forState:UIControlStateNormal];
         () = msg![env; button setFrame:button_frame];
         // FIXME: manually calling layoutSubviews shouldn't be needed?
         () = msg![env; button layoutSubviews];
