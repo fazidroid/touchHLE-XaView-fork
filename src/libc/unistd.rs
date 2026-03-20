@@ -7,9 +7,9 @@
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::fs::GuestPath;
-use crate::libc::errno::{set_errno, EACCES, ENOENT, EROFS};
+use crate::libc::errno::{set_errno, EACCES, EINVAL, ENOENT, EROFS};
 use crate::libc::posix_io::{FileDescriptor, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
-use crate::mem::{ConstPtr, GuestUSize, MutPtr, PAGE_SIZE};
+use crate::mem::{ConstPtr, GuestISize, GuestUSize, MutPtr, PAGE_SIZE};
 use crate::Environment;
 use std::time::Duration;
 
@@ -151,6 +151,25 @@ fn getpagesize(_env: &mut Environment) -> i32 {
     PAGE_SIZE.try_into().unwrap()
 }
 
+fn readlink(
+    env: &mut Environment,
+    path: ConstPtr<u8>,
+    buf: MutPtr<u8>,
+    buf_size: GuestISize,
+) -> GuestISize {
+    log!(
+        "TODO: readlink({:?} '{}', {:?}, {}) -> -1",
+        path,
+        env.mem.cstr_at_utf8(path).unwrap(),
+        buf,
+        buf_size,
+    );
+    // Current implementation of guest's file system doesn't
+    // support symbolic links, so the call should unconditionally fail.
+    set_errno(env, EINVAL);
+    -1
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sleep(_)),
     export_c_func!(usleep(_)),
@@ -162,4 +181,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(gethostname(_, _)),
     export_c_func!(getpagesize()),
     export_c_func!(getgid()),
+    export_c_func!(readlink(_, _, _)),
 ];
