@@ -21,6 +21,11 @@ const X_OK: i32 = 1; // execute/search permission
 const W_OK: i32 = 2; // write permission
 const R_OK: i32 = 4; // read permission
 
+/// SycConf name type. This alias is for readability, POSIX just uses `int`.
+type SysConfName = i32;
+const _SC_PAGESIZE: SysConfName = 29;
+const _SC_NPROCESSORS_ONLN: SysConfName = 58;
+
 fn sleep(env: &mut Environment, seconds: u32) -> u32 {
     env.sleep(Duration::from_secs(seconds.into()));
     // sleep() returns the amount of time remaining that should have been slept,
@@ -176,6 +181,14 @@ fn getdtablesize(_env: &mut Environment) -> i32 {
     256
 }
 
+fn sysconf(_env: &mut Environment, name: i32) -> i32 {
+    match name {
+        _SC_PAGESIZE => PAGE_SIZE.try_into().unwrap(),
+        _SC_NPROCESSORS_ONLN => 1,
+        _ => unimplemented!("TODO: sysconf(name: {})", name),
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sleep(_)),
     export_c_func!(usleep(_)),
@@ -189,4 +202,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(getgid()),
     export_c_func!(readlink(_, _, _)),
     export_c_func!(getdtablesize()),
+    export_c_func!(sysconf(_)),
 ];
