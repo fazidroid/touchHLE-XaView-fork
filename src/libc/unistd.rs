@@ -170,6 +170,12 @@ fn readlink(
     -1
 }
 
+fn getdtablesize(_env: &mut Environment) -> i32 {
+    // Both macOS 15.7.4 and iOS 4.0.1 reports same dtable size.
+    // TODO: Issue an error on `open` if table is full.
+    256
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sleep(_)),
     export_c_func!(usleep(_)),
@@ -182,4 +188,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(getpagesize()),
     export_c_func!(getgid()),
     export_c_func!(readlink(_, _, _)),
+    export_c_func!(getdtablesize()),
 ];
