@@ -1546,12 +1546,12 @@ fn setup_quick_options(
     {
         let button_frame = CGRect {
             origin: CGPoint {
-                x: main_frame.size.width - 30.0,
-                y: 10.0,
+                x: main_frame.size.width - 45.0, // ShiftLeftX
+                y: 30.0, // ShiftDownY
             },
             size: CGSize {
-                width: 20.0,
-                height: 20.0,
+                width: 35.0, // IncreaseHitWidth
+                height: 35.0, // IncreaseHitHeight
             },
         };
 
