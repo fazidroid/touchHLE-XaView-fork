@@ -1540,7 +1540,7 @@ fn setup_quick_options(
     () = msg![env; main_view setHidden:true];
     () = msg![env; super_view addSubview:main_view];
 
-    let divider = 40.0;
+    let divider = 0.0; // FullScreenQOptions
 
     // Close button
     {
