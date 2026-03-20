@@ -22,6 +22,7 @@ pub const KERN_SUCCESS: kern_return_t = 0;
 type thread_inspect_t = mach_port_t;
 type thread_flavor_t = natural_t;
 type thread_info_t = MutPtr<integer_t>;
+pub type thread_state_flavor_t = i32;
 pub type mach_msg_type_number_t = natural_t;
 
 type policy_t = i32;
