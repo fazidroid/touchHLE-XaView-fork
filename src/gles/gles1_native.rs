@@ -64,7 +64,7 @@ impl GLESContext for GLES1NativeContext {
             window.make_gl_context_current(&self.gl_ctx);
         }
         gles11::load_with(|s| window.gl_get_proc_address(s));
-        // Загрузка ES2 (если она у тебя пропала из-за отката файла)
+        // LoadEsTwo
         touchHLE_gl_bindings::gles20::load_with(|s| window.gl_get_proc_address(s));
         self.is_loaded = true;
         Box::new(GLES1Native {
@@ -87,7 +87,7 @@ impl GLESContext for GLES1NativeContext {
         }
 
         make_current_fn(&self.gl_ctx);
-        // Не забываем передавать загрузчик для ES2
+        // LoadEsTwo
         gles11::load_with(&mut *loader_fn);
         touchHLE_gl_bindings::gles20::load_with(loader_fn);
         self.is_loaded = true;
