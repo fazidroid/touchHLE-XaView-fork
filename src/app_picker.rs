@@ -1523,10 +1523,16 @@ fn setup_quick_options(
     super_view: id,
     app_frame: CGRect,
 ) -> QuickOptionsStuff {
-    // UIView*
+    // FixFullScreenBounds
     let main_frame = CGRect {
-        origin: CGPoint { x: 0.0, y: 0.0 },
-        size: app_frame.size,
+        origin: CGPoint {
+            x: -app_frame.origin.x,
+            y: -app_frame.origin.y,
+        },
+        size: CGSize {
+            width: app_frame.size.width + app_frame.origin.x,
+            height: app_frame.size.height + app_frame.origin.y,
+        },
     };
 
     // Container for all the other stuff
@@ -1546,20 +1552,18 @@ fn setup_quick_options(
     {
         let button_frame = CGRect {
             origin: CGPoint {
-                x: main_frame.size.width - 40.0, // TopRightX
-                y: 0.0, // TopRightY
+                x: main_frame.size.width - 40.0,
+                y: 20.0,
             },
             size: CGSize {
-                width: 40.0, // HitAreaWidth
-                height: 40.0, // HitAreaHeight
+                width: 40.0,
+                height: 40.0,
             },
         };
 
-        let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeCustom]; // CustomBtnType
+        let button: id = msg_class![env; UIButton buttonWithType:UIButtonTypeRoundedRect];
         let text = ns_string::get_static_str(env, "×");
         () = msg![env; button setTitle:text forState:UIControlStateNormal];
-        let text_color: id = msg_class![env; UIColor blackColor]; // TextColorBlack
-        () = msg![env; button setTitleColor:text_color forState:UIControlStateNormal];
         () = msg![env; button setFrame:button_frame];
         // FIXME: manually calling layoutSubviews shouldn't be needed?
         () = msg![env; button layoutSubviews];
