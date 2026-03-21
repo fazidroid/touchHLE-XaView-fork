@@ -928,33 +928,108 @@ impl GLES for GLES1Native<'_> {
         touchHLE_gl_bindings::gles20::Uniform3f(location, v0, v1, v2)
     }
     // UniformNativeArrays
-    unsafe fn Uniform4f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat) {
+    unsafe fn Uniform4f(
+        &mut self,
+        location: GLint,
+        v0: GLfloat,
+        v1: GLfloat,
+        v2: GLfloat,
+        v3: GLfloat,
+    ) {
         touchHLE_gl_bindings::gles20::Uniform4f(location, v0, v1, v2, v3)
     }
-    unsafe fn Uniform1fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { touchHLE_gl_bindings::gles20::Uniform1fv(location, count, value) }
-    unsafe fn Uniform2fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { touchHLE_gl_bindings::gles20::Uniform2fv(location, count, value) }
-    unsafe fn Uniform3fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { touchHLE_gl_bindings::gles20::Uniform3fv(location, count, value) }
-    unsafe fn Uniform4fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) { touchHLE_gl_bindings::gles20::Uniform4fv(location, count, value) }
-    unsafe fn Uniform1iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { touchHLE_gl_bindings::gles20::Uniform1iv(location, count, value) }
-    unsafe fn Uniform2iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { touchHLE_gl_bindings::gles20::Uniform2iv(location, count, value) }
-    unsafe fn Uniform3iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { touchHLE_gl_bindings::gles20::Uniform3iv(location, count, value) }
-    unsafe fn Uniform4iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { touchHLE_gl_bindings::gles20::Uniform4iv(location, count, value) }
-    unsafe fn UniformMatrix2fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) { touchHLE_gl_bindings::gles20::UniformMatrix2fv(location, count, transpose, value) }
-    unsafe fn UniformMatrix3fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) { touchHLE_gl_bindings::gles20::UniformMatrix3fv(location, count, transpose, value) }
-    unsafe fn UniformMatrix4fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) {
+    unsafe fn Uniform1fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::Uniform1fv(location, count, value)
+    }
+    unsafe fn Uniform2fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::Uniform2fv(location, count, value)
+    }
+    unsafe fn Uniform3fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::Uniform3fv(location, count, value)
+    }
+    unsafe fn Uniform4fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::Uniform4fv(location, count, value)
+    }
+    unsafe fn Uniform1iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) {
+        touchHLE_gl_bindings::gles20::Uniform1iv(location, count, value)
+    }
+    unsafe fn Uniform2iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) {
+        touchHLE_gl_bindings::gles20::Uniform2iv(location, count, value)
+    }
+    unsafe fn Uniform3iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) {
+        touchHLE_gl_bindings::gles20::Uniform3iv(location, count, value)
+    }
+    unsafe fn Uniform4iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) {
+        touchHLE_gl_bindings::gles20::Uniform4iv(location, count, value)
+    }
+    unsafe fn UniformMatrix2fv(
+        &mut self,
+        location: GLint,
+        count: GLsizei,
+        transpose: GLboolean,
+        value: *const GLfloat,
+    ) {
+        touchHLE_gl_bindings::gles20::UniformMatrix2fv(location, count, transpose, value)
+    }
+    unsafe fn UniformMatrix3fv(
+        &mut self,
+        location: GLint,
+        count: GLsizei,
+        transpose: GLboolean,
+        value: *const GLfloat,
+    ) {
+        touchHLE_gl_bindings::gles20::UniformMatrix3fv(location, count, transpose, value)
+    }
+    unsafe fn UniformMatrix4fv(
+        &mut self,
+        location: GLint,
+        count: GLsizei,
+        transpose: GLboolean,
+        value: *const GLfloat,
+    ) {
         touchHLE_gl_bindings::gles20::UniformMatrix4fv(location, count, transpose, value)
     }
-    unsafe fn GetUniformLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint {
+    unsafe fn GetUniformLocation(
+        &mut self,
+        program: GLuint,
+        name: *const std::ffi::c_char,
+    ) -> GLint {
         touchHLE_gl_bindings::gles20::GetUniformLocation(program, name)
     }
-    unsafe fn GetAttribLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint {
+    unsafe fn GetAttribLocation(
+        &mut self,
+        program: GLuint,
+        name: *const std::ffi::c_char,
+    ) -> GLint {
         touchHLE_gl_bindings::gles20::GetAttribLocation(program, name)
     }
-    unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) {
-        touchHLE_gl_bindings::gles20::GetActiveUniform(program, index, bufSize, length, size, type_, name)
+    unsafe fn GetActiveUniform(
+        &mut self,
+        program: GLuint,
+        index: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        size: *mut GLint,
+        type_: *mut GLenum,
+        name: *mut std::ffi::c_char,
+    ) {
+        touchHLE_gl_bindings::gles20::GetActiveUniform(
+            program, index, bufSize, length, size, type_, name,
+        )
     }
-    unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) {
-        touchHLE_gl_bindings::gles20::GetActiveAttrib(program, index, bufSize, length, size, type_, name)
+    unsafe fn GetActiveAttrib(
+        &mut self,
+        program: GLuint,
+        index: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        size: *mut GLint,
+        type_: *mut GLenum,
+        name: *mut std::ffi::c_char,
+    ) {
+        touchHLE_gl_bindings::gles20::GetActiveAttrib(
+            program, index, bufSize, length, size, type_, name,
+        )
     }
     unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) {
         touchHLE_gl_bindings::gles20::BlendColor(red, green, blue, alpha)
