@@ -5,6 +5,10 @@
  */
 #include <cstdint>
 #include <cstdio>
+#include <thread>
+#include <chrono>
+
+// IncludeThreadHeaders
 
 #include "dynarmic/interface/A32/a32.h"
 #include "dynarmic/interface/A32/config.h"
@@ -177,6 +181,9 @@ private:
       }
       std::fprintf(stderr, "CPSR: 0x%08X\n", cpu->Cpsr());
       std::fprintf(stderr, "===========================\n\n");
+      // FlushAndSleep
+      std::fflush(stderr);
+      std::this_thread::sleep_for(std::chrono::seconds(2));
       abort();
     }
   }
