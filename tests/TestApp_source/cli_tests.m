@@ -19,6 +19,8 @@
 #include <fcntl.h>
 #include <fenv.h>
 #include <locale.h>
+#include <mach/kern_return.h>
+#include <mach/thread_info.h>
 #include <math.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -34,6 +36,13 @@
 #include <wchar.h>
 
 #import "SyncTester.h"
+
+// TODO: include from <mach/thread_act.h> once available in the common-sdk
+extern kern_return_t thread_suspend(mach_port_t target_act);
+extern kern_return_t thread_resume(mach_port_t target_act);
+extern kern_return_t thread_info(mach_port_t target_act, natural_t flavor,
+                                 integer_t *thread_info_out,
+                                 natural_t *thread_info_out_cnt);
 
 // Declare test functions from other files.
 
@@ -831,6 +840,75 @@ int test_mtsem() {
   sem_post(mt_semaphore);
   pthread_join(*my_thread, NULL);
   pthread_join(*my_thread2, NULL);
+  return 0;
+}
+
+sem_t *thread_suspend_semaphore;
+sem_t *thread_suspend_ready;
+int thread_suspend_flag = 0;
+
+void *thread_suspend_thread_func(void *arg) {
+  sem_post(thread_suspend_ready);
+  sem_wait(thread_suspend_semaphore);
+  thread_suspend_flag = 1;
+  return NULL;
+}
+
+int test_thread_suspend_resume() {
+  thread_suspend_flag = 0;
+
+  thread_suspend_semaphore = sem_open("thread_suspend_test", O_CREAT, 0644, 0);
+  if (thread_suspend_semaphore == SEM_FAILED) {
+    printf("Error opening semaphore\n");
+    return -1;
+  }
+  thread_suspend_ready = sem_open("thread_suspend_ready", O_CREAT, 0644, 0);
+  if (thread_suspend_ready == SEM_FAILED) {
+    sem_close(thread_suspend_semaphore);
+    sem_unlink("thread_suspend_test");
+    printf("Error opening ready semaphore\n");
+    return -2;
+  }
+
+  pthread_t thr;
+  if (pthread_create(&thr, NULL, thread_suspend_thread_func, NULL) != 0)
+    return -3;
+
+  // Wait until the worker has reached sem_wait().
+  sem_wait(thread_suspend_ready);
+
+  mach_port_t thr_port = pthread_mach_thread_np(thr);
+  if (thread_suspend(thr_port) != KERN_SUCCESS)
+    return -4;
+
+  // Check that run_state reports TH_STATE_WAITING while suspended.
+  thread_basic_info_data_t thr_info;
+  mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
+  if (thread_info(thr_port, THREAD_BASIC_INFO, (thread_info_t)&thr_info,
+                  &info_count) != KERN_SUCCESS)
+    return -5;
+  if (thr_info.run_state != TH_STATE_WAITING)
+    return -6;
+
+  // Post the semaphore while the thread is suspended — it should not wake up.
+  sem_post(thread_suspend_semaphore);
+  sched_yield();
+
+  if (thread_suspend_flag != 0)
+    return -7;
+
+  if (thread_resume(thr_port) != KERN_SUCCESS)
+    return -8;
+
+  pthread_join(thr, NULL);
+
+  if (thread_suspend_flag != 1)
+    return -9;
+
+  sem_close(thread_suspend_semaphore);
+  sem_unlink("thread_suspend_test");
+  sem_close(thread_suspend_ready);
+  sem_unlink("thread_suspend_ready");
   return 0;
 }
 
@@ -3727,6 +3805,7 @@ struct {
     FUNC_DEF(test_strtof),
     FUNC_DEF(test_sem),
     FUNC_DEF(test_mtsem),
+    FUNC_DEF(test_thread_suspend_resume),
     FUNC_DEF(test_CGAffineTransform),
     FUNC_DEF(test_strncpy),
     FUNC_DEF(test_strncat),

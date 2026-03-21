@@ -10,6 +10,7 @@
 #![allow(non_camel_case_types)]
 
 use crate::dyld::{export_c_func, FunctionExports};
+use crate::environment::ThreadBlock;
 use crate::libc::mach::core_types::{boolean_t, integer_t, natural_t};
 use crate::libc::mach::port::{mach_port_t, MACH_PORT_DEAD, MACH_PORT_NULL};
 use crate::mem::{guest_size_of, MutPtr, SafeRead};
@@ -63,6 +64,7 @@ unsafe impl SafeRead for policy_timeshare_info {}
 
 const TH_STATE_RUNNING: integer_t = 1;
 const TH_STATE_STOPPED: integer_t = 2;
+const TH_STATE_WAITING: integer_t = 3;
 
 /// Undocumented Darwin function that returns information about a thread.
 ///
@@ -98,12 +100,25 @@ fn thread_info(
                     cpu_usage: 0,
                     policy: POLICY_TIMESHARE, // no idea if this is realistic
                     run_state: if thread.active {
-                        TH_STATE_RUNNING
+                        match thread.blocked_by {
+                            ThreadBlock::NotBlocked => TH_STATE_RUNNING,
+                            ThreadBlock::Suspended(count, _) => {
+                                assert!(count > 0);
+                                TH_STATE_WAITING
+                            }
+                            _ => TH_STATE_WAITING,
+                        }
                     } else {
                         TH_STATE_STOPPED
                     },
                     flags: 0, // FIXME
-                    suspend_count: 0,
+                    suspend_count: match thread.blocked_by {
+                        ThreadBlock::Suspended(count, _) => {
+                            assert!(count > 0);
+                            count.try_into().unwrap()
+                        }
+                        _ => 0,
+                    },
                     sleep_time: 0,
                 },
             );
