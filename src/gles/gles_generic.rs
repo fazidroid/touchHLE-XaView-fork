@@ -27,7 +27,11 @@ pub trait GLESContext {
     /// Construct a new context. This might fail if the host OS doesn't have a
     /// compatible driver, for example.
     #[allow(clippy::new_ret_no_self)]
-    fn new(window: &mut crate::window::Window, options: &crate::options::Options) -> Result<Self, String> // PassOptions
+    fn new(
+        window: &mut crate::window::Window,
+        options: &crate::options::Options,
+    ) -> Result<Self, String>
+    // PassOptions
     where
         Self: Sized;
 
@@ -70,9 +74,11 @@ pub trait GLESContext {
 /// of the correct size as documented in the OpenGL ES spec.
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::too_many_arguments)] // not our fault :(
-// EsTwoCheckTrait
+                                     // EsTwoCheckTrait
 pub trait GLES {
-    fn is_gles2(&self) -> bool { false }
+    fn is_gles2(&self) -> bool {
+        false
+    }
     unsafe fn driver_description(&self) -> String;
     // Generic state manipulation
     unsafe fn GetError(&mut self) -> GLenum;
@@ -393,27 +399,65 @@ pub trait GLES {
 
     // EsTwoSupport
     unsafe fn CreateShader(&mut self, type_: GLenum) -> GLuint;
-    unsafe fn ShaderSource(&mut self, shader: GLuint, count: GLsizei, string: *const *const std::ffi::c_char, length: *const GLint);
+    unsafe fn ShaderSource(
+        &mut self,
+        shader: GLuint,
+        count: GLsizei,
+        string: *const *const std::ffi::c_char,
+        length: *const GLint,
+    );
     unsafe fn CompileShader(&mut self, shader: GLuint);
     unsafe fn DeleteShader(&mut self, shader: GLuint); // AddDeleteShader
     unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint);
-    unsafe fn GetShaderInfoLog(&mut self, shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char);
+    unsafe fn GetShaderInfoLog(
+        &mut self,
+        shader: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        infoLog: *mut std::ffi::c_char,
+    );
     unsafe fn CreateProgram(&mut self) -> GLuint;
     unsafe fn DeleteProgram(&mut self, program: GLuint);
     unsafe fn AttachShader(&mut self, program: GLuint, shader: GLuint);
-    unsafe fn BindAttribLocation(&mut self, program: GLuint, index: GLuint, name: *const std::ffi::c_char);
+    unsafe fn BindAttribLocation(
+        &mut self,
+        program: GLuint,
+        index: GLuint,
+        name: *const std::ffi::c_char,
+    );
     unsafe fn LinkProgram(&mut self, program: GLuint);
     unsafe fn UseProgram(&mut self, program: GLuint);
     unsafe fn GetProgramiv(&mut self, program: GLuint, pname: GLenum, params: *mut GLint);
-    unsafe fn GetProgramInfoLog(&mut self, program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char);
-    unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid);
+    unsafe fn GetProgramInfoLog(
+        &mut self,
+        program: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        infoLog: *mut std::ffi::c_char,
+    );
+    unsafe fn VertexAttribPointer(
+        &mut self,
+        indx: GLuint,
+        size: GLint,
+        type_: GLenum,
+        normalized: GLboolean,
+        stride: GLsizei,
+        ptr: *const GLvoid,
+    );
     unsafe fn EnableVertexAttribArray(&mut self, index: GLuint);
     unsafe fn DisableVertexAttribArray(&mut self, index: GLuint);
     // AddAttribTrait
     unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat);
     unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat);
     unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat);
-    unsafe fn VertexAttrib4f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat);
+    unsafe fn VertexAttrib4f(
+        &mut self,
+        indx: GLuint,
+        x: GLfloat,
+        y: GLfloat,
+        z: GLfloat,
+        w: GLfloat,
+    );
     unsafe fn VertexAttrib1fv(&mut self, indx: GLuint, values: *const GLfloat);
     unsafe fn VertexAttrib2fv(&mut self, indx: GLuint, values: *const GLfloat);
     unsafe fn VertexAttrib3fv(&mut self, indx: GLuint, values: *const GLfloat);
@@ -423,7 +467,14 @@ pub trait GLES {
     unsafe fn Uniform2f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat);
     unsafe fn Uniform3f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat);
     // UniformArraySupport
-    unsafe fn Uniform4f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat);
+    unsafe fn Uniform4f(
+        &mut self,
+        location: GLint,
+        v0: GLfloat,
+        v1: GLfloat,
+        v2: GLfloat,
+        v3: GLfloat,
+    );
     unsafe fn Uniform1fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat);
     unsafe fn Uniform2fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat);
     unsafe fn Uniform3fv(&mut self, location: GLint, count: GLsizei, value: *const GLfloat);
@@ -432,13 +483,54 @@ pub trait GLES {
     unsafe fn Uniform2iv(&mut self, location: GLint, count: GLsizei, value: *const GLint);
     unsafe fn Uniform3iv(&mut self, location: GLint, count: GLsizei, value: *const GLint);
     unsafe fn Uniform4iv(&mut self, location: GLint, count: GLsizei, value: *const GLint);
-    unsafe fn UniformMatrix2fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
-    unsafe fn UniformMatrix3fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
-    unsafe fn UniformMatrix4fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat);
-    unsafe fn GetUniformLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint;
-    unsafe fn GetAttribLocation(&mut self, program: GLuint, name: *const std::ffi::c_char) -> GLint;
-    unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char);
-    unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char);
+    unsafe fn UniformMatrix2fv(
+        &mut self,
+        location: GLint,
+        count: GLsizei,
+        transpose: GLboolean,
+        value: *const GLfloat,
+    );
+    unsafe fn UniformMatrix3fv(
+        &mut self,
+        location: GLint,
+        count: GLsizei,
+        transpose: GLboolean,
+        value: *const GLfloat,
+    );
+    unsafe fn UniformMatrix4fv(
+        &mut self,
+        location: GLint,
+        count: GLsizei,
+        transpose: GLboolean,
+        value: *const GLfloat,
+    );
+    unsafe fn GetUniformLocation(
+        &mut self,
+        program: GLuint,
+        name: *const std::ffi::c_char,
+    ) -> GLint;
+    unsafe fn GetAttribLocation(&mut self, program: GLuint, name: *const std::ffi::c_char)
+        -> GLint;
+    unsafe fn GetActiveUniform(
+        &mut self,
+        program: GLuint,
+        index: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        size: *mut GLint,
+        type_: *mut GLenum,
+        name: *mut std::ffi::c_char,
+    );
+    unsafe fn GetActiveAttrib(
+        &mut self,
+        program: GLuint,
+        index: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        size: *mut GLint,
+        type_: *mut GLenum,
+        name: *mut std::ffi::c_char,
+    );
     unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat);
     // AddAttribTrait
     unsafe fn GetVertexAttribiv(&mut self, index: GLuint, pname: GLenum, params: *mut GLint);

@@ -77,9 +77,12 @@ pub unsafe fn present_frame(
         gles.GetBooleanv(gles11::BLEND, &mut old_blend);
         gles.GetBooleanv(gles11::STENCIL_TEST, &mut old_stencil);
         gles.GetBooleanv(gles11::DITHER, &mut old_dither);
-        gles.GetBooleanv(gles11::COLOR_WRITEMASK, old_color_mask.as_mut_ptr() as *mut _);
+        gles.GetBooleanv(
+            gles11::COLOR_WRITEMASK,
+            old_color_mask.as_mut_ptr() as *mut _,
+        );
         gles.GetBooleanv(gles11::DEPTH_WRITEMASK, &mut old_depth_mask);
-        
+
         for i in 0..8 {
             let mut status: GLint = 0;
             gles.GetVertexAttribiv(i, 0x8622, &mut status);
@@ -98,8 +101,13 @@ pub unsafe fn present_frame(
         gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
     }
 
-    gles.Viewport(viewport.0 as _, viewport.1 as _, viewport.2 as _, viewport.3 as _);
-    
+    gles.Viewport(
+        viewport.0 as _,
+        viewport.1 as _,
+        viewport.2 as _,
+        viewport.3 as _,
+    );
+
     if is_gles2 {
         gles.ClearColor(0.2, 0.0, 0.0, 1.0);
     } else {
@@ -117,19 +125,19 @@ pub unsafe fn present_frame(
         let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
         // RemoveDebugTint
         let fs_src = "precision mediump float;\nvarying vec2 v_texCoord;\nuniform sampler2D tex;\nuniform vec4 color;\nvoid main() {\n    vec4 texColor = texture2D(tex, v_texCoord);\n    gl_FragColor = vec4(mix(texColor.rgb, color.rgb, color.a), 1.0);\n}\0";
-        
+
         let vs = gles.CreateShader(0x8B31);
         let vs_ptr = [vs_src.as_ptr() as *const std::ffi::c_char];
         let vs_len = [vs_src.len() as GLint - 1];
         gles.ShaderSource(vs, 1, vs_ptr.as_ptr(), vs_len.as_ptr());
         gles.CompileShader(vs);
-        
+
         let fs = gles.CreateShader(0x8B30);
         let fs_ptr = [fs_src.as_ptr() as *const std::ffi::c_char];
         let fs_len = [fs_src.len() as GLint - 1];
         gles.ShaderSource(fs, 1, fs_ptr.as_ptr(), fs_len.as_ptr());
         gles.CompileShader(fs);
-        
+
         let prog = gles.CreateProgram();
         gles.AttachShader(prog, vs);
         gles.AttachShader(prog, fs);
@@ -137,7 +145,7 @@ pub unsafe fn present_frame(
         gles.BindAttribLocation(prog, 6, c"position".as_ptr() as *const _);
         gles.BindAttribLocation(prog, 7, c"texCoord".as_ptr() as *const _);
         gles.LinkProgram(prog);
-        
+
         let pos = gles.GetAttribLocation(prog, c"position".as_ptr() as *const _);
         let tex = gles.GetAttribLocation(prog, c"texCoord".as_ptr() as *const _);
         let mat = gles.GetUniformLocation(prog, c"texMatrix".as_ptr() as *const _);
@@ -158,11 +166,25 @@ pub unsafe fn present_frame(
         gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
         if pos >= 0 {
             gles.EnableVertexAttribArray(pos as GLuint);
-            gles.VertexAttribPointer(pos as GLuint, 2, gles11::FLOAT, 0, 0, vertices.as_ptr() as *const _);
+            gles.VertexAttribPointer(
+                pos as GLuint,
+                2,
+                gles11::FLOAT,
+                0,
+                0,
+                vertices.as_ptr() as *const _,
+            );
         }
         if tex >= 0 {
             gles.EnableVertexAttribArray(tex as GLuint);
-            gles.VertexAttribPointer(tex as GLuint, 2, gles11::FLOAT, 0, 0, tex_coords.as_ptr() as *const _);
+            gles.VertexAttribPointer(
+                tex as GLuint,
+                2,
+                gles11::FLOAT,
+                0,
+                0,
+                tex_coords.as_ptr() as *const _,
+            );
         }
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);
 
@@ -176,19 +198,39 @@ pub unsafe fn present_frame(
             let mut cursor_vertices = vertices;
             for i in (0..cursor_vertices.len()).step_by(2) {
                 cursor_vertices[i] = (cursor_vertices[i] * radius + x) / (vw as f32 / 2.0) - 1.0;
-                cursor_vertices[i + 1] = 1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
+                cursor_vertices[i + 1] =
+                    1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
             }
-            gles.Uniform4f(col, 0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
-            if tex >= 0 { gles.DisableVertexAttribArray(tex as GLuint); }
+            gles.Uniform4f(
+                col,
+                0.0,
+                0.0,
+                0.0,
+                if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 },
+            );
+            if tex >= 0 {
+                gles.DisableVertexAttribArray(tex as GLuint);
+            }
             if pos >= 0 {
-                gles.VertexAttribPointer(pos as GLuint, 2, gles11::FLOAT, 0, 0, cursor_vertices.as_ptr() as *const _);
+                gles.VertexAttribPointer(
+                    pos as GLuint,
+                    2,
+                    gles11::FLOAT,
+                    0,
+                    0,
+                    cursor_vertices.as_ptr() as *const _,
+                );
             }
             gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         }
 
-        if pos >= 0 { gles.DisableVertexAttribArray(pos as GLuint); }
-        if tex >= 0 { gles.DisableVertexAttribArray(tex as GLuint); }
-        
+        if pos >= 0 {
+            gles.DisableVertexAttribArray(pos as GLuint);
+        }
+        if tex >= 0 {
+            gles.DisableVertexAttribArray(tex as GLuint);
+        }
+
         gles.UseProgram(old_prog as GLuint);
         gles.DeleteProgram(prog);
         gles.DeleteShader(vs);
@@ -197,13 +239,42 @@ pub unsafe fn present_frame(
         gles.BindBuffer(gles11::ARRAY_BUFFER, old_array_buf as GLuint);
         gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, old_elem_buf as GLuint);
         // StateRestoreFix
-        if old_cull != 0 { gles.Enable(gles11::CULL_FACE); } else { gles.Disable(gles11::CULL_FACE); }
-        if old_depth != 0 { gles.Enable(gles11::DEPTH_TEST); } else { gles.Disable(gles11::DEPTH_TEST); }
-        if old_scissor != 0 { gles.Enable(gles11::SCISSOR_TEST); } else { gles.Disable(gles11::SCISSOR_TEST); }
-        if old_blend != 0 { gles.Enable(gles11::BLEND); } else { gles.Disable(gles11::BLEND); }
-        if old_stencil != 0 { gles.Enable(gles11::STENCIL_TEST); } else { gles.Disable(gles11::STENCIL_TEST); }
-        if old_dither != 0 { gles.Enable(gles11::DITHER); } else { gles.Disable(gles11::DITHER); }
-        gles.ColorMask(old_color_mask[0], old_color_mask[1], old_color_mask[2], old_color_mask[3]);
+        if old_cull != 0 {
+            gles.Enable(gles11::CULL_FACE);
+        } else {
+            gles.Disable(gles11::CULL_FACE);
+        }
+        if old_depth != 0 {
+            gles.Enable(gles11::DEPTH_TEST);
+        } else {
+            gles.Disable(gles11::DEPTH_TEST);
+        }
+        if old_scissor != 0 {
+            gles.Enable(gles11::SCISSOR_TEST);
+        } else {
+            gles.Disable(gles11::SCISSOR_TEST);
+        }
+        if old_blend != 0 {
+            gles.Enable(gles11::BLEND);
+        } else {
+            gles.Disable(gles11::BLEND);
+        }
+        if old_stencil != 0 {
+            gles.Enable(gles11::STENCIL_TEST);
+        } else {
+            gles.Disable(gles11::STENCIL_TEST);
+        }
+        if old_dither != 0 {
+            gles.Enable(gles11::DITHER);
+        } else {
+            gles.Disable(gles11::DITHER);
+        }
+        gles.ColorMask(
+            old_color_mask[0],
+            old_color_mask[1],
+            old_color_mask[2],
+            old_color_mask[3],
+        );
         gles.DepthMask(old_depth_mask);
         for i in 0..8 {
             if old_attribs[i as usize] != 0 {
@@ -232,12 +303,18 @@ pub unsafe fn present_frame(
             let mut cursor_vertices = vertices;
             for i in (0..cursor_vertices.len()).step_by(2) {
                 cursor_vertices[i] = (cursor_vertices[i] * radius + x) / (vw as f32 / 2.0) - 1.0;
-                cursor_vertices[i + 1] = 1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
+                cursor_vertices[i + 1] =
+                    1.0 - (cursor_vertices[i + 1] * radius + y) / (vh as f32 / 2.0);
             }
             gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
             gles.Disable(gles11::TEXTURE_2D);
             gles.Color4f(0.0, 0.0, 0.0, if pressed { 2.0 / 3.0 } else { 1.0 / 3.0 });
-            gles.VertexPointer(2, gles11::FLOAT, 0, cursor_vertices.as_ptr() as *const GLvoid);
+            gles.VertexPointer(
+                2,
+                gles11::FLOAT,
+                0,
+                cursor_vertices.as_ptr() as *const GLvoid,
+            );
             gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         }
     }
