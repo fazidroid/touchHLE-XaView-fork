@@ -53,7 +53,7 @@ pub struct Thread {
     /// When a thread is currently executing, its state is stored directly in
     /// the CPU, rather than in a context object. In that case, this field is
     /// None. See also: [std::mem::take] and [cpu::Cpu::swap_context].
-    guest_context: Option<Box<cpu::CpuContext>>,
+    pub guest_context: Option<Box<cpu::CpuContext>>,
     /// The coroutine associated with this thread.
     ///
     /// In more typical rust, this is equivalent to to a [std::future::Future].
