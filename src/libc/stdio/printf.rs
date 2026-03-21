@@ -177,13 +177,16 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             // Integer specifiers
             b'c' => {
                 // FixCharPadding
-                assert!(!prepend_sign);
-                assert!(length_modifier.is_none());
-                let c: u8 = args.next(env);
-                if pad_width > 1 && !left_justified {
-                    res.extend(std::iter::repeat_n(pad_char as u8, (pad_width - 1) as usize));
-                }
-                res.push(c);
+            assert!(!prepend_sign);
+            assert!(length_modifier.is_none());
+            let c: u8 = args.next(env);
+            if pad_width > 1 && !left_justified {
+                res.extend(std::iter::repeat_n(
+                    pad_char as u8,
+                    (pad_width - 1) as usize,
+                ));
+            }
+            res.push(c);
                 if pad_width > 1 && left_justified {
                     res.extend(std::iter::repeat_n(b' ', (pad_width - 1) as usize));
                 }
@@ -191,14 +194,17 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             // Apple extension? Seemingly works in both NSLog and printf.
             b'C' => {
                 // FixWideCharPadding
-                assert!(!prepend_sign);
-                assert!(length_modifier.is_none());
-                let c: unichar = args.next(env);
-                let c = char::from_u32(c.into()).unwrap();
-                if pad_width > 1 && !left_justified {
-                    res.extend(std::iter::repeat_n(pad_char as u8, (pad_width - 1) as usize));
-                }
-                write!(&mut res, "{c}").unwrap();
+            assert!(!prepend_sign);
+            assert!(length_modifier.is_none());
+            let c: unichar = args.next(env);
+            let c = char::from_u32(c.into()).unwrap();
+            if pad_width > 1 && !left_justified {
+                res.extend(std::iter::repeat_n(
+                    pad_char as u8,
+                    (pad_width - 1) as usize,
+                ));
+            }
+            write!(&mut res, "{c}").unwrap();
                 if pad_width > 1 && left_justified {
                     res.extend(std::iter::repeat_n(b' ', (pad_width - 1) as usize));
                 }
