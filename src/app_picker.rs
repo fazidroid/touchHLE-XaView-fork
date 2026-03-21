@@ -1546,14 +1546,14 @@ fn setup_quick_options(
     () = msg![env; main_view setHidden:true];
     () = msg![env; super_view addSubview:main_view];
 
-    let divider = app_frame.origin.y + 35.0; // TopPaddingFix
+    let divider = 45.0; // ShiftedUpOptions
 
     // Close button
     {
         let button_frame = CGRect {
             origin: CGPoint {
-                x: main_frame.size.width - 50.0,
-                y: app_frame.origin.y + 5.0, // TopRightCorner
+                x: main_frame.size.width - 45.0,
+                y: 5.0, // ShiftedUpCross
             },
             size: CGSize {
                 width: 40.0,
