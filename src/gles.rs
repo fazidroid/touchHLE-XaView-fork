@@ -135,7 +135,8 @@ pub fn create_gles1_ctx(
     let mut gles1_ctx = None;
     for implementation in list {
         log!("Trying: {}", implementation.description());
-        match implementation.construct(window, options) { // PassOptionsArgs
+        match implementation.construct(window, options) {
+            // PassOptionsArgs
             Ok(ctx) => {
                 log!("=> Success!");
                 gles1_ctx = Some(ctx);
