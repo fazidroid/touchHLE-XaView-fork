@@ -1183,7 +1183,18 @@ impl Environment {
                     }
                 }
             }
-            cpu::CpuState::Error(e) => ThreadNextAction::DebugCpuError(e),
+            cpu::CpuState::Error(e) => {
+                if matches!(e, cpu::CpuError::UndefinedInstruction) {
+                    let cpsr = self.cpu.cpsr();
+                    if (cpsr & cpu::Cpu::CPSR_THUMB) == 0 {
+                        // ForceThumbRecover
+                        self.cpu.regs_mut()[cpu::Cpu::PC] -= 4;
+                        self.cpu.set_cpsr(cpsr | cpu::Cpu::CPSR_THUMB);
+                        return ThreadNextAction::Continue;
+                    }
+                }
+                ThreadNextAction::DebugCpuError(e)
+            }
         }
     }
 
