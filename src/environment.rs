@@ -1185,17 +1185,8 @@ impl Environment {
             }
             cpu::CpuState::Error(e) => {
                 if matches!(e, cpu::CpuError::UndefinedInstruction) {
-                    let cpsr = self.cpu.cpsr();
-                    if (cpsr & cpu::Cpu::CPSR_THUMB) == 0 {
-                        // BranchToThumbMode
-                        let fault_pc = self.cpu.regs()[cpu::Cpu::PC] - 4;
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(fault_pc | 1));
-                        let lr = self.cpu.regs()[cpu::Cpu::LR];
-                        if (lr & 1) == 0 && lr != 0 {
-                            self.cpu.regs_mut()[cpu::Cpu::LR] = lr | 1;
-                        }
-                        return ThreadNextAction::Continue;
-                    }
+                    // SkipUndefinedOpcode
+                    return ThreadNextAction::Continue;
                 }
                 ThreadNextAction::DebugCpuError(e)
             }
