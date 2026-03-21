@@ -22,7 +22,7 @@ Audi RS3: 1.0.0, 1.0.1 (Missing buttons, screens, textures)
 
 =Asphalt 7 (IOS 4.0-4.3) support: ✅
 
-Fully Working: 1.0.0, 1.0.2, 1.0.4, 1.0.9 (1.0.1, 1.0.5, 1.0.6, 1.0.7, 1.0.8 untested because i didnt find ipa's)
+Fully Working: 1.0.0k, 1.0.2a, 1.0.4c, 1.0.9a (1.0.1, 1.0.5, 1.0.6, 1.0.7, 1.0.8 untested because i didnt find ipa's)
 
 Not working: 1.1.0, 1.8.1 (1.1.1 not finded ipa = untested)
 
