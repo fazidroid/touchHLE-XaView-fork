@@ -522,7 +522,11 @@ fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoid
     }
 }
 
-fn SecItemCopyMatching(_env: &mut Environment, _query: ConstVoidPtr, _result: MutPtr<MutVoidPtr>) -> i32 {
+fn SecItemCopyMatching(
+    _env: &mut Environment,
+    _query: ConstVoidPtr,
+    _result: MutPtr<MutVoidPtr>,
+) -> i32 {
     // FakeSecItemNotFound
     -25300
 }
@@ -587,22 +591,38 @@ fn __muldi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
 
 fn __divdi3(_env: &mut Environment, a: i64, b: i64) -> i64 {
     // Divide64
-    if b == 0 { 0 } else { a.wrapping_div(b) }
+    if b == 0 {
+        0
+    } else {
+        a.wrapping_div(b)
+    }
 }
 
 fn __udivdi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
     // UnsignedDivide64
-    if b == 0 { 0 } else { a.wrapping_div(b) }
+    if b == 0 {
+        0
+    } else {
+        a.wrapping_div(b)
+    }
 }
 
 fn __moddi3(_env: &mut Environment, a: i64, b: i64) -> i64 {
     // Modulo64
-    if b == 0 { 0 } else { a.wrapping_rem(b) }
+    if b == 0 {
+        0
+    } else {
+        a.wrapping_rem(b)
+    }
 }
 
 fn __umoddi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
     // UnsignedModulo64
-    if b == 0 { 0 } else { a.wrapping_rem(b) }
+    if b == 0 {
+        0
+    } else {
+        a.wrapping_rem(b)
+    }
 }
 
 fn __fixdfdi(_env: &mut Environment, a: f64) -> i64 {
@@ -627,12 +647,20 @@ fn __fixunssfdi(_env: &mut Environment, a: f32) -> u64 {
 
 fn __modsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
     // SignedModulo32
-    if b == 0 { 0 } else { a.wrapping_rem(b) }
+    if b == 0 {
+        0
+    } else {
+        a.wrapping_rem(b)
+    }
 }
 
 fn __divsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
     // SignedDivide32
-    if b == 0 { 0 } else { a.wrapping_div(b) }
+    if b == 0 {
+        0
+    } else {
+        a.wrapping_div(b)
+    }
 }
 
 fn CFUUIDCreate(_env: &mut Environment, _alloc: ConstVoidPtr) -> MutVoidPtr {
@@ -640,12 +668,20 @@ fn CFUUIDCreate(_env: &mut Environment, _alloc: ConstVoidPtr) -> MutVoidPtr {
     crate::mem::Ptr::null()
 }
 
-fn CFUUIDCreateString(_env: &mut Environment, _alloc: ConstVoidPtr, _uuid: ConstVoidPtr) -> MutVoidPtr {
+fn CFUUIDCreateString(
+    _env: &mut Environment,
+    _alloc: ConstVoidPtr,
+    _uuid: ConstVoidPtr,
+) -> MutVoidPtr {
     // FakeUUIDString
     crate::mem::Ptr::null()
 }
 
-fn class_respondsToSelector(_env: &mut Environment, _cls: ConstVoidPtr, _sel: ConstVoidPtr) -> bool {
+fn class_respondsToSelector(
+    _env: &mut Environment,
+    _cls: ConstVoidPtr,
+    _sel: ConstVoidPtr,
+) -> bool {
     // FakeRespondsToSelector
     false
 }
