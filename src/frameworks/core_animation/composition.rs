@@ -250,7 +250,12 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
             );
             let err = gles.GetError();
             if err != 0 {
-                log!("Warning: GL error {:#x} during composition FBO setup (w={}, h={})", err, fb_width, fb_height);
+                log!(
+                    "Warning: GL error {:#x} during composition FBO setup (w={}, h={})",
+                    err,
+                    fb_width,
+                    fb_height
+                );
             }
             let status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
             if status != gles11::FRAMEBUFFER_COMPLETE_OES {
@@ -450,13 +455,13 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
             gles.LoadIdentity();
         }
         // CleanupAssertFix
-            gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
-            gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
-            let err = gles.GetError();
-            if err != 0 {
-                log!("Warning: GL error {:#x} during composition cleanup", err);
-            }
+        gles.BindBuffer(gles11::ARRAY_BUFFER, 0);
+        gles.BindBuffer(gles11::ELEMENT_ARRAY_BUFFER, 0);
+        let err = gles.GetError();
+        if err != 0 {
+            log!("Warning: GL error {:#x} during composition cleanup", err);
         }
+    }
 
     // Present our rendered frame (bound to TEXTURE_2D). This copies it to the
     // default framebuffer (0) so we need to unbind our internal framebuffer.
@@ -545,8 +550,19 @@ unsafe fn composite_layer_recursive(
 
         let mvp = mv.multiply(&projection_matrix);
         if env.options.gles_version == 2 {
-            let misc = env.framework_state.core_animation.composition.misc_gl_objects.as_ref().unwrap();
-            gles.UniformMatrix4fv(misc.mvp_uni, 1, 0 /* FALSE */, mvp.columns().as_ptr() as *const _);
+            let misc = env
+                .framework_state
+                .core_animation
+                .composition
+                .misc_gl_objects
+                .as_ref()
+                .unwrap();
+            gles.UniformMatrix4fv(
+                misc.mvp_uni,
+                1,
+                0, /* FALSE */
+                mvp.columns().as_ptr() as *const _,
+            );
         } else {
             gles.MatrixMode(gles11::MODELVIEW);
             load_matrix(gles.as_mut(), mv);
@@ -574,7 +590,10 @@ unsafe fn composite_layer_recursive(
 
         if env.options.gles_version == 2 {
             gles.Uniform4f(misc.color_uni, r_c, g_c, b_c, a_c);
-            gles.Uniform1i(misc.use_tex_uni, if host_obj.corner_radius == 0.0 { 0 } else { 1 });
+            gles.Uniform1i(
+                misc.use_tex_uni,
+                if host_obj.corner_radius == 0.0 { 0 } else { 1 },
+            );
         } else {
             gles.Color4f(r_c, g_c, b_c, a_c);
         }
@@ -584,10 +603,18 @@ unsafe fn composite_layer_recursive(
 
         let radius = host_obj.corner_radius;
         if radius == 0.0 {
-            if env.options.gles_version == 2 && misc.pos_attr >= 0 { // SafeAttrSquare
+            if env.options.gles_version == 2 && misc.pos_attr >= 0 {
+                // SafeAttrSquare
                 gles.EnableVertexAttribArray(misc.pos_attr as GLuint);
                 gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
-                gles.VertexAttribPointer(misc.pos_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                gles.VertexAttribPointer(
+                    misc.pos_attr as GLuint,
+                    2,
+                    gles11::FLOAT,
+                    0,
+                    0,
+                    0 as *const GLvoid,
+                );
             } else if env.options.gles_version != 2 {
                 gles.Disable(gles11::TEXTURE_2D);
                 gles.DisableClientState(gles11::TEXTURE_COORD_ARRAY);
@@ -603,17 +630,26 @@ unsafe fn composite_layer_recursive(
                 0 as *const GLvoid,
             );
 
-            if env.options.gles_version == 2 && misc.pos_attr >= 0 { // SafeAttrSquareDis
+            if env.options.gles_version == 2 && misc.pos_attr >= 0 {
+                // SafeAttrSquareDis
                 gles.DisableVertexAttribArray(misc.pos_attr as GLuint);
             }
         } else {
             if env.options.gles_version == 2 {
                 gles.ActiveTexture(gles11::TEXTURE0);
                 gles.BindTexture(gles11::TEXTURE_2D, misc.rounded_corner_texture);
-                if misc.tex_attr >= 0 { // SafeAttrRound
+                if misc.tex_attr >= 0 {
+                    // SafeAttrRound
                     gles.EnableVertexAttribArray(misc.tex_attr as GLuint);
                     gles.BindBuffer(gles11::ARRAY_BUFFER, misc.rounded_tex_coord_buffer);
-                    gles.VertexAttribPointer(misc.tex_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                    gles.VertexAttribPointer(
+                        misc.tex_attr as GLuint,
+                        2,
+                        gles11::FLOAT,
+                        0,
+                        0,
+                        0 as *const GLvoid,
+                    );
                 }
                 if misc.pos_attr >= 0 {
                     gles.EnableVertexAttribArray(misc.pos_attr as GLuint);
@@ -649,8 +685,16 @@ unsafe fn composite_layer_recursive(
                 gles11::DYNAMIC_DRAW,
             );
 
-            if env.options.gles_version == 2 && misc.pos_attr >= 0 { // SafeAttrRoundPtr
-                gles.VertexAttribPointer(misc.pos_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+            if env.options.gles_version == 2 && misc.pos_attr >= 0 {
+                // SafeAttrRoundPtr
+                gles.VertexAttribPointer(
+                    misc.pos_attr as GLuint,
+                    2,
+                    gles11::FLOAT,
+                    0,
+                    0,
+                    0 as *const GLvoid,
+                );
             } else if env.options.gles_version != 2 {
                 gles.VertexPointer(2, gles11::FLOAT, 0, 0 as *const GLvoid);
             }
@@ -662,9 +706,14 @@ unsafe fn composite_layer_recursive(
                 0 as *const GLvoid,
             );
 
-            if env.options.gles_version == 2 { // SafeAttrRoundDis
-                if misc.pos_attr >= 0 { gles.DisableVertexAttribArray(misc.pos_attr as GLuint); }
-                if misc.tex_attr >= 0 { gles.DisableVertexAttribArray(misc.tex_attr as GLuint); }
+            if env.options.gles_version == 2 {
+                // SafeAttrRoundDis
+                if misc.pos_attr >= 0 {
+                    gles.DisableVertexAttribArray(misc.pos_attr as GLuint);
+                }
+                if misc.tex_attr >= 0 {
+                    gles.DisableVertexAttribArray(misc.tex_attr as GLuint);
+                }
             }
         };
 
@@ -759,11 +808,19 @@ unsafe fn composite_layer_recursive(
             gles.BlendFunc(gles11::ONE, gles11::ONE_MINUS_SRC_ALPHA);
         }
 
-        if env.options.gles_version == 2 { // SafeAttrTex
+        if env.options.gles_version == 2 {
+            // SafeAttrTex
             if misc.pos_attr >= 0 {
                 gles.EnableVertexAttribArray(misc.pos_attr as GLuint);
                 gles.BindBuffer(gles11::ARRAY_BUFFER, misc.basic_square_buffer);
-                gles.VertexAttribPointer(misc.pos_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                gles.VertexAttribPointer(
+                    misc.pos_attr as GLuint,
+                    2,
+                    gles11::FLOAT,
+                    0,
+                    0,
+                    0 as *const GLvoid,
+                );
             }
 
             if misc.tex_attr >= 0 {
@@ -776,7 +833,14 @@ unsafe fn composite_layer_recursive(
                         misc.flipped_square_buffer
                     },
                 );
-                gles.VertexAttribPointer(misc.tex_attr as GLuint, 2, gles11::FLOAT, 0, 0, 0 as *const GLvoid);
+                gles.VertexAttribPointer(
+                    misc.tex_attr as GLuint,
+                    2,
+                    gles11::FLOAT,
+                    0,
+                    0,
+                    0 as *const GLvoid,
+                );
             }
 
             gles.ActiveTexture(gles11::TEXTURE0);
@@ -805,9 +869,14 @@ unsafe fn composite_layer_recursive(
             0 as *const GLvoid,
         );
 
-        if env.options.gles_version == 2 { // SafeAttrTexDis
-            if misc.pos_attr >= 0 { gles.DisableVertexAttribArray(misc.pos_attr as GLuint); }
-            if misc.tex_attr >= 0 { gles.DisableVertexAttribArray(misc.tex_attr as GLuint); }
+        if env.options.gles_version == 2 {
+            // SafeAttrTexDis
+            if misc.pos_attr >= 0 {
+                gles.DisableVertexAttribArray(misc.pos_attr as GLuint);
+            }
+            if misc.tex_attr >= 0 {
+                gles.DisableVertexAttribArray(misc.tex_attr as GLuint);
+            }
         }
     }
     std::mem::drop(gles);
