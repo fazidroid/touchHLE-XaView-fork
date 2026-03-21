@@ -168,8 +168,15 @@ private:
     } else if (exception == Dynarmic::A32::Exception::Breakpoint) {
       cpu->HaltExecution(HaltReasonBreakpoint);
     } else {
-      std::fprintf(stderr, "ExceptionRaised: unexpected exception %u at %x\n",
-                   unsigned(exception), pc);
+      // LogCrashReason
+      std::fprintf(stderr, "\n=== FATAL CPU EXCEPTION ===\n");
+      std::fprintf(stderr, "ExceptionRaised: unexpected exception %u at PC: 0x%08X\n", unsigned(exception), pc);
+      std::fprintf(stderr, "Registers state:\n");
+      for (int i = 0; i < 16; ++i) {
+        std::fprintf(stderr, "R%d: 0x%08X\n", i, cpu->Regs()[i]);
+      }
+      std::fprintf(stderr, "CPSR: 0x%08X\n", cpu->Cpsr());
+      std::fprintf(stderr, "===========================\n\n");
       abort();
     }
   }
