@@ -92,6 +92,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         sys::timeb::FUNCTIONS,
         sys::socket::FUNCTIONS,
         sys::utsname::FUNCTIONS,
+        sys::wait::FUNCTIONS,
         sysctl::FUNCTIONS,
         time::FUNCTIONS,
         unistd::FUNCTIONS,
