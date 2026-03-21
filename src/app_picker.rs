@@ -1546,14 +1546,14 @@ fn setup_quick_options(
     () = msg![env; main_view setHidden:true];
     () = msg![env; super_view addSubview:main_view];
 
-    let divider = 0.0; // FullScreenQOptions
+    let divider = app_frame.origin.y + 35.0; // TopPaddingFix
 
     // Close button
     {
         let button_frame = CGRect {
             origin: CGPoint {
                 x: main_frame.size.width - 50.0,
-                y: app_frame.origin.y + 10.0, // BringBtnDown
+                y: app_frame.origin.y + 5.0, // TopRightCorner
             },
             size: CGSize {
                 width: 40.0,
