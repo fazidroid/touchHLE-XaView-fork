@@ -1552,8 +1552,8 @@ fn setup_quick_options(
     {
         let button_frame = CGRect {
             origin: CGPoint {
-                x: main_frame.size.width - 40.0,
-                y: 20.0,
+                x: main_frame.size.width - 50.0,
+                y: app_frame.origin.y + 10.0, // BringBtnDown
             },
             size: CGSize {
                 width: 40.0,
