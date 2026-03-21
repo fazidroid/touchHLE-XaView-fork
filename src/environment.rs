@@ -1031,11 +1031,20 @@ impl Environment {
         }
 
         if self.gdb_server.is_none() {
-            // DumpCpuBeforePanic
-            self.dump_all_regs();
-            self.stack_trace_current();
-            panic!("Error during CPU execution: {error:?}");
-        }
+                // DumpCpuBeforePanic
+                self.dump_all_regs();
+                self.stack_trace_current();
+                // ReadOpcodeBytes
+                let pc = self.cpu.regs()[cpu::Cpu::PC];
+                let pc_ptr: mem::ConstPtr<u8> = mem::Ptr::from_bits(pc);
+                let b0 = self.mem.read(pc_ptr);
+                let b1 = self.mem.read(pc_ptr + 1);
+                let b2 = self.mem.read(pc_ptr + 2);
+                let b3 = self.mem.read(pc_ptr + 3);
+                // LogOpcodeBytes
+                echo!("CRITICAL: Opcode bytes at PC {:#x}: {:02x} {:02x} {:02x} {:02x}", pc, b0, b1, b2, b3);
+                panic!("Error during CPU execution: {error:?}");
+            }
 
         echo!("Debuggable error during CPU execution: {:?}.", error);
         self.enter_debugger(Some(error))
