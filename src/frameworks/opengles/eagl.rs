@@ -666,8 +666,16 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         }
         old_capabilities
     };
-    let old_matrix_mode: GLenum = if !is_gles2 { get_int(gles, gles11::MATRIX_MODE) as _ } else { 0 };
-    let old_color: [GLfloat; 4] = if !is_gles2 { get_floats(gles, gles11::CURRENT_COLOR) } else { [0.0; 4] };
+    let old_matrix_mode: GLenum = if !is_gles2 {
+        get_int(gles, gles11::MATRIX_MODE) as _
+    } else {
+        0
+    };
+    let old_color: [GLfloat; 4] = if !is_gles2 {
+        get_floats(gles, gles11::CURRENT_COLOR)
+    } else {
+        [0.0; 4]
+    };
     if !is_gles2 {
         for mode in [gles11::MODELVIEW, gles11::PROJECTION, gles11::TEXTURE] {
             gles.MatrixMode(mode);
