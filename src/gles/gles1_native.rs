@@ -330,7 +330,16 @@ impl GLES for GLES1Native<'_> {
         }
     }
     unsafe fn DepthRangef(&mut self, near: GLclampf, far: GLclampf) {
-   unsafe fn PolygonOffset(&mut self, factor: GLfloat, units: GLfloat) {
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::DepthRangef(near, far)
+        } else {
+            gles11::DepthRangef(near, far)
+        }
+    }
+    unsafe fn DepthRangex(&mut self, near: GLclampx, far: GLclampx) {
+        gles11::DepthRangex(near, far)
+    }
+    unsafe fn PolygonOffset(&mut self, factor: GLfloat, units: GLfloat) {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::PolygonOffset(factor, units)
         } else {
