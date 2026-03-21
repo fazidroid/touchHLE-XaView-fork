@@ -164,10 +164,15 @@ private:
     cpu->HaltExecution(HaltReasonSvc);
   }
   void ExceptionRaised(VAddr pc, Dynarmic::A32::Exception exception) override {
-    // MemoryReadCode returned nullopt
+    // CheckMemoryReadCode
     if (exception == Dynarmic::A32::Exception::NoExecuteFault) {
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
     } else if (exception == Dynarmic::A32::Exception::UndefinedInstruction) {
+      // ForceThumbModeFallback
+      if ((cpu->Cpsr() & 0x20) == 0) {
+        cpu->SetCpsr(cpu->Cpsr() | 0x20);
+        return;
+      }
       cpu->HaltExecution(HaltReasonUndefinedInstruction);
     } else if (exception == Dynarmic::A32::Exception::Breakpoint) {
       cpu->HaltExecution(HaltReasonBreakpoint);
