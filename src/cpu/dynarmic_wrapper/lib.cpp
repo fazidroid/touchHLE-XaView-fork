@@ -303,9 +303,12 @@ public:
 
   std::int32_t run_or_step(touchHLE_Mem *mem, std::uint64_t *ticks) {
     env.mem = mem;
-    Dynarmic::HaltReason hr;
     if (ticks) {
       env.ticks_remaining = *ticks;
+    }
+    Dynarmic::HaltReason hr;
+retry_run:
+    if (ticks) {
       hr = cpu->Run();
     } else {
       hr = cpu->Step();
@@ -316,6 +319,11 @@ public:
     } else if (Dynarmic::Has(hr, Dynarmic::HaltReason::MemoryAbort)) {
       res = -2;
     } else if (Dynarmic::Has(hr, HaltReasonUndefinedInstruction)) {
+      // ForceThumbModeFallback
+      if ((cpu->Cpsr() & 0x20) == 0) {
+        cpu->SetCpsr(cpu->Cpsr() | 0x20);
+        goto retry_run;
+      }
       res = -3;
     } else if (Dynarmic::Has(hr, HaltReasonBreakpoint)) {
       res = -4;
