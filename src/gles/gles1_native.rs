@@ -33,7 +33,8 @@ impl GLESContext for GLES1NativeContext {
     }
 
     // FboNewFix
-    fn new(window: &mut Window, options: &crate::options::Options) -> Result<Self, String> { // PassOptions
+    fn new(window: &mut Window, options: &crate::options::Options) -> Result<Self, String> {
+        // PassOptions
         let is_gles2 = options.gles_version == 2;
         let version = if is_gles2 {
             GLVersion::GLES20 // DynamicEsTwo
@@ -105,7 +106,9 @@ pub struct GLES1Native<'gl_ctx> {
 
 // EsTwoCheckImpl
 impl GLES for GLES1Native<'_> {
-    fn is_gles2(&self) -> bool { self.is_gles2 }
+    fn is_gles2(&self) -> bool {
+        self.is_gles2
+    }
     unsafe fn driver_description(&self) -> String {
         let version = CStr::from_ptr(gles11::GetString(gles11::VERSION) as *const _);
         let vendor = CStr::from_ptr(gles11::GetString(gles11::VENDOR) as *const _);
@@ -122,16 +125,32 @@ impl GLES for GLES1Native<'_> {
 
     // Generic state manipulation
     unsafe fn GetError(&mut self) -> GLenum {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetError() } else { gles11::GetError() }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::GetError()
+        } else {
+            gles11::GetError()
+        }
     }
     unsafe fn Enable(&mut self, cap: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Enable(cap) } else { gles11::Enable(cap) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Enable(cap)
+        } else {
+            gles11::Enable(cap)
+        }
     }
     unsafe fn IsEnabled(&mut self, cap: GLenum) -> GLboolean {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::IsEnabled(cap) } else { gles11::IsEnabled(cap) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::IsEnabled(cap)
+        } else {
+            gles11::IsEnabled(cap)
+        }
     }
     unsafe fn Disable(&mut self, cap: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Disable(cap) } else { gles11::Disable(cap) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Disable(cap)
+        } else {
+            gles11::Disable(cap)
+        }
     }
     unsafe fn ClientActiveTexture(&mut self, texture: GLenum) {
         gles11::ClientActiveTexture(texture);
@@ -146,9 +165,13 @@ impl GLES for GLES1Native<'_> {
                 gles11::TEXTURE_COORD_ARRAY => {
                     let mut ct = 0;
                     gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
-                    let attr = if ct == gles11::TEXTURE1 as GLint { 4 } else { 3 };
+                    let attr = if ct == gles11::TEXTURE1 as GLint {
+                        4
+                    } else {
+                        3
+                    };
                     touchHLE_gl_bindings::gles20::EnableVertexAttribArray(attr);
-                },
+                }
                 _ => {}
             }
         } else {
@@ -164,9 +187,13 @@ impl GLES for GLES1Native<'_> {
                 gles11::TEXTURE_COORD_ARRAY => {
                     let mut ct = 0;
                     gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
-                    let attr = if ct == gles11::TEXTURE1 as GLint { 4 } else { 3 };
+                    let attr = if ct == gles11::TEXTURE1 as GLint {
+                        4
+                    } else {
+                        3
+                    };
                     touchHLE_gl_bindings::gles20::DisableVertexAttribArray(attr);
-                },
+                }
                 _ => {}
             }
         } else {
@@ -175,13 +202,25 @@ impl GLES for GLES1Native<'_> {
     }
     // RouteGettersState
     unsafe fn GetBooleanv(&mut self, pname: GLenum, params: *mut GLboolean) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetBooleanv(pname, params) } else { gles11::GetBooleanv(pname, params) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::GetBooleanv(pname, params)
+        } else {
+            gles11::GetBooleanv(pname, params)
+        }
     }
     unsafe fn GetFloatv(&mut self, pname: GLenum, params: *mut GLfloat) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetFloatv(pname, params) } else { gles11::GetFloatv(pname, params) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::GetFloatv(pname, params)
+        } else {
+            gles11::GetFloatv(pname, params)
+        }
     }
     unsafe fn GetIntegerv(&mut self, pname: GLenum, params: *mut GLint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetIntegerv(pname, params) } else { gles11::GetIntegerv(pname, params) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::GetIntegerv(pname, params)
+        } else {
+            gles11::GetIntegerv(pname, params)
+        }
     }
     unsafe fn GetTexEnviv(&mut self, target: GLenum, pname: GLenum, params: *mut GLint) {
         gles11::GetTexEnviv(target, pname, params)
@@ -193,16 +232,32 @@ impl GLES for GLES1Native<'_> {
         gles11::GetPointerv(pname, params as *mut _ as *const _)
     }
     unsafe fn Hint(&mut self, target: GLenum, mode: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Hint(target, mode) } else { gles11::Hint(target, mode) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Hint(target, mode)
+        } else {
+            gles11::Hint(target, mode)
+        }
     }
     unsafe fn Finish(&mut self) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Finish() } else { gles11::Finish() }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Finish()
+        } else {
+            gles11::Finish()
+        }
     }
     unsafe fn Flush(&mut self) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Flush() } else { gles11::Flush() }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Flush()
+        } else {
+            gles11::Flush()
+        }
     }
     unsafe fn GetString(&mut self, name: GLenum) -> *const GLubyte {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::GetString(name) } else { gles11::GetString(name) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::GetString(name)
+        } else {
+            gles11::GetString(name)
+        }
     }
 
     // Other state manipulation
@@ -214,10 +269,18 @@ impl GLES for GLES1Native<'_> {
     }
     // RouteOtherState
     unsafe fn BlendFunc(&mut self, sfactor: GLenum, dfactor: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::BlendFunc(sfactor, dfactor) } else { gles11::BlendFunc(sfactor, dfactor) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BlendFunc(sfactor, dfactor)
+        } else {
+            gles11::BlendFunc(sfactor, dfactor)
+        }
     }
     unsafe fn BlendEquationOES(&mut self, mode: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::BlendEquation(mode) } else { gles11::BlendEquationOES(mode) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BlendEquation(mode)
+        } else {
+            gles11::BlendEquationOES(mode)
+        }
     }
     unsafe fn ColorMask(
         &mut self,
@@ -226,7 +289,11 @@ impl GLES for GLES1Native<'_> {
         blue: GLboolean,
         alpha: GLboolean,
     ) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::ColorMask(red, green, blue, alpha) } else { gles11::ColorMask(red, green, blue, alpha) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::ColorMask(red, green, blue, alpha)
+        } else {
+            gles11::ColorMask(red, green, blue, alpha)
+        }
     }
     unsafe fn ClipPlanef(&mut self, plane: GLenum, equation: *const GLfloat) {
         gles11::ClipPlanef(plane, equation)
@@ -235,31 +302,50 @@ impl GLES for GLES1Native<'_> {
         gles11::ClipPlanex(plane, equation)
     }
     unsafe fn CullFace(&mut self, mode: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::CullFace(mode) } else { gles11::CullFace(mode) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::CullFace(mode)
+        } else {
+            gles11::CullFace(mode)
+        }
     }
     unsafe fn DepthFunc(&mut self, func: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::DepthFunc(func) } else { gles11::DepthFunc(func) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::DepthFunc(func)
+        } else {
+            gles11::DepthFunc(func)
+        }
     }
     unsafe fn DepthMask(&mut self, flag: GLboolean) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::DepthMask(flag) } else { gles11::DepthMask(flag) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::DepthMask(flag)
+        } else {
+            gles11::DepthMask(flag)
+        }
     }
     unsafe fn FrontFace(&mut self, mode: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::FrontFace(mode) } else { gles11::FrontFace(mode) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::FrontFace(mode)
+        } else {
+            gles11::FrontFace(mode)
+        }
     }
     unsafe fn DepthRangef(&mut self, near: GLclampf, far: GLclampf) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::DepthRangef(near, far) } else { gles11::DepthRangef(near, far) }
-    }
-    unsafe fn DepthRangex(&mut self, near: GLclampx, far: GLclampx) {
-        gles11::DepthRangex(near, far)
-    }
-    unsafe fn PolygonOffset(&mut self, factor: GLfloat, units: GLfloat) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::PolygonOffset(factor, units) } else { gles11::PolygonOffset(factor, units) }
+   unsafe fn PolygonOffset(&mut self, factor: GLfloat, units: GLfloat) {
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::PolygonOffset(factor, units)
+        } else {
+            gles11::PolygonOffset(factor, units)
+        }
     }
     unsafe fn PolygonOffsetx(&mut self, factor: GLfixed, units: GLfixed) {
         gles11::PolygonOffsetx(factor, units)
     }
     unsafe fn SampleCoverage(&mut self, value: GLclampf, invert: GLboolean) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::SampleCoverage(value, invert) } else { gles11::SampleCoverage(value, invert) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::SampleCoverage(value, invert)
+        } else {
+            gles11::SampleCoverage(value, invert)
+        }
     }
     unsafe fn SampleCoveragex(&mut self, value: GLclampx, invert: GLboolean) {
         gles11::SampleCoveragex(value, invert)
@@ -268,25 +354,49 @@ impl GLES for GLES1Native<'_> {
         gles11::ShadeModel(mode)
     }
     unsafe fn Scissor(&mut self, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Scissor(x, y, width, height) } else { gles11::Scissor(x, y, width, height) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Scissor(x, y, width, height)
+        } else {
+            gles11::Scissor(x, y, width, height)
+        }
     }
     unsafe fn Viewport(&mut self, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Viewport(x, y, width, height) } else { gles11::Viewport(x, y, width, height) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Viewport(x, y, width, height)
+        } else {
+            gles11::Viewport(x, y, width, height)
+        }
     }
     unsafe fn LineWidth(&mut self, val: GLfloat) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::LineWidth(val) } else { gles11::LineWidth(val) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::LineWidth(val)
+        } else {
+            gles11::LineWidth(val)
+        }
     }
     unsafe fn LineWidthx(&mut self, val: GLfixed) {
         gles11::LineWidthx(val)
     }
     unsafe fn StencilFunc(&mut self, func: GLenum, ref_: GLint, mask: GLuint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::StencilFunc(func, ref_, mask) } else { gles11::StencilFunc(func, ref_, mask) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::StencilFunc(func, ref_, mask)
+        } else {
+            gles11::StencilFunc(func, ref_, mask)
+        }
     }
     unsafe fn StencilOp(&mut self, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::StencilOp(sfail, dpfail, dppass) } else { gles11::StencilOp(sfail, dpfail, dppass) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::StencilOp(sfail, dpfail, dppass)
+        } else {
+            gles11::StencilOp(sfail, dpfail, dppass)
+        }
     }
     unsafe fn StencilMask(&mut self, mask: GLuint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::StencilMask(mask) } else { gles11::StencilMask(mask) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::StencilMask(mask)
+        } else {
+            gles11::StencilMask(mask)
+        }
     }
     unsafe fn LogicOp(&mut self, opcode: GLenum) {
         gles11::LogicOp(opcode);
@@ -364,17 +474,33 @@ impl GLES for GLES1Native<'_> {
 
     // RouteBuffersFix
     unsafe fn IsBuffer(&mut self, buffer: GLuint) -> GLboolean {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::IsBuffer(buffer) } else { gles11::IsBuffer(buffer) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::IsBuffer(buffer)
+        } else {
+            gles11::IsBuffer(buffer)
+        }
     }
     unsafe fn GenBuffers(&mut self, n: GLsizei, buffers: *mut GLuint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::GenBuffers(n, buffers) } else { gles11::GenBuffers(n, buffers) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::GenBuffers(n, buffers)
+        } else {
+            gles11::GenBuffers(n, buffers)
+        }
     }
     unsafe fn DeleteBuffers(&mut self, n: GLsizei, buffers: *const GLuint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::DeleteBuffers(n, buffers) } else { gles11::DeleteBuffers(n, buffers) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::DeleteBuffers(n, buffers)
+        } else {
+            gles11::DeleteBuffers(n, buffers)
+        }
     }
     unsafe fn BindBuffer(&mut self, target: GLenum, buffer: GLuint) {
         assert!(target == gles11::ARRAY_BUFFER || target == gles11::ELEMENT_ARRAY_BUFFER);
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::BindBuffer(target, buffer) } else { gles11::BindBuffer(target, buffer) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BindBuffer(target, buffer)
+        } else {
+            gles11::BindBuffer(target, buffer)
+        }
     }
     unsafe fn BufferData(
         &mut self,
@@ -384,7 +510,11 @@ impl GLES for GLES1Native<'_> {
         usage: GLenum,
     ) {
         assert!(target == gles11::ARRAY_BUFFER || target == gles11::ELEMENT_ARRAY_BUFFER);
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::BufferData(target, size, data, usage) } else { gles11::BufferData(target, size, data, usage) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BufferData(target, size, data, usage)
+        } else {
+            gles11::BufferData(target, size, data, usage)
+        }
     }
 
     unsafe fn BufferSubData(
@@ -395,7 +525,11 @@ impl GLES for GLES1Native<'_> {
         data: *const GLvoid,
     ) {
         assert!(target == gles11::ARRAY_BUFFER || target == gles11::ELEMENT_ARRAY_BUFFER);
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::BufferSubData(target, offset, size, data) } else { gles11::BufferSubData(target, offset, size, data) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BufferSubData(target, offset, size, data)
+        } else {
+            gles11::BufferSubData(target, offset, size, data)
+        }
     }
 
     // Non-pointers
@@ -426,7 +560,9 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 {
             // FixPointerNorm
             let n = if type_ == 0x1401 { 1 } else { 0 };
-            touchHLE_gl_bindings::gles20::VertexAttribPointer(2, size, type_, n as _, stride, pointer);
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(
+                2, size, type_, n as _, stride, pointer,
+            );
         } else {
             gles11::ColorPointer(size, type_, stride, pointer)
         }
@@ -448,8 +584,14 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 {
             let mut ct = 0;
             gles11::GetIntegerv(gles11::CLIENT_ACTIVE_TEXTURE, &mut ct);
-            let attr = if ct == gles11::TEXTURE1 as GLint { 4 } else { 3 };
-            touchHLE_gl_bindings::gles20::VertexAttribPointer(attr, size, type_, 0, stride, pointer);
+            let attr = if ct == gles11::TEXTURE1 as GLint {
+                4
+            } else {
+                3
+            };
+            touchHLE_gl_bindings::gles20::VertexAttribPointer(
+                attr, size, type_, 0, stride, pointer,
+            );
         } else {
             gles11::TexCoordPointer(size, type_, stride, pointer)
         }
@@ -470,7 +612,11 @@ impl GLES for GLES1Native<'_> {
 
     // Drawing
     unsafe fn DrawArrays(&mut self, mode: GLenum, first: GLint, count: GLsizei) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::DrawArrays(mode, first, count) } else { gles11::DrawArrays(mode, first, count) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::DrawArrays(mode, first, count)
+        } else {
+            gles11::DrawArrays(mode, first, count)
+        }
     }
     unsafe fn DrawElements(
         &mut self,
@@ -479,12 +625,20 @@ impl GLES for GLES1Native<'_> {
         type_: GLenum,
         indices: *const GLvoid,
     ) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::DrawElements(mode, count, type_, indices) } else { gles11::DrawElements(mode, count, type_, indices) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::DrawElements(mode, count, type_, indices)
+        } else {
+            gles11::DrawElements(mode, count, type_, indices)
+        }
     }
 
     // Clearing
     unsafe fn Clear(&mut self, mask: GLbitfield) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::Clear(mask) } else { gles11::Clear(mask) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::Clear(mask)
+        } else {
+            gles11::Clear(mask)
+        }
     }
     unsafe fn ClearColor(
         &mut self,
@@ -493,7 +647,11 @@ impl GLES for GLES1Native<'_> {
         blue: GLclampf,
         alpha: GLclampf,
     ) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::ClearColor(red, green, blue, alpha) } else { gles11::ClearColor(red, green, blue, alpha) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::ClearColor(red, green, blue, alpha)
+        } else {
+            gles11::ClearColor(red, green, blue, alpha)
+        }
     }
     unsafe fn ClearColorx(
         &mut self,
@@ -517,7 +675,11 @@ impl GLES for GLES1Native<'_> {
     // Textures
     // RouteTexturesFix
     unsafe fn PixelStorei(&mut self, pname: GLenum, param: GLint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::PixelStorei(pname, param) } else { gles11::PixelStorei(pname, param) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::PixelStorei(pname, param)
+        } else {
+            gles11::PixelStorei(pname, param)
+        }
     }
     unsafe fn ReadPixels(
         &mut self,
@@ -529,31 +691,61 @@ impl GLES for GLES1Native<'_> {
         type_: GLenum,
         pixels: *mut GLvoid,
     ) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::ReadPixels(x, y, width, height, format, type_, pixels) } else { gles11::ReadPixels(x, y, width, height, format, type_, pixels) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::ReadPixels(x, y, width, height, format, type_, pixels)
+        } else {
+            gles11::ReadPixels(x, y, width, height, format, type_, pixels)
+        }
     }
     unsafe fn GenTextures(&mut self, n: GLsizei, textures: *mut GLuint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::GenTextures(n, textures) } else { gles11::GenTextures(n, textures) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::GenTextures(n, textures)
+        } else {
+            gles11::GenTextures(n, textures)
+        }
     }
     unsafe fn DeleteTextures(&mut self, n: GLsizei, textures: *const GLuint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::DeleteTextures(n, textures) } else { gles11::DeleteTextures(n, textures) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::DeleteTextures(n, textures)
+        } else {
+            gles11::DeleteTextures(n, textures)
+        }
     }
     unsafe fn ActiveTexture(&mut self, texture: GLenum) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::ActiveTexture(texture) } else { gles11::ActiveTexture(texture) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::ActiveTexture(texture)
+        } else {
+            gles11::ActiveTexture(texture)
+        }
     }
     unsafe fn IsTexture(&mut self, texture: GLuint) -> GLboolean {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::IsTexture(texture) } else { gles11::IsTexture(texture) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::IsTexture(texture)
+        } else {
+            gles11::IsTexture(texture)
+        }
     }
     unsafe fn BindTexture(&mut self, target: GLenum, texture: GLuint) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::BindTexture(target, texture) } else { gles11::BindTexture(target, texture) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BindTexture(target, texture)
+        } else {
+            gles11::BindTexture(target, texture)
+        }
     }
     unsafe fn TexParameteri(&mut self, target: GLenum, pname: GLenum, param: GLint) {
         // StripMipmapsNative
         if self.is_gles2 {
-            if pname == 0x8191 || pname == 0x813D { return; }
+            if pname == 0x8191 || pname == 0x813D {
+                return;
+            }
             let mut p = param;
             if pname == gles11::TEXTURE_MIN_FILTER {
-                if p == 0x2700 || p == 0x2701 { p = 0x2600; }
-                if p == 0x2702 || p == 0x2703 { p = 0x2601; }
+                if p == 0x2700 || p == 0x2701 {
+                    p = 0x2600;
+                }
+                if p == 0x2702 || p == 0x2703 {
+                    p = 0x2601;
+                }
             }
             touchHLE_gl_bindings::gles20::TexParameteri(target, pname, p)
         } else {
@@ -563,11 +755,17 @@ impl GLES for GLES1Native<'_> {
     unsafe fn TexParameterf(&mut self, target: GLenum, pname: GLenum, param: GLfloat) {
         // StripMipmapsNative
         if self.is_gles2 {
-            if pname == 0x8191 || pname == 0x813D { return; }
+            if pname == 0x8191 || pname == 0x813D {
+                return;
+            }
             let mut p = param;
             if pname == gles11::TEXTURE_MIN_FILTER {
-                if p == 0x2700 as f32 || p == 0x2701 as f32 { p = 0x2600 as f32; }
-                if p == 0x2702 as f32 || p == 0x2703 as f32 { p = 0x2601 as f32; }
+                if p == 0x2700 as f32 || p == 0x2701 as f32 {
+                    p = 0x2600 as f32;
+                }
+                if p == 0x2702 as f32 || p == 0x2703 as f32 {
+                    p = 0x2601 as f32;
+                }
             }
             touchHLE_gl_bindings::gles20::TexParameterf(target, pname, p)
         } else {
@@ -611,12 +809,40 @@ impl GLES for GLES1Native<'_> {
         // RouteTexImageGles
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
-            touchHLE_gl_bindings::gles20::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels);
+            touchHLE_gl_bindings::gles20::TexImage2D(
+                target,
+                level,
+                internalformat,
+                width,
+                height,
+                border,
+                format,
+                type_,
+                pixels,
+            );
             // SafeDefaultFilter
-            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            let p_target = if (0x8515..=0x851A).contains(&target) {
+                0x8513
+            } else {
+                target
+            };
+            touchHLE_gl_bindings::gles20::TexParameteri(
+                p_target,
+                gles11::TEXTURE_MIN_FILTER,
+                gles11::LINEAR as _,
+            );
         } else {
-            gles11::TexImage2D(target, level, internalformat, width, height, border, format, type_, pixels)
+            gles11::TexImage2D(
+                target,
+                level,
+                internalformat,
+                width,
+                height,
+                border,
+                format,
+                type_,
+                pixels,
+            )
         }
     }
     unsafe fn TexSubImage2D(
@@ -634,9 +860,13 @@ impl GLES for GLES1Native<'_> {
         // RouteSubImageFix
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
-            touchHLE_gl_bindings::gles20::TexSubImage2D(target, level, xoffset, yoffset, width, height, format, type_, pixels)
+            touchHLE_gl_bindings::gles20::TexSubImage2D(
+                target, level, xoffset, yoffset, width, height, format, type_, pixels,
+            )
         } else {
-            gles11::TexSubImage2D(target, level, xoffset, yoffset, width, height, format, type_, pixels)
+            gles11::TexSubImage2D(
+                target, level, xoffset, yoffset, width, height, format, type_, pixels,
+            )
         }
     }
     unsafe fn CompressedTexImage2D(
@@ -677,12 +907,38 @@ impl GLES for GLES1Native<'_> {
         // RouteCompTexGles
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::PixelStorei(gles11::UNPACK_ALIGNMENT, 1);
-            touchHLE_gl_bindings::gles20::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
+            touchHLE_gl_bindings::gles20::CompressedTexImage2D(
+                target,
+                level,
+                internalformat,
+                width,
+                height,
+                border,
+                image_size,
+                data.as_ptr() as *const _,
+            );
             // SafeDefaultFilter
-            let p_target = if (0x8515..=0x851A).contains(&target) { 0x8513 } else { target };
-            touchHLE_gl_bindings::gles20::TexParameteri(p_target, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+            let p_target = if (0x8515..=0x851A).contains(&target) {
+                0x8513
+            } else {
+                target
+            };
+            touchHLE_gl_bindings::gles20::TexParameteri(
+                p_target,
+                gles11::TEXTURE_MIN_FILTER,
+                gles11::LINEAR as _,
+            );
         } else {
-            gles11::CompressedTexImage2D(target, level, internalformat, width, height, border, image_size, data.as_ptr() as *const _);
+            gles11::CompressedTexImage2D(
+                target,
+                level,
+                internalformat,
+                width,
+                height,
+                border,
+                image_size,
+                data.as_ptr() as *const _,
+            );
         }
     }
     // RouteCopyTex
@@ -697,7 +953,20 @@ impl GLES for GLES1Native<'_> {
         height: GLsizei,
         border: GLint,
     ) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::CopyTexImage2D(target, level, internalformat, x, y, width, height, border) } else { gles11::CopyTexImage2D(target, level, internalformat, x, y, width, height, border) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::CopyTexImage2D(
+                target,
+                level,
+                internalformat,
+                x,
+                y,
+                width,
+                height,
+                border,
+            )
+        } else {
+            gles11::CopyTexImage2D(target, level, internalformat, x, y, width, height, border)
+        }
     }
     unsafe fn CopyTexSubImage2D(
         &mut self,
@@ -710,7 +979,13 @@ impl GLES for GLES1Native<'_> {
         width: GLsizei,
         height: GLsizei,
     ) {
-        if self.is_gles2 { touchHLE_gl_bindings::gles20::CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height) } else { gles11::CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height) }
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::CopyTexSubImage2D(
+                target, level, xoffset, yoffset, x, y, width, height,
+            )
+        } else {
+            gles11::CopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height)
+        }
     }
     unsafe fn TexEnvf(&mut self, target: GLenum, pname: GLenum, param: GLfloat) {
         gles11::TexEnvf(target, pname, param)
@@ -857,19 +1132,32 @@ impl GLES for GLES1Native<'_> {
     unsafe fn CreateShader(&mut self, type_: GLenum) -> GLuint {
         touchHLE_gl_bindings::gles20::CreateShader(type_)
     }
-    unsafe fn ShaderSource(&mut self, shader: GLuint, count: GLsizei, string: *const *const std::ffi::c_char, length: *const GLint) {
+    unsafe fn ShaderSource(
+        &mut self,
+        shader: GLuint,
+        count: GLsizei,
+        string: *const *const std::ffi::c_char,
+        length: *const GLint,
+    ) {
         touchHLE_gl_bindings::gles20::ShaderSource(shader, count, string, length)
     }
     unsafe fn CompileShader(&mut self, shader: GLuint) {
         touchHLE_gl_bindings::gles20::CompileShader(shader)
     }
-    unsafe fn DeleteShader(&mut self, shader: GLuint) { // NativeDeleteShader
+    unsafe fn DeleteShader(&mut self, shader: GLuint) {
+        // NativeDeleteShader
         touchHLE_gl_bindings::gles20::DeleteShader(shader)
     }
     unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint) {
         touchHLE_gl_bindings::gles20::GetShaderiv(shader, pname, params)
     }
-    unsafe fn GetShaderInfoLog(&mut self, shader: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char) {
+    unsafe fn GetShaderInfoLog(
+        &mut self,
+        shader: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        infoLog: *mut std::ffi::c_char,
+    ) {
         touchHLE_gl_bindings::gles20::GetShaderInfoLog(shader, bufSize, length, infoLog)
     }
     unsafe fn CreateProgram(&mut self) -> GLuint {
@@ -881,7 +1169,12 @@ impl GLES for GLES1Native<'_> {
     unsafe fn AttachShader(&mut self, program: GLuint, shader: GLuint) {
         touchHLE_gl_bindings::gles20::AttachShader(program, shader)
     }
-    unsafe fn BindAttribLocation(&mut self, program: GLuint, index: GLuint, name: *const std::ffi::c_char) {
+    unsafe fn BindAttribLocation(
+        &mut self,
+        program: GLuint,
+        index: GLuint,
+        name: *const std::ffi::c_char,
+    ) {
         touchHLE_gl_bindings::gles20::BindAttribLocation(program, index, name)
     }
     unsafe fn LinkProgram(&mut self, program: GLuint) {
@@ -894,11 +1187,27 @@ impl GLES for GLES1Native<'_> {
     unsafe fn GetProgramiv(&mut self, program: GLuint, pname: GLenum, params: *mut GLint) {
         touchHLE_gl_bindings::gles20::GetProgramiv(program, pname, params)
     }
-    unsafe fn GetProgramInfoLog(&mut self, program: GLuint, bufSize: GLsizei, length: *mut GLsizei, infoLog: *mut std::ffi::c_char) {
+    unsafe fn GetProgramInfoLog(
+        &mut self,
+        program: GLuint,
+        bufSize: GLsizei,
+        length: *mut GLsizei,
+        infoLog: *mut std::ffi::c_char,
+    ) {
         touchHLE_gl_bindings::gles20::GetProgramInfoLog(program, bufSize, length, infoLog)
     }
-    unsafe fn VertexAttribPointer(&mut self, indx: GLuint, size: GLint, type_: GLenum, normalized: GLboolean, stride: GLsizei, ptr: *const GLvoid) {
-        touchHLE_gl_bindings::gles20::VertexAttribPointer(indx, size, type_, normalized, stride, ptr)
+    unsafe fn VertexAttribPointer(
+        &mut self,
+        indx: GLuint,
+        size: GLint,
+        type_: GLenum,
+        normalized: GLboolean,
+        stride: GLsizei,
+        ptr: *const GLvoid,
+    ) {
+        touchHLE_gl_bindings::gles20::VertexAttribPointer(
+            indx, size, type_, normalized, stride, ptr,
+        )
     }
     unsafe fn DisableVertexAttribArray(&mut self, index: GLuint) {
         touchHLE_gl_bindings::gles20::DisableVertexAttribArray(index)
@@ -907,14 +1216,37 @@ impl GLES for GLES1Native<'_> {
         touchHLE_gl_bindings::gles20::EnableVertexAttribArray(index)
     }
     // AddAttribNative
-    unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib1f(indx, x) }
-    unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib2f(indx, x, y) }
-    unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib3f(indx, x, y, z) }
-    unsafe fn VertexAttrib4f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib4f(indx, x, y, z, w) }
-    unsafe fn VertexAttrib1fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib1fv(indx, values) }
-    unsafe fn VertexAttrib2fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib2fv(indx, values) }
-    unsafe fn VertexAttrib3fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib3fv(indx, values) }
-    unsafe fn VertexAttrib4fv(&mut self, indx: GLuint, values: *const GLfloat) { touchHLE_gl_bindings::gles20::VertexAttrib4fv(indx, values) }
+    unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat) {
+        touchHLE_gl_bindings::gles20::VertexAttrib1f(indx, x)
+    }
+    unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat) {
+        touchHLE_gl_bindings::gles20::VertexAttrib2f(indx, x, y)
+    }
+    unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) {
+        touchHLE_gl_bindings::gles20::VertexAttrib3f(indx, x, y, z)
+    }
+    unsafe fn VertexAttrib4f(
+        &mut self,
+        indx: GLuint,
+        x: GLfloat,
+        y: GLfloat,
+        z: GLfloat,
+        w: GLfloat,
+    ) {
+        touchHLE_gl_bindings::gles20::VertexAttrib4f(indx, x, y, z, w)
+    }
+    unsafe fn VertexAttrib1fv(&mut self, indx: GLuint, values: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::VertexAttrib1fv(indx, values)
+    }
+    unsafe fn VertexAttrib2fv(&mut self, indx: GLuint, values: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::VertexAttrib2fv(indx, values)
+    }
+    unsafe fn VertexAttrib3fv(&mut self, indx: GLuint, values: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::VertexAttrib3fv(indx, values)
+    }
+    unsafe fn VertexAttrib4fv(&mut self, indx: GLuint, values: *const GLfloat) {
+        touchHLE_gl_bindings::gles20::VertexAttrib4fv(indx, values)
+    }
     unsafe fn Uniform1i(&mut self, location: GLint, v0: GLint) {
         touchHLE_gl_bindings::gles20::Uniform1i(location, v0)
     }
