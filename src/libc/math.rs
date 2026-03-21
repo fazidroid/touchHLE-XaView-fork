@@ -9,6 +9,7 @@ use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::errno::set_errno;
 use crate::mem::{ConstPtr, MutPtr};
 use crate::Environment;
+use std::num::FpCategory;
 
 // TODO: move to `fenv.h`
 type FERoundingDirection = i32;
@@ -485,6 +486,24 @@ fn hypot(env: &mut Environment, arg1: f64, arg2: f64) -> f64 {
     sqrt(env, arg1 * arg1 + arg2 * arg2)
 }
 
+/// This alias is for readability, POSIX just uses `int`.
+type GuestFPCategory = i32;
+const FP_NAN: GuestFPCategory = 1;
+const FP_INFINITE: GuestFPCategory = 2;
+const FP_ZERO: GuestFPCategory = 3;
+const FP_NORMAL: GuestFPCategory = 4;
+const FP_SUBNORMAL: GuestFPCategory = 5;
+
+fn __fpclassifyf(_env: &mut Environment, arg: f32) -> GuestFPCategory {
+    match arg.classify() {
+        FpCategory::Nan => FP_NAN,
+        FpCategory::Infinite => FP_INFINITE,
+        FpCategory::Zero => FP_ZERO,
+        FpCategory::Normal => FP_NORMAL,
+        FpCategory::Subnormal => FP_SUBNORMAL,
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(abs(_)),
     export_c_func!(fabs(_)),
@@ -569,4 +588,5 @@ pub const FUNCTIONS: FunctionExports = &[
     // Other
     export_c_func!(nan(_)),
     export_c_func!(hypot(_, _)),
+    export_c_func!(__fpclassifyf(_)),
 ];
