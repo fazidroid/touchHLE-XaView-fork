@@ -1041,8 +1041,12 @@ impl Environment {
                 let b1 = self.mem.read(pc_ptr + 1);
                 let b2 = self.mem.read(pc_ptr + 2);
                 let b3 = self.mem.read(pc_ptr + 3);
+                let b4 = self.mem.read(pc_ptr + 4);
+                let b5 = self.mem.read(pc_ptr + 5);
+                let b6 = self.mem.read(pc_ptr + 6);
+                let b7 = self.mem.read(pc_ptr + 7);
                 // LogOpcodeBytes
-                echo!("CRITICAL: Opcode bytes at PC {:#x}: {:02x} {:02x} {:02x} {:02x}", pc, b0, b1, b2, b3);
+                echo!("CRITICAL: Opcode bytes at PC {:#x}: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}", pc, b0, b1, b2, b3, b4, b5, b6, b7);
                 panic!("Error during CPU execution: {error:?}");
             }
 
