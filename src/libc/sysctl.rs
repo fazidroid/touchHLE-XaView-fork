@@ -154,14 +154,6 @@ fn sysctl(
                         _ => b"M68AP",
                     };
                     val.1 = SysInfoType::String(hw_model); // OverrideModel
-                } else if name0 == 6 && name1 == 24 {
-                    val.1 = SysInfoType::Int32(536870912); // FakeMemSize
-                } else if name0 == 6 && name1 == 5 {
-                    val.1 = SysInfoType::Int32(536870912); // FakePhysMem
-                } else if name0 == 6 && name1 == 6 {
-                    val.1 = SysInfoType::Int32(402653184); // FakeUserMem
-                } else if name0 == 6 && name1 == 3 {
-                    val.1 = SysInfoType::Int32(2); // FakeNcpu
                 }
             }
             val
@@ -250,12 +242,6 @@ fn sysctlbyname(
                         _ => b"M68AP",
                     };
                     val = SysInfoType::String(hw_model); // OverrideModel
-                } else if name_str == "hw.memsize" || name_str == "hw.physmem" {
-                    val = SysInfoType::Int32(536870912); // FakeMemSize
-                } else if name_str == "hw.usermem" {
-                    val = SysInfoType::Int32(402653184); // FakeUserMem
-                } else if name_str == "hw.ncpu" {
-                    val = SysInfoType::Int32(2); // FakeNcpu
                 }
             }
             (name_str, val)
