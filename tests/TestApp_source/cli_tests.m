@@ -931,6 +931,51 @@ int test_pthread_mutex_normal() {
   return 0;
 }
 
+pthread_mutex_t recursive_mutex;
+int recursive_trylock_res = -1;
+
+void *recursive_trylocker(void *arg) {
+  recursive_trylock_res = pthread_mutex_trylock(&recursive_mutex);
+  return NULL;
+}
+
+int test_pthread_mutex_recursive_trylock() {
+  pthread_mutexattr_t attr;
+  if (pthread_mutexattr_init(&attr) != 0)
+    return -1;
+  if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) != 0)
+    return -2;
+  if (pthread_mutex_init(&recursive_mutex, &attr) != 0)
+    return -3;
+  if (pthread_mutexattr_destroy(&attr) != 0)
+    return -4;
+
+  if (pthread_mutex_trylock(&recursive_mutex) != 0)
+    return -5;
+
+  if (pthread_mutex_trylock(&recursive_mutex) != 0)
+    return -6;
+
+  pthread_t p;
+  if (pthread_create(&p, NULL, recursive_trylocker, NULL) != 0)
+    return -7;
+  if (pthread_join(p, NULL) != 0)
+    return -8;
+
+  if (recursive_trylock_res != EBUSY)
+    return -9;
+
+  if (pthread_mutex_unlock(&recursive_mutex) != 0)
+    return -10;
+  if (pthread_mutex_unlock(&recursive_mutex) != 0)
+    return -11;
+
+  if (pthread_mutex_destroy(&recursive_mutex) != 0)
+    return -12;
+
+  return 0;
+}
+
 int test_strncpy() {
   char *src = "test\0abcd";
   char dst[10];
@@ -3678,6 +3723,7 @@ struct {
     FUNC_DEF(test_close),
     FUNC_DEF(test_cond_var),
     FUNC_DEF(test_pthread_mutex_normal),
+    FUNC_DEF(test_pthread_mutex_recursive_trylock),
     FUNC_DEF(test_CFMutableDictionary_NullCallbacks),
     FUNC_DEF(test_CFMutableDictionary_CustomCallbacks_PrimitiveTypes),
     FUNC_DEF(test_CFMutableDictionary_CustomCallbacks_CFTypes),
