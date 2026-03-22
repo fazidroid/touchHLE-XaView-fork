@@ -13,14 +13,14 @@
 //! but it is not the current focus of the touchHLE. The current focus is,
 //! you know, **GAMES**.
 
-use crate::dyld::HostDylib;
+use crate::dyld::{ConstantExports, HostConstant, HostDylib};
 use crate::objc::{id, objc_classes, ClassExports};
 
 pub const DYLIB: HostDylib = HostDylib {
     path: "/System/Library/Frameworks/CoreLocation.framework/CoreLocation",
     aliases: &[],
     class_exports: &[CLASSES],
-    constant_exports: &[],
+    constant_exports: &[CONSTANTS],
     function_exports: &[],
 };
 
@@ -69,3 +69,8 @@ const CLASSES: ClassExports = objc_classes! {
 @end
 
 };
+
+const CONSTANTS: ConstantExports = &[(
+    "_kCLLocationAccuracyKilometer",
+    HostConstant::Custom(|env| env.mem.alloc_and_write(1000f64).cast().cast_const()),
+)];
