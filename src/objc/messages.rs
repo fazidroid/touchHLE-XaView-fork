@@ -37,6 +37,11 @@ fn objc_msgSend_inner(
     super2: Option<Class>,
     tolerate_type_mismatch: bool,
 ) {
+    log_dbg!(
+        "Dispatching {} for {:?}",
+        selector.as_str(&env.mem),
+        receiver
+    );
     let message_type_info = env.objc.message_type_info.take();
 
     if receiver == nil {
@@ -84,6 +89,7 @@ fn objc_msgSend_inner(
         if let Some(&super::ClassHostObject {
             superclass,
             ref methods,
+            ref name,
             ..
         }) = host_object.as_any().downcast_ref()
         {
@@ -95,6 +101,7 @@ fn objc_msgSend_inner(
             }
 
             if let Some(imp) = methods.get(&selector) {
+                log_dbg!("Found method on: {}", name);
                 match imp {
                     IMP::Host(host_imp) => {
                         // TODO: do type checks when calling GuestIMPs too.
