@@ -3752,6 +3752,7 @@ struct {
     FUNC_DEF(test_strftime),
     FUNC_DEF(test_RespondsToSelector),
     FUNC_DEF(test_NSKeyedArchiver_NSKeyedUnarchiver),
+    FUNC_DEF(test_AutoreleasePool),
 };
 // clang-format on
 
