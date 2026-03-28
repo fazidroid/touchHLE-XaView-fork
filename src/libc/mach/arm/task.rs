@@ -14,7 +14,7 @@ use crate::libc::mach::vm_map::vm_allocate;
 use crate::mem::{guest_size_of, GuestUSize, MutPtr};
 use crate::Environment;
 
-type task_t = mach_port_t;
+pub type task_t = mach_port_t;
 
 type thread_act_t = mach_port_t;
 type thread_act_array_t = MutPtr<thread_act_t>;
