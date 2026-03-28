@@ -10,6 +10,7 @@
 pub mod core_types;
 pub mod host;
 pub mod init;
+pub mod port;
 pub mod semaphore;
 pub mod thread_info;
 pub mod time;

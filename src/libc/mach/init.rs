@@ -9,7 +9,7 @@
 
 use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant};
 use crate::environment::Environment;
-use crate::libc::mach::thread_info::mach_port_t;
+use crate::libc::mach::port::mach_port_t;
 use crate::mem::PAGE_SIZE;
 
 // Unique mock value so we can assert against itself
