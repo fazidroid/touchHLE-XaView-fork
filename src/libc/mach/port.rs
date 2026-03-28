@@ -11,8 +11,6 @@ type mach_port_name_t = natural_t;
 pub type mach_port_t = mach_port_name_t;
 
 /// MACH_PORT_NULL indicates the absence of any port or port rights.
-#[allow(dead_code)]
-const MACH_PORT_NULL: mach_port_name_t = 0;
+pub const MACH_PORT_NULL: mach_port_name_t = 0;
 /// MACH_PORT_DEAD indicates that a port right was present, but it died.
-#[allow(dead_code)]
-const MACH_PORT_DEAD: mach_port_name_t = !0;
+pub const MACH_PORT_DEAD: mach_port_name_t = !0;

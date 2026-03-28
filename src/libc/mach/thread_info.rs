@@ -11,7 +11,7 @@
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::mach::core_types::{boolean_t, integer_t, natural_t};
-use crate::libc::mach::port::mach_port_t;
+use crate::libc::mach::port::{mach_port_t, MACH_PORT_DEAD, MACH_PORT_NULL};
 use crate::mem::{guest_size_of, MutPtr, SafeRead};
 use crate::Environment;
 
@@ -73,7 +73,8 @@ fn thread_info(
     thread_info_out: thread_info_t,
     thread_info_out_count: MutPtr<mach_msg_type_number_t>,
 ) -> kern_return_t {
-    let thread = env.threads.get(target_act as usize).unwrap();
+    assert!(target_act != MACH_PORT_NULL && target_act != MACH_PORT_DEAD);
+    let thread = env.threads.get((target_act - 1) as usize).unwrap();
 
     let out_size_available = env.mem.read(thread_info_out_count);
 

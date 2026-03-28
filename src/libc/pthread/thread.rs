@@ -353,7 +353,9 @@ type mach_port_t = u32;
 /// is used by apps as a unique thread ID.
 fn pthread_mach_thread_np(env: &mut Environment, thread: pthread_t) -> mach_port_t {
     let host_object = State::get(env).threads.get(&thread).unwrap();
-    host_object.thread_id.try_into().unwrap()
+    // Must return thread_id + 1 to match mach_thread_self()
+    // (Plus 1 is to avoid having MACH_PORT_NULL for the main thread)
+    (host_object.thread_id + 1).try_into().unwrap()
 }
 
 /// Undocumented Darwin function that returns stack's "bottom" address
