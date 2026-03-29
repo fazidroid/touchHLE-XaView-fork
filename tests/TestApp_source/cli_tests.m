@@ -404,6 +404,126 @@ int test_vsnprintf() {
     return -34;
   }
   free(str);
+  // Test h length modifier (%hd, %hu, %hx, %ho)
+  str = str_format("%hd", 42);
+  if (strcmp(str, "42") != 0) {
+    free(str);
+    return -35;
+  }
+  free(str);
+  str = str_format("%hd", -42);
+  if (strcmp(str, "-42") != 0) {
+    free(str);
+    return -36;
+  }
+  free(str);
+  // Truncation: 32768 wraps to -32768 as signed short
+  str = str_format("%hd", 32768);
+  if (strcmp(str, "-32768") != 0) {
+    free(str);
+    return -37;
+  }
+  free(str);
+  // Truncation: 65535 is -1 as signed short
+  str = str_format("%hd", 65535);
+  if (strcmp(str, "-1") != 0) {
+    free(str);
+    return -38;
+  }
+  free(str);
+  str = str_format("%hu", 65535);
+  if (strcmp(str, "65535") != 0) {
+    free(str);
+    return -39;
+  }
+  free(str);
+  // Truncation: 65536 wraps to 0 as unsigned short
+  str = str_format("%hu", 65536);
+  if (strcmp(str, "0") != 0) {
+    free(str);
+    return -40;
+  }
+  free(str);
+  str = str_format("%hx", 0x1234);
+  if (strcmp(str, "1234") != 0) {
+    free(str);
+    return -41;
+  }
+  free(str);
+  // Truncation: upper bits dropped
+  str = str_format("%hx", 0x12345);
+  if (strcmp(str, "2345") != 0) {
+    free(str);
+    return -42;
+  }
+  free(str);
+  // Test hh length modifier (%hhd, %hhu, %hhx, %hho)
+  str = str_format("%hhd", 127);
+  if (strcmp(str, "127") != 0) {
+    free(str);
+    return -43;
+  }
+  free(str);
+  str = str_format("%hhd", -128);
+  if (strcmp(str, "-128") != 0) {
+    free(str);
+    return -44;
+  }
+  free(str);
+  // Truncation: 128 wraps to -128 as signed char
+  str = str_format("%hhd", 128);
+  if (strcmp(str, "-128") != 0) {
+    free(str);
+    return -45;
+  }
+  free(str);
+  // Truncation: 255 is -1 as signed char
+  str = str_format("%hhd", 255);
+  if (strcmp(str, "-1") != 0) {
+    free(str);
+    return -46;
+  }
+  free(str);
+  // Truncation: 256 wraps to 0
+  str = str_format("%hhd", 256);
+  if (strcmp(str, "0") != 0) {
+    free(str);
+    return -47;
+  }
+  free(str);
+  str = str_format("%hhu", 255);
+  if (strcmp(str, "255") != 0) {
+    free(str);
+    return -48;
+  }
+  free(str);
+  // Truncation: 256 wraps to 0 as unsigned char
+  str = str_format("%hhu", 256);
+  if (strcmp(str, "0") != 0) {
+    free(str);
+    return -49;
+  }
+  free(str);
+  // -1 as unsigned char is 255
+  str = str_format("%hhu", -1);
+  if (strcmp(str, "255") != 0) {
+    free(str);
+    return -50;
+  }
+  free(str);
+  str = str_format("%hhx", 0xAB);
+  if (strcmp(str, "ab") != 0) {
+    free(str);
+    return -51;
+  }
+  free(str);
+  // Truncation: upper bits dropped
+  str = str_format("%hhx", 0x1AB);
+  if (strcmp(str, "ab") != 0) {
+    free(str);
+    return -52;
+  }
+  free(str);
 
   return 0;
 }
