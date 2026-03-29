@@ -114,6 +114,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     detach_new_thread_inner(env, selector, target, object, /* tolerate_type_mismatch: */ false)
 }
 
++ (bool)isMainThread {
+    env.current_thread == 0
+}
+
 - (id)initWithTarget:(id)target
             selector:(SEL)selector
               object:(id)object {
