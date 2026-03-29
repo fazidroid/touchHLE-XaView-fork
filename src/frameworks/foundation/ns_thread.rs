@@ -192,6 +192,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     true
 }
 
+- (())setName:(id)name { // NSString *
+    todo_objc_setter!(this, name);
+}
+
 // "To change the stack size, you must set this property before starting your
 // thread. Setting the stack size after the thread has started changes the
 // attribute size (which is reflected by the stackSize method), but it does
