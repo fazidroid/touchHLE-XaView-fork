@@ -124,187 +124,288 @@ char *str_format(const char *format, ...) {
 }
 
 int test_vsnprintf() {
-  int res = 0;
   char *str;
 
   // Test %s
   str = str_format("%s", "test");
-  res += !!strcmp(str, "test");
+  if (strcmp(str, "test") != 0) {
+    free(str);
+    return -1;
+  }
   free(str);
   // Test %s NULL
   str = str_format("%s", NULL);
-  res += !!strcmp(str, "(null)");
+  if (strcmp(str, "(null)") != 0) {
+    free(str);
+    return -2;
+  }
   free(str);
   // Test % without a specifier
   str = str_format("abc%");
-  res += !!strcmp(str, "abc");
+  if (strcmp(str, "abc") != 0) {
+    free(str);
+    return -3;
+  }
   free(str);
   // Test %x
   str = str_format("%x", 2042);
-  res += !!strcmp(str, "7fa");
+  if (strcmp(str, "7fa") != 0) {
+    free(str);
+    return -4;
+  }
   free(str);
   str = str_format("0x%08x", 184638698);
-  res += !!strcmp(str, "0x0b015cea");
+  if (strcmp(str, "0x0b015cea") != 0) {
+    free(str);
+    return -5;
+  }
   free(str);
   // Test %d
   str = str_format("%d|%8d|%08d|%.d|%8.d|%.3d|%8.3d|%08.3d|%*d|%0*d", 5, 5, 5,
                    5, 5, 5, 5, 5, 8, 5, 8, 5);
-  res += !!strcmp(
-      str,
-      "5|       5|00000005|5|       5|005|     005|     005|       5|00000005");
+  if (strcmp(str, "5|       5|00000005|5|       5|005|     005|     005|       "
+                  "5|00000005") != 0) {
+    free(str);
+    return -6;
+  }
   free(str);
   // Test %d with alternative form
   str = str_format("%#.2d", 5);
-  res += !!strcmp(str, "05");
+  if (strcmp(str, "05") != 0) {
+    free(str);
+    return -7;
+  }
   free(str);
   // Test %f
   str = str_format("%f|%8f|%08f|%.f|%8.f|%.3f|%8.3f|%08.3f|%*f|%0*f", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(str, "10.123450|10.123450|10.123450|10|      10|10.123|  "
-                       "10.123|0010.123|10.123450|10.123450");
+  if (strcmp(str, "10.123450|10.123450|10.123450|10|      10|10.123|  "
+                  "10.123|0010.123|10.123450|10.123450") != 0) {
+    free(str);
+    return -8;
+  }
   free(str);
   str = str_format("%f|%8f|%08f|%.f|%8.f|%.3f|%8.3f|%08.3f|%*f|%0*f", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
-                       "-10.123|-010.123|-10.123450|-10.123450");
+  if (strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
+                  "-10.123|-010.123|-10.123450|-10.123450") != 0) {
+    free(str);
+    return -9;
+  }
   free(str);
   // Test %e
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(
-      str, "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
-           "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01");
+  if (strcmp(str,
+             "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
+             "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01") !=
+      0) {
+    free(str);
+    return -10;
+  }
   free(str);
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(
-      str,
-      "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
-      "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1.012345e+01");
+  if (strcmp(str, "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
+                  "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1."
+                  "012345e+01") != 0) {
+    free(str);
+    return -11;
+  }
   free(str);
   // Test %g
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
-                       "10.1|000010.1| 10.1235|010.1235");
+  if (strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
+                  "10.1|000010.1| 10.1235|010.1235") != 0) {
+    free(str);
+    return -12;
+  }
   free(str);
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
-                       "-10.1|-00010.1|-10.1235|-10.1235");
+  if (strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
+                  "-10.1|-00010.1|-10.1235|-10.1235") != 0) {
+    free(str);
+    return -13;
+  }
   free(str);
   str = str_format("%f|%8f|%08f|%.f|%8.f|%.3f|%8.3f|%08.3f|%*f|%0*f", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
-                       "-10.123|-010.123|-10.123450|-10.123450");
+  if (strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
+                  "-10.123|-010.123|-10.123450|-10.123450") != 0) {
+    free(str);
+    return -14;
+  }
   free(str);
   // Test %e
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(
-      str, "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
-           "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01");
+  if (strcmp(str,
+             "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
+             "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01") !=
+      0) {
+    free(str);
+    return -15;
+  }
   free(str);
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(
-      str,
-      "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
-      "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1.012345e+01");
+  if (strcmp(str, "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
+                  "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1."
+                  "012345e+01") != 0) {
+    free(str);
+    return -16;
+  }
   free(str);
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", 0.0, 0.0,
                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16, 0.0, 16, 0.0);
-  res += !!strcmp(
-      str,
-      "0.000000e+00|0.000000e+00|0.000000e+00|0e+00|   "
-      "0e+00|0.000e+00|0.000e+00|0.000e+00|    0.000000e+00|00000.000000e+00");
+  if (strcmp(str, "0.000000e+00|0.000000e+00|0.000000e+00|0e+00|   "
+                  "0e+00|0.000e+00|0.000e+00|0.000e+00|    "
+                  "0.000000e+00|00000.000000e+00") != 0) {
+    free(str);
+    return -17;
+  }
   free(str);
   // Test %g
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
-                       "10.1|000010.1| 10.1235|010.1235");
+  if (strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
+                  "10.1|000010.1| 10.1235|010.1235") != 0) {
+    free(str);
+    return -18;
+  }
   free(str);
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
-                       "-10.1|-00010.1|-10.1235|-10.1235");
+  if (strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
+                  "-10.1|-00010.1|-10.1235|-10.1235") != 0) {
+    free(str);
+    return -19;
+  }
   free(str);
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", 0.0, 0.0,
                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16, 0.0, 16, 0.0);
-  res += !!strcmp(
-      str, "0|       0|00000000|0|       0|0|       0|00000000|               "
-           "0|0000000000000000");
+  if (strcmp(
+          str,
+          "0|       0|00000000|0|       0|0|       0|00000000|               "
+          "0|0000000000000000") != 0) {
+    free(str);
+    return -20;
+  }
   free(str);
   // Test %g with trailing zeros
   str = str_format("%.14g", 1.0);
-  res += !!strcmp(str, "1");
+  if (strcmp(str, "1") != 0) {
+    free(str);
+    return -21;
+  }
   free(str);
   // Test %g with big number
   str = str_format("%.14g", 10000000000.0);
-  res += !!strcmp(str, "10000000000");
+  if (strcmp(str, "10000000000") != 0) {
+    free(str);
+    return -22;
+  }
   free(str);
   // Test %g with a precision argument
   str = str_format("%.*g", 4, 10.234);
-  res += !!strcmp(str, "10.23");
+  if (strcmp(str, "10.23") != 0) {
+    free(str);
+    return -23;
+  }
   free(str);
   // Test length modifiers
   str = str_format("%d %ld %lld %qd %u %lu %llu %qu", 10, 100, 4294967296,
                    4294967296, 10, 100, 4294967296, 4294967296);
-  res += !!strcmp(str,
-                  "10 100 4294967296 4294967296 10 100 4294967296 4294967296");
+  if (strcmp(str,
+             "10 100 4294967296 4294967296 10 100 4294967296 4294967296") !=
+      0) {
+    free(str);
+    return -24;
+  }
   free(str);
   // Test %.50s with a long string
   str = str_format("%.50s",
                    "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ");
-  res += !!strcmp(str, "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX");
+  if (strcmp(str, "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX") != 0) {
+    free(str);
+    return -25;
+  }
   free(str);
   // Test precision for %x
   str = str_format("%.8x-%.8x-%.2x", 10, 9999999, 9999999);
-  res += !!strcmp(str, "0000000a-0098967f-98967f");
+  if (strcmp(str, "0000000a-0098967f-98967f") != 0) {
+    free(str);
+    return -26;
+  }
   free(str);
   // Test unknown specifier skip
   str = str_format("%I");
-  res += !!strcmp(str, "I");
+  if (strcmp(str, "I") != 0) {
+    free(str);
+    return -27;
+  }
   free(str);
   // Test %s with padding
   const char *s = "Hello";
   str = str_format("[%10s]", s);
-  res += !!strcmp(str, "[     Hello]");
+  if (strcmp(str, "[     Hello]") != 0) {
+    free(str);
+    return -28;
+  }
   free(str);
   str = str_format("[%-10s]", s);
-  res += !!strcmp(str, "[Hello     ]");
+  if (strcmp(str, "[Hello     ]") != 0) {
+    free(str);
+    return -29;
+  }
   free(str);
   str = str_format("[%*s]", 10, s);
-  res += !!strcmp(str, "[     Hello]");
+  if (strcmp(str, "[     Hello]") != 0) {
+    free(str);
+    return -30;
+  }
   free(str);
   str = str_format("[%-*s]", 10, s);
-  res += !!strcmp(str, "[Hello     ]");
+  if (strcmp(str, "[Hello     ]") != 0) {
+    free(str);
+    return -31;
+  }
   free(str);
   // Test %p with padding
   str = str_format("%90p", &str);
-  res += (strlen(str) == 90) ? 0 : 1;
+  if (strlen(str) != 90) {
+    free(str);
+    return -32;
+  }
   free(str);
   // Test sign prepend
   str = str_format("%+08d", 31501);
-  res += !!strcmp(str, "+0031501");
+  if (strcmp(str, "+0031501") != 0) {
+    free(str);
+    return -33;
+  }
   free(str);
   str = str_format("%+08d", -31501);
-  res += !!strcmp(str, "-0031501");
+  if (strcmp(str, "-0031501") != 0) {
+    free(str);
+    return -34;
+  }
   free(str);
 
-  return res;
+  return 0;
 }
 
 int test_sscanf() {
