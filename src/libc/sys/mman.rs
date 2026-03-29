@@ -20,7 +20,7 @@ const MAP_ANON: i32 = 0x1000;
 #[derive(Default)]
 pub struct State {
     /// Keeping track of `mmap` allocations
-    allocations: HashMap<MutVoidPtr, GuestUSize>,
+    mmap_allocations: HashMap<MutVoidPtr, GuestUSize>,
 }
 
 /// For files, our implementation of mmap is really simple:
@@ -70,8 +70,8 @@ fn mmap(
         assert_eq!(read as u32, len);
     };
 
-    assert!(!env.libc_state.mmap.allocations.contains_key(&ptr));
-    env.libc_state.mmap.allocations.insert(ptr, len);
+    assert!(!env.libc_state.mman.mmap_allocations.contains_key(&ptr));
+    env.libc_state.mman.mmap_allocations.insert(ptr, len);
 
     ptr
 }
@@ -88,9 +88,12 @@ fn munmap(env: &mut Environment, addr: MutVoidPtr, len: GuestUSize) -> i32 {
         log!("Warning: munmap({:?}, {}) failed, returning -1", addr, len);
         return -1;
     }
-    assert_eq!(*env.libc_state.mmap.allocations.get(&addr).unwrap(), len);
+    assert_eq!(
+        *env.libc_state.mman.mmap_allocations.get(&addr).unwrap(),
+        len
+    );
     env.mem.free(addr);
-    env.libc_state.mmap.allocations.remove(&addr);
+    env.libc_state.mman.mmap_allocations.remove(&addr);
     0 // success
 }
 

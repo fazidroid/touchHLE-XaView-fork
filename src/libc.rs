@@ -26,7 +26,6 @@ pub mod libkern;
 pub mod mach;
 pub mod mach_o;
 pub mod math;
-pub mod mmap;
 pub mod net;
 pub mod netdb;
 pub mod posix_io;
@@ -74,7 +73,6 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         mach::vm_map::FUNCTIONS,
         mach_o::FUNCTIONS,
         math::FUNCTIONS,
-        mmap::FUNCTIONS,
         net::if_::FUNCTIONS,
         netdb::FUNCTIONS,
         posix_io::FUNCTIONS,
@@ -94,6 +92,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         stdlib::FUNCTIONS,
         stdlib::qsort::FUNCTIONS,
         string::FUNCTIONS,
+        sys::mman::FUNCTIONS,
         sys::mount::FUNCTIONS,
         sys::ptrace::FUNCTIONS,
         sys::timeb::FUNCTIONS,
@@ -124,5 +123,5 @@ pub struct State {
     errno: errno::State,
     clocale: clocale::State,
     mach_vm: mach::vm_map::State,
-    mmap: mmap::State,
+    mman: sys::mman::State,
 }
