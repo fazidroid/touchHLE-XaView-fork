@@ -210,6 +210,18 @@ pub(super) fn objc_msgSend_stret(
     )
 }
 
+#[allow(non_snake_case)]
+pub(crate) fn _touchHLE_objc_msgSend_stret_tolerant(
+    env: &mut Environment,
+    _stret: MutVoidPtr,
+    receiver: id,
+    selector: SEL,
+) {
+    objc_msgSend_inner(
+        env, receiver, selector, /* super2: */ None, /* tolerate_type_mismatch: */ true,
+    )
+}
+
 #[repr(C, packed)]
 /// A pointer to this struct replaces the normal receiver parameter for
 /// `objc_msgSendSuper2` and [msg_send_super2].
@@ -297,10 +309,12 @@ where
     (R, P): MsgSendSignature,
     R: GuestRet,
 {
-    // Provide type info for dynamic type checking.
-    env.objc.message_type_info = Some(<(R, P) as MsgSendSignature>::type_info());
-    assert!(R::SIZE_IN_MEM.is_none());
-    (_touchHLE_objc_msgSend_tolerant as fn(&mut Environment, id, SEL)).call_from_host(env, args)
+    if R::SIZE_IN_MEM.is_some() {
+        (_touchHLE_objc_msgSend_stret_tolerant as fn(&mut Environment, MutVoidPtr, id, SEL))
+            .call_from_host(env, args)
+    } else {
+        (_touchHLE_objc_msgSend_tolerant as fn(&mut Environment, id, SEL)).call_from_host(env, args)
+    }
 }
 
 /// Counterpart of [MsgSendSignature] for [msg_send_super2].

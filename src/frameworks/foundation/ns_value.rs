@@ -15,7 +15,7 @@ use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::NSInteger;
 use crate::mem::{ConstVoidPtr, MutVoidPtr};
 use crate::objc::{
-    autorelease, id, msg, msg_class, objc_classes, release, retain, Class, ClassExports,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports,
     HostObject, NSZonePtr,
 };
 use crate::Environment;
@@ -400,19 +400,45 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)description {
-    let desc = match env.objc.borrow(this) {
-        NSNumberHostObject::Bool(value) => from_rust_string(env, (*value as i32).to_string()),
-        NSNumberHostObject::UnsignedLongLong(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::UnsignedInt(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::Int(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::LongLong(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::Float(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::Double(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::Short(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::UnsignedShort(value) => from_rust_string(env, value.to_string()),
-        NSNumberHostObject::Char(value) => from_rust_string(env, value.to_string()),
+    msg![env; this stringValue]
+}
+
+- (id)stringValue {
+    msg![env; this descriptionWithLocale:nil]
+}
+- (id)descriptionWithLocale:(id)locale {
+    assert_eq!(locale, nil); // TODO
+    // TODO: do not alloc format strings each time
+    let format = match env.objc.borrow(this) {
+        NSNumberHostObject::Bool(_) | NSNumberHostObject::Char(_) | NSNumberHostObject::Int(_) => from_rust_string(env, "%i".to_string()),
+        NSNumberHostObject::Double(_) => from_rust_string(env, "%0.16g".to_string()),
+        NSNumberHostObject::Float(_) => from_rust_string(env, "%0.7g".to_string()),
+        NSNumberHostObject::LongLong(_) => from_rust_string(env, "%lli".to_string()),
+        NSNumberHostObject::Short(_) => from_rust_string(env, "%hi".to_string()),
+        NSNumberHostObject::UnsignedInt(_) => from_rust_string(env, "%u".to_string()),
+        NSNumberHostObject::UnsignedLongLong(_) => from_rust_string(env, "%llu".to_string()),
+        NSNumberHostObject::UnsignedShort(_) => from_rust_string(env, "%hu".to_string()),
     };
-    autorelease(env, desc)
+    let ns_string_class = env.objc.get_known_class("NSString", &mut env.mem);
+    let sel = env.objc.lookup_selector("stringWithFormat:").unwrap();
+    // TODO: type info for host-to-host message calls with var-args
+    let res = match env.objc.borrow(this) {
+        NSNumberHostObject::Bool(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value as i32)),
+        NSNumberHostObject::Char(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+        NSNumberHostObject::Double(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+        NSNumberHostObject::Float(value) => {
+            // Need to promote float to double for the expected argument of %g
+            crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value as f64))
+        },
+        NSNumberHostObject::Int(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+        NSNumberHostObject::LongLong(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+        NSNumberHostObject::Short(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+        NSNumberHostObject::UnsignedInt(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+        NSNumberHostObject::UnsignedLongLong(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+        NSNumberHostObject::UnsignedShort(value) => crate::objc::msg_send_no_type_checking(env, (ns_string_class, sel, format, *value)),
+    };
+    release(env, format);
+    res
 }
 
 - (NSUInteger)hash {

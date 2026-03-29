@@ -4002,6 +4002,260 @@ int test_NSKeyedArchiver_NSKeyedUnarchiver() {
   return 0;
 }
 
+int test_NSNumber_stringValue() {
+  NSAutoreleasePool *pool = [NSAutoreleasePool new];
+
+  NSNumber *num;
+  NSString *result;
+  NSString *expected;
+
+  // Bool: YES -> "1"
+  num = [NSNumber numberWithBool:YES];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"1"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -1;
+  }
+
+  // Bool: NO -> "0"
+  num = [NSNumber numberWithBool:NO];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -2;
+  }
+
+  // Int: 0 -> "0"
+  num = [NSNumber numberWithInt:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -3;
+  }
+
+  // Int: 42 -> "42"
+  num = [NSNumber numberWithInt:42];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"42"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -4;
+  }
+
+  // Int: -100 -> "-100"
+  num = [NSNumber numberWithInt:-100];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-100"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -5;
+  }
+
+  // Int: INT_MAX -> "2147483647"
+  num = [NSNumber numberWithInt:2147483647];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"2147483647"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -6;
+  }
+
+  // Int: INT_MIN -> "-2147483648"
+  num = [NSNumber numberWithInt:-2147483648];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-2147483648"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -7;
+  }
+
+  // LongLong: 0 -> "0"
+  num = [NSNumber numberWithLongLong:0LL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -8;
+  }
+
+  // LongLong: 9999999999 -> "9999999999"
+  num = [NSNumber numberWithLongLong:9999999999LL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"9999999999"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -9;
+  }
+
+  // LongLong: -9999999999 -> "-9999999999"
+  num = [NSNumber numberWithLongLong:-9999999999LL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-9999999999"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -10;
+  }
+
+  // UnsignedInt: 0 -> "0"
+  num = [NSNumber numberWithUnsignedInt:0U];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -11;
+  }
+
+  // UnsignedLongLong: 0 -> "0"
+  num = [NSNumber numberWithUnsignedLongLong:0ULL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -12;
+  }
+
+  // Float: 0.0 -> "0"
+  num = [NSNumber numberWithFloat:0.0f];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -13;
+  }
+
+  // Float: 1.5 -> "1.5"
+  num = [NSNumber numberWithFloat:1.5f];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"1.5"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -14;
+  }
+
+  // Float: -1.25 -> "-1.25"
+  num = [NSNumber numberWithFloat:-1.25f];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-1.25"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -15;
+  }
+
+  // Double: 0.0 -> "0"
+  num = [NSNumber numberWithDouble:0.0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -16;
+  }
+
+  // Double: 1.5 -> "1.5"
+  num = [NSNumber numberWithDouble:1.5];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"1.5"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -17;
+  }
+
+  // Double: -1.25 -> "-1.25"
+  num = [NSNumber numberWithDouble:-1.25];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-1.25"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -18;
+  }
+
+  // Short: 0 -> "0"
+  num = [NSNumber numberWithShort:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -19;
+  }
+
+  // Short: 100 -> "100"
+  num = [NSNumber numberWithShort:100];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"100"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -20;
+  }
+
+  // Short: SHRT_MIN -> "-32768"
+  num = [NSNumber numberWithShort:-32768];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-32768"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -21;
+  }
+
+  // Short: SHRT_MAX -> "32767"
+  num = [NSNumber numberWithShort:32767];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"32767"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -22;
+  }
+
+  // UnsignedShort: 0 -> "0"
+  num = [NSNumber numberWithUnsignedShort:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -23;
+  }
+
+  // Char: 0 -> "0"
+  num = [NSNumber numberWithChar:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -24;
+  }
+
+  // Char: 65 -> "65"
+  num = [NSNumber numberWithChar:65];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"65"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -25;
+  }
+
+  // Char: SCHAR_MIN -> "-128"
+  num = [NSNumber numberWithChar:-128];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-128"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -26;
+  }
+
+  // Char: SCHAR_MAX -> "127"
+  num = [NSNumber numberWithChar:127];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"127"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -27;
+  }
+
+  [pool drain];
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -4081,6 +4335,7 @@ struct {
     FUNC_DEF(test_RespondsToSelector),
     FUNC_DEF(test_NSKeyedArchiver_NSKeyedUnarchiver),
     FUNC_DEF(test_AutoreleasePool),
+    FUNC_DEF(test_NSNumber_stringValue),
 };
 // clang-format on
 

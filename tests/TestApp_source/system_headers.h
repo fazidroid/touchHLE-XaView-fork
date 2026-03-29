@@ -392,4 +392,6 @@ NSString *NSStringFromCGPoint(CGPoint);
 NSString *NSStringFromCGSize(CGSize);
 NSString *NSStringFromCGRect(CGRect);
 
+void NSLog(NSString *, ...);
+
 #endif // TOUCHHLE_SYSTEM_HEADERS_H
