@@ -28,6 +28,7 @@ pub const ESPIPE: i32 = 29;
 pub const EROFS: i32 = 30;
 #[allow(dead_code)]
 pub const EPROTONOSUPPORT: i32 = 43;
+pub const ENOTSUP: i32 = 45;
 pub const ECONNRESET: i32 = 54;
 pub const EOVERFLOW: i32 = 75;
 

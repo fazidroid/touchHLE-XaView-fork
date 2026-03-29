@@ -7,7 +7,7 @@
 use crate::dyld::FunctionExports;
 use crate::environment::Environment;
 use crate::export_c_func;
-use crate::libc::errno::{set_errno, EINVAL};
+use crate::libc::errno::{set_errno, EINVAL, ENOTSUP};
 use crate::libc::posix_io;
 use crate::libc::posix_io::{off_t, FileDescriptor, SEEK_SET};
 use crate::mem::{GuestUSize, MutVoidPtr, PAGE_SIZE_ALIGN_MASK};
@@ -97,7 +97,14 @@ fn munmap(env: &mut Environment, addr: MutVoidPtr, len: GuestUSize) -> i32 {
     0 // success
 }
 
+fn madvise(env: &mut Environment, addr: MutVoidPtr, len: GuestUSize, advice: i32) -> i32 {
+    log!("TODO: madvise({:?}, {}, {}) -> -1", addr, len, advice);
+    set_errno(env, ENOTSUP);
+    -1
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(mmap(_, _, _, _, _, _)),
     export_c_func!(munmap(_, _)),
+    export_c_func!(madvise(_, _, _)),
 ];
