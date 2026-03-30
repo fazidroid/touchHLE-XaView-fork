@@ -42,9 +42,9 @@ pub struct MachO {
     pub dynamic_libraries: Vec<String>,
     /// Metadata related to sections.
     pub sections: Vec<Section>,
-    /// Symbols exported by the binary. This is a hashmap so the dynamic linker
-    /// can look things up quickly. Thumb function symbols always have the Thumb
-    /// bit set.
+    /// Defined symbols in the binary (both external and local). This is a
+    /// hashmap so the dynamic linker can look things up quickly. Thumb function
+    /// symbols always have the Thumb bit set.
     pub exported_symbols: HashMap<String, u32>,
     /// List of addresses and names of external relocations for the dynamic
     /// linker to resolve.
@@ -424,7 +424,6 @@ impl MachO {
                             }
                             if let Symbol::Defined {
                                 name: Some(name),
-                                external: true,
                                 entry,
                                 desc,
                                 ..
@@ -515,13 +514,14 @@ impl MachO {
                                 // Resolve them immediately, there is no value
                                 // in passing these on to Dyld.
                                 let addr = Ptr::from_bits(addr);
+                                let addend: u32 = into_mem.read(addr);
                                 let entry = entry as u32;
                                 let entry = if desc & N_ARM_THUMB_DEF != 0 {
                                     entry | GuestFunction::THUMB_BIT
                                 } else {
                                     entry
                                 };
-                                into_mem.write(addr, entry);
+                                into_mem.write(addr, entry.wrapping_add(addend));
                             }
                             Some(Symbol::Prebound { name: Some(n), .. }) => {
                                 let ptr_ptr = Ptr::<u32, true>::from_bits(addr);

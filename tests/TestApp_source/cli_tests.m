@@ -50,6 +50,10 @@ int test_AutoreleasePool(void);    // AutoReleasePoolTest.m
 int test_CGAffineTransform(void);  // CGAffineTransform.c
 int test_RespondsToSelector(void); // RespondsToSelector.m
 
+#ifndef DEFINE_ME_WHEN_BUILDING_ON_MACOS
+int test_cpp_virtual_inheritance(void); // CppVirtualInheritance.cpp
+#endif
+
 // === Main code ===
 
 int test_CGGeometry() {
@@ -4270,6 +4274,7 @@ struct {
     FUNC_DEF(test_synchronized),
     FUNC_DEF(test_read_directory_as_fd),
     FUNC_DEF(test_pthread_get_stacksize_np),
+    FUNC_DEF(test_cpp_virtual_inheritance),
 #endif
     FUNC_DEF(test_qsort),
     FUNC_DEF(test_vsnprintf),
