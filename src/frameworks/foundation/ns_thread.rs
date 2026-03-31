@@ -217,7 +217,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (bool)isCancelled {
-    log!("TODO: [(NSThread *){:?} isCancelled]", this);
+    log_dbg!("TODO: [(NSThread *){:?} isCancelled]", this);
     false
 }
 
