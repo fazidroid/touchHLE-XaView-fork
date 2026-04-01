@@ -7,6 +7,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <thread>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 // IncludeThreadHeaders
 
@@ -85,7 +88,12 @@ private:
 
   std::optional<std::uint32_t> MemoryReadCode(VAddr vaddr) override {
     // LogReadCode
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_FATAL, "touchHLE", "Reading PC: 0x%08X", vaddr);
+#else
     std::fprintf(stderr, "[Dynarmic] Reading PC: 0x%08X\n", vaddr);
+    std::fflush(stderr);
+#endif
     bool error;
     auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
     if (error) {
