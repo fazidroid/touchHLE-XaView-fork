@@ -491,32 +491,36 @@ impl Environment {
                     // Static initializers for libraries must be run before
                     // the initializer in the app binary.
                     for bin_idx in env.get_sorted_bin_indices().unwrap() {
-                        let Some(bin) = env.bins.get(bin_idx) else {
-                            continue;
-                        };
-                        let Some(section) =
-                            bin.get_section(mach_o::SectionType::ModInitFuncPointers)
-                        else {
-                            continue;
+                        // FixBorrowCheck
+                        let (section_addr, section_size, bin_name) = {
+                            let Some(bin) = env.bins.get(bin_idx) else {
+                                continue;
+                            };
+                            let Some(section) =
+                                bin.get_section(mach_o::SectionType::ModInitFuncPointers)
+                            else {
+                                continue;
+                            };
+                            (section.addr, section.size, bin.name.clone())
                         };
 
-                        log_dbg!("Calling static initializers for {:?}", bin.name);
-                        assert!(section.size % 4 == 0);
+                        log_dbg!("Calling static initializers for {:?}", bin_name);
+                        assert!(section_size % 4 == 0);
                         let base: mem::ConstPtr<abi::GuestFunction> =
-                            mem::Ptr::from_bits(section.addr);
-                        let count = section.size / 4;
+                            mem::Ptr::from_bits(section_addr);
+                        let count = section_size / 4;
                         for i in 0..count {
                             let func = env.mem.read(base + i);
-                            // SkipInvalidInitFunc
+                            // SkipBadInit
                             let addr = func.addr_without_thumb_bit();
                             if addr <= 0x2000 {
                                 echo!("WARNING: Skipping corrupted init func {:#010x}", addr);
                                 continue;
                             }
-                            echo!("Calling init func {:#010x} for {:?}", addr, bin.name);
+                            echo!("Calling init func {:#010x} for {:?}", addr, bin_name);
                             () = func.call_from_host(env, ());
                         }
-                        echo!("Static initialization done for {:?}", bin.name);
+                        echo!("Static initialization done for {:?}", bin_name);
                     }
 
                     {
