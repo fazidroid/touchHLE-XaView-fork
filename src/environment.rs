@@ -1631,6 +1631,8 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
+        // InitHangDiagnostic
+        let mut hang_counter = 0;
 
         loop {
             while self
@@ -1640,6 +1642,30 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
+
+                // HangDiagnostic
+                let pc = self.cpu.regs()[cpu::Cpu::PC];
+                if pc == 0x00600ac4 {
+                    hang_counter += 1;
+                    if hang_counter == 100 {
+                        echo!("--- ULTIMATE HANG DUMP ---");
+                        self.dump_all_regs();
+                        self.stack_trace_all();
+                        echo!("--- INSTRUCTION DUMP ---");
+                        let base_addr = pc.saturating_sub(16) & !1;
+                        for addr in (base_addr..=base_addr+32).step_by(2) {
+                            let val: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(addr));
+                            echo!("{:#010x}: {:#06x}", addr, val);
+                        }
+                        echo!("--- THREAD STATES ---");
+                        for (i, t) in self.threads.iter().enumerate() {
+                            echo!("Thread {}: active={}, blocked_by={:?}", i, t.active, t.blocked_by);
+                        }
+                        panic!("Intentional diagnostic panic for Asphalt 7 loading hang");
+                    }
+                } else {
+                    hang_counter = 0;
+                }
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
