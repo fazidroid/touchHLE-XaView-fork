@@ -1595,16 +1595,6 @@ impl Environment {
                 if matches!(e, cpu::CpuError::UndefinedInstruction) {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
                     let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
-                    if is_thumb {
-                        let ptr = mem::ConstPtr::<u32>::from_bits(pc & !3);
-                        let val: u32 = self.mem.read(ptr);
-                        if val == 0xe12fff1e {
-                            // FixCrackedStub
-                            let lr = self.cpu.regs()[cpu::Cpu::LR];
-                            self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
-                            return ThreadNextAction::Continue;
-                        }
-                    }
                     // SkipUndefinedInst
                     let mut inst_len = if is_thumb { 2 } else { 4 };
                     if is_thumb {
@@ -1670,12 +1660,10 @@ impl Environment {
                     if stuck_count > 50 {
                         let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
                         let mut inst_len = if is_thumb { 2 } else { 4 };
-                        // FixUnusedAssignment
                         let mut opcode: u32;
                         if is_thumb {
                             let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(current_pc));
                             opcode = hw as u32;
-                            // Thumb-2 32-bit instruction decoding rule
                             if (hw & 0xe000) == 0xe000 && (hw & 0x1800) != 0 {
                                 inst_len = 4;
                                 let hw2: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(current_pc + 2));
@@ -1685,16 +1673,8 @@ impl Environment {
                             opcode = self.mem.read(mem::ConstPtr::<u32>::from_bits(current_pc));
                         }
 
-                        if (!is_thumb && opcode == 0xe12fff1e) || (is_thumb && opcode == 0x4770) {
-                            let sp = self.cpu.regs()[cpu::Cpu::SP];
-                            let new_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(sp));
-                            self.cpu.regs_mut()[cpu::Cpu::SP] += 4;
-                            echo!("WARNING: Bypassing bx lr loop at {:#010x}. Popped LR: {:#010x}", current_pc, new_lr);
-                            self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(new_lr));
-                        } else {
-                            echo!("WARNING: Bypassing tight loop at {:#010x}, opcode: {:#010x}", current_pc, opcode);
-                            self.cpu.regs_mut()[cpu::Cpu::PC] += inst_len;
-                        }
+                        echo!("WARNING: Bypassing tight loop at {:#010x}, opcode: {:#010x}", current_pc, opcode);
+                        self.cpu.regs_mut()[cpu::Cpu::PC] += inst_len;
                         stuck_count = 0;
                     }
                 } else {
