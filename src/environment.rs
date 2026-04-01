@@ -1555,6 +1555,9 @@ impl Environment {
         assert!(self.threads[initial_thread].active);
         assert!(self.threads[initial_thread].guest_context.is_none());
 
+        // SetupHeartbeatTimer
+        let mut last_heartbeat = Instant::now();
+
         loop {
             while self
                 .remaining_ticks
@@ -1563,6 +1566,12 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
+
+                // PrintDebugHeartbeat
+                if last_heartbeat.elapsed().as_secs() >= 1 {
+                    echo!("[Heartbeat] Thread {}, PC: {:#010x}, LR: {:#010x}", self.current_thread, self.cpu.regs()[cpu::Cpu::PC], self.cpu.regs()[cpu::Cpu::LR]);
+                    last_heartbeat = Instant::now();
+                }
 
                 match self.handle_cpu_state(state) {
                     ThreadNextAction::Continue => {}
