@@ -92,10 +92,6 @@ private:
     if (error) {
       return std::nullopt;
     }
-    // BypassLibcppBarrier
-    if (vaddr == 0x3748B2C4) {
-      return 0xbf00bf00;
-    }
     return value;
   }
 
