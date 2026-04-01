@@ -1581,7 +1581,7 @@ impl Environment {
                 .is_none_or(|remaining_ticks| remaining_ticks > 0)
             {
                 // ForceSingleStepStart
-                let mut current_ticks = if trace_steps < 50 { None } else { self.remaining_ticks.clone() };
+                let mut current_ticks = if trace_steps < 50 { None } else { self.remaining_ticks };
 
                 let state = self
                     .cpu
