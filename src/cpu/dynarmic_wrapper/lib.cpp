@@ -163,6 +163,11 @@ private:
     halting_svc = svc;
     cpu->HaltExecution(HaltReasonSvc);
   }
+  void PreCodeTranslation(VAddr pc) override {
+    // LogPreCode
+    std::fprintf(stderr, "[Dynarmic] Compiling PC: 0x%08X\n", pc);
+    std::fflush(stderr);
+  }
   void ExceptionRaised(VAddr pc, Dynarmic::A32::Exception exception) override {
     // CheckMemoryReadCode
     if (exception == Dynarmic::A32::Exception::NoExecuteFault) {
@@ -249,6 +254,9 @@ class DynarmicWrapper {
 
 public:
   DynarmicWrapper(void *direct_memory_access_ptr, size_t null_page_count) {
+    // UnbufferStderr
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
     Dynarmic::A32::UserConfig user_config;
     user_config.callbacks = &env;
     user_config.coprocessors[15] = std::make_shared<ArmDynarmicCP15>();
