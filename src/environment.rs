@@ -507,18 +507,16 @@ impl Environment {
                         let count = section.size / 4;
                         for i in 0..count {
                             let func = env.mem.read(base + i);
-                            log_dbg!(
-                                "Calling static initializer at {:?} from {:?}",
-                                func,
-                                (base + i)
-                            );
-                            // SkipNullInitFunc
-                            if func.addr_without_thumb_bit() == 0 {
+                            // SkipInvalidInitFunc
+                            let addr = func.addr_without_thumb_bit();
+                            if addr <= 0x2000 {
+                                echo!("WARNING: Skipping corrupted init func {:#010x}", addr);
                                 continue;
                             }
+                            echo!("Calling init func {:#010x} for {:?}", addr, bin.name);
                             () = func.call_from_host(env, ());
                         }
-                        log_dbg!("Static initialization done");
+                        echo!("Static initialization done for {:?}", bin.name);
                     }
 
                     {
@@ -553,11 +551,8 @@ impl Environment {
 
                     // Manually call here, since running call_from_host pushes
                     // a stack frame and disrupts abi for _start.
-                    // FixMainThreadThumb
-                    env.cpu.set_cpsr(
-                        cpu::Cpu::CPSR_USER_MODE
-                            | ((entry_point_addr.is_thumb() as u32) * cpu::Cpu::CPSR_THUMB),
-                    );
+                    // LogMainEntryPoint
+                    echo!("Jumping to main entry point: {:#010x}", entry_point_addr.addr_without_thumb_bit());
                     env.cpu
                         .branch_with_link(entry_point_addr, env.dyld.thread_exit_routine());
                     env.run_call();
