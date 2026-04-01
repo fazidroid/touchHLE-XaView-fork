@@ -87,20 +87,16 @@ private:
   }
 
   std::optional<std::uint32_t> MemoryReadCode(VAddr vaddr) override {
-    // LogReadCode
-#ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_FATAL, "touchHLE", "Reading PC: 0x%08X", vaddr);
-#else
-    std::fprintf(stderr, "[Dynarmic] Reading PC: 0x%08X\n", vaddr);
-    std::fflush(stderr);
-#endif
     bool error;
     auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
     if (error) {
       return std::nullopt;
-    } else {
-      return value;
     }
+    // BypassLibcppBarrier
+    if (vaddr == 0x3748B2C4) {
+      return 0xbf00bf00;
+    }
+    return value;
   }
 
   void MemoryWrite8(VAddr vaddr, std::uint8_t value) override {
