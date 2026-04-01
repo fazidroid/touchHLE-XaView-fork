@@ -476,7 +476,8 @@ fn app_picker_inner(
         () = msg![env; main_view addSubview:label];
     }
 
-    let brand_color: id = if super::branding() == "XAVIEW" {
+    // FixBrandColor
+    let brand_color: id = if crate::branding() == "XAVIEW" {
         msg_class![env; UIColor redColor]
     } else {
         msg_class![env; UIColor grayColor]
