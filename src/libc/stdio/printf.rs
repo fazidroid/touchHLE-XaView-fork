@@ -15,7 +15,7 @@ use crate::libc::stdio::{fwrite, getc, ungetc, EOF, FILE};
 use crate::libc::stdlib::{atof_inner_generic, str_to_int_inner_generic};
 use crate::libc::string::strlen;
 use crate::libc::wchar::wchar_t;
-use crate::mem::{ConstPtr, GuestUSize, Mem, MutPtr, MutVoidPtr, Ptr};
+use crate::mem::{guest_size_of, ConstPtr, GuestUSize, Mem, MutPtr, MutVoidPtr, Ptr};
 use crate::objc::{id, msg, nil};
 use crate::Environment;
 use std::collections::HashSet;
@@ -123,6 +123,15 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
         };
 
         let length_modifier = match get_format_char(&env.mem, format_char_idx) {
+            b'h' => {
+                format_char_idx += 1;
+                if get_format_char(&env.mem, format_char_idx) == b'h' {
+                    format_char_idx += 1;
+                    Some("hh")
+                } else {
+                    Some("h")
+                }
+            }
             b'l' => {
                 format_char_idx += 1;
                 if get_format_char(&env.mem, format_char_idx) == b'l' {
@@ -138,6 +147,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 format_char_idx += 1;
                 Some("ll")
             }
+            b'j' | b'z' | b't' | b'L' => unimplemented!(),
             _ => None,
         };
 
@@ -263,15 +273,31 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     if length_modifier == Some("ll") {
                         let uint: u64 = args.next(env);
                         uint.try_into().unwrap()
+                    } else if length_modifier == Some("hh") {
+                        let uint: u8 = args.next(env);
+                        uint.into()
+                    } else if length_modifier == Some("h") {
+                        let uint: u16 = args.next(env);
+                        uint.into()
                     } else {
+                        assert!(length_modifier.is_none() || length_modifier == Some("l"));
                         let uint: u32 = args.next(env);
                         uint.into()
                     }
-                } else if length_modifier == Some("ll") {
-                    args.next(env)
                 } else {
-                    let int: i32 = args.next(env);
-                    int.into()
+                    if length_modifier == Some("ll") {
+                        args.next(env)
+                    } else if length_modifier == Some("hh") {
+                        let int: i8 = args.next(env);
+                        int.into()
+                    } else if length_modifier == Some("h") {
+                        let int: i16 = args.next(env);
+                        int.into()
+                    } else {
+                        assert!(length_modifier.is_none() || length_modifier == Some("l"));
+                        let int: i32 = args.next(env);
+                        int.into()
+                    }
                 };
 
                 let int_with_precision = if specifier == b'O' {
@@ -331,7 +357,20 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 assert!(!left_justified);
                 // Note: on 32-bit system unsigned int and unsigned long
                 // are u32, so length_modifier is ignored
-                let uint: u32 = args.next(env);
+                let uint: u32 = if length_modifier == Some("ll") {
+                    let uint: u64 = args.next(env);
+                    uint.try_into().unwrap()
+                } else if length_modifier == Some("hh") {
+                    let uint: u8 = args.next(env);
+                    uint.into()
+                } else if length_modifier == Some("h") {
+                    let uint: u16 = args.next(env);
+                    uint.into()
+                } else {
+                    assert!(length_modifier.is_none() || length_modifier == Some("l"));
+                    let uint: u32 = args.next(env);
+                    uint
+                };
                 if pad_width > 0 {
                     assert!(precision.is_none()); // TODO
                     let pad_width = pad_width as usize;
@@ -358,7 +397,20 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 assert!(precision.is_none());
                 // Note: on 32-bit system unsigned int and unsigned long
                 // are u32, so length_modifier is ignored
-                let uint: u32 = args.next(env);
+                let uint: u32 = if length_modifier == Some("ll") {
+                    let uint: u64 = args.next(env);
+                    uint.try_into().unwrap()
+                } else if length_modifier == Some("hh") {
+                    let uint: u8 = args.next(env);
+                    uint.into()
+                } else if length_modifier == Some("h") {
+                    let uint: u16 = args.next(env);
+                    uint.into()
+                } else {
+                    assert!(length_modifier.is_none() || length_modifier == Some("l"));
+                    let uint: u32 = args.next(env);
+                    uint
+                };
                 if pad_width > 0 {
                     let pad_width = pad_width as usize;
                     if pad_char == '0' && precision.is_none() {
@@ -526,6 +578,34 @@ fn snprintf(
     log_dbg!("snprintf() implemented as a wrapper of vsnprintf()");
 
     vsnprintf(env, dest, n, format, args.start())
+}
+
+fn vasprintf(
+    env: &mut Environment,
+    ret: MutPtr<MutPtr<u8>>,
+    format: ConstPtr<u8>,
+    arg: VaList,
+) -> i32 {
+    log_dbg!(
+        "vasprintf({:?}, {:?} ({:?}), ...)",
+        ret,
+        format,
+        env.mem.cstr_at_utf8(format)
+    );
+
+    let res = printf_inner::<false, _>(env, |mem, idx| mem.read(format + idx), arg);
+    let count: GuestUSize = (res.len() + 1).try_into().unwrap();
+
+    let dest: MutPtr<u8> = env.mem.alloc(count * guest_size_of::<u8>()).cast();
+
+    let dest_slice = env.mem.bytes_at_mut(dest, count);
+    for (i, &byte) in res.iter().chain(b"\0".iter()).enumerate() {
+        dest_slice[i] = byte;
+    }
+
+    env.mem.write(ret, dest);
+
+    res.len().try_into().unwrap()
 }
 
 fn vprintf(env: &mut Environment, format: ConstPtr<u8>, arg: VaList) -> i32 {
@@ -1234,6 +1314,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(vsscanf(_, _, _)),
     export_c_func!(fscanf(_, _, _)),
     export_c_func!(snprintf(_, _, _, _)),
+    export_c_func!(vasprintf(_, _, _)),
     export_c_func!(vprintf(_, _)),
     export_c_func!(vsnprintf(_, _, _, _)),
     export_c_func!(vsprintf(_, _, _)),

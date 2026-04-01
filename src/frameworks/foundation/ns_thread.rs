@@ -105,13 +105,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (())sleepForTimeInterval:(NSTimeInterval)ti {
     log_dbg!("[NSThread sleepForTimeInterval:{:?}]", ti);
-    env.sleep(Duration::from_secs_f64(ti), /* tail_call: */ true);
+    env.sleep(Duration::from_secs_f64(ti));
 }
 
 + (())detachNewThreadSelector:(SEL)selector
                      toTarget:(id)target
                    withObject:(id)object {
     detach_new_thread_inner(env, selector, target, object, /* tolerate_type_mismatch: */ false)
+}
+
++ (bool)isMainThread {
+    env.current_thread == 0
 }
 
 - (id)initWithTarget:(id)target
@@ -192,6 +196,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     true
 }
 
+- (())setName:(id)name { // NSString *
+    todo_objc_setter!(this, name);
+}
+
 // "To change the stack size, you must set this property before starting your
 // thread. Setting the stack size after the thread has started changes the
 // attribute size (which is reflected by the stackSize method), but it does
@@ -209,7 +217,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (bool)isCancelled {
-    log!("TODO: [(NSThread *){:?} isCancelled]", this);
+    log_dbg!("TODO: [(NSThread *){:?} isCancelled]", this);
     false
 }
 

@@ -19,6 +19,8 @@
 #include <fcntl.h>
 #include <fenv.h>
 #include <locale.h>
+#include <mach/kern_return.h>
+#include <mach/thread_info.h>
 #include <math.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -35,11 +37,22 @@
 
 #import "SyncTester.h"
 
+// TODO: include from <mach/thread_act.h> once available in the common-sdk
+extern kern_return_t thread_suspend(mach_port_t target_act);
+extern kern_return_t thread_resume(mach_port_t target_act);
+extern kern_return_t thread_info(mach_port_t target_act, natural_t flavor,
+                                 integer_t *thread_info_out,
+                                 natural_t *thread_info_out_cnt);
+
 // Declare test functions from other files.
 
 int test_AutoreleasePool(void);    // AutoReleasePoolTest.m
 int test_CGAffineTransform(void);  // CGAffineTransform.c
 int test_RespondsToSelector(void); // RespondsToSelector.m
+
+#ifndef DEFINE_ME_WHEN_BUILDING_ON_MACOS
+int test_cpp_virtual_inheritance(void); // CppVirtualInheritance.cpp
+#endif
 
 // === Main code ===
 
@@ -115,187 +128,408 @@ char *str_format(const char *format, ...) {
 }
 
 int test_vsnprintf() {
-  int res = 0;
   char *str;
 
   // Test %s
   str = str_format("%s", "test");
-  res += !!strcmp(str, "test");
+  if (strcmp(str, "test") != 0) {
+    free(str);
+    return -1;
+  }
   free(str);
   // Test %s NULL
   str = str_format("%s", NULL);
-  res += !!strcmp(str, "(null)");
+  if (strcmp(str, "(null)") != 0) {
+    free(str);
+    return -2;
+  }
   free(str);
   // Test % without a specifier
   str = str_format("abc%");
-  res += !!strcmp(str, "abc");
+  if (strcmp(str, "abc") != 0) {
+    free(str);
+    return -3;
+  }
   free(str);
   // Test %x
   str = str_format("%x", 2042);
-  res += !!strcmp(str, "7fa");
+  if (strcmp(str, "7fa") != 0) {
+    free(str);
+    return -4;
+  }
   free(str);
   str = str_format("0x%08x", 184638698);
-  res += !!strcmp(str, "0x0b015cea");
+  if (strcmp(str, "0x0b015cea") != 0) {
+    free(str);
+    return -5;
+  }
   free(str);
   // Test %d
   str = str_format("%d|%8d|%08d|%.d|%8.d|%.3d|%8.3d|%08.3d|%*d|%0*d", 5, 5, 5,
                    5, 5, 5, 5, 5, 8, 5, 8, 5);
-  res += !!strcmp(
-      str,
-      "5|       5|00000005|5|       5|005|     005|     005|       5|00000005");
+  if (strcmp(str, "5|       5|00000005|5|       5|005|     005|     005|       "
+                  "5|00000005") != 0) {
+    free(str);
+    return -6;
+  }
   free(str);
   // Test %d with alternative form
   str = str_format("%#.2d", 5);
-  res += !!strcmp(str, "05");
+  if (strcmp(str, "05") != 0) {
+    free(str);
+    return -7;
+  }
   free(str);
   // Test %f
   str = str_format("%f|%8f|%08f|%.f|%8.f|%.3f|%8.3f|%08.3f|%*f|%0*f", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(str, "10.123450|10.123450|10.123450|10|      10|10.123|  "
-                       "10.123|0010.123|10.123450|10.123450");
+  if (strcmp(str, "10.123450|10.123450|10.123450|10|      10|10.123|  "
+                  "10.123|0010.123|10.123450|10.123450") != 0) {
+    free(str);
+    return -8;
+  }
   free(str);
   str = str_format("%f|%8f|%08f|%.f|%8.f|%.3f|%8.3f|%08.3f|%*f|%0*f", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
-                       "-10.123|-010.123|-10.123450|-10.123450");
+  if (strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
+                  "-10.123|-010.123|-10.123450|-10.123450") != 0) {
+    free(str);
+    return -9;
+  }
   free(str);
   // Test %e
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(
-      str, "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
-           "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01");
+  if (strcmp(str,
+             "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
+             "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01") !=
+      0) {
+    free(str);
+    return -10;
+  }
   free(str);
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(
-      str,
-      "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
-      "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1.012345e+01");
+  if (strcmp(str, "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
+                  "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1."
+                  "012345e+01") != 0) {
+    free(str);
+    return -11;
+  }
   free(str);
   // Test %g
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
-                       "10.1|000010.1| 10.1235|010.1235");
+  if (strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
+                  "10.1|000010.1| 10.1235|010.1235") != 0) {
+    free(str);
+    return -12;
+  }
   free(str);
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
-                       "-10.1|-00010.1|-10.1235|-10.1235");
+  if (strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
+                  "-10.1|-00010.1|-10.1235|-10.1235") != 0) {
+    free(str);
+    return -13;
+  }
   free(str);
   str = str_format("%f|%8f|%08f|%.f|%8.f|%.3f|%8.3f|%08.3f|%*f|%0*f", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
-                       "-10.123|-010.123|-10.123450|-10.123450");
+  if (strcmp(str, "-10.123450|-10.123450|-10.123450|-10|     -10|-10.123| "
+                  "-10.123|-010.123|-10.123450|-10.123450") != 0) {
+    free(str);
+    return -14;
+  }
   free(str);
   // Test %e
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(
-      str, "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
-           "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01");
+  if (strcmp(str,
+             "1.012345e+01|1.012345e+01|1.012345e+01|1e+01|   "
+             "1e+01|1.012e+01|1.012e+01|1.012e+01|1.012345e+01|1.012345e+01") !=
+      0) {
+    free(str);
+    return -15;
+  }
   free(str);
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(
-      str,
-      "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
-      "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1.012345e+01");
+  if (strcmp(str, "-1.012345e+01|-1.012345e+01|-1.012345e+01|-1e+01|  "
+                  "-1e+01|-1.012e+01|-1.012e+01|-1.012e+01|-1.012345e+01|-1."
+                  "012345e+01") != 0) {
+    free(str);
+    return -16;
+  }
   free(str);
   str = str_format("%e|%8e|%08e|%.e|%8.e|%.3e|%8.3e|%08.3e|%*e|%0*e", 0.0, 0.0,
                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16, 0.0, 16, 0.0);
-  res += !!strcmp(
-      str,
-      "0.000000e+00|0.000000e+00|0.000000e+00|0e+00|   "
-      "0e+00|0.000e+00|0.000e+00|0.000e+00|    0.000000e+00|00000.000000e+00");
+  if (strcmp(str, "0.000000e+00|0.000000e+00|0.000000e+00|0e+00|   "
+                  "0e+00|0.000e+00|0.000e+00|0.000e+00|    "
+                  "0.000000e+00|00000.000000e+00") != 0) {
+    free(str);
+    return -17;
+  }
   free(str);
   // Test %g
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", 10.12345,
                    10.12345, 10.12345, 10.12345, 10.12345, 10.12345, 10.12345,
                    10.12345, 8, 10.12345, 8, 10.12345);
-  res += !!strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
-                       "10.1|000010.1| 10.1235|010.1235");
+  if (strcmp(str, "10.1235| 10.1235|010.1235|1e+01|   1e+01|10.1|    "
+                  "10.1|000010.1| 10.1235|010.1235") != 0) {
+    free(str);
+    return -18;
+  }
   free(str);
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", -10.12345,
                    -10.12345, -10.12345, -10.12345, -10.12345, -10.12345,
                    -10.12345, -10.12345, 8, -10.12345, 8, -10.12345);
-  res += !!strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
-                       "-10.1|-00010.1|-10.1235|-10.1235");
+  if (strcmp(str, "-10.1235|-10.1235|-10.1235|-1e+01|  -1e+01|-10.1|   "
+                  "-10.1|-00010.1|-10.1235|-10.1235") != 0) {
+    free(str);
+    return -19;
+  }
   free(str);
   str = str_format("%g|%8g|%08g|%.g|%8.g|%.3g|%8.3g|%08.3g|%*g|%0*g", 0.0, 0.0,
                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16, 0.0, 16, 0.0);
-  res += !!strcmp(
-      str, "0|       0|00000000|0|       0|0|       0|00000000|               "
-           "0|0000000000000000");
+  if (strcmp(
+          str,
+          "0|       0|00000000|0|       0|0|       0|00000000|               "
+          "0|0000000000000000") != 0) {
+    free(str);
+    return -20;
+  }
   free(str);
   // Test %g with trailing zeros
   str = str_format("%.14g", 1.0);
-  res += !!strcmp(str, "1");
+  if (strcmp(str, "1") != 0) {
+    free(str);
+    return -21;
+  }
   free(str);
   // Test %g with big number
   str = str_format("%.14g", 10000000000.0);
-  res += !!strcmp(str, "10000000000");
+  if (strcmp(str, "10000000000") != 0) {
+    free(str);
+    return -22;
+  }
   free(str);
   // Test %g with a precision argument
   str = str_format("%.*g", 4, 10.234);
-  res += !!strcmp(str, "10.23");
+  if (strcmp(str, "10.23") != 0) {
+    free(str);
+    return -23;
+  }
   free(str);
   // Test length modifiers
   str = str_format("%d %ld %lld %qd %u %lu %llu %qu", 10, 100, 4294967296,
                    4294967296, 10, 100, 4294967296, 4294967296);
-  res += !!strcmp(str,
-                  "10 100 4294967296 4294967296 10 100 4294967296 4294967296");
+  if (strcmp(str,
+             "10 100 4294967296 4294967296 10 100 4294967296 4294967296") !=
+      0) {
+    free(str);
+    return -24;
+  }
   free(str);
   // Test %.50s with a long string
   str = str_format("%.50s",
                    "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ");
-  res += !!strcmp(str, "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX");
+  if (strcmp(str, "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWX") != 0) {
+    free(str);
+    return -25;
+  }
   free(str);
   // Test precision for %x
   str = str_format("%.8x-%.8x-%.2x", 10, 9999999, 9999999);
-  res += !!strcmp(str, "0000000a-0098967f-98967f");
+  if (strcmp(str, "0000000a-0098967f-98967f") != 0) {
+    free(str);
+    return -26;
+  }
   free(str);
   // Test unknown specifier skip
   str = str_format("%I");
-  res += !!strcmp(str, "I");
+  if (strcmp(str, "I") != 0) {
+    free(str);
+    return -27;
+  }
   free(str);
   // Test %s with padding
   const char *s = "Hello";
   str = str_format("[%10s]", s);
-  res += !!strcmp(str, "[     Hello]");
+  if (strcmp(str, "[     Hello]") != 0) {
+    free(str);
+    return -28;
+  }
   free(str);
   str = str_format("[%-10s]", s);
-  res += !!strcmp(str, "[Hello     ]");
+  if (strcmp(str, "[Hello     ]") != 0) {
+    free(str);
+    return -29;
+  }
   free(str);
   str = str_format("[%*s]", 10, s);
-  res += !!strcmp(str, "[     Hello]");
+  if (strcmp(str, "[     Hello]") != 0) {
+    free(str);
+    return -30;
+  }
   free(str);
   str = str_format("[%-*s]", 10, s);
-  res += !!strcmp(str, "[Hello     ]");
+  if (strcmp(str, "[Hello     ]") != 0) {
+    free(str);
+    return -31;
+  }
   free(str);
   // Test %p with padding
   str = str_format("%90p", &str);
-  res += (strlen(str) == 90) ? 0 : 1;
+  if (strlen(str) != 90) {
+    free(str);
+    return -32;
+  }
   free(str);
   // Test sign prepend
   str = str_format("%+08d", 31501);
-  res += !!strcmp(str, "+0031501");
+  if (strcmp(str, "+0031501") != 0) {
+    free(str);
+    return -33;
+  }
   free(str);
   str = str_format("%+08d", -31501);
-  res += !!strcmp(str, "-0031501");
+  if (strcmp(str, "-0031501") != 0) {
+    free(str);
+    return -34;
+  }
+  free(str);
+  // Test h length modifier (%hd, %hu, %hx, %ho)
+  str = str_format("%hd", 42);
+  if (strcmp(str, "42") != 0) {
+    free(str);
+    return -35;
+  }
+  free(str);
+  str = str_format("%hd", -42);
+  if (strcmp(str, "-42") != 0) {
+    free(str);
+    return -36;
+  }
+  free(str);
+  // Truncation: 32768 wraps to -32768 as signed short
+  str = str_format("%hd", 32768);
+  if (strcmp(str, "-32768") != 0) {
+    free(str);
+    return -37;
+  }
+  free(str);
+  // Truncation: 65535 is -1 as signed short
+  str = str_format("%hd", 65535);
+  if (strcmp(str, "-1") != 0) {
+    free(str);
+    return -38;
+  }
+  free(str);
+  str = str_format("%hu", 65535);
+  if (strcmp(str, "65535") != 0) {
+    free(str);
+    return -39;
+  }
+  free(str);
+  // Truncation: 65536 wraps to 0 as unsigned short
+  str = str_format("%hu", 65536);
+  if (strcmp(str, "0") != 0) {
+    free(str);
+    return -40;
+  }
+  free(str);
+  str = str_format("%hx", 0x1234);
+  if (strcmp(str, "1234") != 0) {
+    free(str);
+    return -41;
+  }
+  free(str);
+  // Truncation: upper bits dropped
+  str = str_format("%hx", 0x12345);
+  if (strcmp(str, "2345") != 0) {
+    free(str);
+    return -42;
+  }
+  free(str);
+  // Test hh length modifier (%hhd, %hhu, %hhx, %hho)
+  str = str_format("%hhd", 127);
+  if (strcmp(str, "127") != 0) {
+    free(str);
+    return -43;
+  }
+  free(str);
+  str = str_format("%hhd", -128);
+  if (strcmp(str, "-128") != 0) {
+    free(str);
+    return -44;
+  }
+  free(str);
+  // Truncation: 128 wraps to -128 as signed char
+  str = str_format("%hhd", 128);
+  if (strcmp(str, "-128") != 0) {
+    free(str);
+    return -45;
+  }
+  free(str);
+  // Truncation: 255 is -1 as signed char
+  str = str_format("%hhd", 255);
+  if (strcmp(str, "-1") != 0) {
+    free(str);
+    return -46;
+  }
+  free(str);
+  // Truncation: 256 wraps to 0
+  str = str_format("%hhd", 256);
+  if (strcmp(str, "0") != 0) {
+    free(str);
+    return -47;
+  }
+  free(str);
+  str = str_format("%hhu", 255);
+  if (strcmp(str, "255") != 0) {
+    free(str);
+    return -48;
+  }
+  free(str);
+  // Truncation: 256 wraps to 0 as unsigned char
+  str = str_format("%hhu", 256);
+  if (strcmp(str, "0") != 0) {
+    free(str);
+    return -49;
+  }
+  free(str);
+  // -1 as unsigned char is 255
+  str = str_format("%hhu", -1);
+  if (strcmp(str, "255") != 0) {
+    free(str);
+    return -50;
+  }
+  free(str);
+  str = str_format("%hhx", 0xAB);
+  if (strcmp(str, "ab") != 0) {
+    free(str);
+    return -51;
+  }
+  free(str);
+  // Truncation: upper bits dropped
+  str = str_format("%hhx", 0x1AB);
+  if (strcmp(str, "ab") != 0) {
+    free(str);
+    return -52;
+  }
   free(str);
 
-  return res;
+  return 0;
 }
 
 int test_sscanf() {
@@ -834,6 +1068,75 @@ int test_mtsem() {
   return 0;
 }
 
+sem_t *thread_suspend_semaphore;
+sem_t *thread_suspend_ready;
+int thread_suspend_flag = 0;
+
+void *thread_suspend_thread_func(void *arg) {
+  sem_post(thread_suspend_ready);
+  sem_wait(thread_suspend_semaphore);
+  thread_suspend_flag = 1;
+  return NULL;
+}
+
+int test_thread_suspend_resume() {
+  thread_suspend_flag = 0;
+
+  thread_suspend_semaphore = sem_open("thread_suspend_test", O_CREAT, 0644, 0);
+  if (thread_suspend_semaphore == SEM_FAILED) {
+    printf("Error opening semaphore\n");
+    return -1;
+  }
+  thread_suspend_ready = sem_open("thread_suspend_ready", O_CREAT, 0644, 0);
+  if (thread_suspend_ready == SEM_FAILED) {
+    sem_close(thread_suspend_semaphore);
+    sem_unlink("thread_suspend_test");
+    printf("Error opening ready semaphore\n");
+    return -2;
+  }
+
+  pthread_t thr;
+  if (pthread_create(&thr, NULL, thread_suspend_thread_func, NULL) != 0)
+    return -3;
+
+  // Wait until the worker has reached sem_wait().
+  sem_wait(thread_suspend_ready);
+
+  mach_port_t thr_port = pthread_mach_thread_np(thr);
+  if (thread_suspend(thr_port) != KERN_SUCCESS)
+    return -4;
+
+  // Check that run_state reports TH_STATE_WAITING while suspended.
+  thread_basic_info_data_t thr_info;
+  mach_msg_type_number_t info_count = THREAD_BASIC_INFO_COUNT;
+  if (thread_info(thr_port, THREAD_BASIC_INFO, (thread_info_t)&thr_info,
+                  &info_count) != KERN_SUCCESS)
+    return -5;
+  if (thr_info.run_state != TH_STATE_WAITING)
+    return -6;
+
+  // Post the semaphore while the thread is suspended — it should not wake up.
+  sem_post(thread_suspend_semaphore);
+  sched_yield();
+
+  if (thread_suspend_flag != 0)
+    return -7;
+
+  if (thread_resume(thr_port) != KERN_SUCCESS)
+    return -8;
+
+  pthread_join(thr, NULL);
+
+  if (thread_suspend_flag != 1)
+    return -9;
+
+  sem_close(thread_suspend_semaphore);
+  sem_unlink("thread_suspend_test");
+  sem_close(thread_suspend_ready);
+  sem_unlink("thread_suspend_ready");
+  return 0;
+}
+
 int done = 0, done2 = 0;
 pthread_mutex_t m;
 pthread_cond_t c, c2;
@@ -892,6 +1195,115 @@ int test_cond_var() {
   pthread_join(p3, NULL);
 
   return done == 1 ? 0 : -1;
+}
+
+pthread_mutex_t normal_mutex;
+int normal_unlock_res = -1;
+
+void *normal_unlocker(void *arg) {
+  normal_unlock_res = pthread_mutex_unlock(&normal_mutex);
+  return NULL;
+}
+
+int test_pthread_mutex_normal() {
+  pthread_mutexattr_t attr;
+  if (pthread_mutexattr_init(&attr) != 0)
+    return -1;
+  if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_NORMAL) != 0)
+    return -2;
+  if (pthread_mutex_init(&normal_mutex, &attr) != 0)
+    return -3;
+  if (pthread_mutexattr_destroy(&attr) != 0)
+    return -4;
+
+  if (pthread_mutex_lock(&normal_mutex) != 0)
+    return -5;
+
+  pthread_t p;
+  if (pthread_create(&p, NULL, normal_unlocker, NULL) != 0)
+    return -6;
+  if (pthread_join(p, NULL) != 0)
+    return -7;
+
+  if (pthread_mutex_destroy(&normal_mutex) != 0)
+    return -8;
+
+  if (normal_unlock_res != 0)
+    return -9;
+
+  return 0;
+}
+
+pthread_mutex_t recursive_mutex;
+int recursive_trylock_res = -1;
+
+void *recursive_trylocker(void *arg) {
+  recursive_trylock_res = pthread_mutex_trylock(&recursive_mutex);
+  return NULL;
+}
+
+int test_pthread_mutex_recursive_trylock() {
+  pthread_mutexattr_t attr;
+  if (pthread_mutexattr_init(&attr) != 0)
+    return -1;
+  if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) != 0)
+    return -2;
+  if (pthread_mutex_init(&recursive_mutex, &attr) != 0)
+    return -3;
+  if (pthread_mutexattr_destroy(&attr) != 0)
+    return -4;
+
+  if (pthread_mutex_trylock(&recursive_mutex) != 0)
+    return -5;
+
+  if (pthread_mutex_trylock(&recursive_mutex) != 0)
+    return -6;
+
+  pthread_t p;
+  if (pthread_create(&p, NULL, recursive_trylocker, NULL) != 0)
+    return -7;
+  if (pthread_join(p, NULL) != 0)
+    return -8;
+
+  if (recursive_trylock_res != EBUSY)
+    return -9;
+
+  if (pthread_mutex_unlock(&recursive_mutex) != 0)
+    return -10;
+  if (pthread_mutex_unlock(&recursive_mutex) != 0)
+    return -11;
+
+  if (pthread_mutex_destroy(&recursive_mutex) != 0)
+    return -12;
+
+  return 0;
+}
+
+int second_thread_thread_size_res = -1;
+
+void *second_thread(void *arg) {
+  size_t stack_size = pthread_get_stacksize_np(pthread_self());
+  if (stack_size == 512 * 1024) {
+    second_thread_thread_size_res = 0;
+  }
+  return NULL;
+}
+
+int test_pthread_get_stacksize_np() {
+  size_t stack_size = pthread_get_stacksize_np(pthread_self());
+  if (stack_size != 1024 * 1024 - getpagesize()) {
+    return -1;
+  }
+
+  pthread_t p;
+  if (pthread_create(&p, NULL, second_thread, NULL) != 0)
+    return -2;
+  if (pthread_join(p, NULL) != 0)
+    return -3;
+  if (second_thread_thread_size_res != 0)
+    return -4;
+
+  return 0;
 }
 
 int test_strncpy() {
@@ -3594,6 +4006,260 @@ int test_NSKeyedArchiver_NSKeyedUnarchiver() {
   return 0;
 }
 
+int test_NSNumber_stringValue() {
+  NSAutoreleasePool *pool = [NSAutoreleasePool new];
+
+  NSNumber *num;
+  NSString *result;
+  NSString *expected;
+
+  // Bool: YES -> "1"
+  num = [NSNumber numberWithBool:YES];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"1"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -1;
+  }
+
+  // Bool: NO -> "0"
+  num = [NSNumber numberWithBool:NO];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -2;
+  }
+
+  // Int: 0 -> "0"
+  num = [NSNumber numberWithInt:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -3;
+  }
+
+  // Int: 42 -> "42"
+  num = [NSNumber numberWithInt:42];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"42"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -4;
+  }
+
+  // Int: -100 -> "-100"
+  num = [NSNumber numberWithInt:-100];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-100"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -5;
+  }
+
+  // Int: INT_MAX -> "2147483647"
+  num = [NSNumber numberWithInt:2147483647];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"2147483647"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -6;
+  }
+
+  // Int: INT_MIN -> "-2147483648"
+  num = [NSNumber numberWithInt:-2147483648];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-2147483648"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -7;
+  }
+
+  // LongLong: 0 -> "0"
+  num = [NSNumber numberWithLongLong:0LL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -8;
+  }
+
+  // LongLong: 9999999999 -> "9999999999"
+  num = [NSNumber numberWithLongLong:9999999999LL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"9999999999"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -9;
+  }
+
+  // LongLong: -9999999999 -> "-9999999999"
+  num = [NSNumber numberWithLongLong:-9999999999LL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-9999999999"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -10;
+  }
+
+  // UnsignedInt: 0 -> "0"
+  num = [NSNumber numberWithUnsignedInt:0U];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -11;
+  }
+
+  // UnsignedLongLong: 0 -> "0"
+  num = [NSNumber numberWithUnsignedLongLong:0ULL];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -12;
+  }
+
+  // Float: 0.0 -> "0"
+  num = [NSNumber numberWithFloat:0.0f];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -13;
+  }
+
+  // Float: 1.5 -> "1.5"
+  num = [NSNumber numberWithFloat:1.5f];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"1.5"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -14;
+  }
+
+  // Float: -1.25 -> "-1.25"
+  num = [NSNumber numberWithFloat:-1.25f];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-1.25"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -15;
+  }
+
+  // Double: 0.0 -> "0"
+  num = [NSNumber numberWithDouble:0.0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -16;
+  }
+
+  // Double: 1.5 -> "1.5"
+  num = [NSNumber numberWithDouble:1.5];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"1.5"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -17;
+  }
+
+  // Double: -1.25 -> "-1.25"
+  num = [NSNumber numberWithDouble:-1.25];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-1.25"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -18;
+  }
+
+  // Short: 0 -> "0"
+  num = [NSNumber numberWithShort:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -19;
+  }
+
+  // Short: 100 -> "100"
+  num = [NSNumber numberWithShort:100];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"100"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -20;
+  }
+
+  // Short: SHRT_MIN -> "-32768"
+  num = [NSNumber numberWithShort:-32768];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-32768"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -21;
+  }
+
+  // Short: SHRT_MAX -> "32767"
+  num = [NSNumber numberWithShort:32767];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"32767"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -22;
+  }
+
+  // UnsignedShort: 0 -> "0"
+  num = [NSNumber numberWithUnsignedShort:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -23;
+  }
+
+  // Char: 0 -> "0"
+  num = [NSNumber numberWithChar:0];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"0"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -24;
+  }
+
+  // Char: 65 -> "65"
+  num = [NSNumber numberWithChar:65];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"65"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -25;
+  }
+
+  // Char: SCHAR_MIN -> "-128"
+  num = [NSNumber numberWithChar:-128];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"-128"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -26;
+  }
+
+  // Char: SCHAR_MAX -> "127"
+  num = [NSNumber numberWithChar:127];
+  result = [num stringValue];
+  expected = [NSString stringWithUTF8String:"127"];
+  if (![result isEqualToString:expected]) {
+    [pool drain];
+    return -27;
+  }
+
+  [pool drain];
+  return 0;
+}
+
 // clang-format off
 #define FUNC_DEF(func)                                                         \
   { &func, #func }
@@ -3607,6 +4273,8 @@ struct {
     FUNC_DEF(test_getcwd_chdir),
     FUNC_DEF(test_synchronized),
     FUNC_DEF(test_read_directory_as_fd),
+    FUNC_DEF(test_pthread_get_stacksize_np),
+    FUNC_DEF(test_cpp_virtual_inheritance),
 #endif
     FUNC_DEF(test_qsort),
     FUNC_DEF(test_vsnprintf),
@@ -3617,6 +4285,7 @@ struct {
     FUNC_DEF(test_strtof),
     FUNC_DEF(test_sem),
     FUNC_DEF(test_mtsem),
+    FUNC_DEF(test_thread_suspend_resume),
     FUNC_DEF(test_CGAffineTransform),
     FUNC_DEF(test_strncpy),
     FUNC_DEF(test_strncat),
@@ -3640,6 +4309,8 @@ struct {
     FUNC_DEF(test_open),
     FUNC_DEF(test_close),
     FUNC_DEF(test_cond_var),
+    FUNC_DEF(test_pthread_mutex_normal),
+    FUNC_DEF(test_pthread_mutex_recursive_trylock),
     FUNC_DEF(test_CFMutableDictionary_NullCallbacks),
     FUNC_DEF(test_CFMutableDictionary_CustomCallbacks_PrimitiveTypes),
     FUNC_DEF(test_CFMutableDictionary_CustomCallbacks_CFTypes),
@@ -3668,6 +4339,8 @@ struct {
     FUNC_DEF(test_strftime),
     FUNC_DEF(test_RespondsToSelector),
     FUNC_DEF(test_NSKeyedArchiver_NSKeyedUnarchiver),
+    FUNC_DEF(test_AutoreleasePool),
+    FUNC_DEF(test_NSNumber_stringValue),
 };
 // clang-format on
 

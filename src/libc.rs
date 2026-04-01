@@ -24,8 +24,8 @@ pub mod ifaddrs;
 pub mod keymgr;
 pub mod libkern;
 pub mod mach;
+pub mod mach_o;
 pub mod math;
-pub mod mmap;
 pub mod net;
 pub mod netdb;
 pub mod posix_io;
@@ -61,13 +61,18 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         ifaddrs::FUNCTIONS,
         keymgr::FUNCTIONS,
         libkern::os_atomic::FUNCTIONS,
+        mach::arm::task::FUNCTIONS,
+        mach::arm::thread_act::FUNCTIONS,
         mach::host::FUNCTIONS,
         mach::init::FUNCTIONS,
+        mach::mach_port::FUNCTIONS,
+        mach::message::FUNCTIONS,
         mach::semaphore::FUNCTIONS,
         mach::thread_info::FUNCTIONS,
         mach::time::FUNCTIONS,
+        mach::vm_map::FUNCTIONS,
+        mach_o::FUNCTIONS,
         math::FUNCTIONS,
-        mmap::FUNCTIONS,
         net::if_::FUNCTIONS,
         netdb::FUNCTIONS,
         posix_io::FUNCTIONS,
@@ -87,11 +92,13 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         stdlib::FUNCTIONS,
         stdlib::qsort::FUNCTIONS,
         string::FUNCTIONS,
+        sys::mman::FUNCTIONS,
         sys::mount::FUNCTIONS,
         sys::ptrace::FUNCTIONS,
         sys::timeb::FUNCTIONS,
         sys::socket::FUNCTIONS,
         sys::utsname::FUNCTIONS,
+        sys::wait::FUNCTIONS,
         sysctl::FUNCTIONS,
         time::FUNCTIONS,
         unistd::FUNCTIONS,
@@ -115,5 +122,6 @@ pub struct State {
     time: time::State,
     errno: errno::State,
     clocale: clocale::State,
-    mmap: mmap::State,
+    mach_vm: mach::vm_map::State,
+    mman: sys::mman::State,
 }

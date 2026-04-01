@@ -144,9 +144,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     env.window.as_mut().unwrap().set_share_with_current_context(true);
 
-    let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
-    let mut gles1_ins = create_gles1_ctx(window, &env.options);
+    let mut gles1_ins = create_gles1_ctx(env);
 
+    let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
         let gles1_ctx = gles1_ins.make_current(window);
         log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
@@ -179,6 +179,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     let mut gles1_ins = create_gles1_ctx(window, &env.options);
 
+    let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
         let gles1_ctx = gles1_ins.make_current(window);
         log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
@@ -354,7 +355,7 @@ pub const CLASSES: ClassExports = objc_classes! {
                 renderbuffer,
             );
             if let Some(sleep_for) = sleep_for {
-                env.sleep(sleep_for, /* tail_call: */ false);
+                env.sleep(sleep_for);
             }
             return true;
         }
@@ -381,7 +382,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     if let Some(sleep_for) = sleep_for {
-        env.sleep(sleep_for, /* tail_call: */ false);
+        env.sleep(sleep_for);
     }
 
     true

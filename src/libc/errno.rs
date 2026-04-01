@@ -17,6 +17,7 @@ pub const ESRCH: i32 = 3;
 pub const EINTR: i32 = 4;
 pub const EIO: i32 = 5;
 pub const EBADF: i32 = 9;
+pub const ECHILD: i32 = 10;
 pub const EDEADLK: i32 = 11;
 pub const EACCES: i32 = 13;
 pub const EBUSY: i32 = 16;
@@ -27,6 +28,7 @@ pub const ESPIPE: i32 = 29;
 pub const EROFS: i32 = 30;
 #[allow(dead_code)]
 pub const EPROTONOSUPPORT: i32 = 43;
+pub const ENOTSUP: i32 = 45;
 pub const ECONNRESET: i32 = 54;
 pub const EOVERFLOW: i32 = 75;
 
