@@ -519,6 +519,11 @@ impl Environment {
 
                     // Manually call here, since running call_from_host pushes
                     // a stack frame and disrupts abi for _start.
+                    // FixMainThreadThumb
+                    env.cpu.set_cpsr(
+                        cpu::Cpu::CPSR_USER_MODE
+                            | ((entry_point_addr.is_thumb() as u32) * cpu::Cpu::CPSR_THUMB),
+                    );
                     env.cpu
                         .branch_with_link(entry_point_addr, env.dyld.thread_exit_routine());
                     env.run_call();
@@ -576,7 +581,11 @@ impl Environment {
         env.set_up_initial_env_vars();
         dyld::Dyld::do_late_linking(&mut env);
 
-        env.cpu.set_cpsr(cpu::Cpu::CPSR_USER_MODE);
+        // FixEnvInitThumb
+        env.cpu.set_cpsr(
+            cpu::Cpu::CPSR_USER_MODE
+                | ((entry_point_addr.is_thumb() as u32) * cpu::Cpu::CPSR_THUMB),
+        );
 
         if let Some(addrs) = env.options.gdb_listen_addrs.take() {
             let listener = TcpListener::bind(addrs.as_slice())
@@ -1559,9 +1568,6 @@ impl Environment {
         assert!(self.threads[initial_thread].active);
         assert!(self.threads[initial_thread].guest_context.is_none());
 
-        // RestoreHeartbeatTimer
-        let mut last_heartbeat = Instant::now();
-
         loop {
             while self
                 .remaining_ticks
@@ -1570,14 +1576,6 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
-
-                // PrintDebugHeartbeat
-                if last_heartbeat.elapsed().as_secs() >= 1 {
-                    let pc = self.cpu.regs()[cpu::Cpu::PC];
-                    let lr = self.cpu.regs()[cpu::Cpu::LR];
-                    echo!("[Heartbeat] Thread {}, PC: {:#010x}, LR: {:#010x}", self.current_thread, pc, lr);
-                    last_heartbeat = Instant::now();
-                }
 
                 match self.handle_cpu_state(state) {
                     ThreadNextAction::Continue => {}
