@@ -510,20 +510,17 @@ impl Environment {
                             mem::Ptr::from_bits(section_addr);
                         let count = section_size / 4;
                         for i in 0..count {
-                            let func = env.mem.read(base + i);
+                            let raw_func: GuestFunction = env.mem.read(base + i);
+                            let addr = raw_func.addr_without_thumb_bit();
                             // SkipBadInit
-                            let addr = func.addr_without_thumb_bit();
                             if addr <= 0x2000 {
                                 echo!("WARNING: Skipping corrupted init func {:#010x}", addr);
                                 continue;
                             }
-                            // BypassLibcppCrash
-                            if addr == 0x3748b2c4 {
-                                echo!("WARNING: Skipping crashy libstdc++ init func {:#010x}", addr);
-                                continue;
-                            }
+                            // ForceThumbInit
+                            let safe_func = GuestFunction::from_addr_with_thumb_bit(addr | 1);
                             echo!("Calling init func {:#010x} for {:?}", addr, bin_name);
-                            () = func.call_from_host(env, ());
+                            () = safe_func.call_from_host(env, ());
                         }
                         echo!("Static initialization done for {:?}", bin_name);
                     }
@@ -1640,9 +1637,6 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
-        // InitUniversalLoopBreaker
-        let mut last_pc = 0;
-        let mut stuck_count = 0;
 
         loop {
             while self
@@ -1652,35 +1646,6 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
-
-                // UniversalSafeLoopBreaker
-                let current_pc = self.cpu.regs()[cpu::Cpu::PC];
-                if current_pc == last_pc {
-                    stuck_count += 1;
-                    if stuck_count > 50 {
-                        let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
-                        let mut inst_len = if is_thumb { 2 } else { 4 };
-                        let mut opcode: u32;
-                        if is_thumb {
-                            let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(current_pc));
-                            opcode = hw as u32;
-                            if (hw & 0xe000) == 0xe000 && (hw & 0x1800) != 0 {
-                                inst_len = 4;
-                                let hw2: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(current_pc + 2));
-                                opcode = ((hw as u32) << 16) | (hw2 as u32);
-                            }
-                        } else {
-                            opcode = self.mem.read(mem::ConstPtr::<u32>::from_bits(current_pc));
-                        }
-
-                        echo!("WARNING: Bypassing tight loop at {:#010x}, opcode: {:#010x}", current_pc, opcode);
-                        self.cpu.regs_mut()[cpu::Cpu::PC] += inst_len;
-                        stuck_count = 0;
-                    }
-                } else {
-                    last_pc = current_pc;
-                    stuck_count = 0;
-                }
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
