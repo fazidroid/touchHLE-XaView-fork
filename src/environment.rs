@@ -433,18 +433,18 @@ impl Environment {
         if entry_point_addr == 0x1000 {
             echo!("WARNING: Corrupted entry point detected (0x1000). Scanning Mach-O load commands for __text section...");
             let mut lc_ptr = 0x101c;
-            let ncmds: u32 = mem.read(mem::Ptr::from_bits(0x1010));
+            let ncmds: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(0x1010));
             for _ in 0..ncmds {
-                let cmd: u32 = mem.read(mem::Ptr::from_bits(lc_ptr));
-                let cmdsize: u32 = mem.read(mem::Ptr::from_bits(lc_ptr + 4));
+                let cmd: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr));
+                let cmdsize: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr + 4));
                 if cmd == 1 {
-                    let nsects: u32 = mem.read(mem::Ptr::from_bits(lc_ptr + 48));
+                    let nsects: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr + 48));
                     let mut sect_ptr = lc_ptr + 56;
                     for _ in 0..nsects {
-                        let sectname_0: u32 = mem.read(mem::Ptr::from_bits(sect_ptr));
-                        let sectname_1: u32 = mem.read(mem::Ptr::from_bits(sect_ptr + 4));
+                        let sectname_0: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr));
+                        let sectname_1: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 4));
                         if sectname_0 == 0x65745f5f && sectname_1 == 0x00007478 {
-                            let sect_addr: u32 = mem.read(mem::Ptr::from_bits(sect_ptr + 32));
+                            let sect_addr: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 32));
                             echo!("Found __text section at {:#010x}. Using as fallback entry point!", sect_addr);
                             entry_point_addr = sect_addr;
                             break;
