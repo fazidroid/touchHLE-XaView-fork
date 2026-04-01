@@ -1670,7 +1670,8 @@ impl Environment {
                     if stuck_count > 50 {
                         let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
                         let mut inst_len = if is_thumb { 2 } else { 4 };
-                        let mut opcode: u32 = 0;
+                        // FixUnusedAssignment
+                        let mut opcode: u32;
                         if is_thumb {
                             let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(current_pc));
                             opcode = hw as u32;
