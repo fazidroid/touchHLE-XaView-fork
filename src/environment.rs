@@ -1592,8 +1592,27 @@ impl Environment {
                 }
             }
             cpu::CpuState::Error(e) => {
-                if matches!(e, cpu::CpuError::UndefinedInstruction) || matches!(e, cpu::CpuError::Breakpoint) {
+                if matches!(e, cpu::CpuError::UndefinedInstruction) {
+                    let pc = self.cpu.regs()[cpu::Cpu::PC];
+                    let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
+                    if is_thumb {
+                        let ptr = mem::ConstPtr::<u32>::from_bits(pc & !3);
+                        let val: u32 = self.mem.read(ptr);
+                        if val == 0xe12fff1e {
+                            // FixCrackedStub
+                            let lr = self.cpu.regs()[cpu::Cpu::LR];
+                            self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                            return ThreadNextAction::Continue;
+                        }
+                    }
+                    // SkipUndefinedInst
+                    self.cpu.regs_mut()[cpu::Cpu::PC] += if is_thumb { 2 } else { 4 };
+                    return ThreadNextAction::Continue;
+                }
+                if matches!(e, cpu::CpuError::Breakpoint) {
                     // BypassGameBkpt
+                    let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
+                    self.cpu.regs_mut()[cpu::Cpu::PC] += if is_thumb { 4 } else { 8 };
                     return ThreadNextAction::Continue;
                 }
                 ThreadNextAction::DebugCpuError(e)
@@ -1608,9 +1627,6 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
-        // DetectInfiniteLoop
-        let mut last_pc = 0;
-        let mut stuck_count = 0;
 
         loop {
             while self
@@ -1620,31 +1636,6 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
-
-                // AntiHangDetector
-                let current_pc = self.cpu.regs()[cpu::Cpu::PC];
-                if current_pc == last_pc {
-                    stuck_count += 1;
-                    if stuck_count == 500 {
-                        echo!("--- HANG DETECTED at PC {:#010x} ---", current_pc);
-                        self.dump_all_regs();
-                        self.stack_trace_current();
-                        echo!("--- INSTRUCTION DUMP ---");
-                        let base_addr = current_pc.saturating_sub(16) & !1;
-                        for addr in (base_addr..=base_addr+32).step_by(2) {
-                            let val: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(addr));
-                            echo!("{:#010x}: {:#06x}", addr, val);
-                        }
-                        echo!("--- END DUMP ---");
-                        // ForceBreakLoop
-                        let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
-                        self.cpu.regs_mut()[cpu::Cpu::PC] += if is_thumb { 2 } else { 4 };
-                        stuck_count = 0;
-                    }
-                } else {
-                    last_pc = current_pc;
-                    stuck_count = 0;
-                }
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
