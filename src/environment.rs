@@ -517,6 +517,11 @@ impl Environment {
                                 echo!("WARNING: Skipping corrupted init func {:#010x}", addr);
                                 continue;
                             }
+                            // BypassLibcppCrash
+                            if addr == 0x3748b2c4 {
+                                echo!("WARNING: Skipping crashy libstdc++ init func {:#010x}", addr);
+                                continue;
+                            }
                             echo!("Calling init func {:#010x} for {:?}", addr, bin_name);
                             () = func.call_from_host(env, ());
                         }
