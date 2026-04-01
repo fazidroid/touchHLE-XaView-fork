@@ -161,6 +161,7 @@ pub enum Event {
     TextInput(TextInputEvent),
 }
 
+#[allow(dead_code)]
 pub enum BatteryState {
     Unknown,
     OnBattery,
@@ -1511,6 +1512,7 @@ pub fn show_error_messagebox(window: Option<&Window>, error_message: &str) {
 /// - pct: i32 - percentage of battery remaining.
 /// - status: [BatteryState] - the current status of the battery
 ///   (unplugged, charging, full, etc.)
+#[allow(dead_code)]
 pub fn get_battery_status() -> (i32, BatteryState) {
     let mut pct = 0;
     // Unfortunately, Rust-SDL2 does not expose this function yet.
