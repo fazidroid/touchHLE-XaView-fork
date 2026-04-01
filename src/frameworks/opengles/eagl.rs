@@ -176,8 +176,8 @@ pub const CLASSES: ClassExports = objc_classes! {
             return nil; // RejectEsTwo
         }
 
-        let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
-    let mut gles1_ins = create_gles1_ctx(window, &env.options);
+        // FixGlesContext
+    let mut gles1_ins = create_gles1_ctx(env);
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
