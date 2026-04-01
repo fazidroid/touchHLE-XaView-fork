@@ -510,17 +510,20 @@ impl Environment {
                             mem::Ptr::from_bits(section_addr);
                         let count = section_size / 4;
                         for i in 0..count {
-                            let raw_func: GuestFunction = env.mem.read(base + i);
-                            let addr = raw_func.addr_without_thumb_bit();
+                            let func: GuestFunction = env.mem.read(base + i);
+                            let addr = func.addr_without_thumb_bit();
                             // SkipBadInit
                             if addr <= 0x2000 {
                                 echo!("WARNING: Skipping corrupted init func {:#010x}", addr);
                                 continue;
                             }
-                            // ForceThumbInit
-                            let safe_func = GuestFunction::from_addr_with_thumb_bit(addr | 1);
+                            // BypassLibcppCrash
+                            if addr == 0x3748b2c4 {
+                                echo!("WARNING: Skipping crashy libstdc++ init func {:#010x}", addr);
+                                continue;
+                            }
                             echo!("Calling init func {:#010x} for {:?}", addr, bin_name);
-                            () = safe_func.call_from_host(env, ());
+                            () = func.call_from_host(env, ());
                         }
                         echo!("Static initialization done for {:?}", bin_name);
                     }
@@ -1589,10 +1592,10 @@ impl Environment {
                 }
             }
             cpu::CpuState::Error(e) => {
-                if matches!(e, cpu::CpuError::UndefinedInstruction) {
+                if matches!(e, cpu::CpuError::UndefinedInstruction) || matches!(e, cpu::CpuError::Breakpoint) {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
                     let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
-                    // SkipUndefinedInst
+                    // SkipExceptionTrap
                     let mut inst_len = if is_thumb { 2 } else { 4 };
                     if is_thumb {
                         let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(pc));
@@ -1601,26 +1604,17 @@ impl Environment {
                         }
                     }
                     self.cpu.regs_mut()[cpu::Cpu::PC] += inst_len;
-                    return ThreadNextAction::Continue;
-                }
-                if matches!(e, cpu::CpuError::Breakpoint) {
-                    // BypassGameBkpt
-                    let pc = self.cpu.regs()[cpu::Cpu::PC];
-                    let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
-                    let mut inst_len = if is_thumb { 2 } else { 4 };
+
+                    let next_pc = self.cpu.regs()[cpu::Cpu::PC];
                     if is_thumb {
-                        let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(pc));
-                        if (hw & 0xe000) == 0xe000 && (hw & 0x1800) != 0 {
-                            inst_len = 4;
-                        }
-                    }
-                    self.cpu.regs_mut()[cpu::Cpu::PC] += inst_len;
-                    
-                    if is_thumb {
-                        let next_pc = self.cpu.regs()[cpu::Cpu::PC];
                         let next_hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(next_pc));
                         if next_hw == 0xe7fe {
                             self.cpu.regs_mut()[cpu::Cpu::PC] += 2;
+                        }
+                    } else {
+                        let next_w: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(next_pc));
+                        if next_w == 0xeafffffe {
+                            self.cpu.regs_mut()[cpu::Cpu::PC] += 4;
                         }
                     }
                     return ThreadNextAction::Continue;
