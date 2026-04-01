@@ -430,7 +430,9 @@ impl Environment {
             .unwrap();
         let entry_point_addr = abi::GuestFunction::from_addr_with_thumb_bit(entry_point_addr);
 
-        log_dbg!("Address of start function: {:?}", entry_point_addr);
+        // ForceLogEntryPoint
+        echo!("--- ENTRY POINT TRACE ---");
+        echo!("Parsed entry_point_addr: {:#x}", entry_point_addr.addr_with_thumb_bit());
 
         let mut bins = dylibs;
         bins.insert(0, executable);
@@ -1568,14 +1570,40 @@ impl Environment {
         assert!(self.threads[initial_thread].active);
         assert!(self.threads[initial_thread].guest_context.is_none());
 
+        // RestoreHeartbeatTimer
+        let mut last_heartbeat = Instant::now();
+        // SetupTracerCounter
+        let mut trace_steps = 0;
+
         loop {
             while self
                 .remaining_ticks
                 .is_none_or(|remaining_ticks| remaining_ticks > 0)
             {
+                // ForceSingleStepStart
+                let mut current_ticks = if trace_steps < 50 { None } else { self.remaining_ticks.clone() };
+
                 let state = self
                     .cpu
-                    .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
+                    .run_or_step(&mut self.mem, current_ticks.as_mut());
+
+                if trace_steps < 50 {
+                    self.remaining_ticks = current_ticks;
+                    let pc = self.cpu.regs()[cpu::Cpu::PC];
+                    let lr = self.cpu.regs()[cpu::Cpu::LR];
+                    echo!("[Trace] Step {}, PC: {:#010x}, LR: {:#010x}", trace_steps, pc, lr);
+                    trace_steps += 1;
+                } else if let Some(ticks) = current_ticks {
+                    self.remaining_ticks = Some(ticks);
+                }
+
+                // PrintDebugHeartbeat
+                if last_heartbeat.elapsed().as_secs() >= 1 {
+                    let pc = self.cpu.regs()[cpu::Cpu::PC];
+                    let lr = self.cpu.regs()[cpu::Cpu::LR];
+                    echo!("[Heartbeat] Thread {}, PC: {:#010x}, LR: {:#010x}", self.current_thread, pc, lr);
+                    last_heartbeat = Instant::now();
+                }
 
                 match self.handle_cpu_state(state) {
                     ThreadNextAction::Continue => {}
