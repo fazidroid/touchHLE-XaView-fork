@@ -84,6 +84,8 @@ private:
   }
 
   std::optional<std::uint32_t> MemoryReadCode(VAddr vaddr) override {
+    // LogReadCode
+    std::fprintf(stderr, "[Dynarmic] Reading PC: 0x%08X\n", vaddr);
     bool error;
     auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
     if (error) {
@@ -162,11 +164,6 @@ private:
   void CallSVC(std::uint32_t svc) override {
     halting_svc = svc;
     cpu->HaltExecution(HaltReasonSvc);
-  }
-  void PreCodeTranslation(VAddr pc) override {
-    // LogPreCode
-    std::fprintf(stderr, "[Dynarmic] Compiling PC: 0x%08X\n", pc);
-    std::fflush(stderr);
   }
   void ExceptionRaised(VAddr pc, Dynarmic::A32::Exception exception) override {
     // CheckMemoryReadCode
