@@ -127,20 +127,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     assert!(enabled);
 }
 - (f32)batteryLevel {
-    let pct = get_battery_status().0;
-    if pct < 0 {
-        log_dbg!("batteryLevel percentage could not be determined, returning 100% for compatibility");
-        return 1.0
-    }
-    pct as f32 / 100.0 // narrow down to 0.0 - 1.0
+    // BypassSDLCrash
+    1.0
 }
 - (UIDeviceBatteryState)batteryState {
-    match get_battery_status().1 {
-        BatteryState::Unknown => UIDeviceBatteryStateUnknown,
-        BatteryState::OnBattery => UIDeviceBatteryStateUnplugged,
-        BatteryState::NoBattery | BatteryState::Charging => UIDeviceBatteryStateCharging,
-        BatteryState::Full => UIDeviceBatteryStateFull,
-    }
+    // FakeBatteryFull
+    UIDeviceBatteryStateFull
 }
 
 @end
