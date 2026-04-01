@@ -1650,6 +1650,9 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
+        // InitSafeLoopBreaker
+        let mut last_pc = 0;
+        let mut stuck_count = 0;
 
         loop {
             while self
@@ -1659,6 +1662,46 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
+
+                // SafeLoopBreaker
+                let current_pc = self.cpu.regs()[cpu::Cpu::PC];
+                if current_pc == last_pc {
+                    stuck_count += 1;
+                    if stuck_count > 20 {
+                        let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
+                        if is_thumb {
+                            let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(current_pc));
+                            if hw == 0xe7fe {
+                                echo!("WARNING: Bypassing b . at {:#010x}", current_pc);
+                                self.cpu.regs_mut()[cpu::Cpu::PC] += 2;
+                                stuck_count = 0;
+                            } else if hw == 0xf7fe {
+                                let hw2: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(current_pc + 2));
+                                if hw2 == 0xbffe {
+                                    echo!("WARNING: Bypassing b.w . at {:#010x}", current_pc);
+                                    self.cpu.regs_mut()[cpu::Cpu::PC] += 4;
+                                    stuck_count = 0;
+                                } else if stuck_count == 21 {
+                                    echo!("Stuck at {:#010x} ({:#06x} {:#06x})", current_pc, hw, hw2);
+                                }
+                            } else if stuck_count == 21 {
+                                echo!("Stuck at {:#010x} ({:#06x})", current_pc, hw);
+                            }
+                        } else {
+                            let w: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(current_pc));
+                            if w == 0xeafffffe {
+                                echo!("WARNING: Bypassing b . at {:#010x}", current_pc);
+                                self.cpu.regs_mut()[cpu::Cpu::PC] += 4;
+                                stuck_count = 0;
+                            } else if stuck_count == 21 {
+                                echo!("Stuck at {:#010x} ({:#010x})", current_pc, w);
+                            }
+                        }
+                    }
+                } else {
+                    last_pc = current_pc;
+                    stuck_count = 0;
+                }
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
