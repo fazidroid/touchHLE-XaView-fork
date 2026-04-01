@@ -478,6 +478,10 @@ impl Environment {
                                 func,
                                 (base + i)
                             );
+                            // SkipNullInitFunc
+                            if func.addr_without_thumb_bit() == 0 {
+                                continue;
+                            }
                             () = func.call_from_host(env, ());
                         }
                         log_dbg!("Static initialization done");
@@ -1555,11 +1559,6 @@ impl Environment {
         assert!(self.threads[initial_thread].active);
         assert!(self.threads[initial_thread].guest_context.is_none());
 
-        // SetupHeartbeatTimer
-        let mut last_heartbeat = Instant::now();
-        // CheckLoopDump
-        let mut code_dumped = false;
-
         loop {
             while self
                 .remaining_ticks
@@ -1568,26 +1567,6 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
-
-                // PrintDebugHeartbeat
-                if last_heartbeat.elapsed().as_secs() >= 1 {
-                    let pc = self.cpu.regs()[cpu::Cpu::PC];
-                    let lr = self.cpu.regs()[cpu::Cpu::LR];
-                    echo!("[Heartbeat] Thread {}, PC: {:#010x}, LR: {:#010x}", self.current_thread, pc, lr);
-                    // DumpLoopCode
-                    if !code_dumped {
-                        code_dumped = true;
-                        echo!("--- CODE DUMP START ---");
-                        for addr in (0x1000..=0x1110).step_by(4) {
-                            let ptr: mem::ConstPtr<u32> = mem::Ptr::from_bits(addr);
-                            let val = self.mem.read(ptr);
-                            echo!("{:#010x}: {:#010x}", addr, val);
-                        }
-                        echo!("--- CODE DUMP END ---");
-                        self.dump_all_regs();
-                    }
-                    last_heartbeat = Instant::now();
-                }
 
                 match self.handle_cpu_state(state) {
                     ThreadNextAction::Continue => {}
