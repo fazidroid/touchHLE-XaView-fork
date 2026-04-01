@@ -1627,6 +1627,9 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
+        // InitAntiHang
+        let mut last_pc = 0;
+        let mut stuck_count = 0;
 
         loop {
             while self
@@ -1636,6 +1639,21 @@ impl Environment {
                 let state = self
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
+
+                // CheckInfiniteLoop
+                let current_pc = self.cpu.regs()[cpu::Cpu::PC];
+                if current_pc == last_pc {
+                    stuck_count += 1;
+                    if stuck_count > 50 {
+                        echo!("WARNING: Bypassing infinite loop at {:#010x}", current_pc);
+                        let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
+                        self.cpu.regs_mut()[cpu::Cpu::PC] += if is_thumb { 2 } else { 4 };
+                        stuck_count = 0;
+                    }
+                } else {
+                    last_pc = current_pc;
+                    stuck_count = 0;
+                }
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
