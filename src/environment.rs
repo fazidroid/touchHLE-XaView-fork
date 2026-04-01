@@ -1541,8 +1541,8 @@ impl Environment {
                 }
             }
             cpu::CpuState::Error(e) => {
-                if matches!(e, cpu::CpuError::UndefinedInstruction) {
-                    // SkipUndefinedOpcode
+                if matches!(e, cpu::CpuError::UndefinedInstruction) || matches!(e, cpu::CpuError::Breakpoint) {
+                    // BypassGameBkpt
                     return ThreadNextAction::Continue;
                 }
                 ThreadNextAction::DebugCpuError(e)
