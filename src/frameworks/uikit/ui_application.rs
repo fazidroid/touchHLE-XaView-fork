@@ -524,7 +524,8 @@ pub(super) fn exit(env: &mut Environment) {
 
     {
         let pool: id = msg_class![env; NSAutoreleasePool new];
-        if !env.is_fake {
+        // FixFakeFlag
+        if !env.is_app_picker {
             let user_defaults: id = msg_class![env; NSUserDefaults standardUserDefaults];
             let _: bool = msg![env; user_defaults synchronize];
         }
