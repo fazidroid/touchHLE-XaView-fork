@@ -429,11 +429,14 @@ impl Environment {
             })
             .unwrap();
 
-        // FixCorruptedEntryPoint
-        if entry_point_addr == 0x1000 {
-            echo!("WARNING: Corrupted entry point detected (0x1000). Scanning Mach-O load commands for __text section...");
+        // RobustEntryPointFix
+        echo!("Original entry_point_addr from Mach-O: {:#010x}", entry_point_addr);
+
+        if (entry_point_addr & !1) <= 0x2000 {
+            echo!("WARNING: Entry point seems corrupted (points to header). Scanning for __text...");
             let mut lc_ptr = 0x101c;
             let ncmds: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(0x1010));
+            let mut found_text = false;
             for _ in 0..ncmds {
                 let cmd: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr));
                 let cmdsize: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr + 4));
@@ -445,13 +448,15 @@ impl Environment {
                         let sectname_1: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 4));
                         if sectname_0 == 0x65745f5f && sectname_1 == 0x00007478 {
                             let sect_addr: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 32));
-                            echo!("Found __text section at {:#010x}. Using as fallback entry point!", sect_addr);
-                            entry_point_addr = sect_addr;
+                            echo!("Found __text section at {:#010x}. Overriding entry point!", sect_addr);
+                            entry_point_addr = sect_addr | 1;
+                            found_text = true;
                             break;
                         }
                         sect_ptr += 68;
                     }
                 }
+                if found_text { break; }
                 lc_ptr += cmdsize;
             }
         }
@@ -459,7 +464,7 @@ impl Environment {
         let entry_point_addr = abi::GuestFunction::from_addr_with_thumb_bit(entry_point_addr);
 
         echo!("--- ENTRY POINT TRACE ---");
-        echo!("Parsed entry_point_addr: {:#x}", entry_point_addr.addr_with_thumb_bit());
+        echo!("Final Entry Point to execute: {:#x}", entry_point_addr.addr_with_thumb_bit());
 
         let mut bins = dylibs;
         bins.insert(0, executable);
