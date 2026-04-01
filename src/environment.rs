@@ -421,16 +421,43 @@ impl Environment {
             }
         }
 
-        let entry_point_addr = executable
+        let mut entry_point_addr = executable
             .entry_point_pc
             .ok_or_else(|| {
                 "Mach-O file does not specify an entry point PC, perhaps it is not an executable?"
                     .to_string()
             })
             .unwrap();
+
+        // FixCorruptedEntryPoint
+        if entry_point_addr == 0x1000 {
+            echo!("WARNING: Corrupted entry point detected (0x1000). Scanning Mach-O load commands for __text section...");
+            let mut lc_ptr = 0x101c;
+            let ncmds: u32 = mem.read(mem::Ptr::from_bits(0x1010));
+            for _ in 0..ncmds {
+                let cmd: u32 = mem.read(mem::Ptr::from_bits(lc_ptr));
+                let cmdsize: u32 = mem.read(mem::Ptr::from_bits(lc_ptr + 4));
+                if cmd == 1 {
+                    let nsects: u32 = mem.read(mem::Ptr::from_bits(lc_ptr + 48));
+                    let mut sect_ptr = lc_ptr + 56;
+                    for _ in 0..nsects {
+                        let sectname_0: u32 = mem.read(mem::Ptr::from_bits(sect_ptr));
+                        let sectname_1: u32 = mem.read(mem::Ptr::from_bits(sect_ptr + 4));
+                        if sectname_0 == 0x65745f5f && sectname_1 == 0x00007478 {
+                            let sect_addr: u32 = mem.read(mem::Ptr::from_bits(sect_ptr + 32));
+                            echo!("Found __text section at {:#010x}. Using as fallback entry point!", sect_addr);
+                            entry_point_addr = sect_addr;
+                            break;
+                        }
+                        sect_ptr += 68;
+                    }
+                }
+                lc_ptr += cmdsize;
+            }
+        }
+
         let entry_point_addr = abi::GuestFunction::from_addr_with_thumb_bit(entry_point_addr);
 
-        // ForceLogEntryPoint
         echo!("--- ENTRY POINT TRACE ---");
         echo!("Parsed entry_point_addr: {:#x}", entry_point_addr.addr_with_thumb_bit());
 
@@ -1570,32 +1597,17 @@ impl Environment {
         assert!(self.threads[initial_thread].active);
         assert!(self.threads[initial_thread].guest_context.is_none());
 
-        // RestoreHeartbeatTimer
+        // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
-        // SetupTracerCounter
-        let mut trace_steps = 0;
 
         loop {
             while self
                 .remaining_ticks
                 .is_none_or(|remaining_ticks| remaining_ticks > 0)
             {
-                // ForceSingleStepStart
-                let mut current_ticks = if trace_steps < 50 { None } else { self.remaining_ticks };
-
                 let state = self
                     .cpu
-                    .run_or_step(&mut self.mem, current_ticks.as_mut());
-
-                if trace_steps < 50 {
-                    self.remaining_ticks = current_ticks;
-                    let pc = self.cpu.regs()[cpu::Cpu::PC];
-                    let lr = self.cpu.regs()[cpu::Cpu::LR];
-                    echo!("[Trace] Step {}, PC: {:#010x}, LR: {:#010x}", trace_steps, pc, lr);
-                    trace_steps += 1;
-                } else if let Some(ticks) = current_ticks {
-                    self.remaining_ticks = Some(ticks);
-                }
+                    .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
