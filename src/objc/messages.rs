@@ -51,7 +51,6 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // Anti-DRM Sabotage Guard: Ignore garbage pointers that games use to intentionally crash
     if receiver.to_bits() >= 0xf0000000 {
         log!("WARNING: objc_msgSend received garbage pointer {:#010x}. Bypassing self-destruct.", receiver.to_bits());
         env.cpu.regs_mut()[0..2].fill(0);
