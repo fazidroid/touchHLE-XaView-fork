@@ -1594,6 +1594,15 @@ impl Environment {
             cpu::CpuState::Error(e) => {
                 if matches!(e, cpu::CpuError::UndefinedInstruction) || matches!(e, cpu::CpuError::Breakpoint) {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
+                    
+                    // ReturnFromBadJump
+                    if pc <= 0x2000 {
+                        let lr = self.cpu.regs()[cpu::Cpu::LR];
+                        echo!("WARNING: Bypassing bad jump into header at {:#010x}. Returning to LR: {:#010x}", pc, lr);
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                        return ThreadNextAction::Continue;
+                    }
+
                     let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
                     // SkipExceptionTrap
                     let mut inst_len = if is_thumb { 2 } else { 4 };
