@@ -1640,7 +1640,7 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
-        let mut block_reason = ThreadBlock::NotBlocked;
+        let mut loop_counters: HashMap<u32, u32> = HashMap::new();
 
         loop {
             while self
@@ -1667,15 +1667,25 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // SleepOnSpinlock
+                // BreakDeadlocksNaturally
                 if pc == 0x00c3296c || pc == 0x37496580 || pc == 0x374965ac || pc == 0x3749668e {
-                    self.remaining_ticks = Some(0);
-                    block_reason = ThreadBlock::Sleeping(Instant::now() + Duration::from_millis(5));
+                    let count = loop_counters.entry(pc).or_insert(0);
+                    *count += 1;
+                    if *count >= 4 {
+                        echo!("WARNING: Breaking spinlock naturally at {:#010x}!", pc);
+                        self.cpu.regs_mut()[0] = 0;
+                        self.cpu.regs_mut()[1] = 0;
+                        let mut cpsr = self.cpu.cpsr();
+                        cpsr |= 1 << 30; 
+                        self.cpu.set_cpsr(cpsr);
+                        *count = 0;
+                    }
+                } else {
+                    loop_counters.clear();
                 }
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
-                    let pc = self.cpu.regs()[cpu::Cpu::PC];
                     let lr = self.cpu.regs()[cpu::Cpu::LR];
                     echo!("[Heartbeat] Thread {}, PC: {:#010x}, LR: {:#010x}", self.current_thread, pc, lr);
                     last_heartbeat = Instant::now();
@@ -1692,8 +1702,7 @@ impl Environment {
                     break;
                 }
             }
-            self.yield_thread(block_reason.clone());
-            block_reason = ThreadBlock::NotBlocked;
+            self.yield_thread(ThreadBlock::NotBlocked);
         }
     }
 
