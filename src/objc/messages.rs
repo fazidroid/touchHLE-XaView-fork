@@ -51,6 +51,13 @@ fn objc_msgSend_inner(
         return;
     }
 
+    // Anti-DRM Sabotage Guard: Ignore garbage pointers that games use to intentionally crash
+    if receiver.to_bits() >= 0xf0000000 {
+        log!("WARNING: objc_msgSend received garbage pointer {:#010x}. Bypassing self-destruct.", receiver.to_bits());
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     let orig_class = super2.unwrap_or_else(|| ObjC::read_isa(receiver, &env.mem));
     if orig_class == nil {
         // BypassNilClassAssert
@@ -65,7 +72,14 @@ fn objc_msgSend_inner(
         if class == nil {
             assert!(class != orig_class);
 
-            let class_host_object = env.objc.get_host_object(orig_class).unwrap();
+            let class_host_object = match env.objc.get_host_object(orig_class) {
+                Some(obj) => obj,
+                None => {
+                    log!("WARNING: objc_msgSend superclass chain lookup failed for {:?}. Bypassing.", orig_class);
+                    env.cpu.regs_mut()[0..2].fill(0);
+                    return;
+                }
+            };
             let &super::ClassHostObject {
                 ref name,
                 is_metaclass,
@@ -109,7 +123,14 @@ fn objc_msgSend_inner(
             );
         }
 
-        let host_object = env.objc.get_host_object(class).unwrap();
+        let host_object = match env.objc.get_host_object(class) {
+            Some(obj) => obj,
+            None => {
+                log!("WARNING: objc_msgSend failed to get host object for class {:?}. Bypassing.", class);
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+        };
 
         if let Some(&super::ClassHostObject {
             superclass,
