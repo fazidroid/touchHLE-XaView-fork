@@ -734,9 +734,9 @@ fn __cxa_guard_abort(env: &mut Environment, guard: MutPtr<u8>) {
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(class_respondsToSelector(_, _)),
-    export_c_func!(__cxa_guard_acquire(_, _)),
-    export_c_func!(__cxa_guard_release(_, _)),
-    export_c_func!(__cxa_guard_abort(_, _)),
+    export_c_func!(__cxa_guard_acquire(_)),
+    export_c_func!(__cxa_guard_release(_)),
+    export_c_func!(__cxa_guard_abort(_)),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
