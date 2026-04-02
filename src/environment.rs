@@ -1644,24 +1644,23 @@ impl Environment {
                 // BypassAsphaltDRM
                 let pc = self.cpu.regs()[cpu::Cpu::PC];
                 if pc == 0x00600ac4 {
-                    echo!("WARNING: Bypassing Asphalt DRM via Frame Pointer Escape!");
-                    let fp = self.cpu.regs()[7];
+                    echo!("WARNING: Bypassing Asphalt DRM via Deep Stack Unwind!");
                     
-                    // RecoverTrueReturn
-                    let true_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp + 4));
-                    let old_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp));
+                    let fp0 = self.cpu.regs()[7];
+                    // Unwind 2 frames to escape the noreturn trap AND its dead-end caller!
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     
-                    echo!("Recovered true return address: {:#010x}", true_lr);
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp2 + 4));
                     
-                    // RestoreRegisters
-                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 12));
-                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 8));
-                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 4));
-                    self.cpu.regs_mut()[7] = old_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp + 8;
-                    self.cpu.regs_mut()[0] = 1;
+                    echo!("Recovered Deep Return Address: {:#010x}", target_lr);
                     
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(true_lr));
+                    // Restore registers to match the safe caller
+                    self.cpu.regs_mut()[7] = fp2; 
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8; 
+                    self.cpu.regs_mut()[0] = 1; // Fake success flag for DRM
+                    
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
                 // PrintDebugHeartbeat
