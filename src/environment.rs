@@ -1668,26 +1668,16 @@ impl Environment {
 
                 // BypassThreadHang
                 if pc == 0x00c3296c {
-                    echo!("WARNING: Bypassing Thread 4 hang at 0x00c3296c via Safe Unwind!");
-                    let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
-                    self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    echo!("WARNING: Bypassing Thread hang at 0x00c3296c via LR!");
+                    let lr = self.cpu.regs()[cpu::Cpu::LR];
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
                 }
 
                 // BypassLibcppLoop
                 if pc == 0x37496580 {
-                    echo!("WARNING: Bypassing libstdc++ loop at 0x37496580 via Safe Unwind!");
-                    let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
-                    self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    echo!("WARNING: Aborting hanging libstdc++ init func!");
+                    let ret_host = self.dyld.return_to_host_routine();
+                    self.cpu.branch(ret_host);
                 }
 
                 // PrintDebugHeartbeat
