@@ -1666,20 +1666,6 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // BypassThreadHang
-                if pc == 0x00c3296c {
-                    echo!("WARNING: Bypassing Thread hang at 0x00c3296c via LR!");
-                    let lr = self.cpu.regs()[cpu::Cpu::LR];
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
-                }
-
-                // BypassLibcppLoop
-                if pc == 0x37496580 {
-                    echo!("WARNING: Aborting hanging libstdc++ init func!");
-                    let ret_host = self.dyld.return_to_host_routine();
-                    self.cpu.branch(ret_host);
-                }
-
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
