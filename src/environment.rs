@@ -1650,24 +1650,43 @@ impl Environment {
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
 
-                // BypassAsphaltDRM
                 let pc = self.cpu.regs()[cpu::Cpu::PC];
+
+                // BypassAsphaltDRM
                 if pc == 0x00600ac4 {
                     echo!("WARNING: Bypassing Asphalt DRM via Deep Stack Unwind!");
-                    
                     let fp0 = self.cpu.regs()[7];
                     let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
-                    
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp2 + 4));
-                    
                     echo!("Recovered Deep Return Address: {:#010x}", target_lr);
-                    
-                    // Restore registers to match the safe caller
                     self.cpu.regs_mut()[7] = fp2; 
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8; 
-                    self.cpu.regs_mut()[0] = 1; // Fake success flag for DRM
-                    
+                    self.cpu.regs_mut()[0] = 1; 
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                }
+
+                // BypassThreadHang
+                if pc == 0x00c3296c {
+                    echo!("WARNING: Bypassing Thread 4 hang at 0x00c3296c via Safe Unwind!");
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                }
+
+                // BypassLibcppLoop
+                if pc == 0x37496580 {
+                    echo!("WARNING: Bypassing libstdc++ loop at 0x37496580 via Safe Unwind!");
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
