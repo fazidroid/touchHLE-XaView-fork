@@ -1666,6 +1666,15 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
+                // ForceBreakDeadlock
+                if pc == 0x00c3296c || pc == 0x37496580 || pc == 0x374965ac || pc == 0x3749668e {
+                    echo!("WARNING: Breaking spinlock at {:#010x}!", pc);
+                    let mut cpsr = self.cpu.cpsr();
+                    cpsr ^= 1 << 30;
+                    self.cpu.set_cpsr(cpsr);
+                    self.cpu.regs_mut()[cpu::Cpu::PC] = pc + 2;
+                }
+
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
