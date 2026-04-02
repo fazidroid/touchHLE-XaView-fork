@@ -1641,6 +1641,15 @@ impl Environment {
                     .cpu
                     .run_or_step(&mut self.mem, self.remaining_ticks.as_mut());
 
+                // BypassAsphaltDRM
+                let pc = self.cpu.regs()[cpu::Cpu::PC];
+                if pc == 0x00600ac4 {
+                    echo!("WARNING: Bypassing Asphalt 7 infinite DRM/Deadlock at 0x00600ac4!");
+                    self.cpu.regs_mut()[0] = 1;
+                    let lr = self.cpu.regs()[cpu::Cpu::LR];
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                }
+
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
