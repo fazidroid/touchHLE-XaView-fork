@@ -51,8 +51,9 @@ fn objc_msgSend_inner(
         return;
     }
 
-    if receiver.to_bits() >= 0xf0000000 {
-        log!("WARNING: objc_msgSend received garbage pointer {:#010x}. Bypassing self-destruct.", receiver.to_bits());
+    // BypassGarbagePointer
+    if receiver.to_bits() >= 0xe0000000 {
+        log!("WARNING: objc_msgSend received garbage pointer {:#010x}. Bypassing.", receiver.to_bits());
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
