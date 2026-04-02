@@ -1644,21 +1644,22 @@ impl Environment {
                 // BypassAsphaltDRM
                 let pc = self.cpu.regs()[cpu::Cpu::PC];
                 if pc == 0x00600ac4 {
-                    echo!("WARNING: Bypassing Asphalt DRM via Frame Pointer Escape (IsCracked = false)!");
-                    let fp = self.cpu.regs()[7];
+                    echo!("WARNING: Bypassing Asphalt DRM via Deep Stack Unwind!");
                     
-                    let true_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp + 4));
-                    let old_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp));
+                    let fp0 = self.cpu.regs()[7];
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     
-                    // Restore callee-saved registers
-                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 12));
-                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 8));
-                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 4));
-                    self.cpu.regs_mut()[7] = old_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp + 8;
-                    self.cpu.regs_mut()[0] = 0; // Return 0 (False / Success)
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp2 + 4));
                     
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(true_lr));
+                    echo!("Recovered Deep Return Address: {:#010x}", target_lr);
+                    
+                    // Restore registers to match the safe caller
+                    self.cpu.regs_mut()[7] = fp2; 
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8; 
+                    self.cpu.regs_mut()[0] = 1; // Fake success flag for DRM
+                    
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
                 // PrintDebugHeartbeat
