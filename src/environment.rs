@@ -1647,7 +1647,6 @@ impl Environment {
                     echo!("WARNING: Bypassing Asphalt DRM via Deep Stack Unwind!");
                     
                     let fp0 = self.cpu.regs()[7];
-                    // Unwind 2 frames to escape the noreturn trap AND its dead-end caller!
                     let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     
