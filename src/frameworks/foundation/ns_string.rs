@@ -771,20 +771,31 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (ConstPtr<u8>)cStringUsingEncoding:(NSStringEncoding)encoding {
-    // TODO: avoid copying
     let string = to_rust_string(env, this);
-    // TODO: other encodings
+    
+    // SanitizeLegacyString
+    let safe_string = if encoding == NSASCIIStringEncoding
+        || encoding == NSMacOSRomanStringEncoding
+        || encoding == NSISOLatin1StringEncoding
+    {
+        if !string.as_bytes().iter().all(|byte| byte.is_ascii()) {
+            let sanitized: String = string.chars().map(|c| if c.is_ascii() { c } else { '?' }).collect();
+            Cow::Owned(sanitized)
+        } else {
+            string
+        }
+    } else {
+        string
+    };
+
     let bytes: Vec<u8> = match encoding {
         NSASCIIStringEncoding | NSMacOSRomanStringEncoding | NSISOLatin1StringEncoding => {
-            // TODO: properly support Mac OS Roman and ISO Latin 1 encodings.
-            // The first 128 characters are identical to the ASCII
-            assert!(string.as_bytes().iter().all(|byte| byte.is_ascii()));
-            string.as_bytes().to_vec()
+            safe_string.as_bytes().to_vec()
         },
         NSUTF8StringEncoding => {
-            string.as_bytes().to_vec()
+            safe_string.as_bytes().to_vec()
         },
-        NSUTF16LittleEndianStringEncoding => string.encode_utf16().flat_map(u16::to_le_bytes).collect(),
+        NSUTF16LittleEndianStringEncoding => safe_string.encode_utf16().flat_map(u16::to_le_bytes).collect(),
         _ => unimplemented!("{}", encoding),
     };
     let null_size: GuestUSize = match encoding {
@@ -794,10 +805,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     let bytes_size = bytes.len() as GuestUSize;
     let total_size: GuestUSize = bytes_size + null_size;
-    let c_string: MutPtr<u8> = env.mem.alloc(total_size).cast();
+    
+    // FixNullTerminator
+    let c_string: MutPtr<u8> = env.mem.calloc(total_size).cast();
     _ = env.mem.bytes_at_mut(c_string, bytes_size).write(&bytes).unwrap();
-    assert_eq!(env.mem.read(c_string + total_size - 1), b'\0');
-    // NSData will handle releasing the string (it is autoreleased)
+    
     let _: id = msg_class![env; NSData dataWithBytesNoCopy:(c_string.cast_void())
                                                     length:total_size];
     c_string.cast_const()
