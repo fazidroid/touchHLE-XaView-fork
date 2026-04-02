@@ -1640,6 +1640,7 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
+        let mut block_reason = ThreadBlock::NotBlocked;
 
         loop {
             while self
@@ -1666,13 +1667,10 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // ForceBreakDeadlock
+                // SleepOnSpinlock
                 if pc == 0x00c3296c || pc == 0x37496580 || pc == 0x374965ac || pc == 0x3749668e {
-                    echo!("WARNING: Breaking spinlock at {:#010x}!", pc);
-                    let mut cpsr = self.cpu.cpsr();
-                    cpsr ^= 1 << 30;
-                    self.cpu.set_cpsr(cpsr);
-                    self.cpu.regs_mut()[cpu::Cpu::PC] = pc + 2;
+                    self.remaining_ticks = Some(0);
+                    block_reason = ThreadBlock::Sleeping(Instant::now() + Duration::from_millis(5));
                 }
 
                 // PrintDebugHeartbeat
@@ -1694,7 +1692,8 @@ impl Environment {
                     break;
                 }
             }
-            self.yield_thread(ThreadBlock::NotBlocked);
+            self.yield_thread(block_reason.clone());
+            block_reason = ThreadBlock::NotBlocked;
         }
     }
 
