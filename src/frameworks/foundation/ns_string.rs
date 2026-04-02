@@ -2000,15 +2000,38 @@ pub fn get_bytes_buffer_inner(
     );
 
     let src = to_rust_string(env, str);
-    if encoding == NSASCIIStringEncoding
+    
+    // Fallback for non-ASCII characters in legacy encodings to prevent crashes
+    let safe_src = if encoding == NSASCIIStringEncoding
         || encoding == NSMacOSRomanStringEncoding
         || encoding == NSISOLatin1StringEncoding
     {
-        // TODO: properly support Mac OS Roman and ISO Latin 1 encoding.
-        // The first 128 characters are identical to the ASCII
-        assert!(src.as_bytes().iter().all(|byte| byte.is_ascii()));
-    }
+        if !src.as_bytes().iter().all(|byte| byte.is_ascii()) {
+            log!("WARNING: get_bytes_buffer_inner replaced non-ASCII chars in {:?}", src);
+            let sanitized: String = src.chars().map(|c| if c.is_ascii() { c } else { '?' }).collect();
+            Cow::Owned(sanitized)
+        } else {
+            src
+        }
+    } else {
+        src
+    };
+
     let dest = env.mem.bytes_at_mut(buffer, buffer_size);
+    let src_len = if include_null_terminator {
+        safe_src.len() + 1
+    } else {
+        safe_src.len()
+    };
+    if dest.len() < src_len {
+        return false;
+    }
+
+    let iter: Box<dyn Iterator<Item = &u8>> = if include_null_terminator {
+        Box::new(safe_src.as_bytes().iter().chain(b"\0".iter()))
+    } else {
+        Box::new(safe_src.as_bytes().iter())
+    };
     let src_len = if include_null_terminator {
         src.len() + 1
     } else {
