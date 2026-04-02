@@ -525,12 +525,13 @@ fn _Block_release(_env: &mut Environment, _block: ConstVoidPtr) {
 }
 
 fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoidPtr) {
-    // RunDispatchOnceBlock
+    // FixDispatchOnceRace
     if env.mem.read(predicate) == 0 {
-        env.mem.write(predicate, -1);
+        env.mem.write(predicate, 1);
         let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
         let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
         let _: u32 = func.call_from_host(env, (block,));
+        env.mem.write(predicate, -1);
     }
 }
 
