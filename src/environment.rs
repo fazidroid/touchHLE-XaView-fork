@@ -1644,10 +1644,24 @@ impl Environment {
                 // BypassAsphaltDRM
                 let pc = self.cpu.regs()[cpu::Cpu::PC];
                 if pc == 0x00600ac4 {
-                    echo!("WARNING: Bypassing Asphalt 7 infinite DRM/Deadlock at 0x00600ac4!");
+                    echo!("WARNING: Bypassing Asphalt DRM via Frame Pointer Escape!");
+                    let fp = self.cpu.regs()[7];
+                    
+                    // RecoverTrueReturn
+                    let true_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp + 4));
+                    let old_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp));
+                    
+                    echo!("Recovered true return address: {:#010x}", true_lr);
+                    
+                    // RestoreRegisters
+                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 12));
+                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 8));
+                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp - 4));
+                    self.cpu.regs_mut()[7] = old_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp + 8;
                     self.cpu.regs_mut()[0] = 1;
-                    let lr = self.cpu.regs()[cpu::Cpu::LR];
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                    
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(true_lr));
                 }
 
                 // PrintDebugHeartbeat
