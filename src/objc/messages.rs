@@ -52,7 +52,7 @@ fn objc_msgSend_inner(
     }
 
     // BypassGarbagePointer
-    if receiver.to_bits() >= 0xe0000000 {
+    if receiver.to_bits() >= 0x80000000 && receiver.to_bits() < 0xff000000 {
         log!("WARNING: objc_msgSend received garbage pointer {:#010x}. Bypassing.", receiver.to_bits());
         env.cpu.regs_mut()[0..2].fill(0);
         return;
