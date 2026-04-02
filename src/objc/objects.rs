@@ -348,11 +348,16 @@ impl super::ObjC {
     /// Deallocate an object. Do not call this directly unless you're
     /// implementing `dealloc` and are sure you don't need to do a super-call.
     pub fn dealloc_object(&mut self, object: id, _mem: &mut Mem) {
-        log!(
-            "MEMORY LEAK INTENTIONAL: Preventing deallocation of {:?} to avoid Use-After-Free crashes",
-            object
-        );
+        // LeakLogToggle
+        static SHOW_ALL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        // LoggedOnceFlag
+        static LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-        // Ничего
+        if SHOW_ALL.load(std::sync::atomic::Ordering::Relaxed) || !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            log!(
+                "MEMORY LEAK INTENTIONAL: Preventing deallocation of {:?} to avoid Use-After-Free crashes (muted further logs)",
+                object
+            );
+        }
     }
 }
