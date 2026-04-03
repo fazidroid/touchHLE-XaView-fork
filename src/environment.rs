@@ -1667,7 +1667,7 @@ impl Environment {
                 }
 
                 // BypassBackgroundHangs
-                if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
+                if (pc == 0x00c3296c || pc == 0x00c32bfc || pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
                     echo!("WARNING: Safely unwinding background hang at {:#010x}!", pc);
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
