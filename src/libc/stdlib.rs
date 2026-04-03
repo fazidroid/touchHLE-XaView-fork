@@ -718,11 +718,22 @@ fn __cxa_guard_abort(env: &mut Environment, guard: MutPtr<u8>) {
     env.mem.write(guard, 0);
 }
 
+fn __Unwind_SjLj_RaiseException(_env: &mut Environment, _ex: ConstVoidPtr) -> i32 {
+    // FakeSjLjRaise
+    0
+}
+
+fn __Unwind_SjLj_Resume(_env: &mut Environment, _ex: ConstVoidPtr) {
+    // FakeSjLjResume
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(__cxa_guard_acquire(_)),
     export_c_func!(__cxa_guard_release(_)),
     export_c_func!(__cxa_guard_abort(_)),
+    export_c_func!(__Unwind_SjLj_RaiseException(_)),
+    export_c_func!(__Unwind_SjLj_Resume(_)),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
