@@ -525,21 +525,12 @@ fn _Block_release(_env: &mut Environment, _block: ConstVoidPtr) {
 }
 
 fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoidPtr) {
-    // FixDispatchOnceRace
-    loop {
-        let status = env.mem.read(predicate);
-        if status == -1 {
-            break;
-        }
-        if status == 0 {
-            env.mem.write(predicate, 1);
-            let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
-            let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
-            let _: u32 = func.call_from_host(env, (block,));
-            env.mem.write(predicate, -1);
-            break;
-        }
-        env.sleep(std::time::Duration::from_millis(5));
+    // RunDispatchOnceBlock
+    if env.mem.read(predicate) == 0 {
+        env.mem.write(predicate, -1);
+        let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
+        let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
+        let _: u32 = func.call_from_host(env, (block,));
     }
 }
 
@@ -707,36 +698,8 @@ fn class_respondsToSelector(
     false
 }
 
-fn __cxa_guard_acquire(env: &mut Environment, guard: MutPtr<u8>) -> i32 {
-    // CxaGuardAcquire
-    loop {
-        let status = env.mem.read(guard);
-        if status == 1 {
-            return 0;
-        }
-        if status == 0 {
-            env.mem.write(guard, 2);
-            return 1;
-        }
-        env.sleep(std::time::Duration::from_millis(5));
-    }
-}
-
-fn __cxa_guard_release(env: &mut Environment, guard: MutPtr<u8>) {
-    // CxaGuardRelease
-    env.mem.write(guard, 1);
-}
-
-fn __cxa_guard_abort(env: &mut Environment, guard: MutPtr<u8>) {
-    // CxaGuardAbort
-    env.mem.write(guard, 0);
-}
-
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(class_respondsToSelector(_, _)),
-    export_c_func!(__cxa_guard_acquire(_)),
-    export_c_func!(__cxa_guard_release(_)),
-    export_c_func!(__cxa_guard_abort(_)),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
