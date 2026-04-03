@@ -619,6 +619,63 @@ impl Environment {
         env.set_up_initial_env_vars();
         dyld::Dyld::do_late_linking(&mut env);
 
+        // WipeSaveNameASCII
+        for addr in 0x1000..0x2000000 {
+            let p = mem::ConstPtr::<u8>::from_bits(addr);
+            if env.mem.read(p) == b'p' 
+                && env.mem.read(p + 1) == b'r' 
+                && env.mem.read(p + 2) == b'o' 
+                && env.mem.read(p + 3) == b'f' 
+            {
+                if env.mem.read(p + 4) == b'i' 
+                    && env.mem.read(p + 5) == b'l' 
+                    && env.mem.read(p + 6) == b'e' 
+                    && env.mem.read(p + 7) == b'.' 
+                {
+                    if env.mem.read(p + 8) == b's' 
+                        && env.mem.read(p + 9) == b'a' 
+                        && env.mem.read(p + 10) == b'v' 
+                    {
+                        echo!("Patching ASCII save name!");
+                        let mp = mem::MutPtr::<u8>::from_bits(addr);
+                        env.mem.write(mp, b'x');
+                    }
+                }
+            }
+        }
+
+        // WipeSaveNameUTF16
+        for addr in 0x1000..0x2000000 {
+            let p = mem::ConstPtr::<u8>::from_bits(addr);
+            if env.mem.read(p) == b'p' 
+                && env.mem.read(p + 1) == 0 
+                && env.mem.read(p + 2) == b'r' 
+                && env.mem.read(p + 3) == 0 
+            {
+                if env.mem.read(p + 4) == b'o' 
+                    && env.mem.read(p + 5) == 0 
+                    && env.mem.read(p + 6) == b'f' 
+                    && env.mem.read(p + 7) == 0 
+                {
+                    if env.mem.read(p + 8) == b'i' 
+                        && env.mem.read(p + 9) == 0 
+                        && env.mem.read(p + 10) == b'l' 
+                        && env.mem.read(p + 11) == 0 
+                    {
+                        if env.mem.read(p + 12) == b'e' 
+                            && env.mem.read(p + 13) == 0 
+                            && env.mem.read(p + 14) == b'.' 
+                            && env.mem.read(p + 15) == 0 
+                        {
+                            echo!("Patching UTF16 save name!");
+                            let mp = mem::MutPtr::<u8>::from_bits(addr);
+                            env.mem.write(mp, b'x');
+                        }
+                    }
+                }
+            }
+        }
+
         // FixEnvInitThumb
         env.cpu.set_cpsr(
             cpu::Cpu::CPSR_USER_MODE
@@ -1674,19 +1731,6 @@ impl Environment {
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
                     self.cpu.regs_mut()[7] = prev_fp;
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
-                }
-
-                // BypassSaveDeadlocks
-                if pc == 0x00c36b18 || pc == 0x00c36128 {
-                    echo!("WARNING: Deep unwinding save deadlock at {:#010x}!", pc);
-                    let fp0 = self.cpu.regs()[7];
-                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp2 + 4));
-                    self.cpu.regs_mut()[7] = fp2;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
