@@ -1725,6 +1725,20 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
+                // BreakSaveDeadlocks
+                if pc == 0x00c36b18 || pc == 0x00c36128 {
+                    echo!("WARNING: Breaking save deadlock loop at {:#010x}!", pc);
+                    let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
+                    let mut inst_len = if is_thumb { 2 } else { 4 };
+                    if is_thumb {
+                        let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(pc));
+                        if (hw & 0xe000) == 0xe000 && (hw & 0x1800) != 0 {
+                            inst_len = 4;
+                        }
+                    }
+                    self.cpu.regs_mut()[cpu::Cpu::PC] += inst_len;
+                }
+
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
                     let lr = self.cpu.regs()[cpu::Cpu::LR];
