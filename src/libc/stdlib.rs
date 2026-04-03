@@ -718,22 +718,78 @@ fn __cxa_guard_abort(env: &mut Environment, guard: MutPtr<u8>) {
     env.mem.write(guard, 0);
 }
 
-fn _Unwind_SjLj_RaiseException(_env: &mut Environment, _ex: ConstVoidPtr) -> i32 {
-    // FakeSjLjRaise
+fn _Unwind_SjLj_RaiseException(env: &mut Environment, _ex: ConstVoidPtr) -> i32 {
+    // BypassExceptionUnwind
+    let mut fp = env.cpu.regs()[7];
+    for _ in 0..30 {
+        if fp == 0 { break; }
+        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
+        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        if lr > 0 && lr < 0x10000000 {
+            env.cpu.regs_mut()[7] = prev_fp;
+            env.cpu.regs_mut()[13] = fp + 8;
+            env.cpu.regs_mut()[0] = 0;
+            env.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+            return 0;
+        }
+        fp = prev_fp;
+    }
     0
 }
 
-fn _Unwind_SjLj_Resume(_env: &mut Environment, _ex: ConstVoidPtr) {
-    // FakeSjLjResume
+fn _Unwind_SjLj_Resume(env: &mut Environment, _ex: ConstVoidPtr) {
+    // BypassExceptionUnwind
+    let mut fp = env.cpu.regs()[7];
+    for _ in 0..30 {
+        if fp == 0 { break; }
+        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
+        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        if lr > 0 && lr < 0x10000000 {
+            env.cpu.regs_mut()[7] = prev_fp;
+            env.cpu.regs_mut()[13] = fp + 8;
+            env.cpu.regs_mut()[0] = 0;
+            env.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+            return;
+        }
+        fp = prev_fp;
+    }
 }
 
-fn _Unwind_SjLj_Resume_or_Rethrow(_env: &mut Environment, _ex: ConstVoidPtr) -> i32 {
-    // FakeSjLjRethrow
+fn _Unwind_SjLj_Resume_or_Rethrow(env: &mut Environment, _ex: ConstVoidPtr) -> i32 {
+    // BypassExceptionUnwind
+    let mut fp = env.cpu.regs()[7];
+    for _ in 0..30 {
+        if fp == 0 { break; }
+        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
+        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        if lr > 0 && lr < 0x10000000 {
+            env.cpu.regs_mut()[7] = prev_fp;
+            env.cpu.regs_mut()[13] = fp + 8;
+            env.cpu.regs_mut()[0] = 0;
+            env.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+            return 0;
+        }
+        fp = prev_fp;
+    }
     0
 }
 
-fn abort(_env: &mut Environment) {
-    // FakeAbort
+fn abort(env: &mut Environment) {
+    // BypassExceptionUnwind
+    let mut fp = env.cpu.regs()[7];
+    for _ in 0..30 {
+        if fp == 0 { break; }
+        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
+        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        if lr > 0 && lr < 0x10000000 {
+            env.cpu.regs_mut()[7] = prev_fp;
+            env.cpu.regs_mut()[13] = fp + 8;
+            env.cpu.regs_mut()[0] = 0;
+            env.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+            return;
+        }
+        fp = prev_fp;
+    }
 }
 
 pub const FUNCTIONS: FunctionExports = &[
