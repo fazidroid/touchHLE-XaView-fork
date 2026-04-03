@@ -1666,21 +1666,9 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // BypassNetworkDeadlocks
-                if pc == 0x00c3296c || pc == 0x00c32bfc || pc == 0x00c3375c || pc == 0x00c3376c || pc == 0x00c3352c || pc == 0x00c33b7c {
-                    echo!("WARNING: Safely unwinding network hang at {:#010x}! Thread: {}", pc, self.current_thread);
-                    let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
-                    self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
-                }
-
-                // BypassLoadingDeadlocks
-                if pc == 0x00a8b93e || pc == 0x00a8b978 {
-                    echo!("WARNING: Safely unwinding loading hang at {:#010x}! Thread: {}", pc, self.current_thread);
+                // BypassBackgroundHangs
+                if (pc == 0x00c3296c || pc == 0x00c32bfc || pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
+                    echo!("WARNING: Safely unwinding background hang at {:#010x}! Thread: {}", pc, self.current_thread);
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
@@ -1885,15 +1873,9 @@ impl Environment {
         // expect to find.
 
         // Initialize HOME envvar
-        // BreakSaveCreation
-        let time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let fake_home = format!("{}/fakedir_{}", self.fs.home_directory().as_str(), time);
         let home_value_cstr = self
             .mem
-            .alloc_and_write_cstr(fake_home.as_bytes());
+            .alloc_and_write_cstr(self.fs.home_directory().as_str().as_bytes());
         self.env_vars.insert(b"HOME".to_vec(), home_value_cstr);
     }
 
