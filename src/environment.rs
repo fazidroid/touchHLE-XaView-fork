@@ -1667,8 +1667,24 @@ impl Environment {
                 }
 
                 // BypassBackgroundHangs
-                if (pc == 0x00c3296c || pc == 0x00c32bfc || pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
+                if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
                     echo!("WARNING: Safely unwinding background hang at {:#010x}!", pc);
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                }
+
+                // TargetedHangBypass
+                let lr = self.cpu.regs()[cpu::Cpu::LR];
+                if (pc == 0x00c3375c && lr == 0x00afdaf9) ||
+                   (pc == 0x00c3376c && lr == 0x00a16403) ||
+                   ((pc == 0x00a8b93e || pc == 0x00a8b978) && lr == 0x00a81fe1) 
+                {
+                    echo!("WARNING: Safely unwinding targeted hang at PC {:#010x}, LR {:#010x}!", pc, lr);
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
