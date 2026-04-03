@@ -1699,6 +1699,16 @@ impl Environment {
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                } else if pc == 0x0020a9c2 && self.current_thread == 0 {
+                    // BypassSplashDeadlock
+                    echo!("WARNING: Safely unwinding splash deadlock at {:#010x}! Thread: {}", pc, self.current_thread);
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
                 // PrintDebugHeartbeat
