@@ -1640,7 +1640,6 @@ impl Environment {
 
         // SetupHeartbeatTimer
         let mut last_heartbeat = Instant::now();
-        let mut loop_counters: HashMap<u32, u32> = HashMap::new();
 
         loop {
             while self
@@ -1663,25 +1662,8 @@ impl Environment {
                     echo!("Recovered Deep Return Address: {:#010x}", target_lr);
                     self.cpu.regs_mut()[7] = fp2; 
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8; 
-                    self.cpu.regs_mut()[0] = 1; 
+                    self.cpu.regs_mut()[0] = 0; 
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
-                }
-
-                // BreakDeadlocksNaturally
-                if pc == 0x00c3296c || pc == 0x37496580 || pc == 0x374965ac || pc == 0x3749668e {
-                    let count = loop_counters.entry(pc).or_insert(0);
-                    *count += 1;
-                    if *count >= 4 {
-                        echo!("WARNING: Breaking spinlock naturally at {:#010x}!", pc);
-                        self.cpu.regs_mut()[0] = 0;
-                        self.cpu.regs_mut()[1] = 0;
-                        let mut cpsr = self.cpu.cpsr();
-                        cpsr |= 1 << 30; 
-                        self.cpu.set_cpsr(cpsr);
-                        *count = 0;
-                    }
-                } else {
-                    loop_counters.clear();
                 }
 
                 // PrintDebugHeartbeat
