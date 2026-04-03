@@ -1694,10 +1694,8 @@ impl Environment {
                         self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                         bg_hang_counters[tid] = 0;
                     }
-                } else if tid != 0 && tid < 16 {
-                    if pc < 0x00c33700 || pc > 0x00c33800 {
-                        bg_hang_counters[tid] = 0;
-                    }
+                } else if tid != 0 && tid < 16 && !(0x00c33700..=0x00c33800).contains(&pc) {
+                    bg_hang_counters[tid] = 0;
                 }
 
                 // PrintDebugHeartbeat
