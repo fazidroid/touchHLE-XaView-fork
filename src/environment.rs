@@ -619,6 +619,27 @@ impl Environment {
         env.set_up_initial_env_vars();
         dyld::Dyld::do_late_linking(&mut env);
 
+        // WipeSaveName
+        for addr in 0x1000..0xc50000 {
+            let p = mem::ConstPtr::<u8>::from_bits(addr);
+            if env.mem.read(p) == b'p'
+                && env.mem.read(p + 1) == b'r'
+                && env.mem.read(p + 2) == b'o'
+                && env.mem.read(p + 3) == b'f'
+                && env.mem.read(p + 4) == b'i'
+                && env.mem.read(p + 5) == b'l'
+                && env.mem.read(p + 6) == b'e'
+                && env.mem.read(p + 7) == b'.'
+                && env.mem.read(p + 8) == b's'
+                && env.mem.read(p + 9) == b'a'
+                && env.mem.read(p + 10) == b'v'
+                && env.mem.read(p + 11) == 0
+            {
+                echo!("WARNING: Patching profile.sav!");
+                env.mem.write(mem::MutPtr::<u8>::from_bits(addr), b'x');
+            }
+        }
+
         // FixEnvInitThumb
         env.cpu.set_cpsr(
             cpu::Cpu::CPSR_USER_MODE
@@ -1675,18 +1696,6 @@ impl Environment {
                     self.cpu.regs_mut()[7] = prev_fp;
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
                     self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
-                }
-
-                // BypassSaveDeadlocks
-                if pc == 0x00c36b18 || pc == 0x00c36128 {
-                    echo!("WARNING: Safely unwinding save file deadlock at {:#010x}!", pc);
-                    let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
-                    self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    // KeepR0Intact
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
