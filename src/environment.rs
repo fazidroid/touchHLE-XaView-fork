@@ -1686,8 +1686,22 @@ impl Environment {
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
                     self.cpu.regs_mut()[7] = prev_fp;
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    self.cpu.regs_mut()[0] = 0;
+                    // Не трогаем R0! Оставляем оригинальный указатель на объект сохранения
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                }
+
+                // BypassFatalErrorTraps
+                if pc == 0x00a80778 || pc == 0x00a80764 || pc == 0x00aacf9c {
+                    echo!("WARNING: Escaping fatal error trap at {:#010x}!", pc);
+                    let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
+                    let mut inst_len = if is_thumb { 2 } else { 4 };
+                    if is_thumb {
+                        let hw: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(pc));
+                        if (hw & 0xe000) == 0xe000 && (hw & 0x1800) != 0 {
+                            inst_len = 4;
+                        }
+                    }
+                    self.cpu.regs_mut()[cpu::Cpu::PC] += inst_len;
                 }
 
                 // PrintDebugHeartbeat
