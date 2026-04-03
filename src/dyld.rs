@@ -723,7 +723,7 @@ impl Dyld {
             (stub_function_ptr, la_symbol_ptr)
         }
 
-        let (stubs, pic_offset) = bins
+        let (stubs, pic_offset) = match bins
             .iter()
             .find_map(|bin| {
                 let stubs = bin.get_section(SectionType::SymbolStubs)?;
@@ -734,8 +734,16 @@ impl Dyld {
                     .get_section(SectionType::LazySymbolPointers)
                     .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
                 Some((stubs, pic_offset))
-            })
-            .unwrap();
+            }) {
+                Some(res) => res,
+                None => {
+                    // BypassGameTrap
+                    println!("WARNING: Ignoring game trap (SVC 0) at {:#010x}", svc_pc);
+                    let is_thumb = (cpu.cpsr() & 0x20) != 0;
+                    cpu.regs_mut()[15] += if is_thumb { 2 } else { 4 };
+                    return None;
+                }
+            };
 
         let info = stubs.dyld_indirect_symbol_info.as_ref().unwrap();
 
@@ -743,7 +751,13 @@ impl Dyld {
         assert!(offset.is_multiple_of(info.entry_size));
         let idx = (offset / info.entry_size) as usize;
 
-        let symbol = info.indirect_undef_symbols[idx].as_deref().unwrap();
+        // BypassInvalidLazyLink
+        let Some(symbol) = info.indirect_undef_symbols[idx].as_deref() else {
+            println!("WARNING: Invalid lazy link symbol at {:#010x}, returning", svc_pc);
+            let target_lr = cpu.regs()[14];
+            cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+            return None;
+        };
 
         if let Some(&addr) = self.non_lazy_host_functions.get(symbol) {
             // The host function was already linked non-lazily, point the
