@@ -698,8 +698,31 @@ fn class_respondsToSelector(
     false
 }
 
+fn __cxa_guard_acquire(env: &mut Environment, guard: MutPtr<u8>) -> i32 {
+    // FakeCxaGuardAcquire
+    let status = env.mem.read(guard);
+    if status == 0 {
+        env.mem.write(guard, 1);
+        return 1;
+    }
+    0
+}
+
+fn __cxa_guard_release(env: &mut Environment, guard: MutPtr<u8>) {
+    // FakeCxaGuardRelease
+    env.mem.write(guard, 2);
+}
+
+fn __cxa_guard_abort(env: &mut Environment, guard: MutPtr<u8>) {
+    // FakeCxaGuardAbort
+    env.mem.write(guard, 0);
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(class_respondsToSelector(_, _)),
+    export_c_func!(__cxa_guard_acquire(_)),
+    export_c_func!(__cxa_guard_release(_)),
+    export_c_func!(__cxa_guard_abort(_)),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
