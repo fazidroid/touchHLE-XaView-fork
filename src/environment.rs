@@ -622,57 +622,47 @@ impl Environment {
         // WipeSaveNameASCII
         for addr in 0x1000..0x2000000 {
             let p = mem::ConstPtr::<u8>::from_bits(addr);
-            if env.mem.read(p) == b'p' 
-                && env.mem.read(p + 1) == b'r' 
-                && env.mem.read(p + 2) == b'o' 
-                && env.mem.read(p + 3) == b'f' 
+            if env.mem.read(p) == b'p'
+                && env.mem.read(p + 1) == b'r'
+                && env.mem.read(p + 2) == b'o'
+                && env.mem.read(p + 3) == b'f'
+                && env.mem.read(p + 4) == b'i'
+                && env.mem.read(p + 5) == b'l'
+                && env.mem.read(p + 6) == b'e'
+                && env.mem.read(p + 7) == b'.'
+                && env.mem.read(p + 8) == b's'
+                && env.mem.read(p + 9) == b'a'
+                && env.mem.read(p + 10) == b'v'
             {
-                if env.mem.read(p + 4) == b'i' 
-                    && env.mem.read(p + 5) == b'l' 
-                    && env.mem.read(p + 6) == b'e' 
-                    && env.mem.read(p + 7) == b'.' 
-                {
-                    if env.mem.read(p + 8) == b's' 
-                        && env.mem.read(p + 9) == b'a' 
-                        && env.mem.read(p + 10) == b'v' 
-                    {
-                        echo!("Patching ASCII save name!");
-                        let mp = mem::MutPtr::<u8>::from_bits(addr);
-                        env.mem.write(mp, b'x');
-                    }
-                }
+                echo!("Patching ASCII save name!");
+                let mp = mem::MutPtr::<u8>::from_bits(addr);
+                env.mem.write(mp, b'x');
             }
         }
 
         // WipeSaveNameUTF16
         for addr in 0x1000..0x2000000 {
             let p = mem::ConstPtr::<u8>::from_bits(addr);
-            if env.mem.read(p) == b'p' 
-                && env.mem.read(p + 1) == 0 
-                && env.mem.read(p + 2) == b'r' 
-                && env.mem.read(p + 3) == 0 
+            if env.mem.read(p) == b'p'
+                && env.mem.read(p + 1) == 0
+                && env.mem.read(p + 2) == b'r'
+                && env.mem.read(p + 3) == 0
+                && env.mem.read(p + 4) == b'o'
+                && env.mem.read(p + 5) == 0
+                && env.mem.read(p + 6) == b'f'
+                && env.mem.read(p + 7) == 0
+                && env.mem.read(p + 8) == b'i'
+                && env.mem.read(p + 9) == 0
+                && env.mem.read(p + 10) == b'l'
+                && env.mem.read(p + 11) == 0
+                && env.mem.read(p + 12) == b'e'
+                && env.mem.read(p + 13) == 0
+                && env.mem.read(p + 14) == b'.'
+                && env.mem.read(p + 15) == 0
             {
-                if env.mem.read(p + 4) == b'o' 
-                    && env.mem.read(p + 5) == 0 
-                    && env.mem.read(p + 6) == b'f' 
-                    && env.mem.read(p + 7) == 0 
-                {
-                    if env.mem.read(p + 8) == b'i' 
-                        && env.mem.read(p + 9) == 0 
-                        && env.mem.read(p + 10) == b'l' 
-                        && env.mem.read(p + 11) == 0 
-                    {
-                        if env.mem.read(p + 12) == b'e' 
-                            && env.mem.read(p + 13) == 0 
-                            && env.mem.read(p + 14) == b'.' 
-                            && env.mem.read(p + 15) == 0 
-                        {
-                            echo!("Patching UTF16 save name!");
-                            let mp = mem::MutPtr::<u8>::from_bits(addr);
-                            env.mem.write(mp, b'x');
-                        }
-                    }
-                }
+                echo!("Patching UTF16 save name!");
+                let mp = mem::MutPtr::<u8>::from_bits(addr);
+                env.mem.write(mp, b'x');
             }
         }
 
