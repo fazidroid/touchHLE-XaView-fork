@@ -727,6 +727,11 @@ fn _Unwind_SjLj_Resume(_env: &mut Environment, _ex: ConstVoidPtr) {
     // FakeSjLjResume
 }
 
+fn _Unwind_SjLj_Resume_or_Rethrow(_env: &mut Environment, _ex: ConstVoidPtr) -> i32 {
+    // FakeSjLjRethrow
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(__cxa_guard_acquire(_)),
@@ -734,6 +739,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(__cxa_guard_abort(_)),
     export_c_func!(_Unwind_SjLj_RaiseException(_)),
     export_c_func!(_Unwind_SjLj_Resume(_)),
+    export_c_func!(_Unwind_SjLj_Resume_or_Rethrow(_)),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
