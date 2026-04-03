@@ -1667,35 +1667,25 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // BypassBackgroundHangs
-                if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
-                    echo!("WARNING: Safely unwinding background hang at {:#010x}!", pc);
-                    let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
-                    self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
-                }
-
-                // SmartNetworkHangBypass
+                // SmartBackgroundHangBypass
                 let tid = self.current_thread;
-                if (pc == 0x00c3375c || pc == 0x00c3376c) && tid != 0 && tid < 16 {
-                    bg_hang_counters[tid] = bg_hang_counters[tid].wrapping_add(1);
-                    if bg_hang_counters[tid] > 10_000_000 {
-                        echo!("WARNING: Safely unwinding deep background network hang at {:#010x} for Thread {}!", pc, tid);
-                        let fp0 = self.cpu.regs()[7];
-                        let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                        let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
-                        self.cpu.regs_mut()[7] = prev_fp;
-                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                        self.cpu.regs_mut()[0] = 0;
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                if tid != 0 && tid < 16 {
+                    if matches!(pc, 0x00c3296c | 0x00c32bfc | 0x00c3375c | 0x00c3376c) {
+                        bg_hang_counters[tid] = bg_hang_counters[tid].wrapping_add(1);
+                        if bg_hang_counters[tid] > 10_000_000 {
+                            echo!("WARNING: Safely unwinding deep background hang at {:#010x} for Thread {}!", pc, tid);
+                            let fp0 = self.cpu.regs()[7];
+                            let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                            let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                            self.cpu.regs_mut()[7] = prev_fp;
+                            self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                            self.cpu.regs_mut()[0] = 0;
+                            self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                            bg_hang_counters[tid] = 0;
+                        }
+                    } else if !(0x00c32900..=0x00c33800).contains(&pc) {
                         bg_hang_counters[tid] = 0;
                     }
-                } else if tid != 0 && tid < 16 && !(0x00c33700..=0x00c33800).contains(&pc) {
-                    bg_hang_counters[tid] = 0;
                 }
 
                 // PrintDebugHeartbeat
