@@ -1678,8 +1678,8 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // BypassSaveDeadlock
-                if pc == 0x00c36b18 {
+                // BypassSaveDeadlocks
+                if pc == 0x00c36b18 || pc == 0x00c36128 {
                     echo!("WARNING: Safely unwinding save file deadlock at {:#010x}!", pc);
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
