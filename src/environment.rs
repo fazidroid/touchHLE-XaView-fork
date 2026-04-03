@@ -1666,9 +1666,9 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // BypassThread4Hang
-                if pc == 0x00c3296c && self.current_thread == 4 {
-                    echo!("WARNING: Safely unwinding Thread 4 hang!");
+                // BypassBackgroundHangs
+                if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
+                    echo!("WARNING: Safely unwinding background hang at {:#010x}!", pc);
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
