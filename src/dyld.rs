@@ -736,10 +736,9 @@ impl Dyld {
                 Some((stubs, pic_offset))
             }) else {
                 log!("WARNING: Unresolved SVC at {:#010x}! Bypassing.", svc_pc);
-                // SafeLazyLinkFallback
+                // BypassInlineSVC
                 fn safe_fallback(env: &mut crate::Environment) {
-                    let lr = env.cpu.regs()[crate::cpu::Cpu::LR];
-                    env.cpu.branch(crate::abi::GuestFunction::from_addr_with_thumb_bit(lr));
+                    env.cpu.regs_mut()[0] = 0;
                 }
                 return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
             };
