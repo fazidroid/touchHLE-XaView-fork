@@ -46,6 +46,12 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    // BypassNSTimeZoneDefault
+    if sel_str == "defaultTimeZone" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     // BypassUIWebViewJS
     if sel_str == "stringByEvaluatingJavaScriptFromString:" {
         env.cpu.regs_mut()[0..2].fill(0);
