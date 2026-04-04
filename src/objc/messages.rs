@@ -171,6 +171,12 @@ fn objc_msgSend_inner(
             ..
         }) = host_object.as_any().downcast_ref()
         {
+            // BypassNSOperationQueue (early catch)
+            if name == "NSOperationQueue" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
             // Skip method lookup on first iteration if this is the super-call
             // variant of objc_msgSend (look up the superclass first)
             if super2.is_some() && class == orig_class {
@@ -224,16 +230,16 @@ Type mismatch when sending message {} to {:?}!
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
         {
-            // BypassGKSession
-
-            // BypassAVAudioSession
-            if name == "AVAudioSession" {
-            // BypassNSOperationQueue
+            // BypassNSOperationQueue (early catch)
             if name == "NSOperationQueue" {
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
 
+            // BypassGKSession
+
+            // BypassAVAudioSession
+            if name == "AVAudioSession" {
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
@@ -274,6 +280,12 @@ Type mismatch when sending message {} to {:?}!
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
         {
+            // BypassNSOperationQueue (early catch)
+            if name == "NSOperationQueue" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
             log!(
                 "Call to faked class \"{}\" ({:?}) {} method \"{}\". Behaving as if message was sent to nil.",
                 name,
