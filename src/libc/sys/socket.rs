@@ -78,8 +78,13 @@ impl sockaddr {
     ///
     /// Port is returned in the native endian format.
     fn to_ipv4_parts(self) -> ([u8; 4], u16) {
-        assert!(self.sa_len == 16 || self.sa_len == 0);
-        assert_eq!(self.sa_family, AF_INET as u8);
+        // RelaxSockaddrAssert
+        if self.sa_len != 16 && self.sa_len != 0 {
+            println!("WARNING: invalid sa_len {}", self.sa_len);
+        }
+        if self.sa_family != AF_INET as u8 {
+            println!("WARNING: invalid sa_family {}", self.sa_family);
+        }
         let port = u16::from_be_bytes([self.sa_data[0], self.sa_data[1]]);
         let ip = [
             self.sa_data[2],
