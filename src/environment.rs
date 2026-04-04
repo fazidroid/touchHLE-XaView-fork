@@ -1690,39 +1690,36 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // DeepRecoveryUnwind
+                    // SingleFrameRecoveryUnwind
                     echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
                     let sp = self.cpu.regs()[cpu::Cpu::SP];
                     let mut found = false;
-                    for offset in (0x80..0x2000).step_by(4) {
-                        let candidate_fp = sp + offset;
-                        let next_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp));
-                        let lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp + 4));
+                    for offset in (0x40..0x4000).step_by(4) {
+                        let addr = sp + offset;
+                        let val_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
+                        let val_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr + 4));
                         
-                        if next_fp > candidate_fp 
-                            && next_fp < candidate_fp + 0x1000 
-                            && next_fp.is_multiple_of(4) 
-                            && lr > 0x10000 
-                            && lr < 0x02000000 
-                            && (lr & 1) == 1 
-                        {
-                            let next_next_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(next_fp));
-                            let next_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(next_fp + 4));
+                        let is_fp_valid = val_fp == 0 || (val_fp > addr && val_fp < addr + 0x10000 && val_fp.is_multiple_of(4));
+                        let is_lr_valid = val_lr > 0x10000 && val_lr < 0x02000000 && (val_lr & 1) == 1;
+                        
+                        if is_fp_valid && is_lr_valid {
+                            let ret_addr = val_lr & !1;
+                            let hw1: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 4));
+                            let hw2: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 2));
                             
-                            if next_next_fp > next_fp 
-                                && next_next_fp < next_fp + 0x1000 
-                                && next_next_fp.is_multiple_of(4) 
-                                && next_lr > 0x10000 
-                                && next_lr < 0x02000000 
-                                && (next_lr & 1) == 1 
-                            {
-                                self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp - 12));
-                                self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp - 8));
-                                self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp - 4));
-                                self.cpu.regs_mut()[7] = next_fp;
-                                self.cpu.regs_mut()[cpu::Cpu::SP] = candidate_fp + 8;
+                            let is_bl32 = (hw1 & 0xF800) == 0xF000;
+                            let is_blx16 = (hw2 & 0xFF80) == 0x4780;
+                            
+                            if is_bl32 || is_blx16 {
+                                if addr >= 12 {
+                                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 12));
+                                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 8));
+                                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 4));
+                                }
+                                self.cpu.regs_mut()[7] = val_fp;
+                                self.cpu.regs_mut()[cpu::Cpu::SP] = addr + 8;
                                 self.cpu.regs_mut()[0] = 0;
-                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(val_lr));
                                 found = true;
                                 break;
                             }
