@@ -22,7 +22,7 @@
 //! - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/index-wide.html)
 
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::libc::errno::{set_errno, EBADF, ECONNRESET, EINVAL, EPROTONOSUPPORT};
+use crate::libc::errno::{set_errno, EBADF, ECONNRESET, EINVAL};
 use crate::libc::posix_io::{close, find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
@@ -146,7 +146,7 @@ fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> File
 
     // OfflineSocketBypass
     if !env.options.network_access {
-        crate::echo!("WARNING: Creating offline socket!");
+        println!("WARNING: Creating offline socket!");
     }
 
     assert_eq!(domain, AF_INET);
@@ -387,7 +387,7 @@ fn connect(
 
     // OfflineConnectBypass
     if !env.options.network_access {
-        crate::echo!("WARNING: Bypassing connect() for offline mode!");
+        println!("WARNING: Bypassing connect() for offline mode!");
         return 0;
     }
 
@@ -437,11 +437,13 @@ fn select(
         let mut count = 0;
         if !read_fds.is_null() {
             let set = env.mem.read(read_fds);
-            count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+            let bits = set.fds_bits;
+            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
         }
         if !write_fds.is_null() {
             let set = env.mem.read(write_fds);
-            count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+            let bits = set.fds_bits;
+            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
         }
         if !error_fds.is_null() {
             env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
