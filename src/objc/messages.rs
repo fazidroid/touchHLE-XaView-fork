@@ -46,6 +46,19 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    
+    // BypassNSStringURLLoading
+    if sel_str == "stringWithContentsOfURL:encoding:error:" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
+    // BypassNSURLConnectionSync
+    if sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     if sel_str == "localizedDescription" || sel_str == "localizedFailureReason" || sel_str == "connection:didFailWithError:" {
         env.cpu.regs_mut()[0..2].fill(0);
         return;
@@ -94,11 +107,6 @@ fn objc_msgSend_inner(
             } = class_host_object.as_any().downcast_ref().unwrap();
 
             // BypassMethodSelector
-            // BypassNSStringURLLoading
-            if selector.as_str(&env.mem) == "stringWithContentsOfURL:encoding:error:" {
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
             if selector.as_str(&env.mem) == "methodForSelector:" {
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
@@ -205,10 +213,6 @@ Type mismatch when sending message {} to {:?}!
         }) = host_object.as_any().downcast_ref()
         {
             // BypassGKSession
-            if name == "GKSession" {
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
 
             // BypassAVAudioSession
             if name == "AVAudioSession" {
@@ -216,6 +220,10 @@ Type mismatch when sending message {} to {:?}!
                 return;
             }
 
+            if name == "GKSession" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
             // FakeAccessoryManager
             if name == "EAAccessoryManager" {
                 env.cpu.regs_mut()[0..2].fill(0);
