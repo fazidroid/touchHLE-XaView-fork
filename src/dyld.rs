@@ -723,7 +723,7 @@ impl Dyld {
             (stub_function_ptr, la_symbol_ptr)
         }
 
-        let (stubs, pic_offset) = bins
+        let Some((stubs, pic_offset)) = bins
             .iter()
             .find_map(|bin| {
                 let stubs = bin.get_section(SectionType::SymbolStubs)?;
@@ -734,8 +734,15 @@ impl Dyld {
                     .get_section(SectionType::LazySymbolPointers)
                     .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
                 Some((stubs, pic_offset))
-            })
-            .unwrap();
+            }) else {
+                crate::echo!("WARNING: Unresolved SVC at {:#010x}! Bypassing.", svc_pc);
+                // SafeLazyLinkFallback
+                fn safe_fallback(env: &mut crate::Environment) {
+                    let lr = env.cpu.regs()[crate::cpu::Cpu::LR];
+                    env.cpu.branch(crate::abi::GuestFunction::from_addr_with_thumb_bit(lr));
+                }
+                return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
+            };
 
         let info = stubs.dyld_indirect_symbol_info.as_ref().unwrap();
 
