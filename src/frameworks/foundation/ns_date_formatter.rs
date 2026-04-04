@@ -61,9 +61,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     format = format.replace("ss", format!("{second:02}").as_str());
 
     // Ignore unsupported date format patterns instead of crashing
-    format = format.chars().map(|c| {
-        if matches!(c, 'A'..='Z' | 'a'..='z') {
-            ' '  // replace unknown patterns with space
+    format = format.chars().map(|c: char| {
+        if c.is_ascii_alphabetic() {
+            ' '
         } else {
             c
         }
