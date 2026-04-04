@@ -739,8 +739,18 @@ impl Dyld {
                 let r0 = cpu.regs()[0];
                 // LogInlineSvc
                 log!("WARNING: Unresolved inline SVC at {:#010x}! Syscall ID (R12): {}, R0: {:#x}", svc_pc, r12, r0);
-                // BypassInlineSVC
+                // SafeInlineSvc
                 fn safe_fallback(env: &mut crate::Environment) {
+                    let r12 = env.cpu.regs()[12];
+                    if r12 == 10 {
+                        let r1 = env.cpu.regs()[1];
+                        let r2 = env.cpu.regs()[2];
+                        let ptr = env.mem.alloc(r2).as_bits();
+                        env.mem.write(crate::mem::MutPtr::<u32>::from_bits(r1), ptr);
+                        env.cpu.regs_mut()[0] = 0;
+                        println!("WARNING: Inline mach_vm_allocate size: {:#x} -> {:#x}", r2, ptr);
+                        return;
+                    }
                     env.cpu.regs_mut()[0] = 0;
                 }
                 return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
