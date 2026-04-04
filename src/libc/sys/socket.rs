@@ -200,15 +200,17 @@ fn getsockopt(
         option_len
     );
 
-    assert_eq!(level, SOL_SOCKET);
-    // TODO: support other options
-    assert_eq!(option_name, SO_ERROR);
+    // RelaxGetsockopt
+    if level != SOL_SOCKET || option_name != SO_ERROR {
+        println!("WARNING: Ignoring getsockopt for level {}, option {}", level, option_name);
+        return 0;
+    }
 
     let option_len_val = env.mem.read(option_len);
-    assert_eq!(option_len_val, 4);
-
-    let option_value: MutPtr<i32> = option_value.cast();
-    env.mem.write(option_value, 0); // no errors
+    if option_len_val >= 4 {
+        let option_value: MutPtr<i32> = option_value.cast();
+        env.mem.write(option_value, 0); // no errors
+    }
 
     0 // Success
 }
@@ -251,13 +253,15 @@ fn setsockopt(
 
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
 
-    assert_eq!(level, SOL_SOCKET);
-    // TODO: SO_REUSEADDR is not supported in std::net (and not so portable)
-    assert!(option_name == SO_REUSEADDR || option_name == SO_BROADCAST);
-
-    assert_eq!(option_len, guest_size_of::<i32>());
-    let tmp: ConstPtr<i32> = option_value.cast();
-    assert_eq!(env.mem.read(tmp), 1);
+    // RelaxSetsockopt
+    if level != SOL_SOCKET {
+        println!("WARNING: Ignoring setsockopt for level {}, option {}", level, option_name);
+        return 0;
+    }
+    if option_name != SO_REUSEADDR && option_name != SO_BROADCAST {
+        println!("WARNING: Ignoring setsockopt unsupported option {}", option_name);
+        return 0;
+    }
 
     let options = &mut State::get_mut(env)
         .sockets
