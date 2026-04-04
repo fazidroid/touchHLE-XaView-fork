@@ -1710,13 +1710,13 @@ impl Environment {
                         }
                     }
                     
-                    let dummy = self.mem.alloc(256);
+                    let dummy_addr = self.mem.alloc(256).to_bits();
                     for i in 0..64 {
-                        self.mem.write(mem::ConstPtr::<u32>::from_bits(dummy + i * 4), 100);
+                        self.mem.write(mem::MutPtr::<u32>::from_bits(dummy_addr + i * 4), 100);
                     }
                     
                     for i in 4..=11 {
-                        self.cpu.regs_mut()[i] = dummy + 128;
+                        self.cpu.regs_mut()[i] = dummy_addr + 128;
                     }
                     
                     self.cpu.regs_mut()[7] = target_sp;
