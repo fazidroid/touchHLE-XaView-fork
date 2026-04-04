@@ -1478,9 +1478,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         // SafeSubBounds
         let start = range.location as usize;
-        let end = (range.location + range.length) as usize;
+        let length = range.length as usize;
+        let end = start + length;
         if start > orig_string.len() || end > orig_string.len() {
-            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", range.location, range.length, orig_string.len());
+            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", start, length, orig_string.len());
             return crate::objc::nil;
         }
         let host_string = orig_string[start..end].to_vec();
@@ -1626,9 +1627,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         // SafeSubBounds
         let start = range.location as usize;
-        let end = (range.location + range.length) as usize;
+        let length = range.length as usize;
+        let end = start + length;
         if start > orig_string.len() || end > orig_string.len() {
-            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", range.location, range.length, orig_string.len());
+            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", start, length, orig_string.len());
             return crate::objc::nil;
         }
         let host_string = orig_string[start..end].to_vec();
