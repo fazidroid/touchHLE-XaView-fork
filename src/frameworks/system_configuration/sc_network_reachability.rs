@@ -11,7 +11,7 @@ use crate::frameworks::core_foundation::cf_allocator::{kCFAllocatorDefault, CFAl
 use crate::frameworks::core_foundation::CFTypeRef;
 use crate::libc::sys::socket::sockaddr;
 use crate::mem::{ConstPtr, MutPtr, MutVoidPtr, Ptr};
-use crate::objc::{msg, objc_classes, Class, ClassExports, HostObject};
+use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
 use std::net::SocketAddrV4;
 
@@ -100,38 +100,25 @@ fn SCNetworkReachabilityCreateWithAddress(
 }
 
 fn SCNetworkReachabilityGetFlags(
-    env: &mut Environment,
-    target: SCNetworkReachabilityRef,
+    _env: &mut Environment,
+    _target: SCNetworkReachabilityRef,
     flags: MutPtr<SCNetworkReachabilityFlags>,
 ) -> bool {
-    // Always report network as reachable
     let out_flags = kSCNetworkReachabilityFlagsReachable;
 
     if !flags.is_null() {
-        env.mem.write(flags, out_flags);
+        unsafe { *flags.as_mut() = out_flags; }
     }
 
-    log!("SCNetworkReachabilityGetFlags -> TRUE (forced reachable)");
     true
 }
 
 fn SCNetworkReachabilitySetCallback(
-    env: &mut Environment,
-    target: SCNetworkReachabilityRef,
-    callout: GuestFunction,
-    context: MutVoidPtr,
+    _env: &mut Environment,
+    _target: SCNetworkReachabilityRef,
+    _callout: GuestFunction,
+    _context: MutVoidPtr,
 ) -> bool {
-    log!(
-        "SCNetworkReachabilitySetCallback({:?}, {:?}, {:?}) -> TRUE",
-        target,
-        callout,
-        context
-    );
-
-    // Trigger callback immediately
-    let flags = kSCNetworkReachabilityFlagsReachable;
-    callout.call(env, (target, flags, context));
-
     true
 }
 
