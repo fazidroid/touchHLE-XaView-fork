@@ -800,29 +800,8 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
     crate::mem::Ptr::null()
 }
 
-fn socket(_env: &mut Environment, _domain: i32, _type_: i32, _protocol: i32) -> i32 {
-    // FakeSocket
-    println!("WARNING: socket() called by C++ backend! Returning 999");
-    999
-}
-
-fn connect(_env: &mut Environment, _fd: i32, _addr: ConstVoidPtr, _len: u32) -> i32 {
-    // FakeConnect
-    println!("WARNING: connect() called by C++ backend! Returning 0");
-    0
-}
-
-fn recv(_env: &mut Environment, _fd: i32, _buf: MutPtr<u8>, _len: GuestUSize, _flags: i32) -> i32 {
-    // FakeRecv
-    println!("WARNING: recv() called by C++ backend! Returning EOF");
-    0
-}
-
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(gethostbyname(_)),
-    export_c_func!(socket(_, _, _)),
-    export_c_func!(connect(_, _, _)),
-    export_c_func!(recv(_, _, _, _)),
     export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(__cxa_guard_acquire(_)),
     export_c_func!(__cxa_guard_release(_)),
