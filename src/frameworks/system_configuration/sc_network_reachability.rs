@@ -100,14 +100,14 @@ fn SCNetworkReachabilityCreateWithAddress(
 }
 
 fn SCNetworkReachabilityGetFlags(
-    _env: &mut Environment,
+    env: &mut Environment,
     _target: SCNetworkReachabilityRef,
     flags: MutPtr<SCNetworkReachabilityFlags>,
 ) -> bool {
     let out_flags = kSCNetworkReachabilityFlagsReachable;
 
     if !flags.is_null() {
-        unsafe { *flags.as_mut() = out_flags; }
+        env.mem.write(flags, out_flags);
     }
 
     true
