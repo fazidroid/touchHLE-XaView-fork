@@ -792,7 +792,37 @@ fn abort(env: &mut Environment) {
     }
 }
 
+fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
+    // FakeGetHostByName
+    if let Ok(s) = env.mem.cstr_at_utf8(name) {
+        crate::echo!("WARNING: gethostbyname called for: {}", s);
+    }
+    crate::mem::Ptr::null()
+}
+
+fn socket(_env: &mut Environment, _domain: i32, _type_: i32, _protocol: i32) -> i32 {
+    // FakeSocketCall
+    crate::echo!("WARNING: socket() called by C++ backend!");
+    -1
+}
+
+fn connect(_env: &mut Environment, _fd: i32, _addr: ConstVoidPtr, _len: u32) -> i32 {
+    // FakeConnectCall
+    crate::echo!("WARNING: connect() called by C++ backend!");
+    -1
+}
+
+fn recv(_env: &mut Environment, _fd: i32, _buf: MutPtr<u8>, _len: GuestUSize, _flags: i32) -> i32 {
+    // FakeRecvCall
+    crate::echo!("WARNING: recv() called by C++ backend!");
+    -1
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(gethostbyname(_)),
+    export_c_func!(socket(_, _, _)),
+    export_c_func!(connect(_, _, _)),
+    export_c_func!(recv(_, _, _, _, _)),
     export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(__cxa_guard_acquire(_)),
     export_c_func!(__cxa_guard_release(_)),
