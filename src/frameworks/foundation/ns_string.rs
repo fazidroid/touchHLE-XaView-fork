@@ -118,7 +118,7 @@ impl StringHostObject {
                 StringHostObject::Utf8(Cow::Owned(string))
             }
             NSUTF8StringEncoding => {
-                let string = String::from_utf8(bytes.into_owned()).unwrap();
+                let string = String::from_utf8_lossy(&bytes).into_owned();
                 StringHostObject::Utf8(Cow::Owned(string))
             }
             NSWindowsCP1252StringEncoding => {
@@ -278,7 +278,7 @@ pub fn with_format(env: &mut Environment, format: id, args: VaList) -> String {
         args,
     );
     // TODO: what if it's not valid UTF-8?
-    String::from_utf8(res).unwrap()
+    String::from_utf8_lossy(&res).into_owned()
 }
 
 pub fn from_rust_ordering(ordering: std::cmp::Ordering) -> NSComparisonResult {
@@ -1770,7 +1770,7 @@ pub fn to_rust_string(env: &mut Environment, string: id) -> Cow<'static, str> {
     env.objc
         .borrow_mut::<StringHostObject>(string)
         .to_utf8()
-        .unwrap()
+        .unwrap_or_else(|_| Cow::Owned(String::from("[INVALID STRING]")))
 }
 
 pub fn for_each_code_unit<F>(env: &mut Environment, string: id, mut f: F)
