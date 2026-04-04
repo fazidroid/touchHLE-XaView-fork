@@ -369,7 +369,13 @@ Type mismatch when sending message {} to {:?}!
                 return;
             }
             panic!(
-                "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
+                "Class \"{}\" ({:?}) is 
+        // --- PATCH: NSHTTPCookieStorage sharedHTTPCookieStorage ---
+        if class_name == "NSHTTPCookieStorage" && sel_name == "sharedHTTPCookieStorage" {
+            return ObjcId::nil();
+        }
+
+unimplemented. Call to {} method \"{}\".",
                 name,
                 class,
                 if is_metaclass { "class" } else { "instance" },
