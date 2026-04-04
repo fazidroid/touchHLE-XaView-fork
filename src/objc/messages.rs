@@ -46,6 +46,12 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    // BypassNSMachPortSelector
+    if sel_str == "port" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     // BypassNSTimeZoneDefault
     if sel_str == "defaultTimeZone" {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -278,13 +284,6 @@ Type mismatch when sending message {} to {:?}!
 
             // BypassAVAudioSession
             if name == "AVAudioSession" {
-
-            // BypassNSMachPort
-            if name == "NSMachPort" {
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
-
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
