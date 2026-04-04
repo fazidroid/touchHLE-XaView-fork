@@ -46,6 +46,12 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    // BypassNSProcessInfoUnique
+    if sel_str == "globallyUniqueString" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     // BypassNSMutableDictionarySort
     if sel_str == "keysSortedByValueUsingSelector:" {
         env.cpu.regs_mut()[0..2].fill(0);
