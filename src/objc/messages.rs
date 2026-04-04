@@ -202,6 +202,13 @@ fn objc_msgSend_inner(
         }) = host_object.as_any().downcast_ref()
         {
 
+            // BypassUIPasteboard
+            if name == "UIPasteboard" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
+
             // BypassNSOperationQueue
             if name == "NSOperationQueue" {
                 env.cpu.regs_mut()[0..2].fill(0);
@@ -274,6 +281,13 @@ Type mismatch when sending message {} to {:?}!
         }) = host_object.as_any().downcast_ref()
         {
 
+            // BypassUIPasteboard
+            if name == "UIPasteboard" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
+
             // BypassNSOperationQueue
             if name == "NSOperationQueue" {
                 env.cpu.regs_mut()[0..2].fill(0);
@@ -336,6 +350,13 @@ Type mismatch when sending message {} to {:?}!
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
         {
+
+            // BypassUIPasteboard
+            if name == "UIPasteboard" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
 
             // BypassNSOperationQueue
             if name == "NSOperationQueue" {
