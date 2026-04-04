@@ -219,11 +219,6 @@ fn objc_msgSend_inner(
         };
 
         if let Some(&super::ClassHostObject {
-            // NSHTTPCookieStorage safe stub
-            if name == "NSHTTPCookieStorage" && selector.as_str(&env.mem) == "sharedHTTPCookieStorage" {
-                return env.objc.alloc_object(class);
-            }
-
             superclass,
             ref methods,
             ref name,
@@ -305,11 +300,6 @@ Type mismatch when sending message {} to {:?}!
                 class = superclass;
             }
         } else if let Some(&super::UnimplementedClass {
-            // NSHTTPCookieStorage safe stub
-            if name == "NSHTTPCookieStorage" && selector.as_str(&env.mem) == "sharedHTTPCookieStorage" {
-                return env.objc.alloc_object(class);
-            }
-
             ref name,
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
