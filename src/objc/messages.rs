@@ -46,6 +46,12 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    // BypassNSTimeZone
+    if sel_str == "knownTimeZoneNames" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     
     // BypassNSStringURLLoading
     if sel_str == "stringWithContentsOfURL:encoding:error:" {
