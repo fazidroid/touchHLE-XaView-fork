@@ -828,7 +828,8 @@ impl Dyld {
             env.cpu.regs_mut()[0] = 0;
         }
 
-        return Some(&(dummy as fn(&mut crate::Environment) -> ()));
+        let f: HostFunction = &(dummy as fn(&mut crate::Environment) -> ());
+        Some(f)
     }
 
     /// Creates a guest function that will call a host function with the name
