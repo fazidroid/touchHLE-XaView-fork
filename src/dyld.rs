@@ -735,7 +735,10 @@ impl Dyld {
                     .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
                 Some((stubs, pic_offset))
             }) else {
-                log!("WARNING: Unresolved SVC at {:#010x}! Bypassing.", svc_pc);
+                let r12 = cpu.regs()[12];
+                let r0 = cpu.regs()[0];
+                // LogInlineSvc
+                log!("WARNING: Unresolved inline SVC at {:#010x}! Syscall ID (R12): {}, R0: {:#x}", svc_pc, r12, r0);
                 // BypassInlineSVC
                 fn safe_fallback(env: &mut crate::Environment) {
                     env.cpu.regs_mut()[0] = 0;
