@@ -802,20 +802,20 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
 
 fn socket(_env: &mut Environment, _domain: i32, _type_: i32, _protocol: i32) -> i32 {
     // FakeSocket
-    println!("WARNING: socket() called by C++ backend!");
-    -1
+    println!("WARNING: socket() called by C++ backend! Returning 999");
+    999
 }
 
 fn connect(_env: &mut Environment, _fd: i32, _addr: ConstVoidPtr, _len: u32) -> i32 {
     // FakeConnect
-    println!("WARNING: connect() called by C++ backend!");
-    -1
+    println!("WARNING: connect() called by C++ backend! Returning 0");
+    0
 }
 
 fn recv(_env: &mut Environment, _fd: i32, _buf: MutPtr<u8>, _len: GuestUSize, _flags: i32) -> i32 {
     // FakeRecv
-    println!("WARNING: recv() called by C++ backend!");
-    -1
+    println!("WARNING: recv() called by C++ backend! Returning EOF");
+    0
 }
 
 pub const FUNCTIONS: FunctionExports = &[
