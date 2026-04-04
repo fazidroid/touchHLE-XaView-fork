@@ -745,7 +745,7 @@ impl Dyld {
                     if r12 == 10 {
                         let r1 = env.cpu.regs()[1];
                         let r2 = env.cpu.regs()[2];
-                        let ptr = env.mem.alloc(r2).as_bits();
+                        let ptr = env.mem.alloc(r2).to_bits();
                         env.mem.write(crate::mem::MutPtr::<u32>::from_bits(r1), ptr);
                         env.cpu.regs_mut()[0] = 0;
                         println!("WARNING: Inline mach_vm_allocate size: {:#x} -> {:#x}", r2, ptr);
