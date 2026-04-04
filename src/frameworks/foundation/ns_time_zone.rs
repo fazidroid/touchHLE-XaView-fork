@@ -47,9 +47,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithName:(id)tz_name { // NSString *
-    assert_ne!(tz_name, nil);
-    retain(env, tz_name);
-    env.objc.borrow_mut::<NSTimeZoneHostObject>(this).time_zone = tz_name;
+    let tz = if tz_name == nil {
+        // fallback to UTC if nil
+        ns_string::get_static_str(env, "UTC")
+    } else {
+        tz_name
+    };
+
+    retain(env, tz);
+    env.objc.borrow_mut::<NSTimeZoneHostObject>(this).time_zone = tz;
     this
 }
 
