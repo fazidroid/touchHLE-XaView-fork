@@ -11,12 +11,13 @@ use crate::frameworks::core_foundation::cf_allocator::{kCFAllocatorDefault, CFAl
 use crate::frameworks::core_foundation::CFTypeRef;
 use crate::libc::sys::socket::sockaddr;
 use crate::mem::{ConstPtr, MutPtr, MutVoidPtr, Ptr};
-use crate::objc::{objc_classes, ClassExports, HostObject};
+use crate::objc::{msg, objc_classes, Class, ClassExports, HostObject};
 use crate::Environment;
 use std::net::SocketAddrV4;
 
 type SCNetworkReachabilityFlags = u32;
 const kSCNetworkReachabilityFlagsReachable: SCNetworkReachabilityFlags = 1 << 1;
+#[allow(dead_code)]
 const kSCNetworkReachabilityFlagsIsDirect: SCNetworkReachabilityFlags = 1 << 17;
 
 pub const CLASSES: ClassExports = objc_classes! {
@@ -31,6 +32,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
+#[allow(dead_code)]
 struct SCNetworkReachabilityHostObject {
     address: Option<SocketAddrV4>,
 }
@@ -101,25 +103,68 @@ fn SCNetworkReachabilityCreateWithAddress(
 
 fn SCNetworkReachabilityGetFlags(
     env: &mut Environment,
-    _target: SCNetworkReachabilityRef,
+    target: SCNetworkReachabilityRef,
     flags: MutPtr<SCNetworkReachabilityFlags>,
 ) -> bool {
-    let out_flags = kSCNetworkReachabilityFlagsReachable;
-
-    if !flags.is_null() {
-        env.mem.write(flags, out_flags);
+    if !env.options.network_access {
+        log_dbg!(
+            "Network access is disabled, SCNetworkReachabilityGetFlags({:?}, {:?}) -> false",
+            target,
+            flags
+        );
+        return false;
     }
 
-    true
+    let target_class: Class = msg![env; target class];
+    assert_eq!(
+        target_class,
+        env.objc
+            .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
+    );
+    let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
+    if let Some(addr) = host_object.address {
+        if addr.ip().is_link_local() {
+            log_dbg!(
+                "SCNetworkReachabilityGetFlags({:?}, {:?}) -> true",
+                target,
+                flags
+            );
+            // Those corresponds to local WiFi connection on a real iOS device
+            // TODO: actually check for the connectivity
+            // (but do we _really_ need it?)
+            let out_flags =
+                kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
+            env.mem.write(flags, out_flags);
+            return true;
+        }
+    }
+    log!(
+        "TODO: SCNetworkReachabilityGetFlags({:?}, {:?}) -> false",
+        target,
+        flags
+    );
+    false
 }
 
 fn SCNetworkReachabilitySetCallback(
-    _env: &mut Environment,
-    _target: SCNetworkReachabilityRef,
-    _callout: GuestFunction,
-    _context: MutVoidPtr,
+    env: &mut Environment,
+    target: SCNetworkReachabilityRef,
+    callout: GuestFunction, // SCNetworkReachabilityCallBack
+    context: MutVoidPtr,    // SCNetworkReachabilityContext *
 ) -> bool {
-    true
+    let target_class: Class = msg![env; target class];
+    assert_eq!(
+        target_class,
+        env.objc
+            .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
+    );
+    log!(
+        "TODO: SCNetworkReachabilitySetCallback({:?}, {:?}, {:?}) -> FALSE",
+        target,
+        callout,
+        context
+    );
+    false
 }
 
 pub const FUNCTIONS: FunctionExports = &[
