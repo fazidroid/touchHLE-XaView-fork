@@ -468,7 +468,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
         // SafeCharIndex
         if index as usize >= utf16.len() {
-            crate::echo!("WARNING: characterAtIndex out of bounds! Index: {}, Len: {}", index, utf16.len());
+            println!("WARNING: characterAtIndex out of bounds! Index: {}, Len: {}", index, utf16.len());
             return 0;
         }
 
@@ -1476,11 +1476,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         if did_convert {
             log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
         }
-        // SafeSubstringBounds
+        // SafeSubBounds
         let start = range.location as usize;
         let end = (range.location + range.length) as usize;
         if start > orig_string.len() || end > orig_string.len() {
-            crate::echo!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", range.location, range.length, orig_string.len());
+            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", range.location, range.length, orig_string.len());
             return crate::objc::nil;
         }
         let host_string = orig_string[start..end].to_vec();
@@ -1624,11 +1624,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         if did_convert {
             log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
         }
-        // SafeSubstringBounds
+        // SafeSubBounds
         let start = range.location as usize;
         let end = (range.location + range.length) as usize;
         if start > orig_string.len() || end > orig_string.len() {
-            crate::echo!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", range.location, range.length, orig_string.len());
+            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", range.location, range.length, orig_string.len());
             return crate::objc::nil;
         }
         let host_string = orig_string[start..end].to_vec();
