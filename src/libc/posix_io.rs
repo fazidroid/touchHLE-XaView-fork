@@ -815,7 +815,11 @@ fn fcntl(
         F_RDADVISE => {
             log_dbg!("TODO: Ignoring F_RDADVISE for file descriptor {}", fd);
         }
-        _ => unimplemented!(),
+        _ => {
+            // BypassFcntl
+            println!("WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.", cmd, fd);
+            return 0;
+        }
     }
     0 // success
 }
