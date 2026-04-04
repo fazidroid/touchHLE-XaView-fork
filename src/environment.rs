@@ -1690,27 +1690,24 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // SafeFpChainUnwind
+                    // ForceMainLoopUnwind
                     echo!("WARNING: Deep unwinding ___stack_chk_fail at {:#010x}! Thread: {}", pc, self.current_thread);
-                    let mut fp = self.cpu.regs()[7];
-                    let mut found = false;
-                    for _ in 0..10 {
-                        if fp < 0x10000 { break; }
-                        let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp));
-                        let lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp + 4));
-                        if lr > 0x10000 && lr < 0x02000000 {
-                            self.cpu.regs_mut()[7] = prev_fp;
-                            self.cpu.regs_mut()[cpu::Cpu::SP] = fp + 8;
-                            self.cpu.regs_mut()[0] = 0;
-                            self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr | 1));
-                            found = true;
+                    let sp = self.cpu.regs()[cpu::Cpu::SP];
+                    let mut target_lr = 0x00357b05;
+                    let mut target_sp = sp + 0x400;
+                    for offset in (0..0x4000).step_by(4) {
+                        let addr = sp + offset;
+                        let val: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
+                        if (val & 0xFFFF0000) == 0x00350000 && (val & 1) == 1 {
+                            target_lr = val;
+                            target_sp = addr + 4;
                             break;
                         }
-                        fp = prev_fp;
                     }
-                    if !found {
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
-                    }
+                    self.cpu.regs_mut()[7] = target_sp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = target_sp;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
                 // PrintDebugHeartbeat
