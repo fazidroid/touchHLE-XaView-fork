@@ -94,6 +94,11 @@ fn objc_msgSend_inner(
             } = class_host_object.as_any().downcast_ref().unwrap();
 
             // BypassMethodSelector
+            // BypassNSStringURLLoading
+            if selector.as_str(&env.mem) == "stringWithContentsOfURL:encoding:error:" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
             if selector.as_str(&env.mem) == "methodForSelector:" {
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
