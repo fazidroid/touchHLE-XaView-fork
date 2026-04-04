@@ -1699,26 +1699,35 @@ impl Environment {
                         let prev_fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                         let lr1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
                         
-                        if prev_fp1 > fp1 && prev_fp1 < fp1 + 0x2000 && prev_fp1.is_multiple_of(4) {
-                            if lr1 > 0x10000 && lr1 < 0x02000000 && (lr1 & 1) == 1 {
-                                let prev_fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(prev_fp1));
-                                let lr2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(prev_fp1 + 4));
-                                if prev_fp2 > prev_fp1 && prev_fp2 < prev_fp1 + 0x2000 && prev_fp2.is_multiple_of(4) {
-                                    if lr2 > 0x10000 && lr2 < 0x02000000 && (lr2 & 1) == 1 {
-                                        // RestoreABI
-                                        if fp1 >= 12 {
-                                            self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 4));
-                                            self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 8));
-                                            self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 12));
-                                        }
-                                        self.cpu.regs_mut()[7] = prev_fp1;
-                                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
-                                        self.cpu.regs_mut()[0] = 0;
-                                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr1));
-                                        found = true;
-                                        break;
-                                    }
+                        if prev_fp1 > fp1 
+                            && prev_fp1 < fp1 + 0x2000 
+                            && prev_fp1.is_multiple_of(4) 
+                            && lr1 > 0x10000 
+                            && lr1 < 0x02000000 
+                            && (lr1 & 1) == 1 
+                        {
+                            let prev_fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(prev_fp1));
+                            let lr2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(prev_fp1 + 4));
+                            
+                            if prev_fp2 > prev_fp1 
+                                && prev_fp2 < prev_fp1 + 0x2000 
+                                && prev_fp2.is_multiple_of(4) 
+                                && lr2 > 0x10000 
+                                && lr2 < 0x02000000 
+                                && (lr2 & 1) == 1 
+                            {
+                                // RestoreABI
+                                if fp1 >= 12 {
+                                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 4));
+                                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 8));
+                                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 12));
                                 }
+                                self.cpu.regs_mut()[7] = prev_fp1;
+                                self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                                self.cpu.regs_mut()[0] = 0;
+                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr1));
+                                found = true;
+                                break;
                             }
                         }
                     }
