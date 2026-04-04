@@ -1690,45 +1690,30 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // HeuristicScannerUnwind
-                    echo!("WARNING: Deep unwinding ___stack_chk_fail at {:#010x}! Thread: {}", pc, self.current_thread);
-                    let sp = self.cpu.regs()[cpu::Cpu::SP];
-                    let mut found = false;
-                    for offset in (0..0x20000).step_by(4) {
-                        let addr = sp + offset;
-                        let val_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
-                        let val_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr + 4));
+                    // TargetedDoubleUnwind
+                    echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
+                    let fp0 = self.cpu.regs()[7];
+                    
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    
+                    if fp1 > fp0 && fp1.wrapping_sub(fp0) < 0x1000 {
+                        let saved_r4: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
+                        let saved_r5: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
+                        let saved_r6: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
+                        let saved_r7: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
+                        let saved_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
 
-                        let is_fp_valid = val_fp == 0 || (val_fp > addr && val_fp < addr + 0x40000 && val_fp.is_multiple_of(4));
-                        let is_lr_valid = val_lr > 0x10000 && val_lr < 0x02000000 && (val_lr & 1) == 1;
-
-                        if is_fp_valid && is_lr_valid {
-                            let ret_addr = val_lr & !1;
-                            let instr_prev16: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 2));
-                            let instr_prev32_hi: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 4));
-                            
-                            let is_bl = (instr_prev32_hi & 0xF800) == 0xF000 && (instr_prev16 & 0xD000) == 0xD000;
-                            let is_blx_reg = (instr_prev16 & 0xFF80) == 0x4780;
-
-                            if is_bl || is_blx_reg {
-                                // RestoreABI
-                                if addr >= 12 {
-                                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 4));
-                                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 8));
-                                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 12));
-                                }
-                                self.cpu.regs_mut()[7] = val_fp;
-                                self.cpu.regs_mut()[cpu::Cpu::SP] = addr + 8;
-                                self.cpu.regs_mut()[0] = 0;
-                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(val_lr));
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                    if !found {
-                        echo!("FATAL: Could not find valid stack frame to unwind!");
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(pc | 1));
+                        self.cpu.regs_mut()[4] = saved_r4;
+                        self.cpu.regs_mut()[5] = saved_r5;
+                        self.cpu.regs_mut()[6] = saved_r6;
+                        self.cpu.regs_mut()[7] = saved_r7;
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                        self.cpu.regs_mut()[0] = 0;
+                        
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(saved_lr | 1));
+                    } else {
+                        echo!("FATAL: Stack chain corrupted beyond fp0!");
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
                     }
                 }
 
