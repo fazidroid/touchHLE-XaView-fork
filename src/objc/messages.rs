@@ -46,6 +46,18 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    // BypassNSURLQuery
+    if sel_str == "query" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
+    // BypassNSCodingEncode
+    if sel_str == "encodeWithCoder:" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     // BypassNSProcessInfoUnique
     if sel_str == "globallyUniqueString" {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -207,6 +219,11 @@ fn objc_msgSend_inner(
         };
 
         if let Some(&super::ClassHostObject {
+            // NSHTTPCookieStorage safe stub
+            if name == "NSHTTPCookieStorage" && selector.as_str(&env.mem) == "sharedHTTPCookieStorage" {
+                return env.objc.alloc_object(class);
+            }
+
             superclass,
             ref methods,
             ref name,
@@ -288,6 +305,11 @@ Type mismatch when sending message {} to {:?}!
                 class = superclass;
             }
         } else if let Some(&super::UnimplementedClass {
+            // NSHTTPCookieStorage safe stub
+            if name == "NSHTTPCookieStorage" && selector.as_str(&env.mem) == "sharedHTTPCookieStorage" {
+                return env.objc.alloc_object(class);
+            }
+
             ref name,
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
@@ -716,9 +738,3 @@ pub fn autorelease(env: &mut Environment, object: id) -> id {
     }
     msg![env; object autorelease]
 }
-
-        // NSHTTPCookieStorage stub (safe dummy object)
-        if class_name == "NSHTTPCookieStorage" && sel_name == "sharedHTTPCookieStorage" {
-            let cls: Class = msg![env; target class];
-            return env.objc.alloc_object(cls);
-        }
