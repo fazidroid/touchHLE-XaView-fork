@@ -1690,28 +1690,35 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // SmartReturnUnwind
+                    // PerfectFrameUnwind
                     echo!("WARNING: Deep unwinding ___stack_chk_fail at {:#010x}! Thread: {}", pc, self.current_thread);
                     let sp = self.cpu.regs()[cpu::Cpu::SP];
                     let mut found = false;
                     for offset in (0..0x2000).step_by(4) {
-                        let addr = sp + offset;
-                        let val: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
-                        if val > 0x10000 && val < 0x02000000 && (val & 1) == 1 {
-                            let ret_addr = val & !1;
-                            let instr_prev16: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 2));
-                            let instr_prev32_hi: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 4));
-                            let is_bl_blx_imm = (instr_prev32_hi & 0xF800) == 0xF000 && (instr_prev16 & 0xC000) == 0xC000;
-                            let is_blx_reg = (instr_prev16 & 0xFF80) == 0x4780;
-                            if is_bl_blx_imm || is_blx_reg {
-                                self.cpu.regs_mut()[7] = addr; 
-                                self.cpu.regs_mut()[cpu::Cpu::SP] = addr + 4;
-                                for i in 0..=11 {
-                                    self.cpu.regs_mut()[i] = 0;
+                        let fp1 = sp + offset;
+                        let prev_fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
+                        let lr1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
+                        
+                        if prev_fp1 > fp1 && prev_fp1 < fp1 + 0x2000 && prev_fp1.is_multiple_of(4) {
+                            if lr1 > 0x10000 && lr1 < 0x02000000 && (lr1 & 1) == 1 {
+                                let prev_fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(prev_fp1));
+                                let lr2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(prev_fp1 + 4));
+                                if prev_fp2 > prev_fp1 && prev_fp2 < prev_fp1 + 0x2000 && prev_fp2.is_multiple_of(4) {
+                                    if lr2 > 0x10000 && lr2 < 0x02000000 && (lr2 & 1) == 1 {
+                                        // RestoreABI
+                                        if fp1 >= 12 {
+                                            self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 4));
+                                            self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 8));
+                                            self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 - 12));
+                                        }
+                                        self.cpu.regs_mut()[7] = prev_fp1;
+                                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                                        self.cpu.regs_mut()[0] = 0;
+                                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr1));
+                                        found = true;
+                                        break;
+                                    }
                                 }
-                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(val));
-                                found = true;
-                                break;
                             }
                         }
                     }
