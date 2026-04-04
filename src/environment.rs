@@ -1690,34 +1690,30 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // SingleFrameRecoveryUnwind
+                    // BruteForceUnwind
                     echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
                     let sp = self.cpu.regs()[cpu::Cpu::SP];
                     let mut found = false;
                     for offset in (0x40..0x4000).step_by(4) {
                         let addr = sp + offset;
-                        let val_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
-                        let val_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr + 4));
+                        let val_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
                         
-                        let is_fp_valid = val_fp == 0 || (val_fp > addr && val_fp < addr + 0x10000 && val_fp.is_multiple_of(4));
-                        let is_lr_valid = val_lr > 0x10000 && val_lr < 0x02000000 && (val_lr & 1) == 1;
-                        
-                        if is_fp_valid && is_lr_valid {
+                        if val_lr > 0x10000 && val_lr < 0x02000000 && (val_lr & 1) == 1 {
                             let ret_addr = val_lr & !1;
-                            let hw1: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 4));
-                            let hw2: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 2));
+                            let hw32: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 4));
+                            let hw16: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 2));
                             
-                            let is_bl32 = (hw1 & 0xF800) == 0xF000;
-                            let is_blx16 = (hw2 & 0xFF80) == 0x4780;
+                            let is_bl32 = (hw32 & 0xF800) == 0xF000 && (hw16 & 0xC000) == 0xC000;
+                            let is_blx16 = (hw16 & 0xFF80) == 0x4780;
                             
                             if is_bl32 || is_blx16 {
-                                if addr >= 12 {
-                                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 12));
-                                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 8));
-                                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 4));
+                                if addr >= 16 {
+                                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 16));
+                                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 12));
+                                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 8));
+                                    self.cpu.regs_mut()[7] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 4));
                                 }
-                                self.cpu.regs_mut()[7] = val_fp;
-                                self.cpu.regs_mut()[cpu::Cpu::SP] = addr + 8;
+                                self.cpu.regs_mut()[cpu::Cpu::SP] = addr + 4;
                                 self.cpu.regs_mut()[0] = 0;
                                 self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(val_lr));
                                 found = true;
@@ -1726,8 +1722,9 @@ impl Environment {
                         }
                     }
                     if !found {
-                        echo!("FATAL: Stack chain corrupted beyond recovery!");
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
+                        echo!("FATAL: BruteForceUnwindFallback");
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = sp + 0x400;
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a1c2dd | 1));
                     }
                 }
 
