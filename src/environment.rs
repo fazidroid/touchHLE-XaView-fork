@@ -1690,39 +1690,43 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // ImmortalMainLoopUnwind
+                    // DeepCleanMainLoop
                     echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
                     let sp = self.cpu.regs()[cpu::Cpu::SP];
-                    let mut target_lr = 0x00357b05;
-                    let mut target_sp = sp + 0x400;
-                    for offset in (0..0x4000).step_by(4) {
+                    let mut found = false;
+                    
+                    for offset in (0x200..0x4000).step_by(4) {
                         let addr = sp + offset;
-                        let val: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
-                        if (val & 0xFFFF0000) == 0x00350000 && (val & 1) == 1 {
-                            let ret_addr = val & !1;
+                        let val_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
+                        
+                        if val_lr > 0x10000 && val_lr < 0x02000000 && (val_lr & 1) == 1 {
+                            let ret_addr = val_lr & !1;
                             let hw32: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 4));
                             let hw16: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 2));
-                            if (hw32 & 0xF800) == 0xF000 && (hw16 & 0xC000) == 0xC000 {
-                                target_lr = val;
-                                target_sp = addr + 4;
+                            
+                            let is_bl32 = (hw32 & 0xF800) == 0xF000 && (hw16 & 0xC000) == 0xC000;
+                            let is_blx16 = (hw16 & 0xFF80) == 0x4780;
+                            
+                            if is_bl32 || is_blx16 {
+                                if addr >= 16 {
+                                    self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 16));
+                                    self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 12));
+                                    self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 8));
+                                    self.cpu.regs_mut()[7] = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr - 4));
+                                }
+                                self.cpu.regs_mut()[cpu::Cpu::SP] = addr + 4;
+                                self.cpu.regs_mut()[0] = 0;
+                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(val_lr));
+                                found = true;
                                 break;
                             }
                         }
                     }
-                    
-                    let dummy_addr = self.mem.alloc(256).to_bits();
-                    for i in 0..64 {
-                        self.mem.write(mem::MutPtr::<u32>::from_bits(dummy_addr + i * 4), 100);
+                    if !found {
+                        echo!("FATAL: DeepCleanMainLoopFallback");
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = sp + 0x400;
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00357b05));
                     }
-                    
-                    for i in 4..=11 {
-                        self.cpu.regs_mut()[i] = dummy_addr + 128;
-                    }
-                    
-                    self.cpu.regs_mut()[7] = target_sp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = target_sp;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
                 // PrintDebugHeartbeat
