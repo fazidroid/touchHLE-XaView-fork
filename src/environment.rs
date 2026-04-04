@@ -1690,29 +1690,46 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // TargetedDoubleUnwind
+                    // DeepRecoveryUnwind
                     echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
-                    let fp0 = self.cpu.regs()[7];
-                    
-                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    
-                    if fp1 > fp0 && fp1.wrapping_sub(fp0) < 0x1000 {
-                        let saved_r4: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
-                        let saved_r5: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
-                        let saved_r6: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
-                        let saved_r7: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
-                        let saved_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
-
-                        self.cpu.regs_mut()[4] = saved_r4;
-                        self.cpu.regs_mut()[5] = saved_r5;
-                        self.cpu.regs_mut()[6] = saved_r6;
-                        self.cpu.regs_mut()[7] = saved_r7;
-                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
-                        self.cpu.regs_mut()[0] = 0;
+                    let sp = self.cpu.regs()[cpu::Cpu::SP];
+                    let mut found = false;
+                    for offset in (0x80..0x2000).step_by(4) {
+                        let candidate_fp = sp + offset;
+                        let next_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp));
+                        let lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp + 4));
                         
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(saved_lr | 1));
-                    } else {
-                        echo!("FATAL: Stack chain corrupted beyond fp0!");
+                        if next_fp > candidate_fp 
+                            && next_fp < candidate_fp + 0x1000 
+                            && next_fp.is_multiple_of(4) 
+                            && lr > 0x10000 
+                            && lr < 0x02000000 
+                            && (lr & 1) == 1 
+                        {
+                            let next_next_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(next_fp));
+                            let next_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(next_fp + 4));
+                            
+                            if next_next_fp > next_fp 
+                                && next_next_fp < next_fp + 0x1000 
+                                && next_next_fp.is_multiple_of(4) 
+                                && next_lr > 0x10000 
+                                && next_lr < 0x02000000 
+                                && (next_lr & 1) == 1 
+                            {
+                                self.cpu.regs_mut()[4] = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp - 12));
+                                self.cpu.regs_mut()[5] = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp - 8));
+                                self.cpu.regs_mut()[6] = self.mem.read(mem::ConstPtr::<u32>::from_bits(candidate_fp - 4));
+                                self.cpu.regs_mut()[7] = next_fp;
+                                self.cpu.regs_mut()[cpu::Cpu::SP] = candidate_fp + 8;
+                                self.cpu.regs_mut()[0] = 0;
+                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if !found {
+                        echo!("FATAL: Stack chain corrupted beyond recovery!");
                         self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
                     }
                 }
