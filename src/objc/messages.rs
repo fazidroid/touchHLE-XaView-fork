@@ -46,12 +46,6 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
-    // BypassNSMutableDictionaryKeyEnumerator
-    if sel_str == "keyEnumerator" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-
     // BypassNSURLQuery
     if sel_str == "query" {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -369,13 +363,7 @@ Type mismatch when sending message {} to {:?}!
                 return;
             }
             panic!(
-                "Class \"{}\" ({:?}) is 
-        // --- PATCH: NSHTTPCookieStorage sharedHTTPCookieStorage ---
-        if class_name == "NSHTTPCookieStorage" && sel_name == "sharedHTTPCookieStorage" {
-            return ObjcId::nil();
-        }
-
-unimplemented. Call to {} method \"{}\".",
+                "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
                 name,
                 class,
                 if is_metaclass { "class" } else { "instance" },
@@ -740,3 +728,9 @@ pub fn autorelease(env: &mut Environment, object: id) -> id {
     }
     msg![env; object autorelease]
 }
+
+
+        // NSHTTPCookieStorage stub
+        if class_name == "NSHTTPCookieStorage" && sel_name == "sharedHTTPCookieStorage" {
+            return ObjcId::nil();
+        }
