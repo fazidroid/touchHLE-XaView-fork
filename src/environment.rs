@@ -1690,24 +1690,34 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // ForceMainLoopUnwind
+                    // SmartReturnUnwind
                     echo!("WARNING: Deep unwinding ___stack_chk_fail at {:#010x}! Thread: {}", pc, self.current_thread);
                     let sp = self.cpu.regs()[cpu::Cpu::SP];
-                    let mut target_lr = 0x00357b05;
-                    let mut target_sp = sp + 0x400;
-                    for offset in (0..0x4000).step_by(4) {
+                    let mut found = false;
+                    for offset in (0..0x2000).step_by(4) {
                         let addr = sp + offset;
                         let val: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(addr));
-                        if (val & 0xFFFF0000) == 0x00350000 && (val & 1) == 1 {
-                            target_lr = val;
-                            target_sp = addr + 4;
-                            break;
+                        if val > 0x10000 && val < 0x02000000 && (val & 1) == 1 {
+                            let ret_addr = val & !1;
+                            let instr_prev16: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 2));
+                            let instr_prev32_hi: u16 = self.mem.read(mem::ConstPtr::<u16>::from_bits(ret_addr - 4));
+                            let is_bl_blx_imm = (instr_prev32_hi & 0xF800) == 0xF000 && (instr_prev16 & 0xC000) == 0xC000;
+                            let is_blx_reg = (instr_prev16 & 0xFF80) == 0x4780;
+                            if is_bl_blx_imm || is_blx_reg {
+                                self.cpu.regs_mut()[7] = addr; 
+                                self.cpu.regs_mut()[cpu::Cpu::SP] = addr + 4;
+                                for i in 0..=11 {
+                                    self.cpu.regs_mut()[i] = 0;
+                                }
+                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(val));
+                                found = true;
+                                break;
+                            }
                         }
                     }
-                    self.cpu.regs_mut()[7] = target_sp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = target_sp;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    if !found {
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
+                    }
                 }
 
                 // PrintDebugHeartbeat
