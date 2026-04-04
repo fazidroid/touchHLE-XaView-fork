@@ -822,7 +822,13 @@ impl Dyld {
             }
         }
 
-        panic!("Call to unimplemented function {symbol}");
+        log!("WARNING: unimplemented function {symbol}, using stub");
+
+        fn dummy(env: &mut crate::Environment) {
+            env.cpu.regs_mut()[0] = 0;
+        }
+
+        return Some(&(dummy as fn(&mut crate::Environment) -> ()));
     }
 
     /// Creates a guest function that will call a host function with the name
