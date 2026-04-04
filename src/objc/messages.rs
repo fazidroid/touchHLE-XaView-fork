@@ -46,6 +46,12 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    // BypassNSMutableDictionarySort
+    if sel_str == "keysSortedByValueUsingSelector:" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     // BypassNSDataDescription
     if sel_str == "description" {
         env.cpu.regs_mut()[0..2].fill(0);
