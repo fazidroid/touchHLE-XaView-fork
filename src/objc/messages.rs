@@ -228,6 +228,12 @@ Type mismatch when sending message {} to {:?}!
 
             // BypassAVAudioSession
             if name == "AVAudioSession" {
+            // BypassNSOperationQueue
+            if name == "NSOperationQueue" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
