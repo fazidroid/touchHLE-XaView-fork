@@ -144,15 +144,9 @@ fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> File
     // TODO: handle errno properly
     set_errno(env, 0);
 
+    // OfflineSocketBypass
     if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, socket({}, {}, {}) => -1",
-            domain,
-            type_,
-            protocol
-        );
-        set_errno(env, EPROTONOSUPPORT);
-        return -1;
+        crate::echo!("WARNING: Creating offline socket!");
     }
 
     assert_eq!(domain, AF_INET);
@@ -301,6 +295,11 @@ fn bind(
     };
     log_dbg!("bind: {} socket address {:?}", type_str, socket_address);
 
+    // OfflineBindBypass
+    if !env.options.network_access {
+        return 0;
+    }
+
     // re-borrow
     let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
     match type_ {
@@ -385,6 +384,13 @@ fn connect(
         .unwrap()
         .tcp_stream
         .is_none());
+
+    // OfflineConnectBypass
+    if !env.options.network_access {
+        crate::echo!("WARNING: Bypassing connect() for offline mode!");
+        return 0;
+    }
+
     let host_stream = TcpStream::connect(socket_address).unwrap();
     // We set host socket as non-blocking in order to have
     // more control of how and when it's used
@@ -425,6 +431,23 @@ fn select(
     } else {
         true
     };
+
+    // OfflineSelectBypass
+    if !env.options.network_access {
+        let mut count = 0;
+        if !read_fds.is_null() {
+            let set = env.mem.read(read_fds);
+            count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        }
+        if !write_fds.is_null() {
+            let set = env.mem.read(write_fds);
+            count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        }
+        if !error_fds.is_null() {
+            env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
+        }
+        return count;
+    }
 
     let mut count = 0;
 
@@ -687,6 +710,10 @@ fn accept(
     let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM);
 
+    // OfflineAcceptBypass
+    if !env.options.network_access {
+        return -1;
+    }
     if let Some(stream) = State::get_mut(env)
         .sockets
         .get_mut(&socket)
@@ -785,6 +812,10 @@ fn recvfrom(
 
     assert_eq!(flags, 0); // TODO
 
+    // OfflineRecvBypass
+    if !env.options.network_access {
+        return 0;
+    }
     let (num_bytes_read, addr) = match type_ {
         SOCK_DGRAM => {
             let udp_socket = env
@@ -877,6 +908,10 @@ fn send(
 
     assert_eq!(flags, 0); // TODO
 
+    // OfflineSendBypass
+    if !env.options.network_access {
+        return length as i32;
+    }
     let num_bytes_written = match type_ {
         SOCK_STREAM => {
             let mut tcp_stream = env
@@ -944,6 +979,10 @@ fn sendto(
         dest_address_len
     );
 
+    // OfflineSendtoBypass
+    if !env.options.network_access {
+        return length as i32;
+    }
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
             if State::get(env)
