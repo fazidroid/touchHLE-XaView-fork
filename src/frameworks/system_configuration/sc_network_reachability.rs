@@ -104,65 +104,35 @@ fn SCNetworkReachabilityGetFlags(
     target: SCNetworkReachabilityRef,
     flags: MutPtr<SCNetworkReachabilityFlags>,
 ) -> bool {
-    if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, SCNetworkReachabilityGetFlags({:?}, {:?}) -> false",
-            target,
-            flags
-        );
-        return false;
+    // Always report network as reachable
+    let out_flags = kSCNetworkReachabilityFlagsReachable;
+
+    if !flags.is_null() {
+        env.mem.write(flags, out_flags);
     }
 
-    let target_class: Class = msg![env; target class];
-    assert_eq!(
-        target_class,
-        env.objc
-            .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
-    );
-    let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
-    if let Some(addr) = host_object.address {
-        if addr.ip().is_link_local() {
-            log_dbg!(
-                "SCNetworkReachabilityGetFlags({:?}, {:?}) -> true",
-                target,
-                flags
-            );
-            // Those corresponds to local WiFi connection on a real iOS device
-            // TODO: actually check for the connectivity
-            // (but do we _really_ need it?)
-            let out_flags =
-                kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
-            env.mem.write(flags, out_flags);
-            return true;
-        }
-    }
-    log!(
-        "TODO: SCNetworkReachabilityGetFlags({:?}, {:?}) -> false",
-        target,
-        flags
-    );
-    false
+    log!("SCNetworkReachabilityGetFlags -> TRUE (forced reachable)");
+    true
 }
 
 fn SCNetworkReachabilitySetCallback(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
-    callout: GuestFunction, // SCNetworkReachabilityCallBack
-    context: MutVoidPtr,    // SCNetworkReachabilityContext *
+    callout: GuestFunction,
+    context: MutVoidPtr,
 ) -> bool {
-    let target_class: Class = msg![env; target class];
-    assert_eq!(
-        target_class,
-        env.objc
-            .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
-    );
     log!(
-        "TODO: SCNetworkReachabilitySetCallback({:?}, {:?}, {:?}) -> FALSE",
+        "SCNetworkReachabilitySetCallback({:?}, {:?}, {:?}) -> TRUE",
         target,
         callout,
         context
     );
-    false
+
+    // Trigger callback immediately
+    let flags = kSCNetworkReachabilityFlagsReachable;
+    callout.call(env, (target, flags, context));
+
+    true
 }
 
 pub const FUNCTIONS: FunctionExports = &[
