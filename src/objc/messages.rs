@@ -44,6 +44,13 @@ fn objc_msgSend_inner(
     );
     let message_type_info = env.objc.message_type_info.take();
 
+    // BypassNetworkError
+    let sel_str = selector.as_str(&env.mem);
+    if sel_str == "localizedDescription" || sel_str == "localizedFailureReason" || sel_str == "connection:didFailWithError:" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
     if receiver == nil {
         // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjectiveC/Chapters/ocObjectsClasses.html#//apple_ref/doc/uid/TP30001163-CH11-SW7
         log_dbg!("[nil {}]", selector.as_str(&env.mem));
