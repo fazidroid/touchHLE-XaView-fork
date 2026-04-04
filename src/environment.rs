@@ -1679,24 +1679,25 @@ impl Environment {
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if (pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
-                    // DeepAbortParserLoop
-                    echo!("WARNING: Deep aborting parser loop at {:#010x}! Thread: {}", pc, self.current_thread);
+                    // DeepParserUnwind
+                    echo!("WARNING: Deep unwinding infinite parser loop at {:#010x}! Thread: {}", pc, self.current_thread);
                     let fp0 = self.cpu.regs()[7];
                     let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
                     self.cpu.regs_mut()[7] = prev_fp;
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
-                    self.cpu.regs_mut()[0] = 0xFFFFFFFF;
+                    self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // BypassStackCheckFail
-                    echo!("WARNING: Safely unwinding ___stack_chk_fail at {:#010x}! Thread: {}", pc, self.current_thread);
+                    // DeepBypassStackCheck
+                    echo!("WARNING: Deep unwinding ___stack_chk_fail at {:#010x}! Thread: {}", pc, self.current_thread);
                     let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
                     self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
                     self.cpu.regs_mut()[0] = 0;
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
