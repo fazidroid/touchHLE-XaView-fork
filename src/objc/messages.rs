@@ -204,6 +204,13 @@ Type mismatch when sending message {} to {:?}!
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
+
+            // BypassAVAudioSession
+            if name == "AVAudioSession" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
             // FakeAccessoryManager
             if name == "EAAccessoryManager" {
                 env.cpu.regs_mut()[0..2].fill(0);
