@@ -735,7 +735,7 @@ impl Dyld {
                     .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
                 Some((stubs, pic_offset))
             }) else {
-                crate::echo!("WARNING: Unresolved SVC at {:#010x}! Bypassing.", svc_pc);
+                log!("WARNING: Unresolved SVC at {:#010x}! Bypassing.", svc_pc);
                 // SafeLazyLinkFallback
                 fn safe_fallback(env: &mut crate::Environment) {
                     let lr = env.cpu.regs()[crate::cpu::Cpu::LR];
