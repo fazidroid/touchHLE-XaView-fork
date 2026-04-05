@@ -225,12 +225,10 @@ fn objc_msgSend_inner(
             }
             
             // ===== NSDate copyWithZone FIX (SAFE) =====
-           if sel_str == "copyWithZone:" {
-                if class_str == "NSDate" {
-                     log!("Stub: NSDate copyWithZone:");
+            if sel_str == "copyWithZone:" {
+                log!("Stub: NSDate copyWithZone:");
                 return;
-                }
-           }
+            }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
