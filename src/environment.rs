@@ -1670,13 +1670,13 @@ impl Environment {
                 }
 
                 // RestoreConditionalUnwinds
-                if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
+                if (pc == 0x00c3296c || pc == 0x00c32bfc || pc == 0x00d01b84) && self.current_thread != 0 {
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
                     let current_lr = self.cpu.regs()[14];
                     // CheckNetworkModule
-                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 {
+                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 || (current_lr & 0xFFFF0000) == 0x00580000 || (target_lr & 0xFFFF0000) == 0x00580000 {
                         echo!("WARNING: Network deadlock safely unwound at {:#010x}! LR: {:#010x}", pc, target_lr);
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
@@ -1689,7 +1689,7 @@ impl Environment {
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
                     // FilterAudioThreads
-                    if (target_lr & 0xFFFF0000) == 0x005b0000 {
+                    if (target_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x00580000 {
                         echo!("WARNING: Deep unwinding infinite parser loop! LR: {:#010x}", target_lr);
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
