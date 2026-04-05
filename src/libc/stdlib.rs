@@ -693,8 +693,8 @@ fn CFUUIDCreateString(
     let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
     let sel_alloc = env.objc.lookup_selector("alloc").unwrap();
     let sel_init = env.objc.lookup_selector("initWithUTF8String:").unwrap();
-    let alloced: crate::objc::id = crate::objc::msg_send(env, (nsstring_class, sel_alloc));
-    let string: crate::objc::id = crate::objc::msg_send(env, (alloced, sel_init, cstr_ptr));
+    let alloced: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (nsstring_class, sel_alloc));
+    let string: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (alloced, sel_init, cstr_ptr.cast_const()));
     string.cast()
 }
 
