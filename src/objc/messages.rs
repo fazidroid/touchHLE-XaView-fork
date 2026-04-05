@@ -47,6 +47,22 @@ fn objc_msgSend_inner(
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
     // SAFE: only crash-prone selectors
+    
+    // ===== MEMORY SAFETY PATCH =====
+    if sel_str == "release" {
+         log!("Blocked release");
+         return;
+     }
+
+     if sel_str == "autorelease" {
+          log!("Blocked autorelease");
+          return;
+     }
+
+     if sel_str == "retain" {
+          log!("Blocked retain");
+          return;
+     }
 
     if sel_str == "keyEnumerator" {
          env.cpu.regs_mut()[0] = 0;
