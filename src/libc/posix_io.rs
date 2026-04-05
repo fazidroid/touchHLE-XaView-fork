@@ -279,7 +279,7 @@ pub fn read(
         Err(e) => {
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
-                    // PATCH: prevent crash/freezing when game reads directory as file
+                    // PATCH: prevent crash/freezing when game reads dir
                     set_errno(env, EISDIR);
                     file.reached_eof = true;
                     return 0;
