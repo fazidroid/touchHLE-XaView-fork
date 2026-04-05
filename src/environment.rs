@@ -517,6 +517,11 @@ impl Environment {
                                 echo!("WARNING: Skipping corrupted init func {:#010x}", addr);
                                 continue;
                             }
+                            // BypassLibcppCrash
+                            if addr == 0x3748b2c4 {
+                                echo!("WARNING: Skipping crashy libstdc++ init func {:#010x}", addr);
+                                continue;
+                            }
                             echo!("Calling init func {:#010x} for {:?}", addr, bin_name);
                             () = func.call_from_host(env, ());
                         }
@@ -1592,11 +1597,13 @@ impl Environment {
                 if matches!(e, cpu::CpuError::UndefinedInstruction) || matches!(e, cpu::CpuError::Breakpoint) {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
                     
-                    // LogBadJump
+                    // ReturnFromBadJump
                     if pc <= 0x2000 {
                         let lr = self.cpu.regs()[cpu::Cpu::LR];
                         let r12 = self.cpu.regs()[12];
-                        echo!("WARNING: Hit bad jump to {:#010x}. LR: {:#010x}, R12: {:#x}", pc, lr, r12);
+                        echo!("WARNING: Bypassing bad jump to {:#010x}. LR: {:#010x}, R12: {:#x}", pc, lr, r12);
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                        return ThreadNextAction::Continue;
                     }
 
                     let is_thumb = (self.cpu.cpsr() & cpu::Cpu::CPSR_THUMB) != 0;
@@ -1662,11 +1669,18 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // LogBackgroundHangs
+                // BypassBackgroundHangs
                 if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
-                    echo!("WARNING: Hit potential background hang at {:#010x}! Thread: {}", pc, self.current_thread);
+                    echo!("WARNING: Safely unwinding background hang at {:#010x}! Thread: {}", pc, self.current_thread);
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if (pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
-                    // LogParserLoop
+                    // DeepParserUnwind
                     let r0 = self.cpu.regs()[0];
                     let r1 = self.cpu.regs()[1];
                     if let Ok(s) = self.mem.cstr_at_utf8(crate::mem::ConstPtr::<u8>::from_bits(r0)) {
@@ -1675,10 +1689,41 @@ impl Environment {
                     if let Ok(s) = self.mem.cstr_at_utf8(crate::mem::ConstPtr::<u8>::from_bits(r1)) {
                         echo!("Parser string arg R1: {}", s);
                     }
-                    echo!("WARNING: Hit potential parser loop at {:#010x}! Thread: {}", pc, self.current_thread);
+                    echo!("WARNING: Deep unwinding infinite parser loop at {:#010x}! Thread: {}", pc, self.current_thread);
+                    let fp0 = self.cpu.regs()[7];
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 } else if pc == 0x00c32b3c {
-                    // LogTargetDoubleUnwind
-                    echo!("WARNING: Hit smashed stack frame func at {:#010x}! Thread: {}", pc, self.current_thread);
+                    // TargetedDoubleUnwind
+                    echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
+                    let fp0 = self.cpu.regs()[7];
+                    
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    
+                    if fp1 > fp0 && fp1.wrapping_sub(fp0) < 0x1000 {
+                        let saved_r4: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
+                        let saved_r5: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
+                        let saved_r6: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
+                        let saved_r7: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
+                        let saved_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
+
+                        self.cpu.regs_mut()[4] = saved_r4;
+                        self.cpu.regs_mut()[5] = saved_r5;
+                        self.cpu.regs_mut()[6] = saved_r6;
+                        self.cpu.regs_mut()[7] = saved_r7;
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                        self.cpu.regs_mut()[0] = 0;
+                        
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(saved_lr | 1));
+                    } else {
+                        echo!("FATAL: Stack chain corrupted beyond fp0!");
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
+                    }
                 }
 
                 // PrintDebugHeartbeat
@@ -1876,9 +1921,15 @@ impl Environment {
         // expect to find.
 
         // Initialize HOME envvar
+        // BreakSaveCreation
+        let time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let fake_home = format!("{}/fakedir_{}", self.fs.home_directory().as_str(), time);
         let home_value_cstr = self
             .mem
-            .alloc_and_write_cstr(self.fs.home_directory().as_str().as_bytes());
+            .alloc_and_write_cstr(fake_home.as_bytes());
         self.env_vars.insert(b"HOME".to_vec(), home_value_cstr);
     }
 
