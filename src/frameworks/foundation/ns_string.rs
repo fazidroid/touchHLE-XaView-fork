@@ -1652,23 +1652,52 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)substringWithRange:(NSRange)range {
-        let host_object = env.objc.borrow_mut::<StringHostObject>(this);
-        let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
-        if did_convert {
-            log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
+            let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+            let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
+            if did_convert {
+                log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
+            }
+            // SafeSubBounds
+            let start = range.location as usize;
+            let length = range.length as usize;
+            let end = start + length;
+            if start > orig_string.len() || end > orig_string.len() {
+                println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", start, length, orig_string.len());
+                return crate::objc::nil;
+            }
+            let host_string = orig_string[start..end].to_vec();
+            let res = from_u16_vec(env, host_string);
+            autorelease(env, res)
         }
-        // SafeSubBounds
-        let start = range.location as usize;
-        let length = range.length as usize;
-        let end = start + length;
-        if start > orig_string.len() || end > orig_string.len() {
-            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", start, length, orig_string.len());
-            return crate::objc::nil;
-        }
-        let host_string = orig_string[start..end].to_vec();
-        let res = from_u16_vec(env, host_string);
-        autorelease(env, res)
-    }
+
+@end
+
+@implementation NSUUID: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    // FakeNSUUIDAlloc
+    let host_object = Box::new(StringHostObject::Utf8(Cow::Borrowed("")));
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
++ (id)UUID {
+    // FakeNSUUIDCreate
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new init];
+    autorelease(env, new)
+}
+
+- (id)init {
+    // FakeNSUUIDInit
+    this
+}
+
+- (id)UUIDString {
+    // FakeNSUUIDString
+    let uuid_str = "12345678-1234-1234-1234-1234567890AB";
+    let res = from_rust_string(env, uuid_str.to_string());
+    autorelease(env, res)
+}
 
 @end
 
