@@ -34,7 +34,7 @@ pub mod mutex;
 pub mod once;
 pub mod thread;
 
-// --- RWLOCK IMPLEMENTATION FOR ARM/ANDROID FIX ---
+// --- RWLOCK IMPLEMENTATION FOR ANDROID LOAD FREEZE ---
 pub mod rwlock {
     use crate::Environment;
     use crate::mem::MutVoidPtr;
@@ -55,10 +55,9 @@ pub mod rwlock {
         let state_ptr = rwlock.cast::<u32>();
         let state = env.mem.read(state_ptr);
         if state == 0xFFFFFFFF {
-            return 16; // EBUSY (Writer is holding the lock)
+            return 16; // EBUSY
         }
         env.mem.write(state_ptr, state + 1);
-        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
         0
     }
 
@@ -71,10 +70,9 @@ pub mod rwlock {
         let state_ptr = rwlock.cast::<u32>();
         let state = env.mem.read(state_ptr);
         if state != 0 {
-            return 16; // EBUSY (Someone else is holding it)
+            return 16; // EBUSY
         }
         env.mem.write(state_ptr, 0xFFFFFFFF);
-        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
         0
     }
 
@@ -93,11 +91,10 @@ pub mod rwlock {
         } else {
             env.mem.write(state_ptr, state - 1); // Unlock reader
         }
-        std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
         0
     }
 }
-// -------------------------------------------------
+// -----------------------------------------------------
 
 #[derive(Default)]
 pub struct State {
