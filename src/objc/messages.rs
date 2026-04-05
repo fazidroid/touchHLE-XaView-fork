@@ -49,12 +49,13 @@ fn objc_msgSend_inner(
 
     // ✅ CORRECT PLACE
     if sel_str == "isMultipleTouchEnabled"
-       || sel_str == "userInteractionEnabled"
-       || sel_str == "isSecureTextEntry"
-       || sel_str == "copyWithZone:"
+        || sel_str == "userInteractionEnabled"
+        || sel_str == "isSecureTextEntry"
+        || sel_str == "copyWithZone:"
     {
-          return receiver;
-     }
+        env.cpu.regs_mut()[0] = receiver.to_bits();
+        return;
+    }
 
      if sel_str == "description" {
          env.cpu.regs_mut()[0] = receiver.to_bits();
