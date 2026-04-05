@@ -224,13 +224,18 @@ fn objc_msgSend_inner(
                 return;
             }
             
-            // ===== NSDate copyWithZone FIX (CORRECT) =====
+            // ===== NSDate copyWithZone FIX =====
             if sel_str == "copyWithZone:" {
-                log!("Stub: NSDate copyWithZone:");
-                env.objc.retain(receiver);
+               log!("Stub: copyWithZone:");
+               env.objc.increment_refcount(receiver);
+               return;
+             }
 
-             return;
-            }
+             if sel_str == "copy" || sel_str == "mutableCopy" {
+                 log!("Stub: copy/mutableCopy:");
+                 env.objc.increment_refcount(receiver);
+                 return;
+             }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
