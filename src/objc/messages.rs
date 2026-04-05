@@ -53,7 +53,7 @@ fn objc_msgSend_inner(
         || sel_str == "isSecureTextEntry"
         || sel_str == "copyWithZone:"
     {
-        env.objc.objects.retain(receiver);
+        env.objc.retain_object(receiver);
         env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
