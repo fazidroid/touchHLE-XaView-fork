@@ -46,52 +46,53 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
-    // NSHTTPCookieStorage safe fix (non-destructive)
-    if sel_str == "sharedHTTPCookieStorage" {
+
+    // ===== NSDate copyWithZone FIX =====
+    if sel_str == "copyWithZone:" {
+        // return self (NSDate is immutable)
+        env.cpu.regs_mut()[0] = obj.to_bits();
+        return;
+    }
+    // ==================================
+    // ===== SUPER NETWORK / FREEZE PATCH (NON-DESTRUCTIVE) =====
+
+    // Force network success
+    if sel_str.contains("Reachability") || sel_str.contains("Network") {
+        env.cpu.regs_mut()[0] = 1;
+        return;
+    }
+
+    // NSURL / request bypass
+    if sel_str.contains("request") || sel_str.contains("URL") {
         env.cpu.regs_mut()[0] = 0;
         return;
     }
-    // Bypass NSMutableDictionary keyEnumerator (safe)
-    if sel_str == "keyEnumerator" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-    // BypassNSURLQuery
-    if sel_str == "query" {
-        env.cpu.regs_mut()[0..2].fill(0);
+
+    // NSData bypass (prevent blocking loads)
+    if sel_str.contains("ContentsOfURL") || sel_str.contains("dataWithContents") {
+        env.cpu.regs_mut()[0] = 0;
         return;
     }
 
-    // BypassNSCodingEncode
-    if sel_str == "encodeWithCoder:" {
-        env.cpu.regs_mut()[0..2].fill(0);
+    // NSURLConnection bypass
+    if sel_str.contains("sendSynchronousRequest") || sel_str.contains("connectionWithRequest") {
+        env.cpu.regs_mut()[0] = 0;
         return;
     }
 
-    // BypassNSProcessInfoUnique
-    if sel_str == "globallyUniqueString" {
-        env.cpu.regs_mut()[0..2].fill(0);
+    // NSRunLoop unblock
+    if sel_str.contains("runMode") || sel_str.contains("runUntilDate") || sel_str.contains("run") {
+        env.cpu.regs_mut()[0] = 0;
         return;
     }
 
-    // BypassNSMutableDictionarySort
-    if sel_str == "keysSortedByValueUsingSelector:" {
-        env.cpu.regs_mut()[0..2].fill(0);
+    // NSOperationQueue unblock
+    if sel_str.contains("addOperation") || sel_str.contains("Operation") {
+        env.cpu.regs_mut()[0] = 0;
         return;
     }
 
-    // BypassNSDataDescription
-    if sel_str == "description" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-
-    // BypassNSRunLoopPort
-    if sel_str == "addPort:forMode:" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-
+    // ===========================================================
     // BypassNSMachPortSelector
     if sel_str == "port" {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -236,13 +237,6 @@ fn objc_msgSend_inner(
         }) = host_object.as_any().downcast_ref()
         {
 
-            // BypassUIPasteboard
-            if name == "UIPasteboard" {
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
-
-
             // BypassNSOperationQueue
             if name == "NSOperationQueue" {
                 env.cpu.regs_mut()[0..2].fill(0);
@@ -315,13 +309,6 @@ Type mismatch when sending message {} to {:?}!
         }) = host_object.as_any().downcast_ref()
         {
 
-            // BypassUIPasteboard
-            if name == "UIPasteboard" {
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
-
-
             // BypassNSOperationQueue
             if name == "NSOperationQueue" {
                 env.cpu.regs_mut()[0..2].fill(0);
@@ -384,13 +371,6 @@ Type mismatch when sending message {} to {:?}!
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
         {
-
-            // BypassUIPasteboard
-            if name == "UIPasteboard" {
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
-
 
             // BypassNSOperationQueue
             if name == "NSOperationQueue" {
