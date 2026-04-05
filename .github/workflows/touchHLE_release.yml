@@ -276,4 +276,3 @@ jobs:
       with:
         name: TestApp_built_on_Windows
         path: tests/TestApp.app
-        
