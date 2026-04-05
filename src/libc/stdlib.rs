@@ -676,17 +676,26 @@ fn __divsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
 }
 
 fn CFUUIDCreate(_env: &mut Environment, _alloc: ConstVoidPtr) -> MutVoidPtr {
-    // FakeUUIDCreate
+    // ImplUUIDCreate
+    log!("CFUUIDCreate: returning null to safely bypass CFRelease");
     crate::mem::Ptr::null()
 }
 
 fn CFUUIDCreateString(
-    _env: &mut Environment,
+    env: &mut Environment,
     _alloc: ConstVoidPtr,
     _uuid: ConstVoidPtr,
 ) -> MutVoidPtr {
-    // FakeUUIDString
-    crate::mem::Ptr::null()
+    // ImplUUIDString
+    log!("CFUUIDCreateString: returning fake toll-free bridged NSString");
+    let uuid_str = b"12345678-1234-1234-1234-1234567890AB";
+    let cstr_ptr = env.mem.alloc_and_write_cstr(uuid_str);
+    let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
+    let sel_alloc = env.objc.lookup_selector("alloc").unwrap();
+    let sel_init = env.objc.lookup_selector("initWithUTF8String:").unwrap();
+    let alloced: crate::objc::id = crate::objc::msg_send(env, (nsstring_class, sel_alloc));
+    let string: crate::objc::id = crate::objc::msg_send(env, (alloced, sel_init, cstr_ptr));
+    string.cast()
 }
 
 fn class_respondsToSelector(
