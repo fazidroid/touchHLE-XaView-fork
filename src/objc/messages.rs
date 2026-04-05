@@ -46,30 +46,14 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
-    // SAFE: only crash-prone selectors
-   
-     if sel_str == "isMultipleTouchEnabled"
-         || sel_str == "userInteractionEnabled"
-         || sel_str == "isSecureTextEntry"
-         || sel_str == "copyWithZone:"
-     {
-         return receiver;
-     }
 
-     if sel_str == "isMultipleTouchEnabled" {
-         return receiver;
-     }
-
-     if sel_str == "userInteractionEnabled" {
-         return receiver;
-     }
-
-     if sel_str == "isSecureTextEntry" {
-         return receiver;
-     }
-
-     if sel_str == "copyWithZone:" {
-         return receiver;
+    // ✅ CORRECT PLACE
+    if sel_str == "isMultipleTouchEnabled"
+       || sel_str == "userInteractionEnabled"
+       || sel_str == "isSecureTextEntry"
+       || sel_str == "copyWithZone:"
+    {
+          return receiver;
      }
 
      if sel_str == "description" {
