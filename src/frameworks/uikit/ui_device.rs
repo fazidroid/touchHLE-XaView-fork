@@ -102,6 +102,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     ns_string::get_static_str(env, "touchHLEdevice..........................")
 }
 
+- (id)identifierForVendor {
+    // FakeVendorIdentifier
+    msg_class![env; NSUUID UUID]
+}
+
 - (bool)isMultitaskingSupported {
     false
 }
