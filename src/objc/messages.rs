@@ -47,6 +47,24 @@ fn objc_msgSend_inner(
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
     // NSHTTPCookieStorage safe fix (non-destructive)
+    
+    if sel_str == "copyWithZone:" {
+       env.cpu.regs_mut()[0] = receiver.to_bits();
+       return;
+    }
+
+    if sel_str == "isSecureTextEntry" {
+       env.cpu.regs_mut()[0] = 0;
+       return;
+     }
+
+     if sel_str == "isMultipleTouchEnabled"
+        || sel_str == "userInteractionEnabled"
+     {
+         env.cpu.regs_mut()[0] = 1; // enable interaction
+         return;
+    }
+   
     if sel_str == "sharedHTTPCookieStorage" {
         env.cpu.regs_mut()[0] = 0;
         return;
