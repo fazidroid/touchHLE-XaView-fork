@@ -47,46 +47,22 @@ fn objc_msgSend_inner(
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
     // SAFE: only crash-prone selectors
-    
-    if sel_str == "isMultipleTouchEnabled" {
-        return 1;
-    }
 
-    if sel_str == "userInteractionEnabled" {
-        return 1;
-    }
-    
-    // UITextField secure input check (needed for name input)
-    if sel_str == "isSecureTextEntry" {
-          // return NO (false)
+     if sel_str == "isMultipleTouchEnabled" {
+         return 1 as _;
+     }
+
+     if sel_str == "userInteractionEnabled" {
+         return 1 as _;
+     }
+
+     if sel_str == "isSecureTextEntry" {
          return 0;
-    }
-    
-    // ===== MEMORY SAFETY PATCH =====
-    if sel_str == "release" {
-         log!("Blocked release");
-         return;
      }
 
-     if sel_str == "autorelease" {
-          log!("Blocked autorelease");
-          return;
+     if sel_str == "copyWithZone:" {
+         return receiver;
      }
-
-     if sel_str == "retain" {
-          log!("Blocked retain");
-          return;
-     }
-
-    if sel_str == "keyEnumerator" {
-         env.cpu.regs_mut()[0] = 0;
-         return;
-    }
-
-    if sel_str == "copyWithZone:" {
-         env.cpu.regs_mut()[0] = receiver.to_bits();
-         return;
-    }
 
      if sel_str == "description" {
          env.cpu.regs_mut()[0] = receiver.to_bits();
