@@ -46,7 +46,28 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
-    // NSHTTPCookieStorage safe fix (non-destructive)
+    // SAFE: only crash-prone selectors
+
+    if sel_str == "keyEnumerator" {
+         env.cpu.regs_mut()[0] = 0;
+         return;
+    }
+
+    if sel_str == "copyWithZone:" {
+         env.cpu.regs_mut()[0] = receiver.to_bits();
+         return;
+    }
+
+     if sel_str == "description" {
+         env.cpu.regs_mut()[0] = receiver.to_bits();
+         return;
+    }
+
+    if sel_str == "globallyUniqueString" {
+         env.cpu.regs_mut()[0] = 0;
+         return;
+    }
+    
     if sel_str == "sharedHTTPCookieStorage" {
         env.cpu.regs_mut()[0] = 0;
         return;
@@ -201,6 +222,12 @@ fn objc_msgSend_inner(
             if selector.as_str(&env.mem) == "setRootViewController:" {
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
+            }
+            
+            // ===== NSDate copyWithZone FIX (SAFE) =====
+            if class_name == "NSDate" && sel_name == "copyWithZone:"          {
+            log!("Stub: NSDate copyWithZone: returning self");
+            return obj; // NSDate is immutable → safe
             }
 
             panic!(
