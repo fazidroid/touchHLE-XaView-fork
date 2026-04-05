@@ -1,8 +1,13 @@
 use crate::Environment;
 use crate::mem::MutVoidPtr;
+use std::sync::Mutex;
+
+// Global lock to enforce safe atomic memory access on Android ARM processors
+static RWLOCK_SYNC: Mutex<()> = Mutex::new(());
 
 pub fn pthread_rwlock_init(env: &mut Environment, rwlock: MutVoidPtr, _attr: MutVoidPtr) -> u32 {
     if !rwlock.is_null() {
+        let _guard = RWLOCK_SYNC.lock().unwrap();
         env.mem.write(rwlock.cast::<u32>(), 0);
     }
     0
@@ -14,6 +19,7 @@ pub fn pthread_rwlock_destroy(_env: &mut Environment, _rwlock: MutVoidPtr) -> u3
 
 pub fn pthread_rwlock_tryrdlock(env: &mut Environment, rwlock: MutVoidPtr) -> u32 {
     if rwlock.is_null() { return 22; } // EINVAL
+    let _guard = RWLOCK_SYNC.lock().unwrap();
     let state_ptr = rwlock.cast::<u32>();
     let state = env.mem.read(state_ptr);
     if state == 0xFFFFFFFF {
@@ -24,11 +30,19 @@ pub fn pthread_rwlock_tryrdlock(env: &mut Environment, rwlock: MutVoidPtr) -> u3
 }
 
 pub fn pthread_rwlock_rdlock(env: &mut Environment, rwlock: MutVoidPtr) -> u32 {
-    pthread_rwlock_tryrdlock(env, rwlock)
+    loop {
+        let res = pthread_rwlock_tryrdlock(env, rwlock);
+        if res != 16 {
+            return res; // Success or fatal error
+        }
+        // Yield the CPU thread for 1 millisecond so the background thread can finish loading
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
 }
 
 pub fn pthread_rwlock_trywrlock(env: &mut Environment, rwlock: MutVoidPtr) -> u32 {
     if rwlock.is_null() { return 22; } // EINVAL
+    let _guard = RWLOCK_SYNC.lock().unwrap();
     let state_ptr = rwlock.cast::<u32>();
     let state = env.mem.read(state_ptr);
     if state != 0 {
@@ -39,11 +53,19 @@ pub fn pthread_rwlock_trywrlock(env: &mut Environment, rwlock: MutVoidPtr) -> u3
 }
 
 pub fn pthread_rwlock_wrlock(env: &mut Environment, rwlock: MutVoidPtr) -> u32 {
-    pthread_rwlock_trywrlock(env, rwlock)
+    loop {
+        let res = pthread_rwlock_trywrlock(env, rwlock);
+        if res != 16 {
+            return res; // Success or fatal error
+        }
+        // Yield the CPU thread for 1 millisecond so the background thread can finish loading
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
 }
 
 pub fn pthread_rwlock_unlock(env: &mut Environment, rwlock: MutVoidPtr) -> u32 {
     if rwlock.is_null() { return 22; } // EINVAL
+    let _guard = RWLOCK_SYNC.lock().unwrap();
     let state_ptr = rwlock.cast::<u32>();
     let state = env.mem.read(state_ptr);
     if state == 0 {
