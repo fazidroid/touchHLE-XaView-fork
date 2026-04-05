@@ -48,15 +48,32 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
     // SAFE: only crash-prone selectors
     
-    // ===== MEMORY SAFETY PATCH =====
-    if sel_str == "release" {
-         log!("Blocked release");
-         return;
+    let allow_memory = class_name == "NSString"
+    || class_name == "NSCFString"
+    || class_name == "NSMutableString";
+
+    if sel == "retain" {
+        if allow_memory {
+        return receiver; // allow silently
+        }
+        log!("Blocked retain");
+        return receiver;
      }
 
-     if sel_str == "autorelease" {
-          log!("Blocked autorelease");
-          return;
+     if sel == "release" {
+         if allow_memory {
+            return receiver;
+         }
+         log!("Blocked release");
+         return receiver;
+     }
+
+     if sel == "autorelease" {
+         if allow_memory {
+            return receiver;
+         }
+         log!("Blocked autorelease");
+         return receiver;
      }
 
      if sel_str == "retain" {
