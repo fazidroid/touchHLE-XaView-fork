@@ -48,7 +48,12 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
     // NSHTTPCookieStorage safe fix (non-destructive)
     if sel_str == "sharedHTTPCookieStorage" {
-        env.cpu.regs_mut()[0] = 0;
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+
+    if sel_str == "isSecureTextEntry:" {
+        env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
 
