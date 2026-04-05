@@ -1669,8 +1669,34 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // RemoveAudioKillers
-                if pc == 0x00c32b3c {
+                // RestoreConditionalUnwinds
+                if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    let current_lr = self.cpu.regs()[14];
+                    // CheckNetworkModule
+                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 {
+                        echo!("WARNING: Network deadlock safely unwound at {:#010x}! LR: {:#010x}", pc, target_lr);
+                        self.cpu.regs_mut()[7] = prev_fp;
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                        self.cpu.regs_mut()[0] = 0;
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    }
+                } else if (pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
+                    let fp0 = self.cpu.regs()[7];
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
+                    // FilterAudioThreads
+                    if (target_lr & 0xFFFF0000) == 0x005b0000 {
+                        echo!("WARNING: Deep unwinding infinite parser loop! LR: {:#010x}", target_lr);
+                        self.cpu.regs_mut()[7] = prev_fp;
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                        self.cpu.regs_mut()[0] = 0;
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    }
+                } else if pc == 0x00c32b3c {
                     // TargetedDoubleUnwind
                     echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
                     let fp0 = self.cpu.regs()[7];
