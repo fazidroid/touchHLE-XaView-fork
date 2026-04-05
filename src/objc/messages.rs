@@ -49,15 +49,15 @@ fn objc_msgSend_inner(
     // SAFE: only crash-prone selectors
 
      if sel_str == "isMultipleTouchEnabled" {
-         return 1 as _;
+         return receiver;
      }
 
      if sel_str == "userInteractionEnabled" {
-         return 1 as _;
+         return receiver;
      }
 
      if sel_str == "isSecureTextEntry" {
-         return 0;
+         return receiver;
      }
 
      if sel_str == "copyWithZone:" {
