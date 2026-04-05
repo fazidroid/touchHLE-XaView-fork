@@ -48,7 +48,8 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
     // NSHTTPCookieStorage safe fix (non-destructive)
     if sel_str == "sharedHTTPCookieStorage" {
-        return env.objc.alloc_object(class);
+        env.cpu.regs_mut()[0] = 0;
+        return;
     }
     // Bypass NSMutableDictionary keyEnumerator (safe)
     if sel_str == "keyEnumerator" {
