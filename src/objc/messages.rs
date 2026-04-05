@@ -225,13 +225,11 @@ fn objc_msgSend_inner(
             }
             
             // ===== NSDate copyWithZone FIX (SAFE) =====
-           if sel.get_str() == "copyWithZone:" {
-             if let Some(class) = env.objc.get_class_of_object(receiver) {
-                       if class.name == "NSDate" {
-                        log!("Stub: NSDate copyWithZone: returning self");
-                         return receiver;
-                  }
-              }
+           if sel_str == "copyWithZone:" {
+                if class_str == "NSDate" {
+                     log!("Stub: NSDate copyWithZone:");
+                return;
+                }
            }
 
             panic!(
