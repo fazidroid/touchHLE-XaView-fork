@@ -832,7 +832,13 @@ fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) 
     -1
 }
 
+fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32 {
+    // FakeDladdr
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(dladdr(_, _)),
     export_c_func!(syscall(_, _, _, _)),
     export_c_func!(gethostbyname(_)),
     export_c_func!(class_respondsToSelector(_, _)),
