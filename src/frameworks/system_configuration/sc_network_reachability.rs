@@ -41,10 +41,10 @@ fn SCNetworkReachabilityCreateWithName(
 ) -> SCNetworkReachabilityRef {
     assert_eq!(allocator, kCFAllocatorDefault); 
     
-    let host_name = env.mem.cstr_at_utf8(name).unwrap_or_default();
+    // FIX: Convert to an owned String immediately to release the borrow on env.mem
+    let host_name = env.mem.cstr_at_utf8(name).map(|s| s.to_string()).unwrap_or_default();
 
     // TARGETED BYPASS: Specifically block Gameloft servers to prevent hangs
-    // returning Ptr::null() forces the game to skip the network handshake.
     if host_name.contains("gameloft.com") {
         log!("Bypassing Gameloft server check for: {}", host_name);
         return Ptr::null();
@@ -92,7 +92,6 @@ fn SCNetworkReachabilityGetFlags(
     target: SCNetworkReachabilityRef,
     flags: MutPtr<SCNetworkReachabilityFlags>,
 ) -> bool {
-    // Preserve existing logic for local WiFi discovery
     let target_class: Class = msg![env; target class];
     assert_eq!(
         target_class,
@@ -108,15 +107,14 @@ fn SCNetworkReachabilityGetFlags(
         }
     }
     
-    // Default to false for non-local hosts to avoid hangs
     false
 }
 
 fn SCNetworkReachabilitySetCallback(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
-    callout: GuestFunction,
-    context: MutVoidPtr,
+    _callout: GuestFunction, // Fixed unused warning
+    _context: MutVoidPtr,    // Fixed unused warning
 ) -> bool {
     let target_class: Class = msg![env; target class];
     assert_eq!(
