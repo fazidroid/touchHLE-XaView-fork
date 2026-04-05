@@ -49,7 +49,7 @@ fn objc_msgSend_inner(
     // NSHTTPCookieStorage safe fix (non-destructive)
     
     if sel_str == "copyWithZone:" {
-       env.cpu.regs_mut()[0] = receiver.to_bits();
+       env.cpu.regs_mut()[0] = 0;
        return;
     }
 
