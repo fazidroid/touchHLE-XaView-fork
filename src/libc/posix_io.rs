@@ -818,6 +818,7 @@ fn fcntl(
         _ => {
     log!("Warning: fcntl({}, {}) unhandled, returning 0", fd, cmd);
     return 0;
+                 }
     }
     0 // success
 }
