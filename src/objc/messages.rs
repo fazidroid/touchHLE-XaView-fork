@@ -48,6 +48,20 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
     // SAFE: only crash-prone selectors
     
+    if sel_str == "isMultipleTouchEnabled" {
+        return 1;
+    }
+
+    if sel_str == "userInteractionEnabled" {
+        return 1;
+    }
+    
+    // UITextField secure input check (needed for name input)
+    if sel_str == "isSecureTextEntry" {
+          // return NO (false)
+         return 0;
+    }
+    
     // ===== MEMORY SAFETY PATCH =====
     if sel_str == "release" {
          log!("Blocked release");
