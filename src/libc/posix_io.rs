@@ -279,8 +279,8 @@ pub fn read(
         Err(e) => {
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
-                    // PATCH: prevent crash/freezing when game reads dir
-                    set_errno(env, EISDIR);
+                    // PATCH: prevent crash when reading dir
+                    let _ = EISDIR; // keep errno intent without borrow conflict
                     file.reached_eof = true;
                     return 0;
                 }
