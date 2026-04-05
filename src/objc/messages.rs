@@ -47,6 +47,11 @@ fn objc_msgSend_inner(
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
     // SAFE: only crash-prone selectors
+        // Bypass empty/null selectors to prevent UIApplication crashes
+    if sel_str == "" {
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
     
     // ===== MEMORY SAFETY PATCH =====
     if sel_str == "release" {
@@ -88,6 +93,13 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = 0;
         return;
     }
+    
+        // Bypass UITextField isSecureTextEntry
+    if sel_str == "isSecureTextEntry" {
+        env.cpu.regs_mut()[0..2].fill(0); // Returns 0 (false)
+        return;
+    }
+    
     // Bypass NSMutableDictionary keyEnumerator (safe)
     if sel_str == "keyEnumerator" {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -159,32 +171,6 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // --- GT Racing & General Fixes ---
-    if sel_str == "startUpdatingAcceleration" || sel_str == "stopUpdatingAcceleration" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-
-    if sel_str == "setUpdateInterval:" || sel_str == "setDelegate:" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-
-    if sel_str == "isAccelerometerAvailable" {
-        env.cpu.regs_mut()[0] = 1; // Return 1 (YES)
-        return;
-    }
-
-    if sel_str == "isAppleURL" || sel_str == "isSecureTextEntry" {
-        env.cpu.regs_mut()[0] = 0; // Return 0 (NO)
-        return;
-    }
-
-    if sel_str == "localizedStringForKey:value:table:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil to prevent crashes
-        return;
-    }
-    // ---------------------------------
     
     // BypassNSStringURLLoading
     if sel_str == "stringWithContentsOfURL:encoding:error:" {
@@ -198,8 +184,7 @@ fn objc_msgSend_inner(
         return;
     }
 
-    if sel_str == "localizedDescription" || sel_str == "localizedFailureReason" ||
-        sel_str == "connection:didFailWithError:" {
+    if sel_str == "localizedDescription" || sel_str == "localizedFailureReason" || sel_str == "connection:didFailWithError:" {
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
@@ -226,10 +211,12 @@ fn objc_msgSend_inner(
     }
 
     // Traverse the chain of superclasses to find the method implementation.
+
     let mut class = orig_class;
     loop {
         if class == nil {
             assert!(class != orig_class);
+
             let class_host_object = match env.objc.get_host_object(orig_class) {
                 Some(obj) => obj,
                 None => {
@@ -243,7 +230,7 @@ fn objc_msgSend_inner(
                 is_metaclass,
                 ..
             } = class_host_object.as_any().downcast_ref().unwrap();
-            
+
             // BypassMethodSelector
             if selector.as_str(&env.mem) == "methodForSelector:" {
                 env.cpu.regs_mut()[0..2].fill(0);
@@ -271,18 +258,16 @@ fn objc_msgSend_inner(
                return;
              }
 
-             if sel_str == "copy" ||
-                sel_str == "mutableCopy" {
+             if sel_str == "copy" || sel_str == "mutableCopy" {
                  log!("Stub: copy/mutableCopy (SAFE)");
-                 return;
+              return;
              }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
                 if is_metaclass { "Class" } else { "Object" },
                 receiver,
-                if is_metaclass { "meta" } 
-                else { "" },
+                if is_metaclass { "meta" } else { "" },
                 name,
                 orig_class,
                 if super2.is_some() {
@@ -302,6 +287,7 @@ fn objc_msgSend_inner(
                 return;
             }
         };
+
         if let Some(&super::ClassHostObject {
             superclass,
             ref methods,
@@ -311,8 +297,7 @@ fn objc_msgSend_inner(
         {
 
             // BypassUIPasteboard
-            if name == "UIPasteboard" 
-            {
+            if name == "UIPasteboard" {
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
@@ -376,7 +361,6 @@ Type mismatch when sending message {} to {:?}!
                         }
                         host_imp.call_from_guest(env)
                     }
-    
                     // We can't create a new stack frame, because that would
                     // interfere with pass-through of stack arguments.
                     IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
@@ -393,7 +377,6 @@ Type mismatch when sending message {} to {:?}!
 
             // BypassUIPasteboard
             if name == "UIPasteboard" {
-               
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
@@ -491,8 +474,7 @@ Type mismatch when sending message {} to {:?}!
                 "Call to faked class \"{}\" ({:?}) {} method \"{}\". Behaving as if message was sent to nil.",
                 name,
                 class,
-                if is_metaclass { "class" } else { 
-                "instance" },
+                if is_metaclass { "class" } else { "instance" },
                 selector.as_str(&env.mem),
             );
             env.cpu.regs_mut()[0..2].fill(0);
@@ -523,14 +505,11 @@ pub(crate) fn _touchHLE_objc_msgSend_tolerant(env: &mut Environment, receiver: i
 /// Variant of `objc_msgSend` for methods that return a struct via a pointer.
 /// See [objc_msgSend_inner].
 ///
-/// The first parameter here is the pointer for the struct return.
-/// This is an
+/// The first parameter here is the pointer for the struct return. This is an
 /// ABI detail that is usually hidden and handled behind-the-scenes by
 /// [crate::abi], but `objc_msgSend` is a special case because of the
-/// pass-through behaviour.
-/// Of course, the pass-through only works if the [IMP]
-/// also has the pointer parameter.
-/// The caller therefore has to pick the
+/// pass-through behaviour. Of course, the pass-through only works if the [IMP]
+/// also has the pointer parameter. The caller therefore has to pick the
 /// appropriate `objc_msgSend` variant depending on the method it wants to call.
 pub(super) fn objc_msgSend_stret(
     env: &mut Environment,
@@ -573,8 +552,7 @@ unsafe impl SafeRead for objc_super {}
 /// This variant has a weird ABI because it needs to receive an additional piece
 /// of information (a class pointer), but it can't actually take this as an
 /// extra parameter, because that would take one of the argument slots reserved
-/// for arguments passed onto the method implementation.
-/// Hence the [objc_super]
+/// for arguments passed onto the method implementation. Hence the [objc_super]
 /// pointer in place of the normal [id].
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSendSuper2(
@@ -583,8 +561,10 @@ pub(super) fn objc_msgSendSuper2(
     selector: SEL,
 ) {
     let objc_super { receiver, class } = env.mem.read(super_ptr);
+
     // Rewrite first argument to match the normal ABI.
     crate::abi::write_next_arg(&mut 0, env.cpu.regs_mut(), &mut env.mem, receiver);
+
     objc_msgSend_inner(
         env,
         receiver,
@@ -607,8 +587,7 @@ pub trait MsgSendSignature: 'static {
     fn type_info() -> (TypeId, &'static str) {
         #[cfg(debug_assertions)]
         let type_name = std::any::type_name::<Self>();
-        // Avoid wasting space on type names in release builds.
-        // At the time of
+        // Avoid wasting space on type names in release builds. At the time of
         // writing this saves about 36KB.
         #[cfg(not(debug_assertions))]
         let type_name = "[description unavailable in release builds]";
@@ -617,8 +596,7 @@ pub trait MsgSendSignature: 'static {
 }
 
 /// Wrapper around [objc_msgSend] which, together with [msg], makes it easy to
-/// send messages in host code.
-/// Warning: all types are inferred from the
+/// send messages in host code. Warning: all types are inferred from the
 /// call-site and they may not be checked, so be very sure you get them correct!
 pub fn msg_send<R, P>(env: &mut Environment, args: P) -> R
 where
@@ -644,7 +622,6 @@ where
     R: GuestRet,
 {
     if R::SIZE_IN_MEM.is_some() {
-        
         (_touchHLE_objc_msgSend_stret_tolerant as fn(&mut Environment, MutVoidPtr, id, SEL))
             .call_from_host(env, args)
     } else {
@@ -700,8 +677,7 @@ where
 ///
 /// See also [msg_class], if you want to send a message to a class.
 #[macro_export]
-macro_rules!
-msg {
+macro_rules! msg {
     [$env:expr; $receiver:tt $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
         {
             let sel = $crate::objc::selector!($($arg1;)? $name $($(, $($namen)?)*)?);
@@ -712,8 +688,7 @@ msg {
         }
     }
 }
-pub use crate::msg;
-// #[macro_export] is weird...
+pub use crate::msg; // #[macro_export] is weird...
 
 /// Variant of [msg] for super-calls.
 ///
@@ -741,8 +716,7 @@ pub use crate::msg;
 /// ```
 #[macro_export]
 macro_rules! msg_super {
-    [$env:expr;
-    $receiver:tt $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
+    [$env:expr; $receiver:tt $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
         {
             let class = $env.objc.get_known_class(
                 _OBJC_CURRENT_CLASS,
@@ -751,6 +725,7 @@ macro_rules! msg_super {
             let sel = $crate::objc::selector!($($arg1;)? $name $($(, $($namen)?)*)?);
             let sel = $env.objc.lookup_selector(sel)
                 .expect("Unknown selector");
+
             let sp = &mut $env.cpu.regs_mut()[$crate::cpu::Cpu::SP];
             let old_sp = *sp;
             *sp -= $crate::mem::guest_size_of::<$crate::objc::objc_super>();
@@ -759,19 +734,19 @@ macro_rules! msg_super {
                 receiver: $receiver,
                 class,
             });
+
             let args = (super_ptr.cast_const(), sel, $($arg1, $($argn),*)?);
             let res = $crate::objc::msg_send_super2($env, args);
 
             $env.cpu.regs_mut()[$crate::cpu::Cpu::SP] = old_sp;
+
             res
         }
     }
 }
-pub use crate::msg_super;
-// #[macro_export] is weird...
+pub use crate::msg_super; // #[macro_export] is weird...
 
-/// Variant of [msg] for sending a message to a named class.
-/// Useful for calling
+/// Variant of [msg] for sending a message to a named class. Useful for calling
 /// class methods, especially `new`.
 ///
 /// ```ignore
@@ -781,13 +756,11 @@ pub use crate::msg_super;
 /// desugars to:
 ///
 /// ```ignore
-/// msg![env;
-/// (env.objc.get_known_class("SomeClass", &mut env.mem)) alloc]
+/// msg![env; (env.objc.get_known_class("SomeClass", &mut env.mem)) alloc]
 /// ```
 #[macro_export]
 macro_rules! msg_class {
-    [$env:expr;
-    $receiver_class:ident $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
+    [$env:expr; $receiver_class:ident $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
         {
             let class = $env.objc.get_known_class(
                 stringify!($receiver_class),
@@ -797,8 +770,7 @@ macro_rules! msg_class {
         }
     }
 }
-pub use crate::msg_class;
-// #[macro_export] is weird...
+pub use crate::msg_class; // #[macro_export] is weird...
 
 /// Shorthand for `let _: id = msg![env; object retain];`
 pub fn retain(env: &mut Environment, object: id) -> id {
