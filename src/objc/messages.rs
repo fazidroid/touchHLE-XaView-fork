@@ -52,22 +52,6 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
-    
-    // ===== MEMORY SAFETY PATCH =====
-    if sel_str == "release" {
-         log!("Blocked release");
-         return;
-     }
-
-     if sel_str == "autorelease" {
-          log!("Blocked autorelease");
-          return;
-     }
-
-     if sel_str == "retain" {
-          log!("Blocked retain");
-          return;
-     }
 
     if sel_str == "keyEnumerator" {
          env.cpu.regs_mut()[0] = 0;
