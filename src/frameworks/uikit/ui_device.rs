@@ -208,4 +208,60 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+@implementation UIPasteboard: NSObject
+
++ (id)allocWithZone:(crate::objc::NSZonePtr)_zone {
+    // FakePasteboardAlloc
+    let host_object = Box::new(TrivialHostObject);
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
+- (id)init {
+    // FakePasteboardInit
+    this
+}
+
++ (id)pasteboardWithName:(id)_name create:(bool)_create {
+    // FakePasteboardWithName
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new init];
+    crate::objc::autorelease(env, new)
+}
+
++ (id)generalPasteboard {
+    // FakeGeneralPasteboard
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new init];
+    crate::objc::autorelease(env, new)
+}
+
+- (id)string {
+    // FakePasteboardString
+    ns_string::get_static_str(env, "")
+}
+
+- (())setString:(id)_string {
+    // FakePasteboardSetString
+}
+
+- (id)dataForPasteboardType:(id)_pasteboardType {
+    // FakePasteboardData
+    crate::objc::nil
+}
+
+- (())setData:(id)_data forPasteboardType:(id)_pasteboardType {
+    // FakePasteboardSetData
+}
+
+- (id)valueForPasteboardType:(id)_pasteboardType {
+    // FakePasteboardValue
+    crate::objc::nil
+}
+
+- (())setValue:(id)_value forPasteboardType:(id)_pasteboardType {
+    // FakePasteboardSetValue
+}
+
+@end
+
 };
