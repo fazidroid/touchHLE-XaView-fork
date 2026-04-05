@@ -46,19 +46,16 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+    // SAFE: only crash-prone selectors
 
-     // SAFE copy fix
-     if sel_str == "copyWithZone:" {
+    if sel_str == "keyEnumerator" {
          env.cpu.regs_mut()[0] = 0;
          return;
-     }
+    }
 
-    if sel_str == "isMultipleTouchEnabled"
-       || sel_str == "userInteractionEnabled"
-       || sel_str == "isSecureTextEntry"
-    {
-       env.cpu.regs_mut()[0] = receiver.to_bits();
-       return;
+    if sel_str == "copyWithZone:" {
+         env.cpu.regs_mut()[0] = receiver.to_bits();
+         return;
     }
 
      if sel_str == "description" {
