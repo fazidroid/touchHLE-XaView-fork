@@ -279,9 +279,10 @@ pub fn read(
         Err(e) => {
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
+                    // PATCH: prevent crash/freezing when game reads directory as file
                     set_errno(env, EISDIR);
-                    // the returned value was validated on iOS
-                    0
+                    file.reached_eof = true;
+                    return 0;
                 }
                 _ => {
                     // TODO: set errno
