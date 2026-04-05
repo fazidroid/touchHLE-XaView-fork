@@ -441,6 +441,37 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this dataUsingEncoding:encoding allowLossyConversion:false]
 }
 
+- (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)encoding {
+    // ImplLengthOfBytes
+    let string = to_rust_string(env, this);
+    let safe_string = if encoding == NSASCIIStringEncoding
+        || encoding == NSMacOSRomanStringEncoding
+        || encoding == NSISOLatin1StringEncoding
+    {
+        if !string.as_bytes().iter().all(|byte| byte.is_ascii()) {
+            let sanitized: String = string.chars().map(|c| if c.is_ascii() { c } else { '?' }).collect();
+            Cow::Owned(sanitized)
+        } else {
+            string
+        }
+    } else {
+        string
+    };
+
+    match encoding {
+        NSASCIIStringEncoding | NSMacOSRomanStringEncoding | NSISOLatin1StringEncoding | NSUTF8StringEncoding => {
+            safe_string.as_bytes().len() as NSUInteger
+        },
+        NSUTF16StringEncoding | NSUTF16LittleEndianStringEncoding | NSUTF16BigEndianStringEncoding => {
+            (safe_string.encode_utf16().count() * 2) as NSUInteger
+        },
+        _ => {
+            log!("WARNING: lengthOfBytesUsingEncoding unimplemented for encoding {}", encoding);
+            0
+        }
+    }
+}
+
 // These are the two methods that have to be overridden by subclasses, so these
 // implementations don't have to care about foreign subclasses.
 - (NSUInteger)length {
