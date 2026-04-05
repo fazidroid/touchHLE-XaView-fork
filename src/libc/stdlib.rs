@@ -534,6 +534,13 @@ fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoid
     }
 }
 
+fn dispatch_async(env: &mut Environment, queue: ConstVoidPtr, block: ConstVoidPtr) {
+    // ImplDispatchAsync
+    let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
+    let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
+    env.new_thread(func, block.cast_mut(), 1024 * 1024);
+}
+
 fn SecItemCopyMatching(
     _env: &mut Environment,
     _query: ConstVoidPtr,
@@ -855,6 +862,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(_Block_copy(_)),
     export_c_func!(_Block_release(_)),
     export_c_func!(dispatch_once(_, _)),
+    export_c_func!(dispatch_async(_, _)),
     export_c_func!(malloc(_)),
     export_c_func!(malloc_size(_)),
     export_c_func!(calloc(_, _)),
