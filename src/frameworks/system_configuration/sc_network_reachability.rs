@@ -173,3 +173,10 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(SCNetworkReachabilityGetFlags(_, _)),
     export_c_func!(SCNetworkReachabilitySetCallback(_, _, _)),
 ];
+
+// ===== FORCE NETWORK READY PATCH (NON-DESTRUCTIVE) =====
+#[allow(unused_variables)]
+fn force_network_ready_stub() -> bool {
+    true
+}
+// ======================================================
