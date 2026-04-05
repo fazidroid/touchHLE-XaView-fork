@@ -225,10 +225,14 @@ fn objc_msgSend_inner(
             }
             
             // ===== NSDate copyWithZone FIX (SAFE) =====
-            if class_name == "NSDate" && sel_name == "copyWithZone:"          {
-            log!("Stub: NSDate copyWithZone: returning self");
-            return obj; // NSDate is immutable → safe
-            }
+           if sel.get_str() == "copyWithZone:" {
+             if let Some(class) = env.objc.get_class_of_object(receiver) {
+                       if class.name == "NSDate" {
+                        log!("Stub: NSDate copyWithZone: returning self");
+                         return receiver;
+                  }
+              }
+           }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
