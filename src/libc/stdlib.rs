@@ -534,7 +534,7 @@ fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoid
     }
 }
 
-fn dispatch_async(env: &mut Environment, queue: ConstVoidPtr, block: ConstVoidPtr) {
+fn dispatch_async(env: &mut Environment, _queue: ConstVoidPtr, block: ConstVoidPtr) {
     // ImplDispatchAsync
     let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
     let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
