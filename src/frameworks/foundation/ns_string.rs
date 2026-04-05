@@ -460,7 +460,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     match encoding {
         NSASCIIStringEncoding | NSMacOSRomanStringEncoding | NSISOLatin1StringEncoding | NSUTF8StringEncoding => {
-            safe_string.as_bytes().len() as NSUInteger
+            // FixClippyLen
+            safe_string.len() as NSUInteger
         },
         NSUTF16StringEncoding | NSUTF16LittleEndianStringEncoding | NSUTF16BigEndianStringEncoding => {
             (safe_string.encode_utf16().count() * 2) as NSUInteger
