@@ -224,10 +224,12 @@ fn objc_msgSend_inner(
                 return;
             }
             
-            // ===== NSDate copyWithZone FIX (SAFE) =====
+            // ===== NSDate copyWithZone FIX (CORRECT) =====
             if sel_str == "copyWithZone:" {
                 log!("Stub: NSDate copyWithZone:");
-                return;
+                env.objc.retain(receiver);
+
+             return;
             }
 
             panic!(
