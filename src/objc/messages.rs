@@ -166,20 +166,22 @@ fn objc_msgSend_inner(
         return;
     }
     
+        // GT Racing Fixes
     if sel_str == "startUpdatingAcceleration" || sel_str == "stopUpdatingAcceleration" {
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
 
     if sel_str == "setUpdateInterval:" || sel_str == "setDelegate:" {
-       env.cpu.regs_mut()[0..2].fill(0);
-       return;
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
     }
 
     if sel_str == "isAccelerometerAvailable" {
-       env.cpu.regs_mut()[0] = 0; // Return false/NO
-       return;
+        env.cpu.regs_mut()[0] = 1; // Return 1 (YES) so the game thinks hardware is present
+        return;
     }
+
 
     // BypassNSStringURLLoading
     if sel_str == "stringWithContentsOfURL:encoding:error:" {
