@@ -42,6 +42,11 @@ fn objc_msgSend_inner(
         selector.as_str(&env.mem),
         receiver
     );
+    // TraceAudioCalls
+    let sel_name = selector.as_str(&env.mem);
+    if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
+        println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
+    }
     let message_type_info = env.objc.message_type_info.take();
 
     if receiver == nil {
