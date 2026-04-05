@@ -176,6 +176,7 @@ pub const FUNCTIONS: FunctionExports = &[
 
 // ===== FORCE NETWORK READY PATCH (NON-DESTRUCTIVE) =====
 #[allow(unused_variables)]
+#[allow(dead_code)]
 fn force_network_ready_stub() -> bool {
     true
 }
