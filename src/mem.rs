@@ -308,12 +308,8 @@ impl Mem {
         //        this, along with removing this special case.
         assert!(self.null_segment_size == 0);
         assert!(new_null_segment_size.is_multiple_of(0x1000));
-
-          // ✅ CRITICAL FIX
-         self.null_segment_size = new_null_segment_size;
-
-         self.allocator
-                .reserve(allocator::Chunk::new(0, new_null_segment_size));
+        self.allocator
+            .reserve(allocator::Chunk::new(0, new_null_segment_size));
         // BypassNullPage
     }
 
