@@ -136,6 +136,8 @@ fn AudioComponentFindNext(
 
     let out_component: AudioComponent = state.audio_component;
 
+    // TraceComponentFind
+    println!("AUDIO_TRACE: AudioComponentFindNext({:?}) -> {:?}", in_desc, out_component);
     log!(
         "TODO: AudioComponentFindNext({:?}, {:?}) -> {:?}",
         in_component,
