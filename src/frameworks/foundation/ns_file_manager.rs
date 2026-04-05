@@ -409,17 +409,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
-    // TODO: other attributes
+    // FixFreeSpaceLimit
     log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
 
     let _ = error; // IgnoreErrorAssert
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // Reporting 1 Gb of free space should be enough
-    // TODO: unify with `statfs`
-    // TODO: account for path
-    let size: u64 = 1024 * 1024 * 1024;
+    // BypassGameloftSpaceCheck
+    let size: u64 = 2040 * 1024 * 1024;
     let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
 
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
