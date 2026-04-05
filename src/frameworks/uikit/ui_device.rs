@@ -216,11 +216,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
-- (id)init {
-    // FakePasteboardInit
-    this
-}
-
 + (id)pasteboardWithName:(id)_name create:(bool)_create {
     // FakePasteboardWithName
     let new: id = msg![env; this alloc];
@@ -233,6 +228,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new init];
     crate::objc::autorelease(env, new)
+}
+
+- (id)init {
+    // FakePasteboardInit
+    this
 }
 
 - (id)string {
