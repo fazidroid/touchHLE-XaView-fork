@@ -226,15 +226,13 @@ fn objc_msgSend_inner(
             
             // ===== NSDate copyWithZone FIX =====
             if sel_str == "copyWithZone:" {
-               log!("Stub: copyWithZone:");
-               env.objc.increment_refcount(receiver);
+               log!("Stub: copyWithZone (SAFE)");
                return;
              }
 
              if sel_str == "copy" || sel_str == "mutableCopy" {
-                 log!("Stub: copy/mutableCopy:");
-                 env.objc.increment_refcount(receiver);
-                 return;
+                 log!("Stub: copy/mutableCopy (SAFE)");
+              return;
              }
 
             panic!(
