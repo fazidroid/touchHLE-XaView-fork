@@ -48,32 +48,15 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
     // SAFE: only crash-prone selectors
     
-    let allow_memory = class_name == "NSString"
-    || class_name == "NSCFString"
-    || class_name == "NSMutableString";
-
-    if sel == "retain" {
-        if allow_memory {
-        return receiver; // allow silently
-        }
-        log!("Blocked retain");
-        return receiver;
-     }
-
-     if sel == "release" {
-         if allow_memory {
-            return receiver;
-         }
+    // ===== MEMORY SAFETY PATCH =====
+    if sel_str == "release" {
          log!("Blocked release");
-         return receiver;
+         return;
      }
 
-     if sel == "autorelease" {
-         if allow_memory {
-            return receiver;
-         }
-         log!("Blocked autorelease");
-         return receiver;
+     if sel_str == "autorelease" {
+          log!("Blocked autorelease");
+          return;
      }
 
      if sel_str == "retain" {
@@ -183,7 +166,7 @@ fn objc_msgSend_inner(
         return;
     }
     
-        // GT Racing Fixes
+        // GT Racing & General Fixes
     if sel_str == "startUpdatingAcceleration" || sel_str == "stopUpdatingAcceleration" {
         env.cpu.regs_mut()[0..2].fill(0);
         return;
@@ -195,10 +178,19 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "isAccelerometerAvailable" {
-        env.cpu.regs_mut()[0] = 1; // Return 1 (YES) so the game thinks hardware is present
+        env.cpu.regs_mut()[0] = 1; // Return 1 (YES)
         return;
     }
 
+    if sel_str == "isAppleURL" || sel_str == "isSecureTextEntry" {
+        env.cpu.regs_mut()[0] = 0; // Return 0 (NO)
+        return;
+    }
+
+    if sel_str == "localizedStringForKey:value:table:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil to prevent crashes
+        return;
+    }
 
     // BypassNSStringURLLoading
     if sel_str == "stringWithContentsOfURL:encoding:error:" {
