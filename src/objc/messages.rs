@@ -47,8 +47,8 @@ fn objc_msgSend_inner(
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
     // SAFE: only crash-prone selectors
-        // Bypass empty/null selectors to prevent UIApplication crashes
-    if sel_str == "" {
+            // Bypass empty/null selectors to prevent UIApplication crashes
+    if sel_str.is_empty() {
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
