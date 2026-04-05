@@ -46,14 +46,56 @@ fn objc_msgSend_inner(
 
     // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
-    // ===== ADDED SAFE PATCH (NO REMOVAL) =====
-    // NSDate copyWithZone fix (immutable → return self)
-    if sel_str == "copyWithZone:" {
-        env.cpu.regs_mut()[0] = receiver.to_bits();
-        return;
-    }
-// ==========================================
-    // NSHTTPCookieStorage safe fix (non-destructive)
+    
+// ================= SAFE PATCH BLOCK (DO NOT MOVE) =================
+if sel_str.contains("ContentsOfURL") ||
+   sel_str.contains("dataWithContents") {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+if sel_str.contains("sendSynchronousRequest") ||
+   sel_str.contains("connectionWithRequest") {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+if sel_str.contains("runMode") ||
+   sel_str.contains("runUntilDate") ||
+   sel_str.contains("run") {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+if sel_str.contains("addOperation") ||
+   sel_str.contains("Operation") {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+if sel_str == "keyEnumerator" {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+if sel_str == "globallyUniqueString" {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+if sel_str == "query" {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+if sel_str == "copyWithZone:" {
+    env.cpu.regs_mut()[0] = receiver.to_bits();
+    return;
+}
+if sel_str == "description" {
+    env.cpu.regs_mut()[0] = receiver.to_bits();
+    return;
+}
+if sel_str == "addPort:forMode:" {
+    env.cpu.regs_mut()[0] = 0;
+    return;
+}
+// ================= END SAFE PATCH BLOCK =================
+
+// NSHTTPCookieStorage safe fix (non-destructive)
     if sel_str == "sharedHTTPCookieStorage" {
         env.cpu.regs_mut()[0] = 0;
         return;
