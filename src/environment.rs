@@ -1921,15 +1921,9 @@ impl Environment {
         // expect to find.
 
         // Initialize HOME envvar
-        // BreakSaveCreation
-        let time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let fake_home = format!("{}/fakedir_{}", self.fs.home_directory().as_str(), time);
         let home_value_cstr = self
             .mem
-            .alloc_and_write_cstr(fake_home.as_bytes());
+            .alloc_and_write_cstr(self.fs.home_directory().as_str().as_bytes());
         self.env_vars.insert(b"HOME".to_vec(), home_value_cstr);
     }
 
