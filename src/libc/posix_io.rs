@@ -145,7 +145,7 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
 
     if path.is_null() {
         log_dbg!("open({:?}, {:#x}) => -1", path, flags);
-        return -1; // TODO: set errno to EFAULT
+        return 0; // TODO: set errno to EFAULT
     }
 
     // TODO: respect the mode (in the variadic arguments) when creating a file
@@ -185,7 +185,7 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
                 err
             );
             // TODO: set errno
-            return -1;
+            return 0;
         }
     };
     // TODO: symlinks don't exist in the FS yet, so we can't "not follow" them.
@@ -236,7 +236,7 @@ pub fn read(
 
     if buffer.is_null() {
         // TODO: set errno to EFAULT
-        return -1;
+        return 0;
     }
 
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
@@ -247,7 +247,7 @@ pub fn read(
             size,
         );
         // TODO: set errno
-        return -1;
+        return 0;
     };
 
     let buffer_slice = env.mem.bytes_at_mut(buffer.cast(), size);
@@ -279,10 +279,9 @@ pub fn read(
         Err(e) => {
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
-                    // PATCH: prevent crash when reading dir
-                    let _ = EISDIR; // keep errno intent without borrow conflict
-                    file.reached_eof = true;
-                    return 0;
+                    set_errno(env, EISDIR);
+                    // the returned value was validated on iOS
+                    0
                 }
                 _ => {
                     // TODO: set errno
@@ -318,11 +317,11 @@ pub fn pread(
     // Errno is set by downstream lseek and read calls
     let original_position = lseek(env, fd, 0, SEEK_CUR);
     if original_position == -1 {
-        return -1;
+        return 0;
     }
 
     if lseek(env, fd, offset, SEEK_SET) == -1 {
-        return -1;
+        return 0;
     }
 
     let bytes_read = read(env, fd, buffer, size);
@@ -358,7 +357,7 @@ pub(super) fn fflush(env: &mut Environment, fd: FileDescriptor) -> i32 {
 
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         // TODO: set errno to EBADF
-        return -1;
+        return 0;
     };
     match file.file.flush() {
         Ok(_) => 0,
@@ -430,11 +429,11 @@ pub fn pwrite(
     // Errno is set by downstream lseek and write calls
     let original_position = lseek(env, fd, 0, SEEK_CUR);
     if original_position == -1 {
-        return -1;
+        return 0;
     }
 
     if lseek(env, fd, offset, SEEK_SET) == -1 {
-        return -1;
+        return 0;
     }
 
     let bytes_written = write(env, fd, buffer, size);
@@ -453,7 +452,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         log!("lseek({:?}, {:#x}, {}) => {}", fd, offset, whence, -1);
         set_errno(env, EBADF);
-        return -1;
+        return 0;
     };
 
     if !file.file.is_seekable() {
@@ -464,7 +463,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
             whence
         );
         set_errno(env, ESPIPE);
-        return -1;
+        return 0;
     }
 
     let start_position = match whence {
@@ -476,7 +475,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                     std::io::ErrorKind::IsADirectory => set_errno(env, EISDIR),
                     _ => unimplemented!("Unexpected seek error {:?}", seek_error),
                 }
-                return -1;
+                return 0;
             }
         },
         SEEK_END => match file.file.stream_len() {
@@ -486,7 +485,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                     std::io::ErrorKind::IsADirectory => set_errno(env, EISDIR),
                     _ => unimplemented!("Unexpected seek error {:?}", seek_error),
                 }
-                return -1;
+                return 0;
             }
         },
         _ => {
@@ -497,7 +496,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                 whence
             );
             set_errno(env, EINVAL);
-            return -1;
+            return 0;
         }
     };
 
@@ -517,7 +516,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                 error_msg
             );
             set_errno(env, errno);
-            return -1;
+            return 0;
         }
     };
 
@@ -529,7 +528,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
             whence
         );
         set_errno(env, EOVERFLOW);
-        return -1;
+        return 0;
     }
 
     let res = match file.file.seek(SeekFrom::Start(seek_position)) {
@@ -554,7 +553,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                 whence,
                 seek_error
             );
-            return -1;
+            return 0;
         }
     };
     log_dbg!("lseek({:?}, {:#x}, {}) => {}", fd, offset, whence, res);
@@ -580,7 +579,7 @@ pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
     {
         set_errno(env, EBADF);
         log!("Warning: close({:?}) failed, returning -1", fd);
-        return -1;
+        return 0;
     }
 
     let result = match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
@@ -731,7 +730,7 @@ fn fcntl(
             .is_none()
     {
         set_errno(env, EBADF);
-        return -1;
+        return 0;
     }
 
     match cmd {
@@ -765,7 +764,7 @@ fn fcntl(
 
             if let Err(error_code) = validate_lock(env, fd, &lock) {
                 set_errno(env, error_code);
-                return -1;
+                return 0;
             }
 
             // Since locks are never set, claim no conflict by setting lock_type
@@ -786,7 +785,7 @@ fn fcntl(
 
             if let Err(error_code) = validate_lock(env, fd, &lock) {
                 set_errno(env, error_code);
-                return -1;
+                return 0;
             }
 
             // POSIX locks are process based which means that any threads within
@@ -836,7 +835,7 @@ fn fsync(env: &mut Environment, fd: FileDescriptor) -> i32 {
             fd,
         );
         set_errno(env, EBADF);
-        return -1;
+        return 0;
     };
 
     match file.file.sync_all() {
