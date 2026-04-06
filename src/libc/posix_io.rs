@@ -40,42 +40,66 @@ struct PosixFileHostObject {
 }
 
 fn file_idx_to_fd(idx: usize) -> FileDescriptor {
-    FileDescriptor::try_from(idx).unwrap() + 3
+    FileDescriptor::try_from(idx)
+        .unwrap()
+        .checked_add(NORMAL_FILENO_BASE)
+        .unwrap()
 }
 fn fd_to_file_idx(fd: FileDescriptor) -> usize {
-    (fd - 3) as usize
+    fd.checked_sub(NORMAL_FILENO_BASE).unwrap() as usize
 }
 
 pub type FileDescriptor = i32;
 pub const STDIN_FILENO: FileDescriptor = 0;
 pub const STDOUT_FILENO: FileDescriptor = 1;
 pub const STDERR_FILENO: FileDescriptor = 2;
+const NORMAL_FILENO_BASE: FileDescriptor = STDERR_FILENO + 1;
 
 pub type OpenFlag = i32;
 pub const O_RDONLY: OpenFlag = 0x0;
 pub const O_WRONLY: OpenFlag = 0x1;
 pub const O_RDWR: OpenFlag = 0x2;
 pub const O_ACCMODE: OpenFlag = O_RDWR | O_WRONLY | O_RDONLY;
+pub const O_NONBLOCK: OpenFlag = 0x4;
+pub const O_APPEND: OpenFlag = 0x8;
+pub const O_SHLOCK: OpenFlag = 0x10;
+pub const O_NOFOLLOW: OpenFlag = 0x100;
 pub const O_CREAT: OpenFlag = 0x200;
 pub const O_TRUNC: OpenFlag = 0x400;
+pub const O_EXCL: OpenFlag = 0x800;
 
 pub type FileControlCommand = i32;
 const F_GETFD: FileControlCommand = 1;
 const F_SETFD: FileControlCommand = 2;
 const F_GETFL: FileControlCommand = 3;
 const F_SETFL: FileControlCommand = 4;
+const F_GETLK: FileControlCommand = 7;
+const F_SETLK: FileControlCommand = 8;
+const F_RDADVISE: FileControlCommand = 44;
+const F_NOCACHE: FileControlCommand = 48;
+
+pub type FDFlag = i32;
+pub const FD_CLOEXEC: FDFlag = 1;
+
+pub type RecordLockingFlag = i16;
+pub const F_RDLCK: RecordLockingFlag = 1;
+pub const F_UNLCK: RecordLockingFlag = 2;
+pub const F_WRLCK: RecordLockingFlag = 3;
 
 #[repr(C, packed)]
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 struct flock {
-    start: i64,
-    len: i64,
-    pid: i32,
+    start: off_t,
+    len: off_t,
+    pid: pid_t,
     lock_type: i16,
     whence: i16,
 }
 unsafe impl SafeRead for flock {}
+
+pub type FLockFlag = i32;
+pub const LOCK_SH: FLockFlag = 1;
 
 fn open(env: &mut Environment, path: ConstPtr<u8>, flags: i32, _args: DotDotDot) -> FileDescriptor {
     set_errno(env, 0);
@@ -97,15 +121,16 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
         _ => { set_errno(env, EINVAL); return -1; }
     };
 
+    if (flags & O_APPEND) != 0 { options.append(); }
     if (flags & O_CREAT) != 0 { options.create(); }
     if (flags & O_TRUNC) != 0 { options.truncate(); }
 
     let path_string = match env.mem.cstr_at_utf8(path) {
-        Ok(s) => s.to_owned(),
+        Ok(path_str) => path_str.to_owned(),
         Err(_) => { set_errno(env, EINVAL); return -1; }
     };
     
-    match env.fs.open_with_options(GuestPath::new(&path_string), options) {
+    let res = match env.fs.open_with_options(GuestPath::new(&path_string), options) {
         Ok(file) => {
             let host_object = PosixFileHostObject {
                 file,
@@ -116,7 +141,12 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
             find_or_create_fd(env, host_object)
         }
         Err(()) => -1,
+    };
+
+    if res != -1 && (flags & O_SHLOCK) != 0 {
+        flock(env, res, LOCK_SH);
     }
+    res
 }
 
 pub fn read(
@@ -126,7 +156,15 @@ pub fn read(
     size: GuestUSize,
 ) -> GuestISize {
     set_errno(env, 0);
-    if fd == STDIN_FILENO { return 0; }
+
+    if buffer.is_null() {
+        set_errno(env, EINVAL);
+        return -1;
+    }
+
+    if fd == STDIN_FILENO {
+        return 0; 
+    }
 
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
@@ -135,17 +173,59 @@ pub fn read(
 
     let buffer_slice = env.mem.bytes_at_mut(buffer.cast(), size);
     match file.file.read(buffer_slice) {
-        Ok(n) => {
-            if n == 0 && size != 0 { file.reached_eof = true; }
-            n.try_into().unwrap()
+        Ok(bytes_read) => {
+            if bytes_read == 0 && size != 0 {
+                file.reached_eof = true;
+            }
+            bytes_read.try_into().unwrap()
         }
         Err(e) => {
+            // BREAK THE LOOP: Tell Asphalt 6 the directory is empty
             if e.kind() == std::io::ErrorKind::IsADirectory {
                 set_errno(env, EISDIR);
-                return 0; // Return EOF for directories to break infinite loops
+                return 0; 
             }
             -1
         }
+    }
+}
+
+pub fn pread(
+    env: &mut Environment,
+    fd: FileDescriptor,
+    buffer: MutVoidPtr,
+    size: GuestUSize,
+    offset: off_t,
+) -> GuestISize {
+    let original_position = lseek(env, fd, 0, SEEK_CUR);
+    if original_position == -1 { return -1; }
+    if lseek(env, fd, offset, SEEK_SET) == -1 { return -1; }
+    let bytes_read = read(env, fd, buffer, size);
+    let _ = lseek(env, fd, original_position, SEEK_SET);
+    bytes_read
+}
+
+pub(super) fn eof(env: &mut Environment, fd: FileDescriptor) -> i32 {
+    if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
+        if file.reached_eof { 1 } else { 0 }
+    } else { 0 }
+}
+
+pub(super) fn clearerr(env: &mut Environment, fd: FileDescriptor) {
+    if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
+        file.reached_eof = false;
+    }
+}
+
+pub(super) fn fflush(env: &mut Environment, fd: FileDescriptor) -> i32 {
+    if fd < NORMAL_FILENO_BASE && fd >= 0 { return 0; }
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        set_errno(env, EBADF);
+        return -1;
+    };
+    match file.file.flush() {
+        Ok(_) => 0,
+        Err(_) => -1,
     }
 }
 
@@ -158,45 +238,137 @@ pub fn write(
     if fd == STDOUT_FILENO || fd == STDERR_FILENO {
         return size.try_into().unwrap();
     }
+
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
         return -1;
     };
+
     let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
     match file.file.write(buffer_slice) {
-        Ok(n) => n.try_into().unwrap(),
+        Ok(bytes_written) => bytes_written.try_into().unwrap(),
         Err(_) => -1,
     }
 }
 
-pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: i64, whence: i32) -> i64 {
+pub fn pwrite(
+    env: &mut Environment,
+    fd: FileDescriptor,
+    buffer: ConstVoidPtr,
+    size: GuestUSize,
+    offset: off_t,
+) -> GuestISize {
+    let original_position = lseek(env, fd, 0, SEEK_CUR);
+    if original_position == -1 { return -1; }
+    if lseek(env, fd, offset, SEEK_SET) == -1 { return -1; }
+    let bytes_written = write(env, fd, buffer, size);
+    let _ = lseek(env, fd, original_position, SEEK_SET);
+    bytes_written
+}
+
+#[allow(non_camel_case_types)]
+pub type off_t = i64;
+pub const SEEK_SET: i32 = 0;
+pub const SEEK_CUR: i32 = 1;
+pub const SEEK_END: i32 = 2;
+
+pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i32) -> off_t {
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
         return -1;
     };
 
-    // FIXED: Prevent Asphalt 6 from trying to rewind a directory and causing a loop
+    // BREAK THE LOOP: Stop Asphalt 6 from trying to rewind a directory 
     if matches!(file.file, GuestFile::Directory) {
-        return 0; 
+        return 0;
     }
 
     if !file.file.is_seekable() {
         set_errno(env, ESPIPE);
         return -1;
     }
-    let seek_pos = match whence {
-        0 => SeekFrom::Start(offset as u64),
-        1 => SeekFrom::Current(offset),
-        2 => SeekFrom::End(offset),
+
+    let start_pos = match whence {
+        SEEK_SET => 0,
+        SEEK_CUR => file.file.stream_position().unwrap_or(0),
+        SEEK_END => file.file.stream_len().unwrap_or(0),
         _ => { set_errno(env, EINVAL); return -1; }
     };
-    match file.file.seek(seek_pos) {
-        Ok(n) => { file.reached_eof = false; n as i64 }
+
+    let seek_pos = match start_pos.checked_add_signed(offset) {
+        Some(pos) => pos,
+        None => { set_errno(env, EINVAL); return -1; }
+    };
+
+    match file.file.seek(SeekFrom::Start(seek_pos)) {
+        Ok(new_offset) => {
+            file.reached_eof = false;
+            new_offset.try_into().unwrap()
+        }
         Err(_) => -1,
     }
 }
 
+pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
+    if matches!(fd, STDIN_FILENO | STDOUT_FILENO | STDERR_FILENO) { return 0; }
+
+    if fd < 0 || env.libc_state.posix_io.files.get(fd_to_file_idx(fd)).is_none() {
+        set_errno(env, EBADF);
+        return -1;
+    }
+
+    match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
+        Some(file) => {
+            match file.file {
+                GuestFile::Directory => 0,
+                GuestFile::Socket => { close_socket(env, fd); 0 }
+                _ => {
+                    if !file.needs_flush { 0 }
+                    else { match file.file.sync_all() { Ok(_) => 0, Err(_) => -1 } }
+                }
+            }
+        }
+        None => { set_errno(env, EBADF); -1 }
+    }
+}
+
+fn rename(env: &mut Environment, old: ConstPtr<u8>, new: ConstPtr<u8>) -> i32 {
+    let old = env.mem.cstr_at_utf8(old).unwrap();
+    let new = env.mem.cstr_at_utf8(new).unwrap();
+    match env.fs.rename(GuestPath::new(&old), GuestPath::new(&new)) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+pub fn getcwd(env: &mut Environment, buf_ptr: MutPtr<u8>, buf_size: GuestUSize) -> MutPtr<u8> {
+    let working_directory = env.fs.working_directory();
+    let working_directory_bytes = working_directory.as_str().as_bytes();
+    if buf_ptr.is_null() {
+        return env.mem.alloc_and_write_cstr(working_directory_bytes);
+    }
+    let res_size = (working_directory_bytes.len() + 1) as u32;
+    if buf_size < res_size { return Ptr::null(); }
+    let buf = env.mem.bytes_at_mut(buf_ptr, res_size);
+    buf[..working_directory_bytes.len()].copy_from_slice(working_directory_bytes);
+    buf[working_directory_bytes.len()] = b'\0';
+    buf_ptr
+}
+
+fn chdir(env: &mut Environment, path_ptr: ConstPtr<u8>) -> i32 {
+    let path = GuestPath::new(env.mem.cstr_at_utf8(path_ptr).unwrap());
+    match env.fs.change_working_directory(path) {
+        Ok(_) => 0,
+        Err(()) => -1,
+    }
+}
+
 fn fcntl(env: &mut Environment, fd: FileDescriptor, cmd: FileControlCommand, args: DotDotDot) -> i32 {
+    if fd >= NORMAL_FILENO_BASE && env.libc_state.posix_io.files.get(fd_to_file_idx(fd)).is_none() {
+        set_errno(env, EBADF);
+        return -1;
+    }
+
     match cmd {
         F_GETFL => 0,
         F_SETFL => 0,
@@ -208,9 +380,47 @@ fn fcntl(env: &mut Environment, fd: FileDescriptor, cmd: FileControlCommand, arg
             if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) { file.flags = flags; }
             0
         }
-        _ => 0,
+        _ => {
+            log!("Warning: fcntl({}, {}) unhandled, returning 0", fd, cmd);
+            0
+        }
     }
 }
+
+fn flock(_env: &mut Environment, _fd: FileDescriptor, _operation: FLockFlag) -> i32 { 0 }
+
+fn fsync(env: &mut Environment, fd: FileDescriptor) -> i32 {
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        set_errno(env, EBADF);
+        return -1;
+    };
+    match file.file.sync_all() { Ok(_) => 0, Err(_) => -1 }
+}
+
+fn ftruncate(env: &mut Environment, fd: FileDescriptor, len: off_t) -> i32 {
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        set_errno(env, EBADF);
+        return -1;
+    };
+    match file.file.set_len(len as u64) { Ok(()) => 0, Err(_) => -1 }
+}
+
+pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(open(_, _, _)),
+    export_c_func!(read(_, _, _)),
+    export_c_func!(pread(_, _, _, _)),
+    export_c_func!(write(_, _, _)),
+    export_c_func!(pwrite(_, _, _, _)),
+    export_c_func!(lseek(_, _, _)),
+    export_c_func!(close(_)),
+    export_c_func!(rename(_, _)),
+    export_c_func!(getcwd(_, _)),
+    export_c_func!(chdir(_)),
+    export_c_func!(fcntl(_, _, _)),
+    export_c_func!(flock(_, _)),
+    export_c_func!(fsync(_)),
+    export_c_func!(ftruncate(_, _)),
+];
 
 fn find_or_create_fd(env: &mut Environment, host_object: PosixFileHostObject) -> FileDescriptor {
     let idx = if let Some(free_idx) = env.libc_state.posix_io.files.iter().position(|f| f.is_none()) {
@@ -224,19 +434,36 @@ fn find_or_create_fd(env: &mut Environment, host_object: PosixFileHostObject) ->
     file_idx_to_fd(idx)
 }
 
-pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
-    if fd < 3 { return 0; }
-    if let Some(slot) = env.libc_state.posix_io.files.get_mut(fd_to_file_idx(fd)) {
-        *slot = None;
-        0
-    } else { -1 }
+pub fn find_or_create_socket(env: &mut Environment) -> FileDescriptor {
+    let host_object = PosixFileHostObject {
+        file: GuestFile::Socket,
+        needs_flush: false,
+        reached_eof: false,
+        flags: 0,
+    };
+    find_or_create_fd(env, host_object)
 }
 
-pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(open(_, _, _)),
-    export_c_func!(read(_, _, _)),
-    export_c_func!(write(_, _, _)),
-    export_c_func!(lseek(_, _, _)),
-    export_c_func!(fcntl(_, _, _)),
-    export_c_func!(close(_)),
-];
+pub fn is_socket(env: &mut Environment, fd: FileDescriptor) -> bool {
+    if let Some(Some(f)) = env.libc_state.posix_io.files.get(fd_to_file_idx(fd)) {
+        matches!(f.file, GuestFile::Socket)
+    } else { false }
+}
+
+#[allow(dead_code)]
+fn validate_lock(env: &mut Environment, fd: FileDescriptor, lock: &flock) -> Result<(), i32> {
+    if !matches!(lock.lock_type, F_RDLCK | F_UNLCK | F_WRLCK) { return Err(EINVAL); }
+    let lock_start = match lock.whence as i32 {
+        SEEK_SET => lock.start,
+        SEEK_CUR => {
+            let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+            file.file.stream_position().unwrap_or(0) as i64 + lock.start
+        }
+        SEEK_END => {
+            let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+            file.file.stream_len().unwrap_or(0) as i64 + lock.start
+        }
+        _ => return Err(EINVAL),
+    };
+    if lock_start < 0 { Err(EINVAL) } else { Ok(()) }
+}
