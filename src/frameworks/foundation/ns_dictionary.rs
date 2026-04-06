@@ -22,7 +22,7 @@ use crate::frameworks::foundation::ns_file_manager::{
 use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::objc::{
-    autorelease, id, msg, msg_class, msg_super, nil, objc_classes, release, retain, Class, ClassExports,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports,
     HostObject, NSZonePtr,
 };
 use crate::{impl_HostObject_with_superclass, Environment};
@@ -379,12 +379,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSDictionary: NSObject
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    let known_class = env.objc.get_known_class("NSDictionary", &mut env.mem);
-    if this == known_class {
-        msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
-    } else {
-        msg_super![env; this allocWithZone:zone]
-    }
+    // Safely force allocation of native _touchHLE_NSDictionary to bypass broken NSObject subclasses
+    msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
 }
 
 + (id)dictionary {
@@ -512,12 +508,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSMutableDictionary: NSDictionary
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    let known_class = env.objc.get_known_class("NSMutableDictionary", &mut env.mem);
-    if this == known_class {
-        msg_class![env; _touchHLE_NSMutableDictionary allocWithZone:zone]
-    } else {
-        msg_super![env; this allocWithZone:zone]
-    }
+    // Safely force allocation of native _touchHLE_NSMutableDictionary to bypass broken NSObject subclasses
+    msg_class![env; _touchHLE_NSMutableDictionary allocWithZone:zone]
 }
 
 + (id)dictionaryWithCapacity:(NSUInteger)capacity {
