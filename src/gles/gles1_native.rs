@@ -1543,8 +1543,4 @@ impl GLES for GLES1Native<'_> {
     unsafe fn BlendEquationSeparate(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
         unimplemented!("BlendEquationSeparate is not supported in GLES1");
     }
-    // --------------------------------------
-
-} // <-- This closes the `impl GLES for GLES1Native` block
-
-} // <-- Keep whatever extra closing brace you currently have at the very end of your file
+} // <-- This should be the very last character in your file! Delete any other } below it.
