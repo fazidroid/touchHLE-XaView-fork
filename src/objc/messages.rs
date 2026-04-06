@@ -244,7 +244,14 @@ fn objc_msgSend_inner(
 
              if sel_str == "copy" || sel_str == "mutableCopy" {
                  log!("Stub: copy/mutableCopy (SAFE)");
-              return;
+                 return;
+             }
+             
+             // ===== Redbull Update Type Confusion FIX =====
+             if sel_str == "stringByReplacingOccurrencesOfString:withString:" {
+                 log!("Stub: stringByReplacingOccurrencesOfString:withString: on invalid class (SAFE)");
+                 env.cpu.regs_mut()[0..2].fill(0);
+                 return;
              }
 
             panic!(
