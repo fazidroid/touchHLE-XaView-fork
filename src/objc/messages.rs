@@ -232,6 +232,11 @@ Type mismatch when sending message {} to {:?}!
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
+            // BypassTextTokenizer
+            if name == "UITextInputStringTokenizer" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
             panic!(
                 "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
                 name,
