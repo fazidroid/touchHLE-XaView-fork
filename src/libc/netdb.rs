@@ -10,7 +10,6 @@ use crate::export_c_func;
 use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_DGRAM, SOCK_STREAM};
 use crate::mem::{guest_size_of, ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
-use super::net_bypass::NetBypass;
 
 const AI_PASSIVE: i32 = 0x1;
 
@@ -18,12 +17,10 @@ pub const IPPROTO_TCP: i32 = 6;
 pub const IPPROTO_UDP: i32 = 17;
 
 const EAI_FAIL: i32 = 4;
-const EAI_NONAME: i32 = 8; // EAI_NONAME: Error code for "Host not found"
 
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// ===== HOSTENT STRUCT REWRITTEN TO SPOOF SERVERS =====
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[allow(non_camel_case_types)]
@@ -36,7 +33,6 @@ pub struct hostent {
 }
 unsafe impl SafeRead for hostent {}
 
-// Custom safe wrapper structs to write the DNS payload
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 struct FakeIP {
@@ -61,7 +57,6 @@ struct FakeAliasList {
     null_term: u32,
 }
 unsafe impl SafeRead for FakeAliasList {}
-// =====================================================
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -85,32 +80,10 @@ fn getaddrinfo(
     hints: ConstPtr<addrinfo>,
     res: MutPtr<MutPtr<addrinfo>>,
 ) -> i32 {
-    let nodename_str = if !node_name.is_null() {
-        env.mem.cstr_at_utf8(node_name.cast_const()).unwrap_or("unknown")
-    } else {
-        "unknown"
-    };
-
-    // --- ASPHALT 6 GETADDRINFO BYPASS START ---
-    // This catches the mid-game LoadProfile config checks!
-    if NetBypass::is_blocked_domain(nodename_str) {
-        log!("Bypass: Blackholing getaddrinfo request for dead server: {}", nodename_str);
-        return EAI_NONAME; // Return host not found immediately
-    }
-    // --- ASPHALT 6 GETADDRINFO BYPASS END ---
-
     if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, getaddrinfo({:?}, {:?}, {:?}, {:?}) -> EAI_FAIL",
-            node_name,
-            serv_name,
-            hints,
-            res
-        );
         return EAI_FAIL;
     }
 
-    // Safely read hints or fallback to a default struct
     let hint = if !hints.is_null() {
         env.mem.read(hints)
     } else {
@@ -128,16 +101,14 @@ fn getaddrinfo(
 
     let mut addr_info = hint;
     
-    // Parse the port or fallback to port 80
     let port_str = if !serv_name.is_null() {
         env.mem.cstr_at_utf8(serv_name.cast_const()).unwrap_or("80")
     } else {
         "80"
     };
     let port: u16 = port_str.parse().unwrap_or(80);
-    log_dbg!("getaddrinfo: port {}", port);
     
-    // FIXED: Use touchHLE's existing sockaddr helper to cleanly write the Fake IP 
+    // SPOOF TO 127.0.0.1 - Triggers instant ECONNREFUSED to break retry loops
     let addr = sockaddr::from_ipv4_parts([127, 0, 0, 1], port);
 
     let tmp_addr = env.mem.alloc_and_write(addr);
@@ -167,42 +138,29 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
 
-    // --- GAMELOFT GETHOSTBYNAME BYPASS START ---
-    // This catches the initial boot DRM checks
-    if NetBypass::is_blocked_domain(name_str) {
-        log!("Bypass: Blackholing gethostbyname request for dead server: {}", name_str);
-        return MutPtr::null();
-    }
-    // --- GAMELOFT GETHOSTBYNAME BYPASS END ---
-
     log!(
-        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1",
+        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1 to force TCP failure",
         name,
         name_str
     );
 
-    // 1. Create a fake IP address (127.0.0.1 / localhost)
     let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
     let ip_ptr = env.mem.alloc_and_write(ip_addr);
 
-    // 2. Create the null-terminated address list required by C structs
     let addr_list = FakeAddrList { ptr: ip_ptr.to_bits(), null_term: 0 };
     let addr_list_ptr = env.mem.alloc_and_write(addr_list);
 
-    // 3. Create the null-terminated aliases list
     let aliases = FakeAliasList { null_term: 0 };
     let aliases_ptr = env.mem.alloc_and_write(aliases);
 
-    // 4. Populate the full hostent struct so the game engine happily reads it
     let hostent_data = hostent {
         h_name: name.cast_mut(),
         h_aliases: aliases_ptr.cast(),
         h_addrtype: AF_INET,
-        h_length: 4, // IPv4 length
+        h_length: 4, 
         h_addr_list: addr_list_ptr.cast(),
     };
 
-    // Allocate the structure and pass the pointer back to the game!
     env.mem.alloc_and_write(hostent_data)
 }
 
