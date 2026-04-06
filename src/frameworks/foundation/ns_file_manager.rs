@@ -141,15 +141,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (bool)fileExistsAtPath:(id)path { // NSString*
-    let path_str = if path != nil { ns_string::to_rust_string(env, path).to_string() } else { String::from("nil") }; // FixCowType
     let res_exists = if path == nil {
         false
     } else {
+        let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
         // fileExistsAtPath: will return true for directories
         // hence Fs::exists() rather than Fs::is_file() is appropriate.
-        env.fs.exists(GuestPath::new(&path_str))
+        env.fs.exists(GuestPath::new(&path))
     };
-    log!("[(NSFileManager*) {:?} fileExistsAtPath:{:?}] => {}", this, path_str, res_exists); // ForceLogExists
+    log_dbg!("[(NSFileManager*) {:?} fileExistsAtPath:{:?}] => {}", this, path, res_exists);
     res_exists
 }
 
@@ -176,8 +176,6 @@ pub const CLASSES: ClassExports = objc_classes! {
                 contents:(id)data // NSData*
               attributes:(id)attributes { // NSDictionary*
     let _ = attributes; // IgnoreAttributes
-    let path_str = if path != nil { ns_string::to_rust_string(env, path).to_string() } else { String::from("nil") }; // FixCowType
-    log!("[(NSFileManager*) {:?} createFileAtPath:{:?}]", this, path_str); // ForceLogCreate
     if data == nil {
         let empty: id = msg_class![env; NSData new];
         let res: bool = msg![env; empty writeToFile:path atomically:false];
@@ -244,7 +242,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let _ = attributes; // IgnoreAttributes
 
     let path_str = ns_string::to_rust_string(env, path); // TODO: avoid copy
-    log!("createDirectoryAtPath called for path: {}", path_str); // ForceLogDirCreate
     let res = if with_intermediates {
         env.fs.create_dir_all(GuestPath::new(&path_str))
     } else {
@@ -252,7 +249,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     match res {
         Ok(()) => {
-            log!("createDirectoryAtPath {} => true", path_str); // ForceLogDirSuccess
+            log_dbg!("createDirectoryAtPath {} => true", path_str);
             true
         }
         Err(err) => {
@@ -412,25 +409,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
-    // FixFreeSpaceLimit
-    let path_str = if _path != nil { ns_string::to_rust_string(env, _path).to_string() } else { String::from("nil") }; // FixCowType
-    log!("attributesOfFileSystemForPath called for path: {}", path_str); // ForceLogFSAttr
+    // TODO: other attributes
     log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
 
     let _ = error; // IgnoreErrorAssert
+
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // AsphaltNeedsTwoGigs
-    let free_size: u64 = 2000 * 1024 * 1024;
-    let free_size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:free_size];
-    let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
-    () = msg![env; dict setObject:free_size_num forKey:fs_free_size_key];
+    // Reporting 1 Gb of free space should be enough
+    // TODO: unify with `statfs`
+    // TODO: account for path
+    let size: u64 = 1024 * 1024 * 1024;
+    let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
 
-    // AddTotalSize
-    let total_size: u64 = 16u64 * 1024 * 1024 * 1024;
-    let total_size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:total_size];
-    let fs_size_key = ns_string::from_rust_string(env, String::from("NSFileSystemSize")); // SafeStringAlloc
-    () = msg![env; dict setObject:total_size_num forKey:fs_size_key];
+    let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
+    () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
 
     let dict_imm = msg![env; dict copy];
     release(env, dict);
