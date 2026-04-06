@@ -19,48 +19,17 @@ use std::collections::HashSet;
 use std::ffi::CStr;
 
 pub const CAPABILITIES: &[GLenum] = &[
-    gl21::ALPHA_TEST,
-    gl21::BLEND,
-    gl21::COLOR_LOGIC_OP,
-    gl21::CLIP_PLANE0,
-    gl21::CLIP_PLANE1,
-    gl21::CLIP_PLANE2,
-    gl21::CLIP_PLANE3,
-    gl21::CLIP_PLANE4,
-    gl21::CLIP_PLANE5,
-    gl21::LIGHT0,
-    gl21::LIGHT1,
-    gl21::LIGHT2,
-    gl21::LIGHT3,
-    gl21::LIGHT4,
-    gl21::LIGHT5,
-    gl21::LIGHT6,
-    gl21::LIGHT7,
-    gl21::COLOR_MATERIAL,
-    gl21::CULL_FACE,
-    gl21::DEPTH_TEST,
-    gl21::DITHER,
-    gl21::FOG,
-    gl21::LIGHTING,
-    gl21::LINE_SMOOTH,
-    gl21::MULTISAMPLE,
-    gl21::NORMALIZE,
-    gl21::POINT_SMOOTH,
-    gl21::POLYGON_OFFSET_FILL,
-    gl21::RESCALE_NORMAL,
-    gl21::SAMPLE_ALPHA_TO_COVERAGE,
-    gl21::SAMPLE_ALPHA_TO_ONE,
-    gl21::SAMPLE_COVERAGE,
-    gl21::SCISSOR_TEST,
-    gl21::STENCIL_TEST,
-    gl21::TEXTURE_2D,
-    gl21::POINT_SPRITE,
+    gl21::ALPHA_TEST, gl21::BLEND, gl21::COLOR_LOGIC_OP, gl21::CLIP_PLANE0, gl21::CLIP_PLANE1,
+    gl21::CLIP_PLANE2, gl21::CLIP_PLANE3, gl21::CLIP_PLANE4, gl21::CLIP_PLANE5, gl21::LIGHT0,
+    gl21::LIGHT1, gl21::LIGHT2, gl21::LIGHT3, gl21::LIGHT4, gl21::LIGHT5, gl21::LIGHT6,
+    gl21::LIGHT7, gl21::COLOR_MATERIAL, gl21::CULL_FACE, gl21::DEPTH_TEST, gl21::DITHER,
+    gl21::FOG, gl21::LIGHTING, gl21::LINE_SMOOTH, gl21::MULTISAMPLE, gl21::NORMALIZE,
+    gl21::POINT_SMOOTH, gl21::POLYGON_OFFSET_FILL, gl21::RESCALE_NORMAL,
+    gl21::SAMPLE_ALPHA_TO_COVERAGE, gl21::SAMPLE_ALPHA_TO_ONE, gl21::SAMPLE_COVERAGE,
+    gl21::SCISSOR_TEST, gl21::STENCIL_TEST, gl21::TEXTURE_2D, gl21::POINT_SPRITE,
 ];
 
-pub const UNSUPPORTED_CAPABILITIES: &[GLenum] = &[
-    0x8620, // GL_VERTEX_PROGRAM_NV
-    gl21::TEXTURE,
-];
+pub const UNSUPPORTED_CAPABILITIES: &[GLenum] = &[0x8620, gl21::TEXTURE];
 
 pub struct ArrayInfo {
     pub name: GLenum,
@@ -79,112 +48,72 @@ struct ArrayStateBackup {
 
 pub const ARRAYS: &[ArrayInfo] = &[
     ArrayInfo {
-        name: gl21::COLOR_ARRAY,
-        buffer_binding: gl21::COLOR_ARRAY_BUFFER_BINDING,
-        size: Some(gl21::COLOR_ARRAY_SIZE),
-        stride: gl21::COLOR_ARRAY_STRIDE,
-        pointer: gl21::COLOR_ARRAY_POINTER,
+        name: gl21::COLOR_ARRAY, buffer_binding: gl21::COLOR_ARRAY_BUFFER_BINDING,
+        size: Some(gl21::COLOR_ARRAY_SIZE), stride: gl21::COLOR_ARRAY_STRIDE, pointer: gl21::COLOR_ARRAY_POINTER,
     },
     ArrayInfo {
-        name: gl21::NORMAL_ARRAY,
-        buffer_binding: gl21::NORMAL_ARRAY_BUFFER_BINDING,
-        size: None,
-        stride: gl21::NORMAL_ARRAY_STRIDE,
-        pointer: gl21::NORMAL_ARRAY_POINTER,
+        name: gl21::NORMAL_ARRAY, buffer_binding: gl21::NORMAL_ARRAY_BUFFER_BINDING,
+        size: None, stride: gl21::NORMAL_ARRAY_STRIDE, pointer: gl21::NORMAL_ARRAY_POINTER,
     },
     ArrayInfo {
-        name: gl21::TEXTURE_COORD_ARRAY,
-        buffer_binding: gl21::TEXTURE_COORD_ARRAY_BUFFER_BINDING,
-        size: Some(gl21::TEXTURE_COORD_ARRAY_SIZE),
-        stride: gl21::TEXTURE_COORD_ARRAY_STRIDE,
-        pointer: gl21::TEXTURE_COORD_ARRAY_POINTER,
+        name: gl21::TEXTURE_COORD_ARRAY, buffer_binding: gl21::TEXTURE_COORD_ARRAY_BUFFER_BINDING,
+        size: Some(gl21::TEXTURE_COORD_ARRAY_SIZE), stride: gl21::TEXTURE_COORD_ARRAY_STRIDE, pointer: gl21::TEXTURE_COORD_ARRAY_POINTER,
     },
     ArrayInfo {
-        name: gl21::VERTEX_ARRAY,
-        buffer_binding: gl21::VERTEX_ARRAY_BUFFER_BINDING,
-        size: Some(gl21::VERTEX_ARRAY_SIZE),
-        stride: gl21::VERTEX_ARRAY_STRIDE,
-        pointer: gl21::VERTEX_ARRAY_POINTER,
+        name: gl21::VERTEX_ARRAY, buffer_binding: gl21::VERTEX_ARRAY_BUFFER_BINDING,
+        size: Some(gl21::VERTEX_ARRAY_SIZE), stride: gl21::VERTEX_ARRAY_STRIDE, pointer: gl21::VERTEX_ARRAY_POINTER,
     },
 ];
 
 const POINT_PARAMS: ParamTable = ParamTable(&[
-    (gl21::POINT_SIZE_MIN, ParamType::Float, 1),
-    (gl21::POINT_SIZE_MAX, ParamType::Float, 1),
-    (gl21::POINT_DISTANCE_ATTENUATION, ParamType::Float, 3),
-    (gl21::POINT_FADE_THRESHOLD_SIZE, ParamType::Float, 1),
+    (gl21::POINT_SIZE_MIN, ParamType::Float, 1), (gl21::POINT_SIZE_MAX, ParamType::Float, 1),
+    (gl21::POINT_DISTANCE_ATTENUATION, ParamType::Float, 3), (gl21::POINT_FADE_THRESHOLD_SIZE, ParamType::Float, 1),
     (gl21::POINT_SMOOTH, ParamType::Boolean, 1),
 ]);
 
 const FOG_PARAMS: ParamTable = ParamTable(&[
-    (gl21::FOG_MODE, ParamType::Int, 1),
-    (gl21::FOG_DENSITY, ParamType::Float, 1),
-    (gl21::FOG_START, ParamType::Float, 1),
-    (gl21::FOG_END, ParamType::Float, 1),
+    (gl21::FOG_MODE, ParamType::Int, 1), (gl21::FOG_DENSITY, ParamType::Float, 1),
+    (gl21::FOG_START, ParamType::Float, 1), (gl21::FOG_END, ParamType::Float, 1),
     (gl21::FOG_COLOR, ParamType::FloatSpecial, 4),
 ]);
 
 const LIGHT_PARAMS: ParamTable = ParamTable(&[
-    (gl21::AMBIENT, ParamType::Float, 4),
-    (gl21::DIFFUSE, ParamType::Float, 4),
-    (gl21::SPECULAR, ParamType::Float, 4),
-    (gl21::POSITION, ParamType::Float, 4),
-    (gl21::SPOT_CUTOFF, ParamType::Float, 1),
-    (gl21::SPOT_DIRECTION, ParamType::Float, 3),
-    (gl21::SPOT_EXPONENT, ParamType::Float, 1),
-    (gl21::CONSTANT_ATTENUATION, ParamType::Float, 1),
-    (gl21::LINEAR_ATTENUATION, ParamType::Float, 1),
-    (gl21::QUADRATIC_ATTENUATION, ParamType::Float, 1),
+    (gl21::AMBIENT, ParamType::Float, 4), (gl21::DIFFUSE, ParamType::Float, 4),
+    (gl21::SPECULAR, ParamType::Float, 4), (gl21::POSITION, ParamType::Float, 4),
+    (gl21::SPOT_CUTOFF, ParamType::Float, 1), (gl21::SPOT_DIRECTION, ParamType::Float, 3),
+    (gl21::SPOT_EXPONENT, ParamType::Float, 1), (gl21::CONSTANT_ATTENUATION, ParamType::Float, 1),
+    (gl21::LINEAR_ATTENUATION, ParamType::Float, 1), (gl21::QUADRATIC_ATTENUATION, ParamType::Float, 1),
 ]);
 
 const LIGHT_MODEL_PARAMS: ParamTable = ParamTable(&[
-    (gl21::LIGHT_MODEL_AMBIENT, ParamType::Float, 4),
-    (gl21::LIGHT_MODEL_TWO_SIDE, ParamType::Boolean, 1),
+    (gl21::LIGHT_MODEL_AMBIENT, ParamType::Float, 4), (gl21::LIGHT_MODEL_TWO_SIDE, ParamType::Boolean, 1),
 ]);
 
 const MATERIAL_PARAMS: ParamTable = ParamTable(&[
-    (gl21::AMBIENT, ParamType::Float, 4),
-    (gl21::DIFFUSE, ParamType::Float, 4),
-    (gl21::SPECULAR, ParamType::Float, 4),
-    (gl21::EMISSION, ParamType::Float, 4),
-    (gl21::SHININESS, ParamType::Float, 1),
-    (gl21::AMBIENT_AND_DIFFUSE, ParamType::Float, 4),
+    (gl21::AMBIENT, ParamType::Float, 4), (gl21::DIFFUSE, ParamType::Float, 4),
+    (gl21::SPECULAR, ParamType::Float, 4), (gl21::EMISSION, ParamType::Float, 4),
+    (gl21::SHININESS, ParamType::Float, 1), (gl21::AMBIENT_AND_DIFFUSE, ParamType::Float, 4),
 ]);
 
 const TEX_ENV_PARAMS: ParamTable = ParamTable(&[
-    (gl21::TEXTURE_ENV_MODE, ParamType::Int, 1),
-    (gl21::COORD_REPLACE, ParamType::Int, 1),
-    (gl21::COMBINE_RGB, ParamType::Int, 1),
-    (gl21::COMBINE_ALPHA, ParamType::Int, 1),
-    (gl21::SRC0_RGB, ParamType::Int, 1),
-    (gl21::SRC1_RGB, ParamType::Int, 1),
-    (gl21::SRC2_RGB, ParamType::Int, 1),
-    (gl21::SRC0_ALPHA, ParamType::Int, 1),
-    (gl21::SRC1_ALPHA, ParamType::Int, 1),
-    (gl21::SRC2_ALPHA, ParamType::Int, 1),
-    (gl21::OPERAND0_RGB, ParamType::Int, 1),
-    (gl21::OPERAND1_RGB, ParamType::Int, 1),
-    (gl21::OPERAND2_RGB, ParamType::Int, 1),
-    (gl21::OPERAND0_ALPHA, ParamType::Int, 1),
-    (gl21::OPERAND1_ALPHA, ParamType::Int, 1),
-    (gl21::OPERAND2_ALPHA, ParamType::Int, 1),
-    (gl21::TEXTURE_ENV_COLOR, ParamType::Float, 4),
-    (gl21::RGB_SCALE, ParamType::Float, 1),
+    (gl21::TEXTURE_ENV_MODE, ParamType::Int, 1), (gl21::COORD_REPLACE, ParamType::Int, 1),
+    (gl21::COMBINE_RGB, ParamType::Int, 1), (gl21::COMBINE_ALPHA, ParamType::Int, 1),
+    (gl21::SRC0_RGB, ParamType::Int, 1), (gl21::SRC1_RGB, ParamType::Int, 1),
+    (gl21::SRC2_RGB, ParamType::Int, 1), (gl21::SRC0_ALPHA, ParamType::Int, 1),
+    (gl21::SRC1_ALPHA, ParamType::Int, 1), (gl21::SRC2_ALPHA, ParamType::Int, 1),
+    (gl21::OPERAND0_RGB, ParamType::Int, 1), (gl21::OPERAND1_RGB, ParamType::Int, 1),
+    (gl21::OPERAND2_RGB, ParamType::Int, 1), (gl21::OPERAND0_ALPHA, ParamType::Int, 1),
+    (gl21::OPERAND1_ALPHA, ParamType::Int, 1), (gl21::OPERAND2_ALPHA, ParamType::Int, 1),
+    (gl21::TEXTURE_ENV_COLOR, ParamType::Float, 4), (gl21::RGB_SCALE, ParamType::Float, 1),
     (gl21::ALPHA_SCALE, ParamType::Float, 1),
 ]);
 
 const TEX_PARAMS: ParamTable = ParamTable(&[
-    (gl21::TEXTURE_MIN_FILTER, ParamType::Int, 1),
-    (gl21::TEXTURE_MAG_FILTER, ParamType::Int, 1),
-    (gl21::TEXTURE_WRAP_S, ParamType::Int, 1),
-    (gl21::TEXTURE_WRAP_T, ParamType::Int, 1),
-    (gl21::GENERATE_MIPMAP, ParamType::Int, 1),
-    (gl21::TEXTURE_MAX_ANISOTROPY_EXT, ParamType::Float, 1),
+    (gl21::TEXTURE_MIN_FILTER, ParamType::Int, 1), (gl21::TEXTURE_MAG_FILTER, ParamType::Int, 1),
+    (gl21::TEXTURE_WRAP_S, ParamType::Int, 1), (gl21::TEXTURE_WRAP_T, ParamType::Int, 1),
+    (gl21::GENERATE_MIPMAP, ParamType::Int, 1), (gl21::TEXTURE_MAX_ANISOTROPY_EXT, ParamType::Float, 1),
     (gl21::MAX_TEXTURE_MAX_ANISOTROPY_EXT, ParamType::Float, 1),
 ]);
-
-const UNSUPPORTED_TEX_PARAMS: ParamTable =
-    ParamTable(&[(gl21::TEXTURE_MAX_LEVEL, ParamType::Float, 1)]);
 
 pub struct GLES1OnGL2State {
     pointer_is_fixed_point: [bool; ARRAYS.len()],
@@ -199,9 +128,7 @@ pub struct GLES1OnGL2Context {
 }
 
 impl GLESContext for GLES1OnGL2Context {
-    fn description() -> &'static str {
-        "OpenGL ES 1.1 via touchHLE GLES1-on-GL2 layer"
-    }
+    fn description() -> &'static str { "OpenGL ES 1.1 via touchHLE GLES1-on-GL2 layer" }
 
     fn new(window: &mut Window, _options: &crate::options::Options) -> Result<Self, String> {
         Ok(Self {
@@ -215,41 +142,20 @@ impl GLESContext for GLES1OnGL2Context {
         })
     }
 
-    fn make_current<'gl_ctx, 'win: 'gl_ctx>(
-        &'gl_ctx mut self,
-        window: &'win mut Window,
-    ) -> Box<dyn GLES + 'gl_ctx> {
-        if self.gl_ctx.is_current() && self.is_loaded {
-            return Box::new(GLES1OnGL2 {
-                state: &mut self.state,
-            });
-        }
-        unsafe {
-            window.make_gl_context_current(&self.gl_ctx);
-        }
+    fn make_current<'gl_ctx, 'win: 'gl_ctx>(&'gl_ctx mut self, window: &'win mut Window) -> Box<dyn GLES + 'gl_ctx> {
+        if self.gl_ctx.is_current() && self.is_loaded { return Box::new(GLES1OnGL2 { state: &mut self.state }); }
+        unsafe { window.make_gl_context_current(&self.gl_ctx); }
         gl21::load_with(|s| window.gl_get_proc_address(s));
         self.is_loaded = true;
-        Box::new(GLES1OnGL2 {
-            state: &mut self.state,
-        })
+        Box::new(GLES1OnGL2 { state: &mut self.state })
     }
 
-    unsafe fn make_current_unchecked_for_window<'gl_ctx>(
-        &'gl_ctx mut self,
-        make_current_fn: &mut dyn FnMut(&GLContext),
-        loader_fn: &mut dyn FnMut(&'static str) -> *const std::ffi::c_void,
-    ) -> Box<dyn GLES + 'gl_ctx> {
-        if self.gl_ctx.is_current() && self.is_loaded {
-            return Box::new(GLES1OnGL2 {
-                state: &mut self.state,
-            });
-        }
+    unsafe fn make_current_unchecked_for_window<'gl_ctx>(&'gl_ctx mut self, make_current_fn: &mut dyn FnMut(&GLContext), loader_fn: &mut dyn FnMut(&'static str) -> *const std::ffi::c_void) -> Box<dyn GLES + 'gl_ctx> {
+        if self.gl_ctx.is_current() && self.is_loaded { return Box::new(GLES1OnGL2 { state: &mut self.state }); }
         make_current_fn(&self.gl_ctx);
         gl21::load_with(loader_fn);
         self.is_loaded = true;
-        Box::new(GLES1OnGL2 {
-            state: &mut self.state,
-        })
+        Box::new(GLES1OnGL2 { state: &mut self.state })
     }
 }
 
@@ -258,11 +164,7 @@ pub struct GLES1OnGL2<'a> {
 }
 
 impl GLES1OnGL2<'_> {
-    unsafe fn translate_fixed_point_arrays(
-        &mut self,
-        first: GLint,
-        count: GLsizei,
-    ) -> [Option<ArrayStateBackup>; ARRAYS.len()] {
+    unsafe fn translate_fixed_point_arrays(&mut self, first: GLint, count: GLsizei) -> [Option<ArrayStateBackup>; ARRAYS.len()] {
         let mut backups: [Option<ArrayStateBackup>; ARRAYS.len()] = Default::default();
         for (i, array_info) in ARRAYS.iter().enumerate() {
             if !self.state.pointer_is_fixed_point[i] { continue; }
@@ -354,7 +256,6 @@ impl GLES1OnGL2<'_> {
 }
 
 impl GLES for GLES1OnGL2<'_> {
-    // UNLOCK ES 2.0 FOR N.O.V.A. 3
     fn is_gles2(&self) -> bool { true }
 
     unsafe fn driver_description(&self) -> String {
@@ -365,16 +266,8 @@ impl GLES for GLES1OnGL2<'_> {
     }
 
     unsafe fn GetIntegerv(&mut self, pname: GLenum, params: *mut GLint) {
-        // FIXED: Intercept shader binary format queries to prevent 0x8df9 panics in util.rs
-        if pname == 0x8df8 { // GL_NUM_SHADER_BINARY_FORMATS
-            *params = 0;
-            return;
-        }
-        if pname == 0x8df9 { // GL_SHADER_BINARY_FORMATS
-            // Return nothing; count is 0
-            return;
-        }
-
+        if pname == 0x8df8 { *params = 0; return; }
+        if pname == 0x8df9 { return; }
         let (type_, _count) = GET_PARAMS.get_type_info(pname);
         let allowed_float = type_ == ParamType::Float && pname == gl21::POINT_SIZE_MAX;
         assert!(type_ == ParamType::Int || allowed_float);
@@ -501,7 +394,34 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn TexParameterxv(&mut self, t: GLenum, p: GLenum, v: *const GLfixed) { TEX_PARAMS.setxv(|v| gl21::TexParameterfv(t, p, v), |v| gl21::TexParameteriv(t, p, v), p, v); }
     unsafe fn TexImage2D(&mut self, t: GLenum, l: GLint, i: GLint, w: GLsizei, h: GLsizei, b: GLint, f: GLenum, ty: GLenum, p: *const GLvoid) { gl21::TexImage2D(t, l, i, w, h, b, f, ty, p); }
     unsafe fn TexSubImage2D(&mut self, t: GLenum, l: GLint, x: GLint, y: GLint, w: GLsizei, h: GLsizei, f: GLenum, ty: GLenum, p: *const GLvoid) { gl21::TexSubImage2D(t, l, x, y, w, h, f, ty, p); }
-    unsafe fn CompressedTexImage2D(&mut self, t: GLenum, l: GLint, i: GLenum, w: GLsizei, h: GLsizei, b: GLint, s: GLsizei, d: *const GLvoid) { let data = unsafe { std::slice::from_raw_parts(d.cast::<u8>(), s as usize) }; if try_decode_pvrtc(self, t, l, i, w, h, b, data) { return; } unimplemented!("CompressedTexImage2D internalformat: {:#x}", i); }
+    
+    unsafe fn CompressedTexImage2D(&mut self, t: GLenum, l: GLint, i: GLenum, w: GLsizei, h: GLsizei, b: GLint, s: GLsizei, d: *const GLvoid) { 
+        let data = unsafe { std::slice::from_raw_parts(d.cast::<u8>(), s as usize) }; 
+        if try_decode_pvrtc(self, t, l, i, w, h, b, data) { return; } 
+        
+        if let Some(PalettedTextureFormat { index_is_nibble, palette_entry_format, palette_entry_type }) = PalettedTextureFormat::get_info(i) {
+            let palette_entry_size = match palette_entry_type {
+                gl21::UNSIGNED_BYTE => match palette_entry_format { gl21::RGB => 3, gl21::RGBA => 4, _ => unreachable!() },
+                gl21::UNSIGNED_SHORT_5_6_5 | gl21::UNSIGNED_SHORT_4_4_4_4 | gl21::UNSIGNED_SHORT_5_5_5_1 => 2,
+                _ => unreachable!(),
+            };
+            let palette_entry_count = if index_is_nibble { 16 } else { 256 };
+            let palette_size = palette_entry_size * palette_entry_count;
+            let index_count = w as usize * h as usize;
+            let (index_word_size, index_word_count) = if index_is_nibble { (1, index_count.div_ceil(2)) } else { (4, index_count.div_ceil(4)) };
+            let indices_size = index_word_size * index_word_count;
+            let (palette, indices) = data.split_at(palette_size);
+            let mut decoded = Vec::<u8>::with_capacity(palette_entry_size * index_count);
+            for i in 0..index_count {
+                let index = if index_is_nibble { (indices[i / 2] >> ((1 - (i % 2)) * 4)) & 0xf } else { indices[i] } as usize;
+                decoded.extend_from_slice(&palette[index * palette_entry_size..][..palette_entry_size]);
+            }
+            gl21::TexImage2D(t, l, palette_entry_format as _, w, h, b, palette_entry_format, palette_entry_type, decoded.as_ptr() as *const _);
+            return;
+        }
+        unimplemented!("CompressedTexImage2D internalformat: {:#x}", i); 
+    }
+
     unsafe fn CopyTexImage2D(&mut self, t: GLenum, l: GLint, i: GLenum, x: GLint, y: GLint, w: GLsizei, h: GLsizei, b: GLint) { gl21::CopyTexImage2D(t, l, i, x, y, w, h, b); }
     unsafe fn CopyTexSubImage2D(&mut self, t: GLenum, l: GLint, x: GLint, y: GLint, sx: GLint, sy: GLint, w: GLsizei, h: GLsizei) { gl21::CopyTexSubImage2D(t, l, x, y, sx, sy, w, h); }
     unsafe fn TexEnvf(&mut self, t: GLenum, p: GLenum, v: GLfloat) { gl21::TexEnvf(t, p, v); }
@@ -531,7 +451,6 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn Translatef(&mut self, x: GLfloat, y: GLfloat, z: GLfloat) { gl21::Translatef(x, y, z); }
     unsafe fn Translatex(&mut self, x: GLfixed, y: GLfixed, z: GLfixed) { gl21::Translatef(fixed_to_float(x), fixed_to_float(y), fixed_to_float(z)); }
 
-    // ES 2.0 FORWARDING (USED BY N.O.V.A. 3)
     unsafe fn CreateShader(&mut self, t: GLenum) -> GLuint { gl21::CreateShader(t) }
     unsafe fn ShaderSource(&mut self, s: GLuint, c: GLsizei, st: *const *const std::ffi::c_char, l: *const GLint) { gl21::ShaderSource(s, c, st, l) }
     unsafe fn CompileShader(&mut self, s: GLuint) { gl21::CompileShader(s) }
@@ -549,7 +468,16 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn VertexAttribPointer(&mut self, i: GLuint, s: GLint, t: GLenum, n: GLboolean, st: GLsizei, p: *const GLvoid) { gl21::VertexAttribPointer(i, s, t, n, st, p) }
     unsafe fn DisableVertexAttribArray(&mut self, i: GLuint) { gl21::DisableVertexAttribArray(i) }
     unsafe fn EnableVertexAttribArray(&mut self, i: GLuint) { gl21::EnableVertexAttribArray(i) }
+    
+    // THE RESTORED MISSING METHODS TO SATISFY E0046
+    unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat) { gl21::VertexAttrib1f(indx, x) }
+    unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat) { gl21::VertexAttrib2f(indx, x, y) }
+    unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) { gl21::VertexAttrib3f(indx, x, y, z) }
     unsafe fn VertexAttrib4f(&mut self, i: GLuint, x: GLfloat, y: GLfloat, z: GLfloat, w: GLfloat) { gl21::VertexAttrib4f(i, x, y, z, w) }
+    unsafe fn VertexAttrib1fv(&mut self, indx: GLuint, values: *const GLfloat) { gl21::VertexAttrib1fv(indx, values) }
+    unsafe fn VertexAttrib2fv(&mut self, indx: GLuint, values: *const GLfloat) { gl21::VertexAttrib2fv(indx, values) }
+    unsafe fn VertexAttrib3fv(&mut self, indx: GLuint, values: *const GLfloat) { gl21::VertexAttrib3fv(indx, values) }
+    unsafe fn VertexAttrib4fv(&mut self, indx: GLuint, values: *const GLfloat) { gl21::VertexAttrib4fv(indx, values) }
     unsafe fn Uniform1i(&mut self, l: GLint, v: GLint) { gl21::Uniform1i(l, v) }
     unsafe fn Uniform1f(&mut self, l: GLint, v: GLfloat) { gl21::Uniform1f(l, v) }
     unsafe fn Uniform2f(&mut self, l: GLint, v0: GLfloat, v1: GLfloat) { gl21::Uniform2f(l, v0, v1) }
@@ -559,9 +487,19 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn Uniform2fv(&mut self, l: GLint, c: GLsizei, v: *const GLfloat) { gl21::Uniform2fv(l, c, v) }
     unsafe fn Uniform3fv(&mut self, l: GLint, c: GLsizei, v: *const GLfloat) { gl21::Uniform3fv(l, c, v) }
     unsafe fn Uniform4fv(&mut self, l: GLint, c: GLsizei, v: *const GLfloat) { gl21::Uniform4fv(l, c, v) }
+    unsafe fn Uniform1iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { gl21::Uniform1iv(location, count, value) }
+    unsafe fn Uniform2iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { gl21::Uniform2iv(location, count, value) }
+    unsafe fn Uniform3iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { gl21::Uniform3iv(location, count, value) }
+    unsafe fn Uniform4iv(&mut self, location: GLint, count: GLsizei, value: *const GLint) { gl21::Uniform4iv(location, count, value) }
+    unsafe fn UniformMatrix2fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) { gl21::UniformMatrix2fv(location, count, transpose, value) }
+    unsafe fn UniformMatrix3fv(&mut self, location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat) { gl21::UniformMatrix3fv(location, count, transpose, value) }
     unsafe fn UniformMatrix4fv(&mut self, l: GLint, c: GLsizei, t: GLboolean, v: *const GLfloat) { gl21::UniformMatrix4fv(l, c, t, v) }
     unsafe fn GetUniformLocation(&mut self, p: GLuint, n: *const std::ffi::c_char) -> GLint { gl21::GetUniformLocation(p, n) }
     unsafe fn GetAttribLocation(&mut self, p: GLuint, n: *const std::ffi::c_char) -> GLint { gl21::GetAttribLocation(p, n) }
+    unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) { gl21::GetActiveUniform(program, index, bufSize, length, size, type_, name) }
+    unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) { gl21::GetActiveAttrib(program, index, bufSize, length, size, type_, name) }
+    unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) { gl21::BlendColor(red, green, blue, alpha) }
+    unsafe fn GetVertexAttribiv(&mut self, index: GLuint, pname: GLenum, params: *mut GLint) { gl21::GetVertexAttribiv(index, pname, params) }
 
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, f: *mut GLuint) { gl21::GenFramebuffersEXT(n, f) }
     unsafe fn GenRenderbuffersOES(&mut self, n: GLsizei, r: *mut GLuint) { gl21::GenRenderbuffersEXT(n, r) }
@@ -572,10 +510,13 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn RenderbufferStorageOES(&mut self, t: GLenum, i: GLenum, w: GLsizei, h: GLsizei) { gl21::RenderbufferStorageEXT(t, i, w, h) }
     unsafe fn FramebufferRenderbufferOES(&mut self, t: GLenum, a: GLenum, rt: GLenum, r: GLuint) { gl21::FramebufferRenderbufferEXT(t, a, rt, r) }
     unsafe fn FramebufferTexture2DOES(&mut self, t: GLenum, a: GLenum, tt: GLenum, tex: GLuint, l: i32) { gl21::FramebufferTexture2DEXT(t, a, tt, tex, l) }
+    unsafe fn GetFramebufferAttachmentParameterivOES(&mut self, target: GLenum, attachment: GLenum, pname: GLenum, params: *mut GLint) { gl21::GetFramebufferAttachmentParameterivEXT(target, attachment, pname, params) }
     unsafe fn CheckFramebufferStatusOES(&mut self, t: GLenum) -> GLenum { gl21::CheckFramebufferStatusEXT(t) }
     unsafe fn DeleteFramebuffersOES(&mut self, n: GLsizei, f: *const GLuint) { gl21::DeleteFramebuffersEXT(n, f) }
     unsafe fn DeleteRenderbuffersOES(&mut self, n: GLsizei, r: *const GLuint) { gl21::DeleteRenderbuffersEXT(n, r) }
     unsafe fn GenerateMipmapOES(&mut self, t: GLenum) { gl21::GenerateMipmapEXT(t) }
     unsafe fn GetBufferParameteriv(&mut self, t: GLenum, pn: GLenum, ps: *mut GLint) { gl21::GetBufferParameteriv(t, pn, ps) }
     unsafe fn GetRenderbufferParameterivOES(&mut self, t: GLenum, pn: GLenum, ps: *mut GLint) { gl21::GetRenderbufferParameterivEXT(t, pn, ps) }
+    unsafe fn MapBufferOES(&mut self, target: GLenum, access: GLenum) -> *mut GLvoid { gl21::MapBuffer(target, access) }
+    unsafe fn UnmapBufferOES(&mut self, target: GLenum) -> GLboolean { gl21::UnmapBuffer(target) }
 }
