@@ -843,6 +843,14 @@ impl Dyld {
             return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
         }
 
+        // ImplDifftime
+        if symbol == "_difftime" {
+            fn impl_difftime(_env: &mut crate::Environment, time1: i32, time0: i32) -> f64 {
+                (time1 as f64) - (time0 as f64)
+            }
+            return Some(&(impl_difftime as fn(&mut crate::Environment, i32, i32) -> f64));
+        }
+
         panic!("Call to unimplemented function {symbol}");
     }
 
