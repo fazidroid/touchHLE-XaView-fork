@@ -128,8 +128,13 @@ fn fstat(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    log!("Warning: fstat() call, this function is mostly unimplemented");
+    // ZeroStructFallback
+    if buf.to_bits() != 0 {
+        env.mem.bytes_at_mut(buf.cast::<u8>(), crate::mem::guest_size_of::<stat>()).fill(0);
+    }
+
     let result = fstat_inner(env, fd, buf);
+    // BetterDebugInfo
     log_dbg!("fstat({:?}, {:?}) -> {}", fd, buf, result);
     result
 }
@@ -138,11 +143,14 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    log!("Warning: stat() call, this function is mostly unimplemented");
-
     fn do_stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
         if path.is_null() {
             return -1; // TODO: Set errno
+        }
+
+        // ZeroStructFallback
+        if buf.to_bits() != 0 {
+            env.mem.bytes_at_mut(buf.cast::<u8>(), crate::mem::guest_size_of::<stat>()).fill(0);
         }
 
         // Open and reuse fstat implementation
@@ -157,6 +165,7 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
     }
     let result = do_stat(env, path, buf);
 
+    // BetterDebugInfo
     log_dbg!(
         "stat({:?} {:?}, {:?}) -> {}",
         path,
