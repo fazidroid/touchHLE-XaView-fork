@@ -51,15 +51,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.class_is_subclass_of(this, class)
 }
 
-// See the instance method section for the normal versions of these.
 + (id)retain {
-    this // classes are not refcounted
+    this 
 }
 + (())release {
-    // classes are not refcounted
 }
 + (())autorelease {
-    // classes are not refcounted
 }
 
 + (bool)instancesRespondToSelector:(SEL)selector {
@@ -125,50 +122,31 @@ pub const CLASSES: ClassExports = objc_classes! {
     this.to_bits()
 }
 
-// To not confuse with isEqualTo:, which is
-// a category of NSWhoseSpecifier!
-// Reference https://nshipster.com/equality
 - (bool)isEqual:(id)other {
     this == other
 }
 
-// TODO: Instance description and debugDescription.
-// This is not hard to add, but before adding a fallback implementation of it,
-// we should make sure all the Foundation classes' overrides of it are there,
-// to prevent weird behavior.
-// TODO: localized description methods also? (not sure if NSObject has them)
-
-// Helper for NSCopying
 - (id)copy {
     msg![env; this copyWithZone:(MutVoidPtr::null())]
 }
 
-// Helper for NSMutableCopying
 - (id)mutableCopy {
     msg![env; this mutableCopyWithZone:(MutVoidPtr::null())]
 }
 
-// NSKeyValueCoding
-// https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueCoding/SearchImplementation.html
 - (())setValue:(id)value
        forKey:(id)key { // NSString*
     let key_string = to_rust_string(env, key);
-    // TODO: avoid copy?
-    assert!(key_string.is_ascii()); // TODO: do we have to handle non-ASCII keys?
+    assert!(key_string.is_ascii()); 
     let camel_case_key_string = format!("{}{}", key_string.as_bytes()[0].to_ascii_uppercase() as char, &key_string[1..]);
 
     let class = msg![env; this class];
-    // TODO: If value is nil, the target ivar/method argument type must be
-    // checked. If it's non-object type, invoke setNilValueForKey:
     assert!(value != nil);
-    // TODO: If value is a NSNumber or NSValue, it must be unwrapped
+    
     let value_class = msg![env; value class];
     let ns_value_class = env.objc.get_known_class("NSValue", &mut env.mem);
     assert!(!env.objc.class_is_subclass_of(value_class, ns_value_class));
 
-    // Look for the first accessor named set<Key>: or _set<Key>, in that order.
-    // If found, invoke it with the input value (or unwrapped value, as needed)
-    // and finish.
     if let Some(sel) = env.objc.lookup_selector(&format!("set{camel_case_key_string}:")) {
         if env.objc.class_has_method(class, sel) {
             () = msg_send(env, (this, sel, value));
@@ -183,12 +161,6 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
 
-    // If no simple accessor is found, and if the class method
-    // accessInstanceVariablesDirectly returns YES, look for an instance
-    // variable with a name like _<key>, _is<Key>, <key>, or is<Key>,
-    // in that order.
-    // If found, set the variable directly with the input value
-    // (or unwrapped value) and finish.
     let sel = env.objc.lookup_selector("accessInstanceVariablesDirectly").unwrap();
     let accessInstanceVariablesDirectly = msg_send(env, (class, sel));
 
@@ -204,19 +176,14 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
 
-    // Upon finding no accessor or instance variable,
-    // invoke setValue:forUndefinedKey:.
-    // This raises an exception by default, but a subclass of NSObject
-    // may provide key-specific behavior.
     let sel = env.objc.lookup_selector("setValue:forUndefinedKey:").unwrap();
     () = msg_send(env, (this, sel, value, key));
 }
 
 - (())setValue:(id)_value
 forUndefinedKey:(id)key { // NSString*
-    // TODO: Raise NSUnknownKeyException
     let class: Class = ObjC::read_isa(this, &env.mem);
-    let class_name_string = env.objc.get_class_name(class).to_owned(); // TODO: Avoid copying
+    let class_name_string = env.objc.get_class_name(class).to_owned(); 
     let key_string = to_rust_string(env, key);
 
     panic!("Object {:?} of class {:?} ({:?}) does not have a setter for {} ({:?})\
@@ -250,23 +217,9 @@ forUndefinedKey:(id)key { // NSString*
 
 - (())performSelectorInBackground:(SEL)sel
                        withObject:(id)arg {
-    // FIXED: Gameloft "Anti-Freeze" Hack for background loading loops
-    log_dbg!("Synchronously executing background selector: {:?}", sel.as_str(&env.mem));
-    if arg != nil {
-        let _res: id = msg![env; this performSelector:sel withObject:arg];
-    } else {
-        let _res: id = msg![env; this performSelector:sel];
-    }
-}
-
-- (())performSelector:(SEL)sel withObject:(id)arg afterDelay:(NSTimeInterval)delay {
-    // FIXED: Gameloft "Anti-Freeze" Hack for delayed loading loops
-    log_dbg!("Bypassing Gameloft delay of {}s for selector: {:?}", delay, sel.as_str(&env.mem));
-    if arg != nil {
-        let _res: id = msg![env; this performSelector:sel withObject:arg];
-    } else {
-        let _res: id = msg![env; this performSelector:sel];
-    }
+    // FIXED: Route all background loading requests to TRUE background threads to stop freezing!
+    log_dbg!("Executing background selector in real background thread: {:?}", sel.as_str(&env.mem));
+    detach_new_thread_inner(env, this, sel, arg);
 }
 
 - (())performSelectorOnMainThread:(SEL)sel withObject:(id)arg waitUntilDone:(bool)wait {
@@ -281,7 +234,6 @@ forUndefinedKey:(id)key { // NSString*
         return;
     }
     
-    // Maintain game-specific hacks for compatibility
     if env.bundle.bundle_identifier().starts_with("com.gameloft.POP") && (sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie").unwrap()) && wait {
         log!("Applying game-specific hack for PoP: WW: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
         return;
@@ -333,8 +285,6 @@ forUndefinedKey:(id)key { // NSString*
         log!("Ignoring performSelectorOnMainThread waitUntilDone:true (non-blocking)");
     }
 
-    // FIXED: Gameloft "Anti-Freeze" Hack for deferred execution
-    log_dbg!("Synchronously executing main thread selector: {:?}", sel.as_str(&env.mem));
     if arg != nil {
         let _res: id = msg![env; this performSelector:sel withObject:arg];
     } else {
@@ -342,7 +292,7 @@ forUndefinedKey:(id)key { // NSString*
     }
 }
 
-// Private method, used by performSelector:withObject:afterDelay:
+// Private method, used by touchHLE's standard performSelector:withObject:afterDelay:
 - (())_touchHLE_timerFireMethod:(id)which { // NSTimer *
     let dict: id = msg![env; which userInfo];
 
@@ -364,7 +314,6 @@ forUndefinedKey:(id)key { // NSString*
     }
 }
 
-// UINibLoadingAdditions protocol
 - (())awakeFromNib {
     // no-op
 }
