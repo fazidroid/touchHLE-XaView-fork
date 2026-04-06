@@ -1535,7 +1535,6 @@ impl GLES for GLES1Native<'_> {
         gles11::UnmapBufferOES(target)
     }
 
-    // --- ADD THE MISSING FUNCTIONS HERE ---
     unsafe fn BlendFuncSeparate(&mut self, _sfactorRGB: GLenum, _dfactorRGB: GLenum, _sfactorAlpha: GLenum, _dfactorAlpha: GLenum) {
         unimplemented!("BlendFuncSeparate is not supported in GLES1");
     }
@@ -1543,6 +1542,4 @@ impl GLES for GLES1Native<'_> {
     unsafe fn BlendEquationSeparate(&mut self, _modeRGB: GLenum, _modeAlpha: GLenum) {
         unimplemented!("BlendEquationSeparate is not supported in GLES1");
     }
-    // --------------------------------------
-    }
-} // <-- This should be the very last character in your file! Delete any other } below it.
+}
