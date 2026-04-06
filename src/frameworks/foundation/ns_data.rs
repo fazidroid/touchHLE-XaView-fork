@@ -109,19 +109,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentsOfURL:(id)url { 
-    if url == nil { return nil; }
+    if url == nil { return msg![env; this init]; }
     let path: id = msg![env; url absoluteString];
-    if path == nil { return nil; }
+    if path == nil { return msg![env; this init]; }
     
     let path_str = to_rust_string(env, path);
-    // FIXED: Safely return nil if the URL doesn't start with HTTP to prevent GT Racing crash
+    // FIXED: Safely return empty object if the URL doesn't start with HTTP to prevent GT Racing crash
     if !path_str.starts_with("http") && !path_str.starts_with("file:") {
-        log!("Warning: NSData initWithContentsOfURL called with non-http URL: {:?}. Returning nil.", path_str);
-        return nil;
+        log!("Warning: NSData initWithContentsOfURL called with non-http URL: {:?}. Returning empty data.", path_str);
+        return msg![env; this init];
     }
     
     log!("TODO: ignoring [(NSData*){:?} initWithContentsOfURL:{:?}]", this, path_str);
-    nil
+    msg![env; this init]
 }
 
 - (id)initWithContentsOfFile:(id)path {
