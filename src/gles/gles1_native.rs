@@ -1536,11 +1536,13 @@ impl GLES for GLES1Native<'_> {
     }
 
     // --- ADD THE MISSING FUNCTIONS HERE ---
-    unsafe fn BlendFuncSeparate(&mut self, sfactorRGB: GLenum, dfactorRGB: GLenum, sfactorAlpha: GLenum, dfactorAlpha: GLenum) {
+    unsafe fn BlendFuncSeparate(&mut self, _sfactorRGB: GLenum, _dfactorRGB: GLenum, _sfactorAlpha: GLenum, _dfactorAlpha: GLenum) {
         unimplemented!("BlendFuncSeparate is not supported in GLES1");
     }
 
-    unsafe fn BlendEquationSeparate(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
+    unsafe fn BlendEquationSeparate(&mut self, _modeRGB: GLenum, _modeAlpha: GLenum) {
         unimplemented!("BlendEquationSeparate is not supported in GLES1");
+    }
+    // --------------------------------------
     }
 } // <-- This should be the very last character in your file! Delete any other } below it.
