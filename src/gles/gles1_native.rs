@@ -286,7 +286,7 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::BlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha)
         } else {
-            gles11::BlendFuncSeparateOES(srcRGB, dstRGB, srcAlpha, dstAlpha)
+            gles11::BlendFunc(srcRGB, dstRGB)
         }
     }
     unsafe fn BlendEquationOES(&mut self, mode: GLenum) {
@@ -301,7 +301,7 @@ impl GLES for GLES1Native<'_> {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::BlendEquationSeparate(modeRGB, modeAlpha)
         } else {
-            gles11::BlendEquationSeparateOES(modeRGB, modeAlpha)
+            gles11::BlendEquationOES(modeRGB)
         }
     }
     unsafe fn ColorMask(
