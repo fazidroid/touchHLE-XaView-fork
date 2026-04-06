@@ -328,6 +328,10 @@ forUndefinedKey:(id)key { // NSString*
             return;
         }
     }
+    
+    if wait {
+        log!("Ignoring performSelectorOnMainThread waitUntilDone:true (non-blocking)");
+    }
 
     // FIXED: Gameloft "Anti-Freeze" Hack for deferred execution
     log_dbg!("Synchronously executing main thread selector: {:?}", sel.as_str(&env.mem));
