@@ -21,9 +21,19 @@ const EAI_FAIL: i32 = 4;
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// TODO: struct definition
+// ===== HOSTENT STRUCT REWRITTEN TO SPOOF SERVERS =====
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
-struct hostent {}
+pub struct hostent {
+    h_name: MutPtr<u8>,
+    h_aliases: MutPtr<u32>,
+    h_addrtype: i32,
+    h_length: i32,
+    h_addr_list: MutPtr<u32>,
+}
+unsafe impl SafeRead for hostent {}
+// =====================================================
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -100,13 +110,36 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
     log!(
-        "TODO: gethostbyname({:?} \"{}\") => NULL",
+        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1",
         name,
-        env.mem.cstr_at_utf8(name).unwrap()
+        name_str
     );
-    // TODO: set h_errno
-    Ptr::null()
+
+    // 1. Create a fake IP address byte array (127.0.0.1 / localhost)
+    let ip_addr: [u8; 4] = [127, 0, 0, 1];
+    let ip_ptr = env.mem.alloc_and_write(ip_addr);
+
+    // 2. Create the null-terminated address list required by C structs
+    let addr_list: [u32; 2] = [ip_ptr.to_bits(), 0];
+    let addr_list_ptr = env.mem.alloc_and_write(addr_list);
+
+    // 3. Create the null-terminated aliases list
+    let aliases: [u32; 1] = [0];
+    let aliases_ptr = env.mem.alloc_and_write(aliases);
+
+    // 4. Populate the full hostent struct so the game engine happily reads it
+    let hostent_data = hostent {
+        h_name: name.cast_mut(),
+        h_aliases: aliases_ptr.cast(),
+        h_addrtype: AF_INET,
+        h_length: 4, // IPv4 length
+        h_addr_list: addr_list_ptr.cast(),
+    };
+
+    // Allocate the structure and pass the pointer back to the game!
+    env.mem.alloc_and_write(hostent_data)
 }
 
 pub const FUNCTIONS: FunctionExports = &[
