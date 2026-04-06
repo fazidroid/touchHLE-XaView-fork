@@ -210,7 +210,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 pub fn to_rust_path(env: &mut Environment, url: id) -> Cow<'static, GuestPath> {
     let path_string: id = msg![env; url path];
     if path_string == nil {
-        return Cow::Owned(GuestPathBuf::new());
+        return Cow::Borrowed(GuestPath::new(""));
     }
 
     match to_rust_string(env, path_string) {
