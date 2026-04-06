@@ -67,8 +67,8 @@ enum SysInfoType {
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(sysctl(_, _, _, _, _, _, _)),
-    export_c_func!(sysctlbyname(_, _, _, _, _, _, _)),
+    export_c_func!(sysctl(_, _, _, _, _, _)),
+    export_c_func!(sysctlbyname(_, _, _, _, _)),
 ];
 
 pub fn sysctl(
@@ -84,7 +84,9 @@ pub fn sysctl(
     if name_len == 6 {
         let mut mib = [0i32; 6];
         for i in 0..6 {
-            mib[i] = env.mem.read(name_ptr.offset(i as isize)).unwrap_or(0);
+            // Explicitly tell Rust we are reading an i32 to fix the compiler error
+            let val: i32 = env.mem.read(name_ptr.offset(i as isize)).unwrap_or(0i32);
+            mib[i] = val;
         }
 
         // Check for CTL_NET (4), AF_ROUTE (17), AF_LINK (18), NET_RT_IFLIST (3)
@@ -196,6 +198,7 @@ fn sysctl_impl<F>(
     oldlenp: MutPtr<GuestUSize>,
     newp: MutVoidPtr,
     newlen: GuestUSize,
+    name_lookup: F, // <--- Restored missing parameter!
 ) -> i32
 where
     F: FnOnce(&mut Environment) -> (&'static str, SysInfoType),
