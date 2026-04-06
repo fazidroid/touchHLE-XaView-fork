@@ -12,11 +12,10 @@ use crate::frameworks::core_animation::ca_eagl_layer::{
 use crate::frameworks::core_graphics::{CGFloat, CGRect, CGSize};
 use crate::frameworks::foundation::ns_string::get_static_str;
 use crate::frameworks::foundation::NSUInteger;
-use crate::gles::gles11_raw as gles11; // constants only
+use crate::gles::gles11_raw as gles11; 
 use crate::gles::gles11_raw::types::*;
 use crate::gles::present::{present_frame, FpsCounter};
-// FIXED: Added create_gles2_ctx to match your gles/ folder contents
-use crate::gles::{create_gles1_ctx, create_gles2_ctx, gles1_on_gl2, GLESContext, GLES};
+use crate::gles::{create_gles1_ctx, gles1_on_gl2, GLESContext, GLES};
 use crate::mem::MutPtr;
 use crate::objc::{id, msg, nil, objc_classes, release, retain, ClassExports, HostObject};
 use crate::options::Options;
@@ -26,36 +25,21 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-// These are used by the EAGLDrawable protocol implemented by CAEAGLayer.
 pub const kEAGLDrawablePropertyColorFormat: &str = "ColorFormat";
 pub const kEAGLDrawablePropertyRetainedBacking: &str = "RetainedBacking";
 pub const kEAGLColorFormatRGBA8: &str = "RGBA8";
 pub const kEAGLColorFormatRGB565: &str = "RGB565";
 
 pub const CONSTANTS: ConstantExports = &[
-    (
-        "_kEAGLDrawablePropertyColorFormat",
-        HostConstant::Item(kEAGLDrawablePropertyColorFormat as *const _ as _),
-    ),
-    (
-        "_kEAGLDrawablePropertyRetainedBacking",
-        HostConstant::Item(kEAGLDrawablePropertyRetainedBacking as *const _ as _),
-    ),
-    (
-        "_kEAGLColorFormatRGBA8",
-        HostConstant::Item(kEAGLColorFormatRGBA8 as *const _ as _),
-    ),
-    (
-        "_kEAGLColorFormatRGB565",
-        HostConstant::Item(kEAGLColorFormatRGB565 as *const _ as _),
-    ),
+    ("_kEAGLDrawablePropertyColorFormat", HostConstant::NSString(kEAGLDrawablePropertyColorFormat)),
+    ("_kEAGLDrawablePropertyRetainedBacking", HostConstant::NSString(kEAGLDrawablePropertyRetainedBacking)),
+    ("_kEAGLColorFormatRGBA8", HostConstant::NSString(kEAGLColorFormatRGBA8)),
+    ("_kEAGLColorFormatRGB565", HostConstant::NSString(kEAGLColorFormatRGB565)),
 ];
 
 pub(super) type EAGLRenderingAPI = u32; 
 const kEAGLRenderingAPIOpenGLES1: EAGLRenderingAPI = 1;
 const kEAGLRenderingAPIOpenGLES2: EAGLRenderingAPI = 2;
-#[allow(dead_code)]
-const kEAGLRenderingAPIOpenGLES3: EAGLRenderingAPI = 3;
 
 pub(super) struct EAGLContextHostObject {
     pub(super) api: EAGLRenderingAPI, 
@@ -109,12 +93,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithAPI:(EAGLRenderingAPI)api sharegroup:(id)group {
     if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
-        log!("TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil", api, group);
-        return nil;
-    }
-
-    if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
         return nil;
     }
 
@@ -130,13 +108,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     env.window.as_mut().unwrap().set_share_with_current_context(true);
 
-    // FIXED: Correctly branch between ES 1.1 and ES 2.0 based on requested API
-    let mut gles_ins = if api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Initializing Shared OpenGL ES 2.0 context for modern 3D game...");
-        create_gles2_ctx(env)
-    } else {
-        create_gles1_ctx(env)
-    };
+    let mut gles_ins = create_gles1_ctx(env);
 
     {
         let gles_ctx = gles_ins.make_current(window);
@@ -156,22 +128,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithAPI:(EAGLRenderingAPI)api {
     if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
-        log!("TODO: App requested EAGL initWithAPI:{}, returning nil", api);
         return nil;
     }
 
-    if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
-        return nil;
-    }
-
-    // FIXED: Correctly branch between ES 1.1 and ES 2.0 based on requested API
-    let mut gles_ins = if api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Initializing OpenGL ES 2.0 context for modern 3D game...");
-        create_gles2_ctx(env)
-    } else {
-        create_gles1_ctx(env)
-    };
+    let mut gles_ins = create_gles1_ctx(env);
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
