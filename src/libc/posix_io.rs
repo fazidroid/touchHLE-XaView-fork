@@ -132,6 +132,13 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
     
     let res = match env.fs.open_with_options(GuestPath::new(&path_string), options) {
         Ok(file) => {
+            // FIXED: Reject attempts to open directories as files to break Asphalt 6 loop
+            if matches!(file, GuestFile::Directory) {
+                log_dbg!("Blocking attempt to open directory as a file: {}", path_string);
+                set_errno(env, EISDIR);
+                return -1;
+            }
+
             let host_object = PosixFileHostObject {
                 file,
                 needs_flush,
@@ -180,7 +187,6 @@ pub fn read(
             bytes_read.try_into().unwrap()
         }
         Err(e) => {
-            // BREAK THE LOOP: Tell Asphalt 6 the directory is empty
             if e.kind() == std::io::ErrorKind::IsADirectory {
                 set_errno(env, EISDIR);
                 return 0; 
@@ -278,7 +284,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
         return -1;
     };
 
-    // BREAK THE LOOP: Stop Asphalt 6 from trying to rewind a directory 
+    // FIXED: Prevent Asphalt 6 from trying to rewind a directory and causing an infinite loop
     if matches!(file.file, GuestFile::Directory) {
         return 0;
     }
