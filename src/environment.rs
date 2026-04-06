@@ -1566,29 +1566,6 @@ impl Environment {
                     dyld::Dyld::SVC_LAZY_LINK
                     | dyld::Dyld::SVC_LAZY_LINK_RET_FLAG
                     | dyld::Dyld::SVC_LINKED_FUNCTIONS_BASE.. => {
-                        // BypassStackChkFailA8
-                        if self.cpu.regs()[14] == 0x00433ba1 {
-                            echo!("WARNING: Unwinding A8 smashed stack! Thread: {}", self.current_thread);
-                            let fp0 = self.cpu.regs()[7];
-                            let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                            if fp1 > fp0 && fp1.wrapping_sub(fp0) < 0x1000 {
-                                let saved_r4: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
-                                let saved_r5: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
-                                let saved_r6: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
-                                let saved_r7: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
-                                let saved_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
-
-                                self.cpu.regs_mut()[4] = saved_r4;
-                                self.cpu.regs_mut()[5] = saved_r5;
-                                self.cpu.regs_mut()[6] = saved_r6;
-                                self.cpu.regs_mut()[7] = saved_r7;
-                                self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
-                                self.cpu.regs_mut()[0] = 0;
-                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(saved_lr | 1));
-                            }
-                            return ThreadNextAction::Continue;
-                        }
-
                         if let Some(f) = self.dyld.get_svc_handler(
                             &self.bins,
                             &mut self.mem,
