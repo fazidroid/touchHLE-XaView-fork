@@ -7,10 +7,7 @@
 
 use crate::objc::{id, msg, nil, objc_classes, SEL, ClassExports, HostObject};
 use crate::frameworks::foundation::NSInteger;
-use crate::mem::Ptr;
-use crate::Environment;
 
-// Define host objects to satisfy the HostObject trait requirement
 pub(super) struct NSOperationQueueHostObject;
 impl HostObject for NSOperationQueueHostObject {}
 
@@ -19,7 +16,8 @@ impl HostObject for NSOperationHostObject {}
 
 pub(super) struct NSInvocationOperationHostObject {
     pub target: id,
-    pub sel: SEL,
+    // FIXED: Wrap SEL in an Option so we can safely initialize it with None
+    pub sel: Option<SEL>, 
     pub arg: id,
 }
 impl HostObject for NSInvocationOperationHostObject {}
@@ -31,7 +29,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSOperationQueue: NSObject
 
 + (id)alloc {
-    // FIXED: Use a proper HostObject struct instead of ()
     env.objc.alloc_object(this, Box::new(NSOperationQueueHostObject), &mut env.mem)
 }
 
@@ -42,7 +39,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     () = msg![env; op start];
 }
 
-// FIXED: Use NSInteger instead of isize to satisfy GuestArg trait
 - (())setMaxConcurrentOperationCount:(NSInteger)_count { }
 
 @end
@@ -51,7 +47,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSOperation: NSObject
 
 + (id)alloc {
-    // FIXED: Use a proper HostObject struct instead of ()
     env.objc.alloc_object(this, Box::new(NSOperationHostObject), &mut env.mem)
 }
 
@@ -75,8 +70,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)alloc {
     let host_object = Box::new(NSInvocationOperationHostObject {
         target: nil,
-        // FIXED: Initializing with a null pointer since from_raw was missing
-        sel: SEL::from(Ptr::null()),
+        sel: None, // FIXED: Safely initialized as None!
         arg: nil,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
@@ -85,7 +79,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)initWithTarget:(id)target selector:(SEL)sel object:(id)arg {
     let host_object = env.objc.borrow_mut::<NSInvocationOperationHostObject>(this);
     host_object.target = target;
-    host_object.sel = sel;
+    host_object.sel = Some(sel); // FIXED: Storing the provided selector
     host_object.arg = arg;
     this
 }
@@ -93,7 +87,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())main {
     let host_object = env.objc.borrow::<NSInvocationOperationHostObject>(this);
     let target = host_object.target;
-    let sel = host_object.sel;
+    let sel = host_object.sel.expect("NSInvocationOperation executed without a selector!");
     let arg = host_object.arg;
     
     if arg != nil {
