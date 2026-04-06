@@ -1064,6 +1064,10 @@ impl Environment {
                     &mut self.threads[thread].blocked_by,
                     ThreadBlock::NotBlocked,
                 );
+                // WatchdogSuspendTracer
+                if thread == 0 {
+                    echo!("[Watchdog] Thread 0 SUSPENDED by Thread {}!", self.current_thread);
+                }
                 log_dbg!("Suspend thread {} from {:?}", thread, previous_thread_state);
                 self.threads[thread].blocked_by =
                     ThreadBlock::Suspended(1, Box::new(previous_thread_state));
@@ -1751,6 +1755,12 @@ impl Environment {
     /// condition is met.
     pub fn yield_thread(&mut self, thread_block: ThreadBlock) {
         assert!(!self.threads[self.current_thread].is_blocked());
+        // ThreadZeroYieldTracer
+        if self.current_thread == 0 && thread_block != ThreadBlock::NotBlocked {
+            let pc = self.cpu.regs()[cpu::Cpu::PC];
+            let lr = self.cpu.regs()[cpu::Cpu::LR];
+            echo!("[Watchdog] Thread 0 BLOCKED! PC: {:#010x}, LR: {:#010x}, Reason: {:?}", pc, lr, thread_block);
+        }
         log_dbg!(
             "Thread {} yielding on {:?}",
             self.current_thread,
