@@ -268,6 +268,13 @@ fn objc_msgSend_inner(
                  return;
              }
 
+             // ===== Burstly JSON Serializer FIX =====
+             if sel_str == "toJSONAs:excludingInArray:withTranslations:" {
+                 log!("Stub: toJSONAs:excludingInArray:withTranslations: on invalid class (SAFE)");
+                 env.cpu.regs_mut()[0..2].fill(0);
+                 return;
+             }
+
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
                 if is_metaclass { "Class" } else { "Object" },
