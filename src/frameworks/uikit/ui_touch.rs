@@ -194,15 +194,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
     let event = ui_event::new_event(env, all_touches);
     autorelease(env, event);
-    // views with existing touches (see isMultipleTouchEnabled check below)
-    let views_with_existing_touches: HashSet<id> = env
-        .framework_state
-        .uikit
-        .ui_touch
-        .current_touches
-        .values()
-        .map(|&touch| env.objc.borrow::<UITouchHostObject>(touch).view)
-        .collect();
+    
     // view to set of touches for this view
     let mut view_touches: HashMap<id, id> = HashMap::new();
     let touches_arr: id = msg![env; touches allObjects];
@@ -230,14 +222,17 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
         let mut view: id = msg![env; window hitTest:location_in_window withEvent:event];
         
-        // If the inner hitTest still rejects it, force the touch into the window itself!
+        // If the inner hitTest still rejects it, force the touch into the game view!
         if view == nil {
-            log!(
-                "Couldn't find a view for touch at {:?} in window {:?}, forcing to window to prevent discard!",
-                location_in_window,
-                window,
-            );
-            view = window;
+            let subviews: id = msg![env; window subviews];
+            let count: NSUInteger = msg![env; subviews count];
+            if count > 0 {
+                // Grab the very first layer inside the window (usually the OpenGL Game View)
+                view = msg![env; subviews objectAtIndex:0];
+                log!("Touch out of bounds, forcing into main game view!");
+            } else {
+                view = window;
+            }
         } else {
             log_dbg!(
                 "Found view {:?} with frame {:?} for touch at {:?} in window {:?}",
@@ -252,24 +247,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         }
         // ===============================
 
-        let is_multi_touch_enabled: bool = msg![env; view isMultipleTouchEnabled];
-        if !is_multi_touch_enabled {
-            // When a view has multi-touch disabled, it can only have one active
-            // touch at once. So, we can only report a new touch to the view if
-            // there are no other touches currently associated with it, and if
-            // there are multiple new touches for this view, we can only report
-            // one of them.
-            let view_has_other_new_touches = view_touches.contains_key(&view);
-            let view_has_existing_touches = views_with_existing_touches.contains(&view);
-            if view_has_other_new_touches || view_has_existing_touches {
-                log!(
-                    "Ignoring new touch {:?} for view {:?}, !isMultipleTouchEnabled",
-                    touch,
-                    view
-                );
-                continue;
-            }
-        }
+        // IS MULTIPLE TOUCH ENABLED CHECK REMOVED HERE TO PREVENT GHOST LOCKS!
 
         // Only create the set after the isMultipleTouchEnabled checks so we
         // won't end up with an empty set.
