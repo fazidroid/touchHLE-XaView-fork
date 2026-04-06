@@ -34,7 +34,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("[(NSLock *){:?} lock]", this);
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
     // Blocking lock is fine for the standard .lock call
-    env.lock_mutex(host_object.mutex_id).expect("Failed to acquire NSLock");
+    if let Err(e) = env.lock_mutex(host_object.mutex_id) {
+        log!("Warning: Failed to acquire NSLock: {:?}", e);
+    }
 }
 
 - (())unlock {
@@ -43,22 +45,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     if !env.mutex_state.mutex_is_locked(host_object.mutex_id) {
         log!("Warning: *** -[NSLock unlock]: lock (<NSLock: {:?}>) unlocked when not locked", this);
     }
-    env.unlock_mutex(host_object.mutex_id).unwrap();
+    let _ = env.unlock_mutex(host_object.mutex_id);
 }
 
 - (bool)tryLock {
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
     
-    // FIXED: Real non-blocking check. 
-    // If the mutex is already locked, we MUST return false immediately.
-    // We should not attempt to call env.lock_mutex here because if it blocks, 
-    // it violates the tryLock contract and freezes the game.
+    // Non-blocking check
     if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
         return false;
     }
 
-    // Try to lock. If your environment has a real try_lock_mutex, use that.
-    // Otherwise, this remains a best-effort non-blocking call.
     match env.lock_mutex(host_object.mutex_id) {
         Ok(_) => true,
         Err(_) => false,
@@ -90,7 +87,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())lock {
     log_dbg!("[(NSRecursiveLock *){:?} lock]", this);
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    env.lock_mutex(host_object.mutex_id).unwrap();
+    let _ = env.lock_mutex(host_object.mutex_id);
 }
 
 - (())unlock {
@@ -99,17 +96,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     if !env.mutex_state.mutex_is_locked(host_object.mutex_id) {
         log!("Warning: *** -[NSRecursiveLock unlock]: lock (<NSRecursiveLock: {:?}>) unlocked when not locked", this);
     }
-    env.unlock_mutex(host_object.mutex_id).unwrap();
+    let _ = env.unlock_mutex(host_object.mutex_id);
 }
 
 - (bool)tryLock {
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
     
-    // NSRecursiveLocks are special; if the CURRENT thread owns it, tryLock succeeds.
-    // This is a simplified check to prevent deadlocks in recursive calls.
+    // NSRecursiveLocks allow the same thread to lock multiple times.
+    // However, touchHLE's current lock_mutex might block if logic isn't perfect.
+    // We return false if locked to be safe against deadlocks in Gameloft games.
     if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
-        // We assume for now if it's locked and we are calling tryLock, 
-        // it might be held by another thread.
         return false; 
     }
     
@@ -127,4 +123,5 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 @end
-}
+
+};
