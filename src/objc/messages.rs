@@ -44,8 +44,16 @@ fn objc_msgSend_inner(
     );
     let message_type_info = env.objc.message_type_info.take();
 
-    // BypassNetworkError
     let sel_str = selector.as_str(&env.mem);
+
+    // ===== URL Tracker Bypasses =====
+    if sel_str == "HTTPMethod" || sel_str == "host" {
+        log!("Stub: {} to safely bypass tracker URL parsing!", sel_str);
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+    // ================================
+
     // SAFE: only crash-prone selectors
             // Bypass empty/null selectors to prevent UIApplication crashes
     if sel_str.is_empty() {
