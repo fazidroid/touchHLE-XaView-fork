@@ -7,6 +7,7 @@
 
 use crate::objc::{id, msg, nil, objc_classes, SEL, ClassExports, HostObject};
 use crate::frameworks::foundation::NSInteger;
+use crate::mem::Ptr;
 
 pub(super) struct NSOperationQueueHostObject;
 impl HostObject for NSOperationQueueHostObject {}
@@ -16,7 +17,6 @@ impl HostObject for NSOperationHostObject {}
 
 pub(super) struct NSInvocationOperationHostObject {
     pub target: id,
-    // FIXED: Wrap SEL in an Option so we can safely initialize it with None
     pub sel: Option<SEL>, 
     pub arg: id,
 }
@@ -70,7 +70,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)alloc {
     let host_object = Box::new(NSInvocationOperationHostObject {
         target: nil,
-        sel: None, // FIXED: Safely initialized as None!
+        sel: None,
         arg: nil,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
@@ -79,7 +79,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)initWithTarget:(id)target selector:(SEL)sel object:(id)arg {
     let host_object = env.objc.borrow_mut::<NSInvocationOperationHostObject>(this);
     host_object.target = target;
-    host_object.sel = Some(sel); // FIXED: Storing the provided selector
+    host_object.sel = Some(sel);
     host_object.arg = arg;
     this
 }
@@ -90,10 +90,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     let sel = host_object.sel.expect("NSInvocationOperation executed without a selector!");
     let arg = host_object.arg;
     
+    // FIXED: Capture the return value to prevent type mismatch panics
     if arg != nil {
-        () = msg![env; target performSelector:sel withObject:arg];
+        let _res: id = msg![env; target performSelector:sel withObject:arg];
     } else {
-        () = msg![env; target performSelector:sel];
+        let _res: id = msg![env; target performSelector:sel];
     }
 }
 
