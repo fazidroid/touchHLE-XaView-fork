@@ -5,9 +5,8 @@
  */
 //! `NSOperation` and `NSOperationQueue`.
 
-use crate::objc::{id, msg, nil, objc_classes, SEL, ClassExports, HostObject};
+use crate::objc::{id, msg, msg_class, nil, objc_classes, SEL, ClassExports, HostObject};
 use crate::frameworks::foundation::NSInteger;
-use crate::mem::Ptr;
 
 pub(super) struct NSOperationQueueHostObject;
 impl HostObject for NSOperationQueueHostObject {}
@@ -17,7 +16,7 @@ impl HostObject for NSOperationHostObject {}
 
 pub(super) struct NSInvocationOperationHostObject {
     pub target: id,
-    pub sel: Option<SEL>, 
+    pub sel: Option<SEL>,
     pub arg: id,
 }
 impl HostObject for NSInvocationOperationHostObject {}
@@ -41,6 +40,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())setMaxConcurrentOperationCount:(NSInteger)_count { }
 
+// FIXED: Prevent spinlocks by always reporting the queue as empty!
+- (NSInteger)operationCount { 0 }
+
+- (id)operations { 
+    msg_class![env; NSArray array] 
+}
+
+- (())cancelAllOperations { }
+
+- (())waitUntilAllOperationsAreFinished { }
+
 @end
 
 
@@ -58,8 +68,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())main { }
 
+// FIXED: Gameloft loading threads will spinlock forever if these return false!
 - (bool)isCancelled { false }
+- (bool)isFinished { true } // Tells the game the asset loaded instantly
+- (bool)isExecuting { false }
+- (bool)isReady { true }
+- (bool)isConcurrent { false }
 
+- (())waitUntilFinished { }
 - (())cancel { }
 
 @end
@@ -90,7 +106,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let sel = host_object.sel.expect("NSInvocationOperation executed without a selector!");
     let arg = host_object.arg;
     
-    // FIXED: Capture the return value to prevent type mismatch panics
+    // Execute the requested loading task synchronously
     if arg != nil {
         let _res: id = msg![env; target performSelector:sel withObject:arg];
     } else {
