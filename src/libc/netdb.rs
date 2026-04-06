@@ -8,7 +8,7 @@
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_DGRAM, SOCK_STREAM};
-use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
+use crate::mem::{guest_size_of, ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
 
 const AI_PASSIVE: i32 = 0x1;
@@ -33,6 +33,32 @@ pub struct hostent {
     h_addr_list: MutPtr<u32>,
 }
 unsafe impl SafeRead for hostent {}
+
+// Custom safe wrapper structs to write the DNS payload
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct FakeIP {
+    b1: u8,
+    b2: u8,
+    b3: u8,
+    b4: u8,
+}
+unsafe impl SafeRead for FakeIP {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct FakeAddrList {
+    ptr: u32,
+    null_term: u32,
+}
+unsafe impl SafeRead for FakeAddrList {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct FakeAliasList {
+    null_term: u32,
+}
+unsafe impl SafeRead for FakeAliasList {}
 // =====================================================
 
 #[derive(Copy, Clone, Debug)]
@@ -117,16 +143,16 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
         name_str
     );
 
-    // 1. Create a fake IP address byte array (127.0.0.1 / localhost)
-    let ip_addr: [u8; 4] = [127, 0, 0, 1];
+    // 1. Create a fake IP address (127.0.0.1 / localhost)
+    let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
     let ip_ptr = env.mem.alloc_and_write(ip_addr);
 
     // 2. Create the null-terminated address list required by C structs
-    let addr_list: [u32; 2] = [ip_ptr.to_bits(), 0];
+    let addr_list = FakeAddrList { ptr: ip_ptr.to_bits(), null_term: 0 };
     let addr_list_ptr = env.mem.alloc_and_write(addr_list);
 
     // 3. Create the null-terminated aliases list
-    let aliases: [u32; 1] = [0];
+    let aliases = FakeAliasList { null_term: 0 };
     let aliases_ptr = env.mem.alloc_and_write(aliases);
 
     // 4. Populate the full hostent struct so the game engine happily reads it
