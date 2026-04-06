@@ -1527,10 +1527,24 @@ impl GLES for GLES1Native<'_> {
             gles11::GetBufferParameteriv(target, pname, params)
         }
     }
-    unsafe fn MapBufferOES(&mut self, target: GLenum, access: GLenum) -> *mut GLvoid {
+   unsafe fn MapBufferOES(&mut self, target: GLenum, access: GLenum) -> *mut GLvoid {
         gles11::MapBufferOES(target, access)
     }
+    
     unsafe fn UnmapBufferOES(&mut self, target: GLenum) -> GLboolean {
         gles11::UnmapBufferOES(target)
     }
-}
+
+    // --- ADD THE MISSING FUNCTIONS HERE ---
+    unsafe fn BlendFuncSeparate(&mut self, sfactorRGB: GLenum, dfactorRGB: GLenum, sfactorAlpha: GLenum, dfactorAlpha: GLenum) {
+        unimplemented!("BlendFuncSeparate is not supported in GLES1");
+    }
+
+    unsafe fn BlendEquationSeparate(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
+        unimplemented!("BlendEquationSeparate is not supported in GLES1");
+    }
+    // --------------------------------------
+
+} // <-- This closes the `impl GLES for GLES1Native` block
+
+} // <-- Keep whatever extra closing brace you currently have at the very end of your file
