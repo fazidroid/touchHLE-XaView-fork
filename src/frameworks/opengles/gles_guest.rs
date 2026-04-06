@@ -486,13 +486,25 @@ fn glStencilFunc(env: &mut Environment, func: GLenum, ref_: GLint, mask: GLuint)
         gles.StencilFunc(func, ref_, mask)
     });
 }
+fn glStencilFuncSeparate(env: &mut Environment, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+    // StencilFuncSeparateImpl
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilFuncSeparate(face, func, ref_, mask) })
+}
 fn glStencilOp(env: &mut Environment, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.StencilOp(sfail, dpfail, dppass)
     });
 }
+fn glStencilOpSeparate(env: &mut Environment, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+    // StencilOpSeparateImpl
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilOpSeparate(face, sfail, dpfail, dppass) })
+}
 fn glStencilMask(env: &mut Environment, mask: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilMask(mask) });
+}
+fn glStencilMaskSeparate(env: &mut Environment, face: GLenum, mask: GLuint) {
+    // StencilMaskSeparateImpl
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilMaskSeparate(face, mask) })
 }
 fn glLogicOp(env: &mut Environment, opcode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.LogicOp(opcode) });
@@ -2289,8 +2301,11 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glLineWidth(_)),
     export_c_func!(glLineWidthx(_)),
     export_c_func!(glStencilFunc(_, _, _)),
+    export_c_func!(glStencilFuncSeparate(_, _, _, _)),
     export_c_func!(glStencilOp(_, _, _)),
+    export_c_func!(glStencilOpSeparate(_, _, _, _)),
     export_c_func!(glStencilMask(_)),
+    export_c_func!(glStencilMaskSeparate(_, _)),
     export_c_func!(glLogicOp(_)),
     // Points
     export_c_func!(glPointSize(_)),
