@@ -166,20 +166,20 @@ fn SCNetworkReachabilitySetCallback(
 }
 
 fn SCNetworkReachabilityScheduleWithRunLoop(
-    env: &mut Environment,
-    target: SCNetworkReachabilityRef,
-    run_loop: MutVoidPtr,
-    run_loop_mode: MutVoidPtr,
+    _env: &mut Environment,
+    _target: SCNetworkReachabilityRef,
+    _run_loop: MutVoidPtr,
+    _run_loop_mode: MutVoidPtr,
 ) -> bool {
     // FakeNetSchedule
     true
 }
 
 fn SCNetworkReachabilityUnscheduleFromRunLoop(
-    env: &mut Environment,
-    target: SCNetworkReachabilityRef,
-    run_loop: MutVoidPtr,
-    run_loop_mode: MutVoidPtr,
+    _env: &mut Environment,
+    _target: SCNetworkReachabilityRef,
+    _run_loop: MutVoidPtr,
+    _run_loop_mode: MutVoidPtr,
 ) -> bool {
     // FakeNetUnschedule
     true
