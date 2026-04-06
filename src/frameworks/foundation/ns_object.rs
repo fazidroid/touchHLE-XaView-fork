@@ -152,16 +152,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueCoding/SearchImplementation.html
 - (())setValue:(id)value
        forKey:(id)key { // NSString*
-    let key_string = to_rust_string(env, key); // TODO: avoid copy?
+    let key_string = to_rust_string(env, key);
+    // TODO: avoid copy?
     assert!(key_string.is_ascii()); // TODO: do we have to handle non-ASCII keys?
     let camel_case_key_string = format!("{}{}", key_string.as_bytes()[0].to_ascii_uppercase() as char, &key_string[1..]);
 
     let class = msg![env; this class];
-
     // TODO: If value is nil, the target ivar/method argument type must be
     // checked. If it's non-object type, invoke setNilValueForKey:
     assert!(value != nil);
-
     // TODO: If value is a NSNumber or NSValue, it must be unwrapped
     let value_class = msg![env; value class];
     let ns_value_class = env.objc.get_known_class("NSValue", &mut env.mem);
@@ -192,6 +191,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     // (or unwrapped value) and finish.
     let sel = env.objc.lookup_selector("accessInstanceVariablesDirectly").unwrap();
     let accessInstanceVariablesDirectly = msg_send(env, (class, sel));
+
     if accessInstanceVariablesDirectly {
         if let Some(ivar_ptr) = env.objc.object_lookup_ivar(&env.mem, this, &format!("_{key_string}"))
             .or_else(|| env.objc.object_lookup_ivar(&env.mem, this, &format!("_is{camel_case_key_string}")))
@@ -218,6 +218,7 @@ forUndefinedKey:(id)key { // NSString*
     let class: Class = ObjC::read_isa(this, &env.mem);
     let class_name_string = env.objc.get_class_name(class).to_owned(); // TODO: Avoid copying
     let key_string = to_rust_string(env, key);
+
     panic!("Object {:?} of class {:?} ({:?}) does not have a setter for {} ({:?})\
         \nAvailable selectors: {}\nAvailable ivars: {}",
         this, class_name_string, class, key_string, key,
@@ -249,29 +250,23 @@ forUndefinedKey:(id)key { // NSString*
 
 - (())performSelectorInBackground:(SEL)sel
                        withObject:(id)arg {
-    detach_new_thread_inner(env, sel, this, arg, /* tolerate_type_mismatch: */ true)
+    // FIXED: Gameloft "Anti-Freeze" Hack for background loading loops
+    log_dbg!("Synchronously executing background selector: {:?}", sel.as_str(&env.mem));
+    if arg != nil {
+        let _res: id = msg![env; this performSelector:sel withObject:arg];
+    } else {
+        let _res: id = msg![env; this performSelector:sel];
+    }
 }
 
 - (())performSelector:(SEL)sel withObject:(id)arg afterDelay:(NSTimeInterval)delay {
-    log_dbg!("performSelector:{} withObject:{:?} afterDelay:{}", sel.as_str(&env.mem), arg, delay);
-
-    let sel_key: id = get_static_str(env, "SEL");
-    let sel_str = from_rust_string(env, sel.as_str(&env.mem).to_string());
-    let arg_key: id = get_static_str(env, "arg");
-    let dict = dict_from_keys_and_objects(env, &[(sel_key, sel_str), (arg_key, arg)]);
-
-    // TODO: using timer is not the most efficient implementation, but does work
-    // Proper implementation requires a message queue in the run loop
-    let selector = env.objc.lookup_selector("_touchHLE_timerFireMethod:").unwrap();
-    let timer:id = msg_class![env; NSTimer timerWithTimeInterval:delay
-                                              target:this
-                                            selector:selector
-                                            userInfo:dict
-                                             repeats:false];
-
-    let run_loop: id = msg_class![env; NSRunLoop mainRunLoop];
-    let mode: id = get_static_str(env, NSDefaultRunLoopMode);
-    () = msg![env; run_loop addTimer:timer forMode:mode];
+    // FIXED: Gameloft "Anti-Freeze" Hack for delayed loading loops
+    log_dbg!("Bypassing Gameloft delay of {}s for selector: {:?}", delay, sel.as_str(&env.mem));
+    if arg != nil {
+        let _res: id = msg![env; this performSelector:sel withObject:arg];
+    } else {
+        let _res: id = msg![env; this performSelector:sel];
+    }
 }
 
 - (())performSelectorOnMainThread:(SEL)sel withObject:(id)arg waitUntilDone:(bool)wait {
@@ -285,6 +280,8 @@ forUndefinedKey:(id)key { // NSString*
         }
         return;
     }
+    
+    // Maintain game-specific hacks for compatibility
     if env.bundle.bundle_identifier().starts_with("com.gameloft.POP") && (sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie").unwrap()) && wait {
         log!("Applying game-specific hack for PoP: WW: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
         return;
@@ -306,14 +303,16 @@ forUndefinedKey:(id)key { // NSString*
             log!("Applying game-specific hack for Ferrari GT: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
             return;
         }
-        if sel == env.objc.lookup_selector("initTextInput:").unwrap() || sel == env.objc.lookup_selector("removeTextField:").unwrap() {
+        if sel == env.objc.lookup_selector("initTextInput:").unwrap() ||
+            sel == env.objc.lookup_selector("removeTextField:").unwrap() {
             log!("Applying game-specific hack for Ferrari GT: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
             () = msg_send(env, (this, sel, arg));
             return;
         }
     }
     if env.bundle.bundle_identifier().starts_with("com.gameloft.HOS2") && wait {
-        if sel == env.objc.lookup_selector("loadMovie:").unwrap() || sel == env.objc.lookup_selector("sendGameInfo").unwrap() || sel == env.objc.lookup_selector("setStatusBar:").unwrap() {
+        if sel == env.objc.lookup_selector("loadMovie:").unwrap() ||
+            sel == env.objc.lookup_selector("sendGameInfo").unwrap() || sel == env.objc.lookup_selector("setStatusBar:").unwrap() {
             log!("Applying game-specific hack for HOS2: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
             if sel.as_str(&env.mem).ends_with(':') {
                 () = msg_send(env, (this, sel, arg));
@@ -323,19 +322,20 @@ forUndefinedKey:(id)key { // NSString*
             }
             return;
         }
-        if sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie:").unwrap() {
+        if sel == env.objc.lookup_selector("startMovie:").unwrap() ||
+            sel == env.objc.lookup_selector("stopMovie:").unwrap() {
             log!("Applying game-specific hack for HOS2: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
             return;
         }
     }
-    // Ignore waitUntilDone (non-blocking fallback)
-    if wait {
-        log!("Ignoring performSelectorOnMainThread waitUntilDone:true (non-blocking)");
-    }
 
-    // The current implementation of performSelector:withObject:afterDelay
-    // already runs on the main thread.
-    msg![env; this performSelector:sel withObject:arg afterDelay:0.0]
+    // FIXED: Gameloft "Anti-Freeze" Hack for deferred execution
+    log_dbg!("Synchronously executing main thread selector: {:?}", sel.as_str(&env.mem));
+    if arg != nil {
+        let _res: id = msg![env; this performSelector:sel withObject:arg];
+    } else {
+        let _res: id = msg![env; this performSelector:sel];
+    }
 }
 
 // Private method, used by performSelector:withObject:afterDelay:
