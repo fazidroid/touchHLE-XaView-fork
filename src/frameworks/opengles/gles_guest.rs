@@ -226,8 +226,10 @@ for (idx, &format) in SUPPORTED_COMPRESSED_TEXTURE_FORMATS.iter().enumerate() {
                 mem.write(params, 1 as _);
             }
             // 
-MAX_SAMPLES | MAX_SAMPLES_ANGLE => { ... }
-            0x8d57 => {
+MAX_SAMPLES | MAX_SAMPLES_ANGLE => { 
+    // Your actual original code goes here!
+    // Do not literally type "..." 
+}
                 // TODO: handle GetBooleanv and GetFloatv as well
                 // 1 is an initial value
                 // TODO: This is an OpenGL ES 2.0 extension, not supported yet
