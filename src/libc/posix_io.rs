@@ -141,10 +141,9 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
     );
     assert!(flags & O_EXCL == 0);
 
-    // FIXED: Return -1 (Error) instead of 0 (Stdin) on failure to prevent infinite loops
     if path.is_null() {
         log_dbg!("open({:?}, {:#x}) => -1", path, flags);
-        set_errno(env, EINVAL); // Swapped EFAULT for EINVAL
+        set_errno(env, EINVAL); 
         return -1; 
     }
 
@@ -179,7 +178,7 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
         Ok(path_str) => path_str.to_owned(),
         Err(err) => {
             log!("open() error, unable to treat {:?} as utf8 str: {:?}", path, err);
-            set_errno(env, EINVAL); // Swapped EFAULT for EINVAL
+            set_errno(env, EINVAL); 
             return -1;
         }
     };
@@ -201,7 +200,6 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
             find_or_create_fd(env, host_object)
         }
         Err(()) => {
-            // TODO: set errno
             -1
         }
     };
@@ -222,13 +220,12 @@ pub fn read(
     set_errno(env, 0);
 
     if buffer.is_null() {
-        set_errno(env, EINVAL); // Swapped EFAULT for EINVAL
+        set_errno(env, EINVAL); 
         return -1;
     }
 
-    // Safely simulate reading from stdin
     if fd == STDIN_FILENO {
-        return 0; // standard EOF for non-blocking stdin
+        return 0; 
     }
 
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
@@ -254,7 +251,8 @@ pub fn read(
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
                     set_errno(env, EISDIR);
-                    0
+                    // FIXED: Correctly returning -1 (Error) instead of 0 to break the Asphalt 6 loop!
+                    -1 
                 }
                 _ => {
                     -1
@@ -306,7 +304,7 @@ pub(super) fn clearerr(env: &mut Environment, fd: FileDescriptor) {
 pub(super) fn fflush(env: &mut Environment, fd: FileDescriptor) -> i32 {
     set_errno(env, 0);
     if fd < NORMAL_FILENO_BASE && fd >= 0 {
-        return 0; // Safely pretend we flushed stdout/stderr
+        return 0; 
     }
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
@@ -326,7 +324,6 @@ pub fn write(
 ) -> GuestISize {
     set_errno(env, 0);
 
-    // Safely catch standard streams so they don't panic the emulator
     if fd == STDOUT_FILENO || fd == STDERR_FILENO {
         let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
         if let Ok(s) = std::str::from_utf8(buffer_slice) {
@@ -335,7 +332,6 @@ pub fn write(
         return size.try_into().unwrap();
     }
 
-    // Prevent unwrap panic on bad file descriptors
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         log!("Warning: write({:?}, {:?}, {:#x}) called with unknown fd, returning -1", fd, buffer, size);
         set_errno(env, EBADF);
