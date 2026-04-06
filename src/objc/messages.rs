@@ -301,9 +301,9 @@ fn objc_msgSend_inner(
         }) = host_object.as_any().downcast_ref()
         {
             
-            // ===== AUTO-DISMISS ALERTS SAFELY =====
+            // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
             if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
-                log!("AUTO-DISMISSING UIAlertView to unfreeze game screen!");
+                log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
                 
                 // Only ask for the delegate if touchHLE actually supports it!
                 if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
@@ -318,6 +318,17 @@ fn objc_msgSend_inner(
                             let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
                         }
                     }
+                }
+                
+                // Drop the invisible shield!
+                if env.objc.object_has_method_named(&env.mem, receiver, "setHidden:") {
+                    let _: () = msg![env; receiver setHidden:true];
+                }
+                if env.objc.object_has_method_named(&env.mem, receiver, "setUserInteractionEnabled:") {
+                    let _: () = msg![env; receiver setUserInteractionEnabled:false];
+                }
+                if env.objc.object_has_method_named(&env.mem, receiver, "removeFromSuperview") {
+                    let _: () = msg![env; receiver removeFromSuperview];
                 }
                 
                 env.cpu.regs_mut()[0..2].fill(0);
