@@ -346,7 +346,7 @@ fn glBlendFuncSeparate(
 ) {
     // BlendFuncSeparateImpl
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.BlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha)
+        gles.BlendFuncSeparateOES(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha)
     })
 }
 fn glBlendEquationOES(env: &mut Environment, mode: GLenum) {
@@ -358,7 +358,7 @@ fn glBlendEquation(env: &mut Environment, mode: GLenum) {
 fn glBlendEquationSeparate(env: &mut Environment, modeRGB: GLenum, modeAlpha: GLenum) {
     // BlendEqSeparateImpl
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.BlendEquationSeparate(modeRGB, modeAlpha)
+        gles.BlendEquationSeparateOES(modeRGB, modeAlpha)
     })
 }
 fn glColorMask(
