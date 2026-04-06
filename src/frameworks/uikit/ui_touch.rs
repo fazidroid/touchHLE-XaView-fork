@@ -10,13 +10,12 @@ use crate::frameworks::core_graphics::{CGPoint, CGRect};
 use crate::frameworks::foundation::{NSInteger, NSTimeInterval, NSUInteger};
 use crate::mem::MutVoidPtr;
 use crate::objc::{
-    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports, HostObject,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
 };
 use crate::window::{Coords, Event, FingerId};
 use crate::Environment;
 use std::collections::hash_map::{Entry, HashMap};
-use std::collections::HashSet;
 
 pub type UITouchPhase = NSInteger;
 pub const UITouchPhaseBegan: UITouchPhase = 0;
