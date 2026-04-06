@@ -226,7 +226,7 @@ for (idx, &format) in SUPPORTED_COMPRESSED_TEXTURE_FORMATS.iter().enumerate() {
                 mem.write(params, 1 as _);
             }
             // 
-MAX_SAMPLES or MAX_SAMPLES_ANGLE
+MAX_SAMPLES | MAX_SAMPLES_ANGLE => { ... }
             0x8d57 => {
                 // TODO: handle GetBooleanv and GetFloatv as well
                 // 1 is an initial value
@@ -1728,7 +1728,7 @@ if let Some((guest_buffer, host_buffer)) = current_ctx_host_object
 
 /// If fog is enabled, check if the values for start and end distances
 /// are equal.
-Apple platforms (even modern Mac OS) seem to handle that
+// Apple platforms (even modern Mac OS) seem to handle that
 /// gracefully, however, both Windows and Android have issues in those cases.
 /// This workaround is required so Doom 2 RPG renders correctly.
 /// It prevents divisions by zero in levels where fog is used and both
