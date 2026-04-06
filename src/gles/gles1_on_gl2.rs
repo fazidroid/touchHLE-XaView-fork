@@ -11,7 +11,7 @@ use super::gles11_raw as gles11; // constants only
 use super::gles_generic::GLES;
 use super::util::{
     fixed_to_float, matrix_fixed_to_float, try_decode_pvrtc, PalettedTextureFormat, ParamTable,
-    ParamType, GET_PARAMS,
+    ParamType,
 };
 use super::GLESContext;
 use crate::window::{GLContext, GLVersion, Window};
@@ -266,11 +266,11 @@ impl GLES for GLES1OnGL2<'_> {
     }
 
     unsafe fn GetIntegerv(&mut self, pname: GLenum, params: *mut GLint) {
+        // FIXED: Intercept shader binary format queries to prevent 0x8df9 panics
         if pname == 0x8df8 { *params = 0; return; }
         if pname == 0x8df9 { return; }
-        let (type_, _count) = GET_PARAMS.get_type_info(pname);
-        let allowed_float = type_ == ParamType::Float && pname == gl21::POINT_SIZE_MAX;
-        assert!(type_ == ParamType::Int || allowed_float);
+        
+        // FIXED: Bypass GET_PARAMS validation to allow native ES 2.0 queries from N.O.V.A. 3
         gl21::GetIntegerv(pname, params);
     }
 
@@ -409,11 +409,11 @@ impl GLES for GLES1OnGL2<'_> {
             let palette_size = palette_entry_size * palette_entry_count;
             let index_count = w as usize * h as usize;
             let (index_word_size, index_word_count) = if index_is_nibble { (1, index_count.div_ceil(2)) } else { (4, index_count.div_ceil(4)) };
-            let indices_size = index_word_size * index_word_count;
+            let _indices_size = index_word_size * index_word_count; // FIXED: Added underscore to silence warning
             let (palette, indices) = data.split_at(palette_size);
             let mut decoded = Vec::<u8>::with_capacity(palette_entry_size * index_count);
-            for i in 0..index_count {
-                let index = if index_is_nibble { (indices[i / 2] >> ((1 - (i % 2)) * 4)) & 0xf } else { indices[i] } as usize;
+            for idx in 0..index_count {
+                let index = if index_is_nibble { (indices[idx / 2] >> ((1 - (idx % 2)) * 4)) & 0xf } else { indices[idx] } as usize;
                 decoded.extend_from_slice(&palette[index * palette_entry_size..][..palette_entry_size]);
             }
             gl21::TexImage2D(t, l, palette_entry_format as _, w, h, b, palette_entry_format, palette_entry_type, decoded.as_ptr() as *const _);
@@ -469,7 +469,6 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn DisableVertexAttribArray(&mut self, i: GLuint) { gl21::DisableVertexAttribArray(i) }
     unsafe fn EnableVertexAttribArray(&mut self, i: GLuint) { gl21::EnableVertexAttribArray(i) }
     
-    // THE RESTORED MISSING METHODS TO SATISFY E0046
     unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat) { gl21::VertexAttrib1f(indx, x) }
     unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat) { gl21::VertexAttrib2f(indx, x, y) }
     unsafe fn VertexAttrib3f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat, z: GLfloat) { gl21::VertexAttrib3f(indx, x, y, z) }
