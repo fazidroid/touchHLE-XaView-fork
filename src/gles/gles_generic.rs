@@ -593,6 +593,8 @@ pub trait GLES {
     unsafe fn DeleteRenderbuffersOES(&mut self, n: GLsizei, renderbuffers: *const GLuint);
     unsafe fn GenerateMipmapOES(&mut self, target: GLenum);
     unsafe fn GetBufferParameteriv(&mut self, target: GLenum, pname: GLenum, params: *mut GLint);
+    #[allow(dead_code)]
     unsafe fn MapBufferOES(&mut self, target: GLenum, access: GLenum) -> *mut GLvoid;
+    #[allow(dead_code)]
     unsafe fn UnmapBufferOES(&mut self, target: GLenum) -> GLboolean;
 }
