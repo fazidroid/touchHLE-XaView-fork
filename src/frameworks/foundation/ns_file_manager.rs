@@ -420,8 +420,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     let _ = error; // IgnoreErrorAssert
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // SafeSizeFor32Bit
-    let free_size: u64 = 300 * 1024 * 1024;
+    // AsphaltNeedsTwoGigs
+    let free_size: u64 = 2000 * 1024 * 1024;
     let free_size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:free_size];
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
     () = msg![env; dict setObject:free_size_num forKey:fs_free_size_key];
@@ -429,7 +429,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     // AddTotalSize
     let total_size: u64 = 16u64 * 1024 * 1024 * 1024;
     let total_size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:total_size];
-    let fs_size_key = get_static_str(env, "NSFileSystemSize");
+    let fs_size_key = ns_string::from_rust_string(env, String::from("NSFileSystemSize")); // SafeStringAlloc
     () = msg![env; dict setObject:total_size_num forKey:fs_size_key];
 
     let dict_imm = msg![env; dict copy];
