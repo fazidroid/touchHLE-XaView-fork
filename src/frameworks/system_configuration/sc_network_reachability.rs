@@ -11,7 +11,7 @@ use crate::frameworks::core_foundation::cf_allocator::CFAllocatorRef;
 use crate::frameworks::core_foundation::CFTypeRef;
 use crate::libc::sys::socket::sockaddr;
 use crate::mem::{ConstPtr, MutPtr, MutVoidPtr};
-use crate::objc::{id, objc_classes, msg, Class, ClassExports, HostObject};
+use crate::objc::{objc_classes, msg, Class, ClassExports, HostObject};
 use crate::Environment;
 use std::net::SocketAddrV4;
 

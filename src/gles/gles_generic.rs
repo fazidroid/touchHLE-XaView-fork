@@ -68,18 +68,21 @@ pub trait GLESContext {
 ///
 /// These are effectively direct wrappers around the raw OpenGL functions,
 /// but they make sure that the context is active while it is using it.
+///
 /// # Safety
 /// These functions (should) act as documented by the OpenGL ES spec. Callers
 /// should ensure that all uses of raw pointers are verfied to be valid and
 /// of the correct size as documented in the OpenGL ES spec.
 #[allow(clippy::upper_case_acronyms)]
 #[allow(clippy::too_many_arguments)] // not our fault :(
-                                     // EsTwoCheckTrait
+// EsTwoCheckTrait
 pub trait GLES {
     fn is_gles2(&self) -> bool {
         false
     }
+
     unsafe fn driver_description(&self) -> String;
+
     // Generic state manipulation
     unsafe fn GetError(&mut self) -> GLenum;
     unsafe fn Enable(&mut self, cap: GLenum);
@@ -327,7 +330,6 @@ pub trait GLES {
     unsafe fn TexEnvfv(&mut self, target: GLenum, pname: GLenum, params: *const GLfloat);
     unsafe fn TexEnvxv(&mut self, target: GLenum, pname: GLenum, params: *const GLfixed);
     unsafe fn TexEnviv(&mut self, target: GLenum, pname: GLenum, params: *const GLint);
-
     unsafe fn MultiTexCoord4f(
         &mut self,
         target: GLenum,
@@ -407,7 +409,8 @@ pub trait GLES {
         length: *const GLint,
     );
     unsafe fn CompileShader(&mut self, shader: GLuint);
-    unsafe fn DeleteShader(&mut self, shader: GLuint); // AddDeleteShader
+    unsafe fn DeleteShader(&mut self, shader: GLuint);
+    // AddDeleteShader
     unsafe fn GetShaderiv(&mut self, shader: GLuint, pname: GLenum, params: *mut GLint);
     unsafe fn GetShaderInfoLog(
         &mut self,
@@ -446,6 +449,7 @@ pub trait GLES {
     );
     unsafe fn EnableVertexAttribArray(&mut self, index: GLuint);
     unsafe fn DisableVertexAttribArray(&mut self, index: GLuint);
+
     // AddAttribTrait
     unsafe fn VertexAttrib1f(&mut self, indx: GLuint, x: GLfloat);
     unsafe fn VertexAttrib2f(&mut self, indx: GLuint, x: GLfloat, y: GLfloat);
@@ -466,6 +470,7 @@ pub trait GLES {
     unsafe fn Uniform1f(&mut self, location: GLint, v0: GLfloat);
     unsafe fn Uniform2f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat);
     unsafe fn Uniform3f(&mut self, location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat);
+
     // UniformArraySupport
     unsafe fn Uniform4f(
         &mut self,
@@ -532,8 +537,11 @@ pub trait GLES {
         name: *mut std::ffi::c_char,
     );
     unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat);
-    // AddAttribTrait
     unsafe fn GetVertexAttribiv(&mut self, index: GLuint, pname: GLenum, params: *mut GLint);
+    
+    // FIXED: Support for ES 2.0 advanced alpha blending!
+    unsafe fn BlendFuncSeparate(&mut self, sfactorRGB: GLenum, dfactorRGB: GLenum, sfactorAlpha: GLenum, dfactorAlpha: GLenum);
+    unsafe fn BlendEquationSeparate(&mut self, modeRGB: GLenum, modeAlpha: GLenum);
 
     // OES_framebuffer_object (incomplete)
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, framebuffers: *mut GLuint);
