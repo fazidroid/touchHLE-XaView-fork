@@ -16,7 +16,6 @@ use crate::Environment;
 use std::net::SocketAddrV4;
 
 type SCNetworkReachabilityFlags = u32;
-// Flag indicating the network is fully reachable
 const kSCNetworkReachabilityFlagsReachable: SCNetworkReachabilityFlags = 1 << 1;
 #[allow(dead_code)]
 const kSCNetworkReachabilityFlagsIsDirect: SCNetworkReachabilityFlags = 1 << 17;
@@ -30,6 +29,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 #[allow(dead_code)]
 struct SCNetworkReachabilityHostObject {
     address: Option<SocketAddrV4>,
+    is_name_based: bool, // Track whether this is checking an internet hostname
 }
 impl HostObject for SCNetworkReachabilityHostObject {}
 
@@ -44,7 +44,10 @@ fn SCNetworkReachabilityCreateWithName(
     let res: id = msg![env; class alloc];
     env.objc.alloc_object(
         res,
-        Box::new(SCNetworkReachabilityHostObject { address: None }),
+        Box::new(SCNetworkReachabilityHostObject { 
+            address: None, 
+            is_name_based: true 
+        }),
         &mut env.mem,
     );
     res
@@ -62,13 +65,13 @@ fn SCNetworkReachabilityCreateWithAddress(
         res,
         Box::new(SCNetworkReachabilityHostObject {
             address: Some(addr.to_sockaddr_v4()),
+            is_name_based: false,
         }),
         &mut env.mem,
     );
     res
 }
 
-// ===== ALWAYS ONLINE BYPASS =====
 fn SCNetworkReachabilityGetFlags(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
@@ -80,20 +83,27 @@ fn SCNetworkReachabilityGetFlags(
         env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
     
-    // Always tell the game we have an active, reachable connection!
-    // This stops games like GT Racing from freezing due to "No WIFI" alerts.
-    let out_flags = kSCNetworkReachabilityFlagsReachable;
-    env.mem.write(flags, out_flags);
+    let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
+    
+    if host_object.is_name_based {
+        // Ad networks (Burstly, Tapjoy, Gameloft Trackers) use CreateWithName to check internet servers.
+        // We return 0 (Unreachable) so they voluntarily disable themselves and prevent crashes!
+        env.mem.write(flags, 0);
+    } else {
+        // Games use CreateWithAddress (0.0.0.0) to check if the Wi-Fi hardware is turned on.
+        // We return Reachable so "No WIFI" alerts don't appear and Local Multiplayer works perfectly!
+        let out_flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
+        env.mem.write(flags, out_flags);
+    }
     
     true
 }
-// ================================
 
 fn SCNetworkReachabilitySetCallback(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
-    _callout: GuestFunction, // Fixed unused warning
-    _context: MutVoidPtr,    // Fixed unused warning
+    _callout: GuestFunction, 
+    _context: MutVoidPtr,    
 ) -> bool {
     let target_class: Class = msg![env; target class];
     assert_eq!(
@@ -101,7 +111,7 @@ fn SCNetworkReachabilitySetCallback(
         env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
     
-    // Just return true to pretend we successfully registered the callback
+    // Pretend the callback registered perfectly
     true
 }
 
