@@ -72,22 +72,45 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (CGPoint)locationInView:(id)that_view { // UIView*
     let &UITouchHostObject { location, window, .. } = env.objc.borrow(this);
     let location_in_window: CGPoint = msg![env; window convertPoint:location fromWindow:nil];
-    let result: CGPoint = if that_view == nil {
+    let mut result: CGPoint = if that_view == nil {
         location_in_window
     } else {
         msg![env; that_view convertPoint:location_in_window fromView:window]
     };
+    
+    // ===== DYNAMIC ANDROID BOUNDS CLAMPING =====
+    // Dynamically scales to either Portrait (320x480) or Landscape (480x320) based on the current view!
+    if that_view != nil {
+        let bounds: CGRect = msg![env; that_view bounds];
+        if bounds.size.width > 0.0 && bounds.size.height > 0.0 {
+            if result.x < 0.0 { result.x = 0.0; }
+            if result.y < 0.0 { result.y = 0.0; }
+            // Subtract 1.0 to ensure the touch strictly falls inside C++ array boundaries
+            if result.x >= bounds.size.width { result.x = bounds.size.width - 1.0; }
+            if result.y >= bounds.size.height { result.y = bounds.size.height - 1.0; }
+        }
+    }
     result
 }
 
 - (CGPoint)previousLocationInView:(id)that_view { // UIView*
     let &UITouchHostObject { previous_location, window, .. } = env.objc.borrow(this);
     let location_in_window: CGPoint = msg![env; window convertPoint:previous_location fromWindow:nil];
-    let result: CGPoint = if that_view == nil {
+    let mut result: CGPoint = if that_view == nil {
         location_in_window
     } else {
         msg![env; that_view convertPoint:location_in_window fromView:window]
     };
+
+    if that_view != nil {
+        let bounds: CGRect = msg![env; that_view bounds];
+        if bounds.size.width > 0.0 && bounds.size.height > 0.0 {
+            if result.x < 0.0 { result.x = 0.0; }
+            if result.y < 0.0 { result.y = 0.0; }
+            if result.x >= bounds.size.width { result.x = bounds.size.width - 1.0; }
+            if result.y >= bounds.size.height { result.y = bounds.size.height - 1.0; }
+        }
+    }
     result
 }
 
@@ -110,20 +133,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 };
-
-// ===== ANDROID COORDINATE CLAMPER =====
-fn clamp_coords(coords: Coords) -> Coords {
-    let mut x = coords.0;
-    let mut y = coords.1;
-    // Force touches to stay within the iPhone 3GS screen bounds (320x480).
-    // This stops the internal C++ game engine from ignoring touches on tall Android screens!
-    if x < 0.0 { x = 0.0; }
-    if x > 319.9 { x = 319.9; }
-    if y < 0.0 { y = 0.0; }
-    if y > 479.9 { y = 479.9; }
-    (x, y)
-}
-// ======================================
 
 /// [super::handle_events] will forward touch events to this function.
 pub fn handle_event(env: &mut Environment, event: Event) {
@@ -149,9 +158,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     };
 
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-    for (finger_id, raw_coords) in map {
-        let coords = clamp_coords(raw_coords); // Compress coordinates into valid game space!
-        
+    for (finger_id, coords) in map {
         let current_touches = &mut env.framework_state.uikit.ui_touch.current_touches;
         if current_touches.contains_key(&finger_id) {
             assert_eq!(current_touches.len(), 1);
@@ -306,9 +313,7 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
     let mut view_touches: HashMap<id, id> = HashMap::new();
-    for (finger_id, raw_coords) in map {
-        let coords = clamp_coords(raw_coords); // Compress coordinates!
-        
+    for (finger_id, coords) in map {
         let Some(&touch) = env
             .framework_state
             .uikit
@@ -387,9 +392,7 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     }
 
     let mut view_touches: HashMap<id, id> = HashMap::new();
-    for (finger_id, raw_coords) in map {
-        let coords = clamp_coords(raw_coords); // Compress coordinates!
-        
+    for (finger_id, coords) in map {
         let Some(&touch) = env
             .framework_state
             .uikit
