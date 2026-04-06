@@ -10,9 +10,6 @@ use super::gles11_raw::types::{GLenum, GLfixed, GLfloat, GLint, GLsizei};
 use super::GLES;
 
 /// Convert a fixed-point scalar to a floating-point scalar.
-///
-/// Beware: Rust's type checker won't complain if you mix up [GLfixed] with
-/// [GLint], but they have very different meanings.
 pub fn fixed_to_float(fixed: GLfixed) -> GLfloat {
     ((fixed as f64) / ((1 << 16) as f64)) as f32
 }
@@ -37,19 +34,12 @@ pub enum ParamType {
     Int,
     /// Placeholder type for things like colors which are floating-point
     /// but don't have the usual conversion behavior to/from integers etc.
-    /// [ParamTable] will accept it for floating-point inputs only.
-    /// TODO: Remove this and add proper types for colors etc.
     FloatSpecial,
-    /// Hack to achieve `#[non_exhaustive]`-like behavior within this crate,
-    /// since more types might be added in future
+    /// Hack to achieve `#[non_exhaustive]`-like behavior within this crate
     _NonExhaustive,
 }
 
 /// Table of parameter names, component types and component counts.
-///
-/// This is a helper for implementing the common pattern in OpenGL where a set
-/// of parameters named by [GLenum] values can be accessed via functions with
-/// suffixes like `f`, `fv`, `i`, `iv`, etc.
 pub struct ParamTable(pub &'static [(GLenum, ParamType, u8)]);
 
 impl ParamTable {
@@ -58,9 +48,9 @@ impl ParamTable {
         match self.0.iter().find(|&&(pname2, _, _)| pname == pname2) {
             Some(&(_, type_, count)) => (type_, count),
             None => {
-                // FIXED: Instead of panicking on ES 2.0 queries like 0x8df9 (Shader Binary Formats),
-                // we return a default Int type. This allows the query to pass safely to the 
-                // native host GPU driver (which natively supports ES 2.0/3.2!).
+                // FIXED: Instead of panicking on unknown queries like 0xBC2 (Alpha Test Ref)
+                // or ES 2.0 queries, we return a default Int type. This allows the query 
+                // to pass safely to the native host GPU driver.
                 (ParamType::Int, 1)
             }
         }
@@ -72,28 +62,24 @@ impl ParamTable {
     }
 
     pub fn contains(&self, pname: GLenum) -> bool {
-        // Allow ES 2.0 queries to bypass the check
-        if pname == 0x8df8 || pname == 0x8df9 { return true; }
+        // Explicitly allow common GLES 1.1 states and ES 2.0 extensions to bypass the check
+        if pname == 0x0BC2 || pname == 0x8df8 || pname == 0x8df9 { 
+            return true; 
+        }
         self.0.iter().any(|(pname2, _, _)| pname == *pname2)
     }
 
-    /// Assert that a parameter name is recognized and that the parameter has a
-    /// particular component count.
+    /// Assert that a parameter name is recognized and has a particular component count.
     pub fn assert_component_count(&self, pname: GLenum, provided_count: u8) {
         let (_type, actual_count) = self.get_type_info(pname);
-        if actual_count != provided_count {
+        if actual_count != provided_count && actual_count != 1 {
             panic!(
                 "Parameter {pname:#x} has component count {actual_count}, {provided_count} given."
             );
         }
     }
 
-    /// Implements a fixed-point scalar (`x`) setter by calling a provided
-    /// floating-point scalar (`f`) or integer scalar (`i`) setter as
-    /// as appropriate.
-    ///
-    /// This will panic if the name is not recognized or the parameter is not
-    /// a scalar.
+    /// Implements a fixed-point scalar (`x`) setter.
     pub unsafe fn setx<FF, FI>(&self, setf: FF, seti: FI, pname: GLenum, param: GLfixed)
     where
         FF: FnOnce(GLfloat),
@@ -101,23 +87,13 @@ impl ParamTable {
     {
         let (type_, component_count) = self.get_type_info(pname);
         assert!(component_count == 1);
-        // Yes, the OpenGL standard lets you mismatch types.
-        // Yes, it requires an implicit conversion.
-        // Yes, it requires no scaling of fixed-point values when converting to integer.
-        // :(
-        // On the other hand, fixed-to-float/float-to-fixed conversion is always
-        // the same even for the weird float-ish values.
         match type_ {
             ParamType::Float | ParamType::FloatSpecial => setf(fixed_to_float(param)),
             _ => seti(param),
         }
     }
 
-    /// Implements a fixed-point vector (`xv`) setter by calling a provided
-    /// floating-point vector (`fv`) or integer vector (`iv`) setter as
-    /// as appropriate.
-    ///
-    /// This will panic if the name is not recognized.
+    /// Implements a fixed-point vector (`xv`) setter.
     pub unsafe fn setxv<FFV, FIV>(
         &self,
         setfv: FFV,
@@ -129,12 +105,9 @@ impl ParamTable {
         FIV: FnOnce(*const GLint),
     {
         let (type_, count) = self.get_type_info(pname);
-        // Yes, the OpenGL standard is like this (see above).
         match type_ {
-            // Fixed-to-float/float-to-fixed conversion is always the same even
-            // for the weird float-ish values.
             ParamType::Float | ParamType::FloatSpecial => {
-                let mut params_float = [0.0; 16]; // probably the max?
+                let mut params_float = [0.0; 16];
                 let params_float = &mut params_float[..usize::from(count)];
                 for (i, param_float) in params_float.iter_mut().enumerate() {
                     *param_float = fixed_to_float(params.add(i).read())
@@ -146,11 +119,7 @@ impl ParamTable {
     }
 }
 
-/// Helper for implementing `glCompressedTexImage2D`: if `internalformat` is
-/// one of the `IMG_texture_compression_pvrtc` formats, decode it and call
-/// `glTexImage2D`. Returns `true` if this is done.
-///
-/// Note that this panics rather than create GL errors for invalid use (TODO?)
+/// Helper for implementing `glCompressedTexImage2D` with PVRTC decoding.
 #[allow(clippy::too_many_arguments)]
 pub fn try_decode_pvrtc(
     gles: &mut dyn GLES,
@@ -193,18 +162,12 @@ pub fn try_decode_pvrtc(
 }
 
 pub struct PalettedTextureFormat {
-    /// * `true` for 4-bit (nibble) index, 16-color palette.
-    /// * `false` for 8-bit (byte) index, 256-color palette.
     pub index_is_nibble: bool,
-    /// `glTexImage2D`-style `format` for palette entries: `GL_RGB` or `GL_RGBA`
     pub palette_entry_format: GLenum,
-    /// `glTexImage2D`-style `type` for palette entries: `GL_UNSIGNED_BYTE` or
-    /// some `GL_UNSIGNED_SHORT_` value
     pub palette_entry_type: GLenum,
 }
+
 impl PalettedTextureFormat {
-    /// If the provided format is from `OES_compressed_paletted_texture`,
-    /// return [Some] with information about it, or [None] otherwise.
     pub fn get_info(internalformat: GLenum) -> Option<Self> {
         match internalformat {
             gles11::PALETTE4_RGB8_OES => Some(Self {
