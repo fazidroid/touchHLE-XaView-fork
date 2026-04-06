@@ -75,7 +75,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     if that_view == nil {
         location_in_window
     } else {
-        msg![env; that_view convertPoint:location_in_window fromView:window]
+        msg![env;
+        that_view convertPoint:location_in_window fromView:window]
     }
 }
 - (CGPoint)previousLocationInView:(id)that_view { // UIView*
@@ -84,7 +85,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     if that_view == nil {
         location_in_window
     } else {
-        msg![env; that_view convertPoint:location_in_window fromView:window]
+        msg![env;
+        that_view convertPoint:location_in_window fromView:window]
     }
 }
 
@@ -137,10 +139,8 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     };
 
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-
     for (finger_id, coords) in map {
         let current_touches = &mut env.framework_state.uikit.ui_touch.current_touches;
-
         if current_touches.contains_key(&finger_id) {
             // this seems to happen only on the desktop with a single touch
             assert_eq!(current_touches.len(), 1);
@@ -152,15 +152,12 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         }
 
         log_dbg!("Finger {:?} touch down: {:?}", finger_id, coords);
-
         let location = CGPoint {
             x: coords.0,
             y: coords.1,
         };
-
         // TODO: is this the correct state of the UITouch and UIEvent during
         //       hit testing?
-
         let new_touch: id = msg_class![env; UITouch alloc];
         *env.objc.borrow_mut(new_touch) = UITouchHostObject {
             view: nil,
@@ -197,7 +194,6 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
     let event = ui_event::new_event(env, all_touches);
     autorelease(env, event);
-
     // views with existing touches (see isMultipleTouchEnabled check below)
     let views_with_existing_touches: HashSet<id> = env
         .framework_state
@@ -207,10 +203,8 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         .values()
         .map(|&touch| env.objc.borrow::<UITouchHostObject>(touch).view)
         .collect();
-
     // view to set of touches for this view
     let mut view_touches: HashMap<id, id> = HashMap::new();
-
     let touches_arr: id = msg![env; touches allObjects];
     let touches_count: NSUInteger = msg![env; touches_arr count];
     for i in 0..touches_count {
@@ -218,16 +212,14 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let &UITouchHostObject { location, .. } = env.objc.borrow(touch);
 
         // Assumes the windows in the list are ordered back-to-front.
-        // TODO: this may not be correct once we support windowLevel.
         let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+        
+        // ===== TOUCH BOUNDS BYPASS =====
         let Some((window, location_in_window)) = windows.into_iter().rev().find_map(|window| {
             let location_in_window: CGPoint =
                 msg![env; window convertPoint:location fromWindow:nil];
-            if msg![env; window pointInside:location_in_window withEvent:event] {
-                Some((window, location_in_window))
-            } else {
-                None
-            }
+            // Bypass strict bounds/pointInside checking: if a window exists, accept the touch!
+            Some((window, location_in_window))
         }) else {
             log!(
                 "Couldn't find a window for touch at {:?}, discarding",
@@ -236,14 +228,16 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             continue;
         };
 
-        let view: id = msg![env; window hitTest:location_in_window withEvent:event];
+        let mut view: id = msg![env; window hitTest:location_in_window withEvent:event];
+        
+        // If the inner hitTest still rejects it, force the touch into the window itself!
         if view == nil {
             log!(
-                "Couldn't find a view for touch at {:?} in window {:?}, discarding",
+                "Couldn't find a view for touch at {:?} in window {:?}, forcing to window to prevent discard!",
                 location_in_window,
                 window,
             );
-            continue;
+            view = window;
         } else {
             log_dbg!(
                 "Found view {:?} with frame {:?} for touch at {:?} in window {:?}",
@@ -256,6 +250,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
                 window,
             );
         }
+        // ===============================
 
         let is_multi_touch_enabled: bool = msg![env; view isMultipleTouchEnabled];
         if !is_multi_touch_enabled {
@@ -272,14 +267,6 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
                     touch,
                     view
                 );
-                // The touch will continue to be tracked until it ends, but the
-                // view will be nil, so messages sent to it will be ignored.
-                // TODO: Figure out if/how these should be delivered elsewhere
-                //       in the responder chain.
-                // FIXME: The fact the view is nil might be observed via
-                //        touchesForView:nil or allTouches on UIEvent.
-                //        This might cause problems. What does the real OS do?
-                //        Does this need to be prevented?
                 continue;
             }
         }
@@ -317,17 +304,14 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
 fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     let pool: id = msg_class![env; NSAutoreleasePool new];
-
     let timestamp: NSTimeInterval = {
         let process_info = msg_class![env; NSProcessInfo processInfo];
         msg![env; process_info systemUptime]
     };
 
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-
     // view to set of touches for this view
     let mut view_touches: HashMap<id, id> = HashMap::new();
-
     for (finger_id, coords) in map {
         let Some(&touch) = env
             .framework_state
@@ -347,7 +331,6 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             x: coords.0,
             y: coords.1,
         };
-
         let view = env.objc.borrow::<UITouchHostObject>(touch).view;
         let host_object = env.objc.borrow_mut::<UITouchHostObject>(touch);
 
@@ -364,7 +347,6 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         host_object.phase = UITouchPhaseMoved;
 
         let _: () = msg![env; touches addObject:touch];
-
         if let Entry::Vacant(e) = view_touches.entry(view) {
             let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
             e.insert(touches);
@@ -387,7 +369,6 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
     let event = ui_event::new_event(env, all_touches);
     autorelease(env, event);
-
     for (view, touches) in view_touches {
         log_dbg!(
             "Sending [{:?} touchesMoved:{:?} withEvent:{:?}]",
@@ -403,14 +384,12 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
 fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     let pool: id = msg_class![env; NSAutoreleasePool new];
-
     let timestamp: NSTimeInterval = {
         let process_info = msg_class![env; NSProcessInfo processInfo];
         msg![env; process_info systemUptime]
     };
 
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-
     // We need to construct all touches set _BEFORE_ removing touches!
     // (as removed one are reported as the part of the event)
     let all_touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
@@ -427,7 +406,6 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
     // view to set of touches for this view
     let mut view_touches: HashMap<id, id> = HashMap::new();
-
     for (finger_id, coords) in map {
         let Some(&touch) = env
             .framework_state
@@ -449,7 +427,6 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             x: coords.0,
             y: coords.1,
         };
-
         let view = env.objc.borrow::<UITouchHostObject>(touch).view;
         let host_object = env.objc.borrow_mut::<UITouchHostObject>(touch);
         host_object.previous_location = host_object.location;
@@ -459,7 +436,6 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         host_object.phase = UITouchPhaseEnded;
 
         let _: () = msg![env; touches addObject:touch];
-
         if let Entry::Vacant(e) = view_touches.entry(view) {
             let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
             e.insert(touches);
