@@ -11,7 +11,7 @@ pub mod statvfs;
 use crate::abi::DotDotDot;
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::fs::{GuestFile, GuestOpenOptions, GuestPath};
-use crate::libc::errno::{set_errno, EBADF, EINTR, EINVAL, EIO, EISDIR, EOVERFLOW, ESPIPE, EFAULT};
+use crate::libc::errno::{set_errno, EBADF, EINTR, EINVAL, EIO, EISDIR, EOVERFLOW, ESPIPE};
 use crate::libc::sys::socket::close_socket;
 use crate::libc::unistd::pid_t;
 use crate::mem::{
@@ -144,7 +144,7 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
     // FIXED: Return -1 (Error) instead of 0 (Stdin) on failure to prevent infinite loops
     if path.is_null() {
         log_dbg!("open({:?}, {:#x}) => -1", path, flags);
-        set_errno(env, EFAULT);
+        set_errno(env, EINVAL); // Swapped EFAULT for EINVAL
         return -1; 
     }
 
@@ -179,8 +179,8 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
         Ok(path_str) => path_str.to_owned(),
         Err(err) => {
             log!("open() error, unable to treat {:?} as utf8 str: {:?}", path, err);
-            set_errno(env, EFAULT);
-            return -1; // FIXED
+            set_errno(env, EINVAL); // Swapped EFAULT for EINVAL
+            return -1;
         }
     };
     
@@ -222,8 +222,8 @@ pub fn read(
     set_errno(env, 0);
 
     if buffer.is_null() {
-        set_errno(env, EFAULT);
-        return -1; // FIXED
+        set_errno(env, EINVAL); // Swapped EFAULT for EINVAL
+        return -1;
     }
 
     // Safely simulate reading from stdin
@@ -234,7 +234,7 @@ pub fn read(
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         log!("Warning: read({:?}, {:?}, {:#x}) called with unknown fd, returning -1", fd, buffer, size);
         set_errno(env, EBADF);
-        return -1; // FIXED
+        return -1;
     };
 
     let buffer_slice = env.mem.bytes_at_mut(buffer.cast(), size);
@@ -275,11 +275,11 @@ pub fn pread(
 ) -> GuestISize {
     let original_position = lseek(env, fd, 0, SEEK_CUR);
     if original_position == -1 {
-        return -1; // FIXED
+        return -1;
     }
 
     if lseek(env, fd, offset, SEEK_SET) == -1 {
-        return -1; // FIXED
+        return -1;
     }
 
     let bytes_read = read(env, fd, buffer, size);
@@ -310,7 +310,7 @@ pub(super) fn fflush(env: &mut Environment, fd: FileDescriptor) -> i32 {
     }
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
-        return -1; // FIXED
+        return -1;
     };
     match file.file.flush() {
         Ok(_) => 0,
@@ -368,11 +368,11 @@ pub fn pwrite(
 ) -> GuestISize {
     let original_position = lseek(env, fd, 0, SEEK_CUR);
     if original_position == -1 {
-        return -1; // FIXED
+        return -1;
     }
 
     if lseek(env, fd, offset, SEEK_SET) == -1 {
-        return -1; // FIXED
+        return -1;
     }
 
     let bytes_written = write(env, fd, buffer, size);
@@ -391,13 +391,13 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         log!("lseek({:?}, {:#x}, {}) => {}", fd, offset, whence, -1);
         set_errno(env, EBADF);
-        return -1; // FIXED
+        return -1;
     };
 
     if !file.file.is_seekable() {
         log!("Warning: lseek({:?}, {:#x}, {}) => -1. Called with unseekable fd.", fd, offset, whence);
         set_errno(env, ESPIPE);
-        return -1; // FIXED
+        return -1;
     }
 
     let start_position = match whence {
@@ -409,7 +409,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                     std::io::ErrorKind::IsADirectory => set_errno(env, EISDIR),
                     _ => unimplemented!("Unexpected seek error {:?}", seek_error),
                 }
-                return -1; // FIXED
+                return -1;
             }
         },
         SEEK_END => match file.file.stream_len() {
@@ -419,13 +419,13 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                     std::io::ErrorKind::IsADirectory => set_errno(env, EISDIR),
                     _ => unimplemented!("Unexpected seek error {:?}", seek_error),
                 }
-                return -1; // FIXED
+                return -1;
             }
         },
         _ => {
             log!("Warning: lseek({:?}, {:#x}, {}) => -1. Called with invalid \"whence\".", fd, offset, whence);
             set_errno(env, EINVAL);
-            return -1; // FIXED
+            return -1;
         }
     };
 
@@ -439,14 +439,14 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
             };
             log!("Warning: lseek({:?}, {:#x}, {}) => -1. {}", fd, offset, whence, error_msg);
             set_errno(env, errno);
-            return -1; // FIXED
+            return -1;
         }
     };
 
     if seek_position > off_t::MAX as u64 {
         log!("Warning: lseek({:?}, {:#x}, {}) => -1. Seek position does not fit in off_t.", fd, offset, whence);
         set_errno(env, EOVERFLOW);
-        return -1; // FIXED
+        return -1;
     }
 
     let res = match file.file.seek(SeekFrom::Start(seek_position)) {
@@ -461,7 +461,7 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
                 _ => unimplemented!("Unexpected seek error {:?}", seek_error),
             }
             log!("Warning: lseek({:?}, {:#x}, {}) failed with error: {:?}, returning -1", fd, offset, whence, seek_error);
-            return -1; // FIXED
+            return -1;
         }
     };
     log_dbg!("lseek({:?}, {:#x}, {}) => {}", fd, offset, whence, res);
@@ -478,7 +478,7 @@ pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
     if fd < 0 || env.libc_state.posix_io.files.get(fd_to_file_idx(fd)).is_none() {
         set_errno(env, EBADF);
         log!("Warning: close({:?}) failed, returning -1", fd);
-        return -1; // FIXED
+        return -1;
     }
 
     let result = match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
@@ -586,17 +586,16 @@ fn fcntl(
             .is_none()
     {
         set_errno(env, EBADF);
-        return -1; // FIXED
+        return -1; 
     }
 
     match cmd {
-        // --- ADDED MISSING F_GETFL and F_SETFL TO BREAK INFINITE LOOPS ---
         F_GETFL => {
             if fd < 0 {
                 set_errno(env, EBADF);
                 return -1;
             }
-            return 0; // Return success to stop polling
+            return 0;
         }
         F_SETFL => {
             let flags: i32 = args.start().next(env);
@@ -605,7 +604,7 @@ fn fcntl(
                 set_errno(env, EBADF);
                 return -1;
             }
-            return 0; // Accept the set flags gracefully
+            return 0;
         }
         F_GETFD => {
             if fd < NORMAL_FILENO_BASE {
@@ -642,7 +641,7 @@ fn fcntl(
 
             if let Err(error_code) = validate_lock(env, fd, &lock) {
                 set_errno(env, error_code);
-                return -1; // FIXED
+                return -1; 
             }
 
             log!("TODO: fcntl({}, F_GETLK, {:?}) called. Locking unimplemented, any conflicts will be unreported.", fd, lock);
@@ -659,7 +658,7 @@ fn fcntl(
 
             if let Err(error_code) = validate_lock(env, fd, &lock) {
                 set_errno(env, error_code);
-                return -1; // FIXED
+                return -1; 
             }
 
             log!("TODO: fcntl({}, F_SETLK, {:?}) called. Locking unimplemented, ignoring lock.", fd, lock);
@@ -676,10 +675,10 @@ fn fcntl(
         _ => {
             log!("Warning: fcntl({}, {}) unhandled, returning -1", fd, cmd);
             set_errno(env, EINVAL);
-            return -1; // FIXED
+            return -1; 
         }
     }
-    0 // success
+    0 
 }
 
 fn flock(env: &mut Environment, fd: FileDescriptor, operation: FLockFlag) -> i32 {
@@ -692,7 +691,7 @@ fn fsync(env: &mut Environment, fd: FileDescriptor) -> i32 {
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         log!("Warning: fsync({:?}) called with unknown fd, returning -1", fd);
         set_errno(env, EBADF);
-        return -1; // FIXED
+        return -1; 
     };
 
     match file.file.sync_all() {
@@ -716,10 +715,9 @@ fn fsync(env: &mut Environment, fd: FileDescriptor) -> i32 {
 
 fn ftruncate(env: &mut Environment, fd: FileDescriptor, len: off_t) -> i32 {
     set_errno(env, 0);
-    // Prevent unwrap panic on unknown fd
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
-        return -1; // FIXED
+        return -1; 
     };
     match file.file.set_len(len as u64) {
         Ok(()) => 0,
