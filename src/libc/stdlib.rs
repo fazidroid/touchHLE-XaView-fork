@@ -847,6 +847,24 @@ fn abort(env: &mut Environment) {
     }
 }
 
+fn __stack_chk_fail(env: &mut Environment) {
+    // SafeStackUnwind
+    let mut fp = env.cpu.regs()[7];
+    for _ in 0..30 {
+        if fp == 0 { break; }
+        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
+        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        if lr > 0 && lr < 0x10000000 {
+            env.cpu.regs_mut()[7] = prev_fp;
+            env.cpu.regs_mut()[13] = fp + 8;
+            env.cpu.regs_mut()[0] = 0;
+            env.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+            return;
+        }
+        fp = prev_fp;
+    }
+}
+
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
     // FakeHost
     if let Ok(s) = env.mem.cstr_at_utf8(name) {
@@ -879,6 +897,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(_Unwind_SjLj_Resume(_)),
     export_c_func!(_Unwind_SjLj_Resume_or_Rethrow(_)),
     export_c_func!(abort()),
+    export_c_func!(__stack_chk_fail()),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
