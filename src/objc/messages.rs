@@ -294,20 +294,25 @@ fn objc_msgSend_inner(
         }) = host_object.as_any().downcast_ref()
         {
             
-            // ===== AUTO-DISMISS ALERTS =====
+            // ===== AUTO-DISMISS ALERTS SAFELY =====
             if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
                 log!("AUTO-DISMISSING UIAlertView to unfreeze game screen!");
-                let delegate: id = msg![env; receiver delegate];
-                if delegate != nil {
-                    if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
-                        let zero: i32 = 0;
-                        let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
-                    }
-                    if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
-                        let zero: i32 = 0;
-                        let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
+                
+                // Only ask for the delegate if touchHLE actually supports it!
+                if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
+                    let delegate: id = msg![env; receiver delegate];
+                    if delegate != nil {
+                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
+                            let zero: i32 = 0;
+                            let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
+                        }
+                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
+                            let zero: i32 = 0;
+                            let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
+                        }
                     }
                 }
+                
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
