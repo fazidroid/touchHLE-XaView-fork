@@ -100,18 +100,18 @@ pub const CLASSES: ClassExports = objc_classes! {
         return msg![env; this initWithAPI:api];
     }
 
-    let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
-    let prev_context = env.objc.borrow_mut::<EAGLContextHostObject>(group).gles_ctx.as_mut().unwrap();
-
+    // FIXED: Briefly borrow window only when needed to satisfy the Borrow Checker
     {
-        let _prev_ctx = prev_context.make_current(window);
+        let prev_context_gles = env.objc.borrow_mut::<EAGLContextHostObject>(group).gles_ctx.as_mut().unwrap();
+        let _prev_ctx = prev_context_gles.make_current(env.window.as_mut().unwrap());
     }
+    
     env.window.as_mut().unwrap().set_share_with_current_context(true);
 
     let mut gles_ins = create_gles1_ctx(env);
 
     {
-        let gles_ctx = gles_ins.make_current(window);
+        let gles_ctx = gles_ins.make_current(env.window.as_mut().unwrap());
         log!("Driver info: {}", unsafe { gles_ctx.driver_description() });
     }
 
@@ -133,9 +133,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let mut gles_ins = create_gles1_ctx(env);
 
-    let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
+    // FIXED: Briefly borrow window to prevent E0499 overlaps
     {
-        let gles_ctx = gles_ins.make_current(window);
+        let gles_ctx = gles_ins.make_current(env.window.as_mut().expect("OpenGL ES is not supported in headless mode"));
         log!("Driver info: {}", unsafe { gles_ctx.driver_description() });
     }
 
