@@ -105,8 +105,6 @@ fn objc_msgSend_inner(
             } = class_host_object.as_any().downcast_ref().unwrap();
 
             // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
-            // Instead of crashing the emulator when a method is missing, we safely print a warning and return 0 (nil).
-            // This instantly bypasses EVERY missing ad network and tracking method Gameloft throws at us!
             log!(
                 "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
                 if is_metaclass { "Class" } else { "Object" },
@@ -238,9 +236,14 @@ fn objc_msgSend_inner(
             env.cpu.regs_mut()[0..2].fill(0);
             return;
         } else {
-            panic!(
-                "Item {class:?} in superclass chain of object {receiver:?}'s class {orig_class:?} has an unexpected host object type."
+            // FIXED: SAFE BYPASS FOR EA GAMES
+            // Instead of panicking on unexpected host object types, we log a warning and return 0.
+            log!(
+                "SAFE BYPASS: Item {:?} in superclass chain of object {:?}'s class {:?} has an unexpected host object type. Returning 0 to prevent crash.",
+                class, receiver, orig_class
             );
+            env.cpu.regs_mut()[0..2].fill(0);
+            return;
         }
     }
 }
