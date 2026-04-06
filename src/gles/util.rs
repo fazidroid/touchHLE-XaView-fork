@@ -10,6 +10,9 @@ use super::gles11_raw::types::{GLenum, GLfixed, GLfloat, GLint, GLsizei};
 use super::GLES;
 
 /// Convert a fixed-point scalar to a floating-point scalar.
+///
+/// Beware: Rust's type checker won't complain if you mix up [GLfixed] with
+/// [GLint], but they have very different meanings.
 pub fn fixed_to_float(fixed: GLfixed) -> GLfloat {
     ((fixed as f64) / ((1 << 16) as f64)) as f32
 }
@@ -26,79 +29,182 @@ pub unsafe fn matrix_fixed_to_float(m: *const GLfixed) -> [GLfloat; 16] {
 /// Type of a parameter, used in [ParamTable].
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum ParamType {
+    /// `GLboolean`
     Boolean,
+    /// `GLfloat`
     Float,
-    FloatSpecial,
+    /// `GLint`
     Int,
+    /// Placeholder type for things like colors which are floating-point
+    /// but don't have the usual conversion behavior to/from integers etc.
+    /// [ParamTable] will accept it for floating-point inputs only.
+    /// TODO: Remove this and add proper types for colors etc.
+    FloatSpecial,
+    /// Hack to achieve `#[non_exhaustive]`-like behavior within this crate,
+    /// since more types might be added in future
+    _NonExhaustive,
 }
 
-pub struct ParamTable(pub &'static [(GLenum, ParamType, usize)]);
+/// Table of parameter names, component types and component counts.
+///
+/// This is a helper for implementing the common pattern in OpenGL where a set
+/// of parameters named by [GLenum] values can be accessed via functions with
+/// suffixes like `f`, `fv`, `i`, `iv`, etc.
+pub struct ParamTable(pub &'static [(GLenum, ParamType, u8)]);
 
 impl ParamTable {
-    pub fn contains(&self, pname: GLenum) -> bool {
-        self.0.iter().any(|&(name, _, _)| name == pname)
-    }
-
-    pub fn get_type_info(&self, pname: GLenum) -> (ParamType, usize) {
-        for &(name, type_, count) in self.0.iter() {
-            if name == pname {
-                return (type_, count);
-            }
-        }
-        panic!("Unhandled parameter name: {:#x}", pname);
-    }
-
-    pub unsafe fn setx<F, I>(&self, mut f: F, mut i: I, pname: GLenum, param: GLfixed)
-    where
-        F: FnMut(GLfloat),
-        I: FnMut(GLint),
-    {
-        let (type_, count) = self.get_type_info(pname);
-        assert_eq!(count, 1);
-        match type_ {
-            ParamType::Float | ParamType::FloatSpecial => f(fixed_to_float(param)),
-            ParamType::Int => i(param),
-            ParamType::Boolean => i(if param != 0 { 1 } else { 0 }),
-        }
-    }
-
-    pub unsafe fn setxv<F, I>(&self, mut f: F, mut i: I, pname: GLenum, params: *const GLfixed)
-    where
-        F: FnMut(*const GLfloat),
-        I: FnMut(*const GLint),
-    {
-        let (type_, count) = self.get_type_info(pname);
-        match type_ {
-            ParamType::Float | ParamType::FloatSpecial => {
-                let mut float_params = Vec::with_capacity(count);
-                for j in 0..count {
-                    float_params.push(fixed_to_float(params.add(j).read_unaligned()));
-                }
-                f(float_params.as_ptr());
-            }
-            ParamType::Int | ParamType::Boolean => {
-                i(params as *const GLint);
+    /// Look up the component type and count for a parameter.
+    pub fn get_type_info(&self, pname: GLenum) -> (ParamType, u8) {
+        match self.0.iter().find(|&&(pname2, _, _)| pname == pname2) {
+            Some(&(_, type_, count)) => (type_, count),
+            None => {
+                // FIXED: Instead of panicking on ES 2.0 queries like 0x8df9 (Shader Binary Formats),
+                // we return a default Int type. This allows the query to pass safely to the 
+                // native host GPU driver (which natively supports ES 2.0/3.2!).
+                (ParamType::Int, 1)
             }
         }
     }
 
-    pub fn assert_component_count(&self, pname: GLenum, expected: usize) {
-        let (_type, actual) = self.get_type_info(pname);
-        assert_eq!(actual, expected);
-    }
-
+    /// Assert that a parameter name is recognized.
     pub fn assert_known_param(&self, pname: GLenum) {
-        let _ = self.get_type_info(pname);
+        self.get_type_info(pname);
     }
+
+    pub fn contains(&self, pname: GLenum) -> bool {
+        // Allow ES 2.0 queries to bypass the check
+        if pname == 0x8df8 || pname == 0x8df9 { return true; }
+        self.0.iter().any(|(pname2, _, _)| pname == *pname2)
+    }
+
+    /// Assert that a parameter name is recognized and that the parameter has a
+    /// particular component count.
+    pub fn assert_component_count(&self, pname: GLenum, provided_count: u8) {
+        let (_type, actual_count) = self.get_type_info(pname);
+        if actual_count != provided_count {
+            panic!(
+                "Parameter {pname:#x} has component count {actual_count}, {provided_count} given."
+            );
+        }
+    }
+
+    /// Implements a fixed-point scalar (`x`) setter by calling a provided
+    /// floating-point scalar (`f`) or integer scalar (`i`) setter as
+    /// as appropriate.
+    ///
+    /// This will panic if the name is not recognized or the parameter is not
+    /// a scalar.
+    pub unsafe fn setx<FF, FI>(&self, setf: FF, seti: FI, pname: GLenum, param: GLfixed)
+    where
+        FF: FnOnce(GLfloat),
+        FI: FnOnce(GLint),
+    {
+        let (type_, component_count) = self.get_type_info(pname);
+        assert!(component_count == 1);
+        // Yes, the OpenGL standard lets you mismatch types.
+        // Yes, it requires an implicit conversion.
+        // Yes, it requires no scaling of fixed-point values when converting to integer.
+        // :(
+        // On the other hand, fixed-to-float/float-to-fixed conversion is always
+        // the same even for the weird float-ish values.
+        match type_ {
+            ParamType::Float | ParamType::FloatSpecial => setf(fixed_to_float(param)),
+            _ => seti(param),
+        }
+    }
+
+    /// Implements a fixed-point vector (`xv`) setter by calling a provided
+    /// floating-point vector (`fv`) or integer vector (`iv`) setter as
+    /// as appropriate.
+    ///
+    /// This will panic if the name is not recognized.
+    pub unsafe fn setxv<FFV, FIV>(
+        &self,
+        setfv: FFV,
+        setiv: FIV,
+        pname: GLenum,
+        params: *const GLfixed,
+    ) where
+        FFV: FnOnce(*const GLfloat),
+        FIV: FnOnce(*const GLint),
+    {
+        let (type_, count) = self.get_type_info(pname);
+        // Yes, the OpenGL standard is like this (see above).
+        match type_ {
+            // Fixed-to-float/float-to-fixed conversion is always the same even
+            // for the weird float-ish values.
+            ParamType::Float | ParamType::FloatSpecial => {
+                let mut params_float = [0.0; 16]; // probably the max?
+                let params_float = &mut params_float[..usize::from(count)];
+                for (i, param_float) in params_float.iter_mut().enumerate() {
+                    *param_float = fixed_to_float(params.add(i).read())
+                }
+                setfv(params_float.as_ptr())
+            }
+            _ => setiv(params),
+        }
+    }
+}
+
+/// Helper for implementing `glCompressedTexImage2D`: if `internalformat` is
+/// one of the `IMG_texture_compression_pvrtc` formats, decode it and call
+/// `glTexImage2D`. Returns `true` if this is done.
+///
+/// Note that this panics rather than create GL errors for invalid use (TODO?)
+#[allow(clippy::too_many_arguments)]
+pub fn try_decode_pvrtc(
+    gles: &mut dyn GLES,
+    target: GLenum,
+    level: GLint,
+    internalformat: GLenum,
+    width: GLsizei,
+    height: GLsizei,
+    border: GLint,
+    pvrtc_data: &[u8],
+) -> bool {
+    let is_2bit = match internalformat {
+        gles11::COMPRESSED_RGB_PVRTC_4BPPV1_IMG |
+        gles11::COMPRESSED_RGBA_PVRTC_4BPPV1_IMG => false,
+        gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG |
+        gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG => true,
+        _ => return false,
+    };
+    assert!(border == 0);
+    let pixels = crate::image::decode_pvrtc(
+        pvrtc_data,
+        is_2bit,
+        width.try_into().unwrap(),
+        height.try_into().unwrap(),
+    );
+    unsafe {
+        gles.TexImage2D(
+            target,
+            level,
+            gles11::RGBA as _,
+            width,
+            height,
+            border,
+            gles11::RGBA,
+            gles11::UNSIGNED_BYTE,
+            pixels.as_ptr() as *const _,
+        )
+    };
+    true
 }
 
 pub struct PalettedTextureFormat {
+    /// * `true` for 4-bit (nibble) index, 16-color palette.
+    /// * `false` for 8-bit (byte) index, 256-color palette.
     pub index_is_nibble: bool,
+    /// `glTexImage2D`-style `format` for palette entries: `GL_RGB` or `GL_RGBA`
     pub palette_entry_format: GLenum,
+    /// `glTexImage2D`-style `type` for palette entries: `GL_UNSIGNED_BYTE` or
+    /// some `GL_UNSIGNED_SHORT_` value
     pub palette_entry_type: GLenum,
 }
-
 impl PalettedTextureFormat {
+    /// If the provided format is from `OES_compressed_paletted_texture`,
+    /// return [Some] with information about it, or [None] otherwise.
     pub fn get_info(internalformat: GLenum) -> Option<Self> {
         match internalformat {
             gles11::PALETTE4_RGB8_OES => Some(Self {
@@ -155,23 +261,3 @@ impl PalettedTextureFormat {
         }
     }
 }
-
-pub unsafe fn try_decode_pvrtc(
-    _gles: &mut dyn GLES,
-    _target: GLenum,
-    _level: GLint,
-    _internalformat: GLenum,
-    _width: GLsizei,
-    _height: GLsizei,
-    _border: GLint,
-    _data: &[u8],
-) -> bool {
-    false
-}
-
-// DEFINING SHADER CONSTANT FOR N.O.V.A. 3 FIX
-pub const GET_PARAMS: ParamTable = ParamTable(&[
-    (gles11::MAX_TEXTURE_SIZE, ParamType::Int, 1),
-    (0x8df8, ParamType::Int, 1), // GL_NUM_SHADER_BINARY_FORMATS
-    (0x8df9, ParamType::Int, 0), // GL_SHADER_BINARY_FORMATS (Tell N3 we support 0 binary formats)
-]);
