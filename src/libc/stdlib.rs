@@ -607,6 +607,21 @@ fn __udivmodsi4(env: &mut Environment, a: u32, b: u32, rem: MutPtr<u32>) -> u32 
     }
 }
 
+fn __divmodsi4(env: &mut Environment, a: i32, b: i32, rem: MutPtr<i32>) -> i32 {
+    // ImplDivmodsi4
+    if b == 0 {
+        if !rem.is_null() {
+            env.mem.write(rem, 0);
+        }
+        0
+    } else {
+        if !rem.is_null() {
+            env.mem.write(rem, a.wrapping_rem(b));
+        }
+        a.wrapping_div(b)
+    }
+}
+
 fn __floatdidf(_env: &mut Environment, a: i64) -> f64 {
     // IntToDouble
     a as f64
@@ -884,6 +899,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(__udivsi3(_, _)),
     export_c_func!(__umodsi3(_, _)),
     export_c_func!(__udivmodsi4(_, _, _)),
+    export_c_func!(__divmodsi4(_, _, _)),
     export_c_func!(OSMemoryBarrier()),
     export_c_func!(class_getInstanceSize(_)),
     export_c_func!(objc_getClass(_)),
