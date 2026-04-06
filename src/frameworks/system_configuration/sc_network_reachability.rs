@@ -41,16 +41,16 @@ fn SCNetworkReachabilityCreateWithName(
     _nodename: ConstPtr<i8>,
 ) -> SCNetworkReachabilityRef {
     let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    let res: id = msg![env; class alloc];
+    
+    // FIXED: Let alloc_object safely create the new object using the actual class pointer
     env.objc.alloc_object(
-        res,
+        class,
         Box::new(SCNetworkReachabilityHostObject { 
             address: None, 
             is_name_based: true 
         }),
         &mut env.mem,
-    );
-    res
+    )
 }
 
 fn SCNetworkReachabilityCreateWithAddress(
@@ -60,16 +60,16 @@ fn SCNetworkReachabilityCreateWithAddress(
 ) -> SCNetworkReachabilityRef {
     let addr = env.mem.read(address);
     let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    let res: id = msg![env; class alloc];
+    
+    // FIXED: Let alloc_object safely create the new object using the actual class pointer
     env.objc.alloc_object(
-        res,
+        class,
         Box::new(SCNetworkReachabilityHostObject {
             address: Some(addr.to_sockaddr_v4()),
             is_name_based: false,
         }),
         &mut env.mem,
-    );
-    res
+    )
 }
 
 fn SCNetworkReachabilityGetFlags(
