@@ -33,6 +33,11 @@ const CLASSES: ClassExports = objc_classes! {
     // method. (All devices have accelerometer, but only some do have gyro).
     false
 }
+- (bool)isAccelerometerAvailable {
+    // FakeAccelerometerCheck
+    log!("TODO: [(CMMotionManager *){:?} isAccelerometerAvailable] -> false", this);
+    false
+}
 
 @end
 
