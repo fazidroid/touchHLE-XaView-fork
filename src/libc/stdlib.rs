@@ -848,21 +848,27 @@ fn abort(env: &mut Environment) {
 }
 
 fn __stack_chk_fail(env: &mut Environment) {
-    // SafeStackUnwind
-    let mut fp = env.cpu.regs()[7];
-    for _ in 0..30 {
-        if fp == 0 { break; }
-        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
-        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
-        if lr > 0 && lr < 0x10000000 {
-            env.cpu.regs_mut()[7] = prev_fp;
-            env.cpu.regs_mut()[13] = fp + 8;
-            env.cpu.regs_mut()[0] = 0;
-            env.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
-            return;
-        }
-        fp = prev_fp;
+    // DebugStackFail
+    let fp = env.cpu.regs()[7];
+    let sp = env.cpu.regs()[13];
+    let lr = env.cpu.regs()[14];
+    println!("========================================");
+    println!("[DEBUG] ___stack_chk_fail triggered!");
+    println!("[DEBUG] LR: {:#010x}, FP: {:#010x}, SP: {:#010x}", lr, fp, sp);
+    println!("[DEBUG] Stack dump:");
+    let mut curr = sp;
+    while curr <= fp + 32 {
+        let val: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(curr));
+        let b = val.to_le_bytes();
+        let c0 = if b[0] >= 32 && b[0] <= 126 { b[0] as char } else { '.' };
+        let c1 = if b[1] >= 32 && b[1] <= 126 { b[1] as char } else { '.' };
+        let c2 = if b[2] >= 32 && b[2] <= 126 { b[2] as char } else { '.' };
+        let c3 = if b[3] >= 32 && b[3] <= 126 { b[3] as char } else { '.' };
+        println!("[DEBUG] {:#010x}: {:08x} | {}{}{}{}", curr, val, c0, c1, c2, c3);
+        curr += 4;
     }
+    println!("========================================");
+    panic!("Stack smashed! Debug dump completed.");
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
