@@ -7,11 +7,11 @@
 
 use crate::abi::GuestFunction;
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::frameworks::core_foundation::cf_allocator::{kCFAllocatorDefault, CFAllocatorRef};
+use crate::frameworks::core_foundation::cf_allocator::CFAllocatorRef;
 use crate::frameworks::core_foundation::CFTypeRef;
 use crate::libc::sys::socket::sockaddr;
-use crate::mem::{ConstPtr, MutPtr, MutVoidPtr, Ptr};
-use crate::objc::{objc_classes, msg, Class, ClassExports, HostObject};
+use crate::mem::{ConstPtr, MutPtr, MutVoidPtr};
+use crate::objc::{id, objc_classes, msg, Class, ClassExports, HostObject};
 use crate::Environment;
 use std::net::SocketAddrV4;
 
@@ -116,8 +116,8 @@ fn SCNetworkReachabilitySetCallback(
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(SCNetworkReachabilityCreateWithName(_, _, _)),
-    export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _, _)),
-    export_c_func!(SCNetworkReachabilityGetFlags(_, _, _)),
-    export_c_func!(SCNetworkReachabilitySetCallback(_, _, _, _)),
+    export_c_func!(SCNetworkReachabilityCreateWithName(_, _)),
+    export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _)),
+    export_c_func!(SCNetworkReachabilityGetFlags(_, _)),
+    export_c_func!(SCNetworkReachabilitySetCallback(_, _, _)),
 ];
