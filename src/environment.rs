@@ -1064,6 +1064,10 @@ impl Environment {
                     &mut self.threads[thread].blocked_by,
                     ThreadBlock::NotBlocked,
                 );
+                // WatchdogSuspendTracer
+                if thread == 0 {
+                    echo!("[Watchdog] Thread 0 SUSPENDED by Thread {}!", self.current_thread);
+                }
                 log_dbg!("Suspend thread {} from {:?}", thread, previous_thread_state);
                 self.threads[thread].blocked_by =
                     ThreadBlock::Suspended(1, Box::new(previous_thread_state));
@@ -1573,6 +1577,15 @@ impl Environment {
                             svc_pc,
                             svc,
                         ) {
+                            // LibcurlSelectBypass
+                            let lr = self.cpu.regs()[cpu::Cpu::LR];
+                            if self.current_thread == 0 && (lr == 0x00a7c31b || lr == 0x00a86273) {
+                                echo!("WARNING: Breaking libcurl network deadlock at LR {:#010x}", lr);
+                                self.cpu.regs_mut()[0] = 0xFFFFFFFF; // Return -1 (Error)
+                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                                return ThreadNextAction::Continue;
+                            }
+
                             f.call_from_guest(self);
                             // On entry_size 4 return here since there's
                             // no space to add a ret after the svc call
@@ -1676,27 +1689,27 @@ impl Environment {
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
                     let current_lr = self.cpu.regs()[14];
                     // CheckNetworkModule
-                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 || (current_lr & 0xFFFF0000) == 0x00580000 || (target_lr & 0xFFFF0000) == 0x00580000 {
+                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 {
                         echo!("WARNING: Network deadlock safely unwound at {:#010x}! LR: {:#010x}", pc, target_lr);
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
                         self.cpu.regs_mut()[0] = 0;
                         self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                     }
-                } else if (pc == 0x00c3375c || pc == 0x00c3376c || pc == 0x00d01b84) && self.current_thread != 0 {
+                } else if (pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
                     let fp0 = self.cpu.regs()[7];
                     let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
                     // FilterAudioThreads
-                    if (target_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x00580000 {
+                    if (target_lr & 0xFFFF0000) == 0x005b0000 {
                         echo!("WARNING: Deep unwinding infinite parser loop! LR: {:#010x}", target_lr);
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
                         self.cpu.regs_mut()[0] = 0;
                         self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                     }
-                } else if pc == 0x00c32b3c || pc == 0x00d01d54 {
+                } else if pc == 0x00c32b3c {
                     // TargetedDoubleUnwind
                     echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
                     let fp0 = self.cpu.regs()[7];
