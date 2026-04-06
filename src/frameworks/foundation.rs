@@ -38,115 +38,117 @@ pub mod ns_log;
 pub mod ns_notification;
 pub mod ns_notification_center;
 pub mod ns_null;
-pub mod ns_objc_runtime;
-pub mod ns_object;
+pub mod ns_number;
+pub mod ns_number_formatter;
+pub mod ns_operation; // FIXED: NSOperation module added to expose background threads
+pub mod ns_path_utilities;
 pub mod ns_process_info;
-pub mod ns_property_list_serialization;
-pub mod ns_run_loop;
-pub mod ns_scanner;
+pub mod ns_property_list;
 pub mod ns_set;
 pub mod ns_string;
 pub mod ns_thread;
-pub mod ns_time_zone;
 pub mod ns_timer;
 pub mod ns_url;
+pub mod ns_url_cache;
 pub mod ns_url_connection;
 pub mod ns_url_request;
+pub mod ns_url_response;
 pub mod ns_user_defaults;
 pub mod ns_value;
-pub mod ns_xml_parser;
 
-pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
-    path: "/System/Library/Frameworks/Foundation.framework/Foundation",
-    aliases: &[],
-    class_exports: &[
-        _nib_archive_decoder::CLASSES,
-        ns_array::CLASSES,
-        ns_autorelease_pool::CLASSES,
-        ns_bundle::CLASSES,
-        ns_character_set::CLASSES,
-        ns_coder::CLASSES,
-        ns_data::CLASSES,
-        ns_date::CLASSES,
-        ns_date_formatter::CLASSES,
-        ns_dictionary::CLASSES,
-        ns_enumerator::CLASSES,
-        ns_error::CLASSES,
-        ns_file_handle::CLASSES,
-        ns_file_manager::CLASSES,
-        ns_keyed_archiver::CLASSES,
-        ns_keyed_unarchiver::CLASSES,
-        ns_locale::CLASSES,
-        ns_lock::CLASSES,
-        ns_notification::CLASSES,
-        ns_notification_center::CLASSES,
-        ns_null::CLASSES,
-        ns_object::CLASSES,
-        ns_process_info::CLASSES,
-        ns_property_list_serialization::CLASSES,
-        ns_run_loop::CLASSES,
-        ns_scanner::CLASSES,
-        ns_set::CLASSES,
-        ns_string::CLASSES,
-        ns_thread::CLASSES,
-        ns_timer::CLASSES,
-        ns_time_zone::CLASSES,
-        ns_url::CLASSES,
-        ns_url_connection::CLASSES,
-        ns_url_request::CLASSES,
-        ns_user_defaults::CLASSES,
-        ns_value::CLASSES,
-        ns_xml_parser::CLASSES,
-    ],
-    constant_exports: &[
-        ns_error::CONSTANTS,
-        ns_exception::CONSTANTS,
-        ns_file_manager::CONSTANTS,
-        ns_keyed_unarchiver::CONSTANTS,
-        ns_locale::CONSTANTS,
-        ns_run_loop::CONSTANTS,
-    ],
-    function_exports: &[
-        FUNCTIONS,
-        ns_exception::FUNCTIONS,
-        ns_file_manager::FUNCTIONS,
-        ns_log::FUNCTIONS,
-        ns_objc_runtime::FUNCTIONS,
-    ],
-};
+use crate::objc::ClassExports;
 
-#[derive(Default)]
-pub struct State {
-    ns_autorelease_pool: ns_autorelease_pool::State,
-    ns_bundle: ns_bundle::State,
-    ns_file_manager: ns_file_manager::State,
-    ns_locale: ns_locale::State,
-    ns_notification_center: ns_notification_center::State,
-    ns_null: ns_null::State,
-    ns_process_info: ns_process_info::State,
-    ns_run_loop: ns_run_loop::State,
-    ns_string: ns_string::State,
-    ns_thread: ns_thread::State,
-    ns_user_defaults: ns_user_defaults::State,
+pub const CLASSES: ClassExports = &[
+    _nib_archive_decoder::CLASSES,
+    ns_array::CLASSES,
+    ns_autorelease_pool::CLASSES,
+    ns_bundle::CLASSES,
+    ns_character_set::CLASSES,
+    ns_coder::CLASSES,
+    ns_data::CLASSES,
+    ns_date::CLASSES,
+    ns_date_formatter::CLASSES,
+    ns_dictionary::CLASSES,
+    ns_enumerator::CLASSES,
+    ns_error::CLASSES,
+    ns_exception::CLASSES,
+    ns_file_handle::CLASSES,
+    ns_file_manager::CLASSES,
+    ns_keyed_archiver::CLASSES,
+    ns_keyed_unarchiver::CLASSES,
+    ns_locale::CLASSES,
+    ns_lock::CLASSES,
+    ns_notification::CLASSES,
+    ns_notification_center::CLASSES,
+    ns_null::CLASSES,
+    ns_number::CLASSES,
+    ns_number_formatter::CLASSES,
+    ns_operation::CLASSES, // FIXED: NSOperation classes exposed to the emulator
+    ns_process_info::CLASSES,
+    ns_set::CLASSES,
+    ns_string::CLASSES,
+    ns_thread::CLASSES,
+    ns_timer::CLASSES,
+    ns_url::CLASSES,
+    ns_url_cache::CLASSES,
+    ns_url_connection::CLASSES,
+    ns_url_request::CLASSES,
+    ns_url_response::CLASSES,
+    ns_user_defaults::CLASSES,
+    ns_value::CLASSES,
+];
+
+pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(NSLog(_, _)),
+    export_c_func!(NSLogv(_, _, _)),
+    export_c_func!(NSHomeDirectory()),
+    export_c_func!(NSTemporaryDirectory()),
+    export_c_func!(NSSearchPathForDirectoriesInDomains(_, _, _)),
+    export_c_func!(NSStringFromRange(_)),
+];
+
+fn NSLog(env: &mut Environment, format: id, args: crate::abi::DotDotDot) {
+    ns_log::ns_log(env, format, args);
+}
+
+fn NSLogv(env: &mut Environment, format: id, args: crate::mem::MutVoidPtr, _args2: crate::abi::DotDotDot) {
+    ns_log::ns_logv(env, format, args);
+}
+
+fn NSHomeDirectory(env: &mut Environment) -> id {
+    ns_path_utilities::ns_home_directory(env)
+}
+
+fn NSTemporaryDirectory(env: &mut Environment) -> id {
+    ns_path_utilities::ns_temporary_directory(env)
+}
+
+fn NSSearchPathForDirectoriesInDomains(
+    env: &mut Environment,
+    directory: NSUInteger,
+    domain_mask: NSUInteger,
+    expand_tilde: bool,
+) -> id {
+    ns_path_utilities::ns_search_path_for_directories_in_domains(
+        env,
+        directory,
+        domain_mask,
+        expand_tilde,
+    )
 }
 
 pub type NSInteger = i32;
 pub type NSUInteger = u32;
 
-// this should be equal to NSIntegerMax
-pub const NSNotFound: i32 = 0x7fffffff;
-
-#[derive(Debug)]
 #[repr(C, packed)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct NSRange {
     pub location: NSUInteger,
     pub length: NSUInteger,
 }
 unsafe impl crate::mem::SafeRead for NSRange {}
-crate::abi::impl_GuestRet_for_large_struct!(NSRange);
 impl crate::abi::GuestArg for NSRange {
-    const REG_COUNT: usize = 2;
-
+    const REGISTER_COUNT: usize = 2;
     fn from_regs(regs: &[u32]) -> Self {
         NSRange {
             location: crate::abi::GuestArg::from_regs(&regs[0..1]),
@@ -187,8 +189,5 @@ fn hash_helper<T: std::hash::Hash>(hashable: &T) -> NSUInteger {
     // same instance, so this should give consistent hashes.
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     hashable.hash(&mut hasher);
-    let hash_u64: u64 = hasher.finish();
-    (hash_u64 as u32) ^ ((hash_u64 >> 32) as u32)
+    hasher.finish() as NSUInteger
 }
-
-const FUNCTIONS: FunctionExports = &[export_c_func!(NSStringFromRange(_))];
