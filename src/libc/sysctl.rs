@@ -84,8 +84,8 @@ pub fn sysctl(
     if name_len == 6 {
         let mut mib = [0i32; 6];
         for i in 0..6 {
-            // Explicitly tell Rust we are reading an i32 to fix the compiler error
-            let val: i32 = env.mem.read(name_ptr.offset(i as isize)).unwrap_or(0i32);
+            // FIXED: Proper pointer arithmetic without .unwrap()
+            let val: i32 = env.mem.read(name_ptr + (i as u32));
             mib[i] = val;
         }
 
@@ -106,37 +106,40 @@ pub fn sysctl(
                     return -1;
                 }
 
+                // Safely cast to a u8 pointer for byte writing
+                let oldp_u8 = oldp.cast::<u8>();
+
                 // 1. Zero memory
                 for i in 0..fake_size {
-                    env.mem.write(oldp.offset(i as isize), 0u8);
+                    env.mem.write(oldp_u8 + i, 0u8);
                 }
                 
                 // 2. if_msghdr
-                env.mem.write(oldp.offset(0), 152u8); // ifm_msglen
-                env.mem.write(oldp.offset(1), 0u8);
-                env.mem.write(oldp.offset(2), 5u8);   // ifm_version
-                env.mem.write(oldp.offset(3), 14u8);  // ifm_type
-                env.mem.write(oldp.offset(12), 1u8);  // ifm_index
+                env.mem.write(oldp_u8 + 0, 152u8); // ifm_msglen
+                env.mem.write(oldp_u8 + 1, 0u8);
+                env.mem.write(oldp_u8 + 2, 5u8);   // ifm_version
+                env.mem.write(oldp_u8 + 3, 14u8);  // ifm_type
+                env.mem.write(oldp_u8 + 12, 1u8);  // ifm_index
                 
                 // 3. sockaddr_dl
-                let sdl_offset = 76isize;
-                env.mem.write(oldp.offset(sdl_offset + 0), 20u8); // sdl_len
-                env.mem.write(oldp.offset(sdl_offset + 1), 18u8); // sdl_family
-                env.mem.write(oldp.offset(sdl_offset + 2), 1u8);  // sdl_index
-                env.mem.write(oldp.offset(sdl_offset + 4), 6u8);  // sdl_type
-                env.mem.write(oldp.offset(sdl_offset + 5), 3u8);  // sdl_nlen
-                env.mem.write(oldp.offset(sdl_offset + 6), 6u8);  // sdl_alen
+                let sdl_offset = 76u32;
+                env.mem.write(oldp_u8 + sdl_offset + 0, 20u8); // sdl_len
+                env.mem.write(oldp_u8 + sdl_offset + 1, 18u8); // sdl_family
+                env.mem.write(oldp_u8 + sdl_offset + 2, 1u8);  // sdl_index
+                env.mem.write(oldp_u8 + sdl_offset + 4, 6u8);  // sdl_type
+                env.mem.write(oldp_u8 + sdl_offset + 5, 3u8);  // sdl_nlen
+                env.mem.write(oldp_u8 + sdl_offset + 6, 6u8);  // sdl_alen
                 
-                env.mem.write(oldp.offset(sdl_offset + 8), b'e');
-                env.mem.write(oldp.offset(sdl_offset + 9), b'n');
-                env.mem.write(oldp.offset(sdl_offset + 10), b'0');
+                env.mem.write(oldp_u8 + sdl_offset + 8, b'e');
+                env.mem.write(oldp_u8 + sdl_offset + 9, b'n');
+                env.mem.write(oldp_u8 + sdl_offset + 10, b'0');
                 
-                env.mem.write(oldp.offset(sdl_offset + 11), 0x00u8);
-                env.mem.write(oldp.offset(sdl_offset + 12), 0x11u8);
-                env.mem.write(oldp.offset(sdl_offset + 13), 0x22u8);
-                env.mem.write(oldp.offset(sdl_offset + 14), 0x33u8);
-                env.mem.write(oldp.offset(sdl_offset + 15), 0x44u8);
-                env.mem.write(oldp.offset(sdl_offset + 16), 0x55u8);
+                env.mem.write(oldp_u8 + sdl_offset + 11, 0x00u8);
+                env.mem.write(oldp_u8 + sdl_offset + 12, 0x11u8);
+                env.mem.write(oldp_u8 + sdl_offset + 13, 0x22u8);
+                env.mem.write(oldp_u8 + sdl_offset + 14, 0x33u8);
+                env.mem.write(oldp_u8 + sdl_offset + 15, 0x44u8);
+                env.mem.write(oldp_u8 + sdl_offset + 16, 0x55u8);
             }
             return 0;
         }
@@ -152,11 +155,11 @@ pub fn sysctl(
     }
 
     let mib = (
-        env.mem.read(name_ptr.offset(0)),
-        env.mem.read(name_ptr.offset(1)),
+        env.mem.read(name_ptr + 0u32),
+        env.mem.read(name_ptr + 1u32),
     );
 
-    sysctl_impl(env, oldp, oldlenp, newp, newlen, |env| {
+    sysctl_impl(env, oldp, oldlenp, newp, newlen, |_env| {
         if let Some(val) = SYSCTL_BY_MIB.get(&mib) {
             let name_str = SYSCTL_VALUES.iter().find(|(m, _, _)| *m == mib).unwrap().1;
             (name_str, *val)
@@ -178,14 +181,16 @@ pub fn sysctlbyname(
     newp: MutVoidPtr,
     newlen: GuestUSize,
 ) -> i32 {
-    let name_str = env.mem.cstr_at_utf8(name_ptr).unwrap();
+    // FIXED: Clone to a String so we drop the borrow on `env` before closure
+    let name_string = env.mem.cstr_at_utf8(name_ptr).unwrap_or_default().to_string();
 
     sysctl_impl(env, oldp, oldlenp, newp, newlen, |env| {
-        if let Some(val) = SYSCTL_BY_NAME.get(name_str) {
-            (name_str, *val)
+        // Find the 'static lifetime key from the lazy map to satisfy the compiler
+        if let Some((&k, val)) = SYSCTL_BY_NAME.get_key_value(name_string.as_str()) {
+            (k, *val)
         } else {
             set_errno(env, crate::libc::errno::ENOENT);
-            log!("TODO: sysctlbyname called with unimplemented name: {name_str}, returning ENOENT");
+            log!("TODO: sysctlbyname called with unimplemented name: {}, returning ENOENT", name_string);
             // Workaround for https://github.com/hikari-no-yume/touchHLE/issues/4
             ("not implemented", String(b"TODO!"))
         }
@@ -198,7 +203,7 @@ fn sysctl_impl<F>(
     oldlenp: MutPtr<GuestUSize>,
     newp: MutVoidPtr,
     newlen: GuestUSize,
-    name_lookup: F, // <--- Restored missing parameter!
+    name_lookup: F,
 ) -> i32
 where
     F: FnOnce(&mut Environment) -> (&'static str, SysInfoType),
