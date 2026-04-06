@@ -228,7 +228,8 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             let count: NSUInteger = msg![env; subviews count];
             if count > 0 {
                 // Grab the very first layer inside the window (usually the OpenGL Game View)
-                view = msg![env; subviews objectAtIndex:0];
+                let zero: NSUInteger = 0; // Explicitly defining as NSUInteger to prevent crashes!
+                view = msg![env; subviews objectAtIndex:zero];
                 log!("Touch out of bounds, forcing into main game view!");
             } else {
                 view = window;
