@@ -6,7 +6,16 @@
 //! `NSOperation` and `NSOperationQueue`.
 
 use crate::objc::{id, msg, nil, objc_classes, SEL, ClassExports, HostObject};
+use crate::frameworks::foundation::NSInteger;
+use crate::mem::Ptr;
 use crate::Environment;
+
+// Define host objects to satisfy the HostObject trait requirement
+pub(super) struct NSOperationQueueHostObject;
+impl HostObject for NSOperationQueueHostObject {}
+
+pub(super) struct NSOperationHostObject;
+impl HostObject for NSOperationHostObject {}
 
 pub(super) struct NSInvocationOperationHostObject {
     pub target: id,
@@ -22,7 +31,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSOperationQueue: NSObject
 
 + (id)alloc {
-    env.objc.alloc_object(this, Box::new(()), &mut env.mem)
+    // FIXED: Use a proper HostObject struct instead of ()
+    env.objc.alloc_object(this, Box::new(NSOperationQueueHostObject), &mut env.mem)
 }
 
 - (id)init { this }
@@ -32,7 +42,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     () = msg![env; op start];
 }
 
-- (())setMaxConcurrentOperationCount:(isize)_count { }
+// FIXED: Use NSInteger instead of isize to satisfy GuestArg trait
+- (())setMaxConcurrentOperationCount:(NSInteger)_count { }
 
 @end
 
@@ -40,7 +51,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSOperation: NSObject
 
 + (id)alloc {
-    env.objc.alloc_object(this, Box::new(()), &mut env.mem)
+    // FIXED: Use a proper HostObject struct instead of ()
+    env.objc.alloc_object(this, Box::new(NSOperationHostObject), &mut env.mem)
 }
 
 - (id)init { this }
@@ -63,7 +75,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)alloc {
     let host_object = Box::new(NSInvocationOperationHostObject {
         target: nil,
-        sel: SEL::from_raw(0),
+        // FIXED: Initializing with a null pointer since from_raw was missing
+        sel: SEL::from(Ptr::null()),
         arg: nil,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
