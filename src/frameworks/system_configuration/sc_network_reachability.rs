@@ -16,6 +16,7 @@ use crate::Environment;
 use std::net::SocketAddrV4;
 
 type SCNetworkReachabilityFlags = u32;
+// Flag indicating the network is fully reachable
 const kSCNetworkReachabilityFlagsReachable: SCNetworkReachabilityFlags = 1 << 1;
 #[allow(dead_code)]
 const kSCNetworkReachabilityFlagsIsDirect: SCNetworkReachabilityFlags = 1 << 17;
@@ -36,57 +37,38 @@ type SCNetworkReachabilityRef = CFTypeRef;
 
 fn SCNetworkReachabilityCreateWithName(
     env: &mut Environment,
-    allocator: CFAllocatorRef,
-    name: ConstPtr<u8>,
+    _allocator: CFAllocatorRef,
+    _nodename: ConstPtr<i8>,
 ) -> SCNetworkReachabilityRef {
-    assert_eq!(allocator, kCFAllocatorDefault); 
-    
-    // FIX: Convert to an owned String immediately to release the borrow on env.mem
-    let host_name = env.mem.cstr_at_utf8(name).map(|s| s.to_string()).unwrap_or_default();
-
-    // TARGETED BYPASS: Specifically block Gameloft servers to prevent hangs
-    if host_name.contains("gameloft.com") {
-        log!("Bypassing Gameloft server check for: {}", host_name);
-        return Ptr::null();
-    }
-
-    // Original game-specific hack for Cut the Rope
-    if env.bundle.bundle_identifier().starts_with("com.chillingo.cuttherope")
-        && host_name == "chillingo-crystal.appspot.com"
-    {
-        log!("Applying game-specific hack for Cut the Rope: SCNetworkReachabilityCreateWithName returns NULL");
-        return Ptr::null();
-    }
-
-    let isa = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    let res = env.objc.alloc_object(
-        isa,
+    let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
+    let res: id = msg![env; class alloc];
+    env.objc.alloc_object(
+        res,
         Box::new(SCNetworkReachabilityHostObject { address: None }),
         &mut env.mem,
     );
-    
-    log_dbg!("SCNetworkReachabilityCreateWithName({:?}, {:?}) -> {:?}", allocator, host_name, res);
     res
 }
 
 fn SCNetworkReachabilityCreateWithAddress(
     env: &mut Environment,
-    allocator: CFAllocatorRef,
+    _allocator: CFAllocatorRef,
     address: ConstPtr<sockaddr>,
 ) -> SCNetworkReachabilityRef {
-    assert_eq!(allocator, kCFAllocatorDefault);
-    let isa = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    let address_val = env.mem.read(address);
-    let res = env.objc.alloc_object(
-        isa,
+    let addr = env.mem.read(address);
+    let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
+    let res: id = msg![env; class alloc];
+    env.objc.alloc_object(
+        res,
         Box::new(SCNetworkReachabilityHostObject {
-            address: Some(address_val.to_sockaddr_v4()),
+            address: Some(addr.to_sockaddr_v4()),
         }),
         &mut env.mem,
     );
     res
 }
 
+// ===== ALWAYS ONLINE BYPASS =====
 fn SCNetworkReachabilityGetFlags(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
@@ -98,17 +80,14 @@ fn SCNetworkReachabilityGetFlags(
         env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
     
-    let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
-    if let Some(addr) = host_object.address {
-        if addr.ip().is_link_local() {
-            let out_flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
-            env.mem.write(flags, out_flags);
-            return true;
-        }
-    }
+    // Always tell the game we have an active, reachable connection!
+    // This stops games like GT Racing from freezing due to "No WIFI" alerts.
+    let out_flags = kSCNetworkReachabilityFlagsReachable;
+    env.mem.write(flags, out_flags);
     
-    false
+    true
 }
+// ================================
 
 fn SCNetworkReachabilitySetCallback(
     env: &mut Environment,
@@ -121,12 +100,14 @@ fn SCNetworkReachabilitySetCallback(
         target_class,
         env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
-    false
+    
+    // Just return true to pretend we successfully registered the callback
+    true
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(SCNetworkReachabilityCreateWithName(_, _)),
-    export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _)),
-    export_c_func!(SCNetworkReachabilityGetFlags(_, _)),
-    export_c_func!(SCNetworkReachabilitySetCallback(_, _, _)),
+    export_c_func!(SCNetworkReachabilityCreateWithName(_, _, _)),
+    export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _, _)),
+    export_c_func!(SCNetworkReachabilityGetFlags(_, _, _)),
+    export_c_func!(SCNetworkReachabilitySetCallback(_, _, _, _)),
 ];
