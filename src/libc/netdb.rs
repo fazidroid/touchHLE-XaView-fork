@@ -12,46 +12,15 @@ use crate::mem::{guest_size_of, ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
 use super::net_bypass::NetBypass;
 
-// ... (existing structs: hostent, FakeIP, etc.) ...
-
-fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
-
-    // NEW BYPASS CHECK
-    if NetBypass::is_blocked_domain(name_str) {
-        log!("Bypass: Blackholing DNS request for dead server: {}", name_str);
-        // Returning a null pointer (MutPtr::null()) causes the game to get a
-        // 'host not found' error immediately, which is safer than spoofing 127.0.0.1.
-        return MutPtr::null();
-    }
-
-    log!(
-        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1",
-        name,
-        name_str
-    );
-
-    // ... (rest of your existing spoofing logic: FakeIP, FakeAddrList, etc.) ...
-    
-    // For reference, ensure your existing code follows:
-    let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
-    let ip_ptr = env.mem.alloc_and_write(ip_addr);
-    
-    // ... (continue with the rest of your current gethostbyname implementation)
-    MutPtr::null() // Placeholder - keep your original return logic here
-}
-
 const AI_PASSIVE: i32 = 0x1;
-
 pub const IPPROTO_TCP: i32 = 6;
 pub const IPPROTO_UDP: i32 = 17;
-
 const EAI_FAIL: i32 = 4;
 
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// ===== HOSTENT STRUCT REWRITTEN TO SPOOF SERVERS =====
+// ===== STRUCTS FOR DNS SPOOFING =====
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[allow(non_camel_case_types)]
@@ -64,7 +33,6 @@ pub struct hostent {
 }
 unsafe impl SafeRead for hostent {}
 
-// Custom safe wrapper structs to write the DNS payload
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 struct FakeIP {
@@ -89,7 +57,6 @@ struct FakeAliasList {
     null_term: u32,
 }
 unsafe impl SafeRead for FakeAliasList {}
-// =====================================================
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -105,6 +72,7 @@ pub struct addrinfo {
     ai_next: MutPtr<addrinfo>,
 }
 unsafe impl SafeRead for addrinfo {}
+// ===================================
 
 fn getaddrinfo(
     env: &mut Environment,
@@ -167,25 +135,32 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
+
+    // 1. BYPASS CHECK: Block dead servers immediately
+    if NetBypass::is_blocked_domain(name_str) {
+        log!("Bypass: Blackholing DNS request for dead server: {}", name_str);
+        return MutPtr::null();
+    }
+
     log!(
         "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1",
         name,
         name_str
     );
 
-    // 1. Create a fake IP address (127.0.0.1 / localhost)
+    // 2. Create a fake IP address (127.0.0.1 / localhost)
     let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
     let ip_ptr = env.mem.alloc_and_write(ip_addr);
 
-    // 2. Create the null-terminated address list required by C structs
+    // 3. Create the null-terminated address list
     let addr_list = FakeAddrList { ptr: ip_ptr.to_bits(), null_term: 0 };
     let addr_list_ptr = env.mem.alloc_and_write(addr_list);
 
-    // 3. Create the null-terminated aliases list
+    // 4. Create the null-terminated aliases list
     let aliases = FakeAliasList { null_term: 0 };
     let aliases_ptr = env.mem.alloc_and_write(aliases);
 
-    // 4. Populate the full hostent struct so the game engine happily reads it
+    // 5. Populate the full hostent struct
     let hostent_data = hostent {
         h_name: name.cast_mut(),
         h_aliases: aliases_ptr.cast(),
@@ -194,7 +169,7 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
         h_addr_list: addr_list_ptr.cast(),
     };
 
-    // Allocate the structure and pass the pointer back to the game!
+    // Allocate the structure and pass the pointer back to the game
     env.mem.alloc_and_write(hostent_data)
 }
 
