@@ -8,7 +8,6 @@
 use crate::objc::{id, msg, msg_class, nil, objc_classes, SEL, ClassExports, HostObject};
 use crate::frameworks::foundation::NSInteger;
 use crate::frameworks::foundation::ns_thread::detach_new_thread_inner;
-use crate::mem::Ptr;
 
 pub(super) struct NSOperationQueueHostObject;
 impl HostObject for NSOperationQueueHostObject {}
@@ -37,9 +36,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())addOperation:(id)op {
     log_dbg!("[(NSOperationQueue*){:?} addOperation:{:?}] (executing in TRUE background thread!)", this, op);
-    // FIXED: Gameloft network operations block forever. We MUST run them in a true background thread!
     let sel = env.objc.lookup_selector("start").unwrap();
-    detach_new_thread_inner(env, op, sel, nil);
+    // FIXED: Passed arguments in correct order and added `true` for tolerate_type_mismatch
+    detach_new_thread_inner(env, sel, op, nil, true);
 }
 
 - (())setMaxConcurrentOperationCount:(NSInteger)_count { }
@@ -75,7 +74,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (bool)isFinished { true } 
 - (bool)isExecuting { false }
 - (bool)isReady { true }
-- (bool)isConcurrent { true } // We are now truly concurrent!
+- (bool)isConcurrent { true } 
 
 - (())waitUntilFinished { }
 - (())cancel { }

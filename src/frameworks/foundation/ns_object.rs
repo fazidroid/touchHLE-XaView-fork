@@ -14,10 +14,8 @@
 //!
 //! See also: [crate::objc], especially the `objects` module.
 
-use super::ns_dictionary::dict_from_keys_and_objects;
-use super::ns_run_loop::NSDefaultRunLoopMode;
 use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
-use super::{NSTimeInterval, NSUInteger};
+use super::NSUInteger;
 use crate::frameworks::foundation::ns_thread::detach_new_thread_inner;
 use crate::mem::MutVoidPtr;
 use crate::objc::{
@@ -217,9 +215,9 @@ forUndefinedKey:(id)key { // NSString*
 
 - (())performSelectorInBackground:(SEL)sel
                        withObject:(id)arg {
-    // FIXED: Route all background loading requests to TRUE background threads to stop freezing!
     log_dbg!("Executing background selector in real background thread: {:?}", sel.as_str(&env.mem));
-    detach_new_thread_inner(env, this, sel, arg);
+    // FIXED: Passed arguments in correct order and added `true` for tolerate_type_mismatch
+    detach_new_thread_inner(env, sel, this, arg, true);
 }
 
 - (())performSelectorOnMainThread:(SEL)sel withObject:(id)arg waitUntilDone:(bool)wait {
