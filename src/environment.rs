@@ -1064,10 +1064,6 @@ impl Environment {
                     &mut self.threads[thread].blocked_by,
                     ThreadBlock::NotBlocked,
                 );
-                // WatchdogSuspendTracer
-                if thread == 0 {
-                    echo!("[Watchdog] Thread 0 SUSPENDED by Thread {}!", self.current_thread);
-                }
                 log_dbg!("Suspend thread {} from {:?}", thread, previous_thread_state);
                 self.threads[thread].blocked_by =
                     ThreadBlock::Suspended(1, Box::new(previous_thread_state));
@@ -1577,15 +1573,6 @@ impl Environment {
                             svc_pc,
                             svc,
                         ) {
-                            // LibcurlSelectBypass
-                            let lr = self.cpu.regs()[cpu::Cpu::LR];
-                            if self.current_thread == 0 && (lr == 0x00a7c31b || lr == 0x00a86273) {
-                                echo!("WARNING: Breaking libcurl network deadlock at LR {:#010x}", lr);
-                                self.cpu.regs_mut()[0] = 0xFFFFFFFF; // Return -1 (Error)
-                                self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
-                                return ThreadNextAction::Continue;
-                            }
-
                             f.call_from_guest(self);
                             // On entry_size 4 return here since there's
                             // no space to add a ret after the svc call
