@@ -1961,6 +1961,14 @@ fn glEnableVertexAttribArray(env: &mut Environment, index: GLuint) {
     })
 }
 
+fn glGetVertexAttribiv(env: &mut Environment, index: GLuint, pname: GLenum, params: MutPtr<GLint>) {
+    // GetVertexAttribivImpl
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let params_ptr = mem.ptr_at_mut(params, 4);
+        gles.GetVertexAttribiv(index, pname, params_ptr);
+    })
+}
+
 // ImplAttribGuest
 fn glVertexAttrib1f(env: &mut Environment, indx: GLuint, x: GLfloat) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.VertexAttrib1f(indx, x) })
@@ -2449,6 +2457,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetAttribLocation(_, _)),
     export_c_func!(glGetActiveUniform(_, _, _, _, _, _, _)),
     export_c_func!(glGetActiveAttrib(_, _, _, _, _, _, _)),
+    export_c_func!(glGetVertexAttribiv(_, _, _)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {
