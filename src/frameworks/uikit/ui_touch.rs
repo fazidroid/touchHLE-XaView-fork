@@ -10,7 +10,7 @@ use crate::frameworks::core_graphics::{CGPoint, CGRect};
 use crate::frameworks::foundation::{NSInteger, NSTimeInterval, NSUInteger};
 use crate::mem::MutVoidPtr;
 use crate::objc::{
-    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
+    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports, HostObject,
     NSZonePtr,
 };
 use crate::window::{Coords, Event, FingerId};
@@ -73,7 +73,6 @@ pub const CLASSES: ClassExports = objc_classes! {
         msg![env; that_view convertPoint:location_in_window fromView:window]
     };
     
-    // Firmly clamp to the target view's boundaries so game logic mathematically accepts the touch
     if that_view != nil {
         let bounds: CGRect = msg![env; that_view bounds];
         let w = bounds.size.width;
@@ -159,10 +158,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             return handle_touches_move(env, HashMap::from([(finger_id, coords)]));
         }
 
-        let location = CGPoint {
-            x: coords.0,
-            y: coords.1,
-        };
+        let location = CGPoint { x: coords.0, y: coords.1 };
         let new_touch: id = msg_class![env; UITouch alloc];
         *env.objc.borrow_mut(new_touch) = UITouchHostObject {
             view: nil,
@@ -209,9 +205,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         for window in windows.into_iter().rev() {
             let mut loc_in_win: CGPoint = msg![env; window convertPoint:location fromWindow:nil];
             
-            // --- DYNAMIC BOUNDS CLAMPER ---
-            // Force the Android touch coords to always fall mathematically inside the window
-            // This prevents scaled 1080p+ touches from completely missing the 320x480 virtual frame
+            // 1. DYNAMIC CLAMPER
             let bounds: CGRect = msg![env; window bounds];
             let w = bounds.size.width;
             let h = bounds.size.height;
@@ -222,9 +216,42 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
                 if loc_in_win.y >= h { loc_in_win.y = h - 1.0; }
             }
             
-            // Now that the touch is guaranteed to be mathematically inside the window,
-            // run the native recursive hit test to drill down exactly to the menu button!
-            let hit_view: id = msg![env; window hitTest:loc_in_win withEvent:event];
+            // 2. NATIVE HIT TEST
+            let mut hit_view: id = msg![env; window hitTest:loc_in_win withEvent:event];
+            
+            let uiview_class = env.objc.get_known_class("UIView", &mut env.mem);
+            let is_exact_uiview: bool = if hit_view != nil { msg![env; hit_view isMemberOfClass:uiview_class] } else { false };
+            let uiimageview_class = env.objc.get_known_class("UIImageView", &mut env.mem);
+            let is_imageview: bool = if hit_view != nil { msg![env; hit_view isKindOfClass:uiimageview_class] } else { false };
+
+            // 3. SHIELD PIERCER
+            // If the hit view is a generic emulator UIView (like an invisible error overlay) or image, pierce through it!
+            if hit_view == nil || is_exact_uiview || is_imageview {
+                let subviews: id = msg![env; window subviews];
+                let count: NSUInteger = msg![env; subviews count];
+                
+                let mut found_custom = false;
+                for j in (0..count).rev() {
+                    let v: id = msg![env; subviews objectAtIndex:j];
+                    let is_generic: bool = msg![env; v isMemberOfClass:uiview_class];
+                    let is_img: bool = msg![env; v isKindOfClass:uiimageview_class];
+                    let is_hidden: bool = msg![env; v isHidden];
+                    let is_interactive: bool = msg![env; v isUserInteractionEnabled];
+                    
+                    // Route exclusively to the custom interactive layer (the 3D game engine)
+                    if !is_generic && !is_img && !is_hidden && is_interactive {
+                        hit_view = v;
+                        found_custom = true;
+                        log!("Shield Pierced! Rerouted touch directly to 3D Game Engine {:?}", hit_view);
+                        break;
+                    }
+                }
+                
+                if !found_custom && hit_view == nil {
+                    hit_view = window; // Ultimate fallback
+                }
+            }
+
             if hit_view != nil {
                 target_view = hit_view;
                 target_window = window;
@@ -233,11 +260,9 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         }
 
         if target_view == nil {
-            log!("Couldn't find any view for touch at {:?}, discarding", location);
             continue;
         }
 
-        // isMultipleTouchEnabled constraint disabled to prevent ghost lockouts
         if let Entry::Vacant(e) = view_touches.entry(target_view) {
             let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
             e.insert(touches);
