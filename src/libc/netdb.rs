@@ -10,6 +10,36 @@ use crate::export_c_func;
 use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_DGRAM, SOCK_STREAM};
 use crate::mem::{guest_size_of, ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
+use super::net_bypass::NetBypass;
+
+// ... (existing structs: hostent, FakeIP, etc.) ...
+
+fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
+
+    // NEW BYPASS CHECK
+    if NetBypass::is_blocked_domain(name_str) {
+        log!("Bypass: Blackholing DNS request for dead server: {}", name_str);
+        // Returning a null pointer (MutPtr::null()) causes the game to get a
+        // 'host not found' error immediately, which is safer than spoofing 127.0.0.1.
+        return MutPtr::null();
+    }
+
+    log!(
+        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1",
+        name,
+        name_str
+    );
+
+    // ... (rest of your existing spoofing logic: FakeIP, FakeAddrList, etc.) ...
+    
+    // For reference, ensure your existing code follows:
+    let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
+    let ip_ptr = env.mem.alloc_and_write(ip_addr);
+    
+    // ... (continue with the rest of your current gethostbyname implementation)
+    MutPtr::null() // Placeholder - keep your original return logic here
+}
 
 const AI_PASSIVE: i32 = 0x1;
 

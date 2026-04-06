@@ -27,6 +27,7 @@ pub mod mach;
 pub mod mach_o;
 pub mod math;
 pub mod net;
+pub mod net_bypass;
 pub mod netdb;
 pub mod posix_io;
 pub mod pthread;

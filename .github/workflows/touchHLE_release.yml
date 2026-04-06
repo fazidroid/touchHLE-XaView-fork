@@ -2,10 +2,12 @@ name: Build touchHLE
 
 on:
   push:
-    branches:
+    branches: 
+      - "trunk"
       - "N3"
   pull_request:
-    branches:
+    branches: 
+      - "trunk"
       - "N3"
   create: # for tags
   workflow_dispatch: {} # This allows you to manually run the build on the N3 branch from the Actions tab
