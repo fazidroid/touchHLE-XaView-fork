@@ -275,6 +275,13 @@ fn objc_msgSend_inner(
                  return;
              }
 
+             // ===== Burstly self FIX =====
+             if sel_str == "self" {
+                 log!("Stub: self on invalid class (SAFE)");
+                 env.cpu.regs_mut()[0] = receiver.to_bits();
+                 return;
+             }
+
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
                 if is_metaclass { "Class" } else { "Object" },
