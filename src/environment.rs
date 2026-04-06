@@ -1064,10 +1064,6 @@ impl Environment {
                     &mut self.threads[thread].blocked_by,
                     ThreadBlock::NotBlocked,
                 );
-                // WatchdogSuspendTracer
-                if thread == 0 {
-                    echo!("[Watchdog] Thread 0 SUSPENDED by Thread {}!", self.current_thread);
-                }
                 log_dbg!("Suspend thread {} from {:?}", thread, previous_thread_state);
                 self.threads[thread].blocked_by =
                     ThreadBlock::Suspended(1, Box::new(previous_thread_state));
@@ -1674,13 +1670,13 @@ impl Environment {
                 }
 
                 // RestoreConditionalUnwinds
-                if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
+                if (pc == 0x00c3296c || pc == 0x00c32bfc || pc == 0x00d01b84) && self.current_thread != 0 {
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
                     let current_lr = self.cpu.regs()[14];
                     // CheckNetworkModule
-                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 {
+                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 || (current_lr & 0xFFFF0000) == 0x00580000 || (target_lr & 0xFFFF0000) == 0x00580000 {
                         echo!("WARNING: Network deadlock safely unwound at {:#010x}! LR: {:#010x}", pc, target_lr);
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
@@ -1693,7 +1689,7 @@ impl Environment {
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
                     // FilterAudioThreads
-                    if (target_lr & 0xFFFF0000) == 0x005b0000 {
+                    if (target_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x00580000 {
                         echo!("WARNING: Deep unwinding infinite parser loop! LR: {:#010x}", target_lr);
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
@@ -1755,12 +1751,6 @@ impl Environment {
     /// condition is met.
     pub fn yield_thread(&mut self, thread_block: ThreadBlock) {
         assert!(!self.threads[self.current_thread].is_blocked());
-        // ThreadZeroYieldTracer
-        if self.current_thread == 0 && thread_block != ThreadBlock::NotBlocked {
-            let pc = self.cpu.regs()[cpu::Cpu::PC];
-            let lr = self.cpu.regs()[cpu::Cpu::LR];
-            echo!("[Watchdog] Thread 0 BLOCKED! PC: {:#010x}, LR: {:#010x}, Reason: {:?}", pc, lr, thread_block);
-        }
         log_dbg!(
             "Thread {} yielding on {:?}",
             self.current_thread,
