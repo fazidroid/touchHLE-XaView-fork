@@ -100,7 +100,6 @@ pub const CLASSES: ClassExports = objc_classes! {
         return msg![env; this initWithAPI:api];
     }
 
-    // FIXED: Briefly borrow window only when needed to satisfy the Borrow Checker
     {
         let prev_context_gles = env.objc.borrow_mut::<EAGLContextHostObject>(group).gles_ctx.as_mut().unwrap();
         let _prev_ctx = prev_context_gles.make_current(env.window.as_mut().unwrap());
@@ -108,7 +107,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     
     env.window.as_mut().unwrap().set_share_with_current_context(true);
 
-    let mut gles_ins = create_gles1_ctx(env);
+    // FIXED: FORCING the emulator to use our gles1_on_gl2 ES 2.0 hack instead of native 1.1 fallback
+    let mut gles_ins: Box<dyn GLESContext> = Box::new(crate::gles::gles1_on_gl2::GLES1OnGL2Context::new(env.window.as_mut().unwrap(), &env.options).unwrap());
 
     {
         let gles_ctx = gles_ins.make_current(env.window.as_mut().unwrap());
@@ -131,11 +131,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         return nil;
     }
 
-    let mut gles_ins = create_gles1_ctx(env);
+    // FIXED: FORCING the emulator to use our gles1_on_gl2 ES 2.0 hack instead of native 1.1 fallback
+    let mut gles_ins: Box<dyn GLESContext> = Box::new(crate::gles::gles1_on_gl2::GLES1OnGL2Context::new(env.window.as_mut().unwrap(), &env.options).unwrap());
 
-    // FIXED: Briefly borrow window to prevent E0499 overlaps
     {
-        let gles_ctx = gles_ins.make_current(env.window.as_mut().expect("OpenGL ES is not supported in headless mode"));
+        let gles_ctx = gles_ins.make_current(env.window.as_mut().unwrap());
         log!("Driver info: {}", unsafe { gles_ctx.driver_description() });
     }
 
