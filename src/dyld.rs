@@ -835,6 +835,14 @@ impl Dyld {
             }
         }
 
+        // FakeForkCall
+        if symbol == "_fork" {
+            fn fake_fork(env: &mut crate::Environment) {
+                env.cpu.regs_mut()[0] = 0xffffffff;
+            }
+            return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
+        }
+
         panic!("Call to unimplemented function {symbol}");
     }
 
