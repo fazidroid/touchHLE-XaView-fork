@@ -12,7 +12,7 @@ use crate::frameworks::core_animation::ca_eagl_layer::{
 use crate::frameworks::core_graphics::{CGFloat, CGRect, CGSize};
 use crate::frameworks::foundation::ns_string::get_static_str;
 use crate::frameworks::foundation::NSUInteger;
-use crate::gles::gles11_raw as gles11; 
+use crate::gles::gles11_raw as gles11; // constants only
 use crate::gles::gles11_raw::types::*;
 use crate::gles::present::{present_frame, FpsCounter};
 use crate::gles::{create_gles1_ctx, gles1_on_gl2, GLESContext, GLES};
