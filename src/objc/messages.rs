@@ -47,6 +47,13 @@ fn objc_msgSend_inner(
     if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
         println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
     }
+
+    // TraceDeadlockLoop
+    let lr = env.cpu.regs()[14];
+    if env.current_thread == 0 && (lr == 0x00a7c31b || lr == 0x00a86273) {
+        println!("DEADLOCK_TRACE: LR {:#010x} called [{:?} {}]", lr, receiver, sel_name);
+    }
+
     let message_type_info = env.objc.message_type_info.take();
 
     if receiver == nil {
