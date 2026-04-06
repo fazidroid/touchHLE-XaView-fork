@@ -851,6 +851,27 @@ impl Dyld {
             return Some(&(impl_difftime as fn(&mut crate::Environment, i32, i32) -> f64));
         }
 
+        // BypassStackChkFail
+        if symbol == "___stack_chk_fail" {
+            fn bypass_stack_chk_fail(env: &mut crate::Environment) {
+                let mut fp = env.cpu.regs()[7];
+                for _ in 0..30 {
+                    if fp == 0 { break; }
+                    let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
+                    let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+                    if lr > 0 && lr < 0x10000000 {
+                        env.cpu.regs_mut()[7] = prev_fp;
+                        env.cpu.regs_mut()[13] = fp + 8;
+                        env.cpu.regs_mut()[0] = 0;
+                        env.cpu.branch(crate::abi::GuestFunction::from_addr_with_thumb_bit(lr));
+                        return;
+                    }
+                    fp = prev_fp;
+                }
+            }
+            return Some(&(bypass_stack_chk_fail as fn(&mut crate::Environment) -> ()));
+        }
+
         panic!("Call to unimplemented function {symbol}");
     }
 
