@@ -848,14 +848,11 @@ fn abort(env: &mut Environment) {
 }
 
 fn __stack_chk_fail(env: &mut Environment) {
-    // DebugStackFailStderr
+    // DebugStackFailPanic
     let fp = env.cpu.regs()[7];
     let sp = env.cpu.regs()[13];
     let lr = env.cpu.regs()[14];
-    eprintln!("========================================");
-    eprintln!("[DEBUG] ___stack_chk_fail triggered!");
-    eprintln!("[DEBUG] LR: {:#010x}, FP: {:#010x}, SP: {:#010x}", lr, fp, sp);
-    eprintln!("[DEBUG] Stack dump:");
+    let mut dump = format!("\n[DEBUG] ___stack_chk_fail triggered!\n[DEBUG] LR: {:#010x}, FP: {:#010x}, SP: {:#010x}\n[DEBUG] Stack dump:\n", lr, fp, sp);
     let mut curr = sp;
     while curr <= fp + 32 {
         let val: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(curr));
@@ -864,11 +861,10 @@ fn __stack_chk_fail(env: &mut Environment) {
         let c1 = if b[1] >= 32 && b[1] <= 126 { b[1] as char } else { '.' };
         let c2 = if b[2] >= 32 && b[2] <= 126 { b[2] as char } else { '.' };
         let c3 = if b[3] >= 32 && b[3] <= 126 { b[3] as char } else { '.' };
-        eprintln!("[DEBUG] {:#010x}: {:08x} | {}{}{}{}", curr, val, c0, c1, c2, c3);
+        dump.push_str(&format!("[DEBUG] {:#010x}: {:08x} | {}{}{}{}\n", curr, val, c0, c1, c2, c3));
         curr += 4;
     }
-    eprintln!("========================================");
-    panic!("Stack smashed! Debug dump completed.");
+    panic!("{}", dump);
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
