@@ -337,12 +337,30 @@ fn glBlendFunc(env: &mut Environment, sfactor: GLenum, dfactor: GLenum) {
         gles.BlendFunc(sfactor, dfactor)
     })
 }
+fn glBlendFuncSeparate(
+    env: &mut Environment,
+    sfactorRGB: GLenum,
+    dfactorRGB: GLenum,
+    sfactorAlpha: GLenum,
+    dfactorAlpha: GLenum,
+) {
+    // BlendFuncSeparateImpl
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.BlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha)
+    })
+}
 fn glBlendEquationOES(env: &mut Environment, mode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.BlendEquationOES(mode) })
 }
 fn glBlendEquation(env: &mut Environment, mode: GLenum) {
     glBlendEquationOES(env, mode)
 } // BlendAlias
+fn glBlendEquationSeparate(env: &mut Environment, modeRGB: GLenum, modeAlpha: GLenum) {
+    // BlendEqSeparateImpl
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.BlendEquationSeparate(modeRGB, modeAlpha)
+    })
+}
 fn glColorMask(
     env: &mut Environment,
     red: GLboolean,
@@ -2247,8 +2265,10 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glAlphaFunc(_, _)),
     export_c_func!(glAlphaFuncx(_, _)),
     export_c_func!(glBlendFunc(_, _)),
+    export_c_func!(glBlendFuncSeparate(_, _, _, _)),
     export_c_func!(glBlendEquationOES(_)),
     export_c_func!(glBlendEquation(_)),
+    export_c_func!(glBlendEquationSeparate(_, _)),
     export_c_func!(glBlendColor(_, _, _, _)),
     export_c_func!(glColorMask(_, _, _, _)),
     export_c_func!(glClipPlanef(_, _)),
