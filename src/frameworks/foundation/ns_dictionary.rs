@@ -311,16 +311,19 @@ pub fn init_with_objects_and_keys(
 
 /// Helper function to share `initWithDictionary:` implementations
 fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) -> id {
-    let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
     let mut host_object = <DictionaryHostObject as Default>::default();
-
-    for key in other_host_object.iter_keys() {
-        let object = other_host_object.lookup(env, key);
-        host_object.insert(env, key, object, /* copy_key: */ true);
+    
+    // SAFE BYPASS: Do not attempt to borrow 'nil' if the provided dictionary is empty
+    if other_dict != nil {
+        let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
+        for key in other_host_object.iter_keys() {
+            let object = other_host_object.lookup(env, key);
+            host_object.insert(env, key, object, /* copy_key: */ true);
+        }
+        *env.objc.borrow_mut(other_dict) = other_host_object;
     }
 
     *env.objc.borrow_mut(this) = host_object;
-    *env.objc.borrow_mut(other_dict) = other_host_object;
     this
 }
 
@@ -789,6 +792,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())addEntriesFromDictionary:(id)other { // NSDictionary *
+    // SAFE BYPASS: Do not attempt to read from a 'nil' dictionary
+    if other == nil { return; }
+    
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other));
     for (k, v) in host_obj.map.values().flatten() {
         () = msg![env; this setObject:(*v) forKey:(*k)];
