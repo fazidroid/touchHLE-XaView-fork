@@ -867,6 +867,16 @@ impl GLES for GLES1OnGL2<'_> {
         }
         gl21::BlendFunc(sfactor, dfactor);
     }
+    unsafe fn BlendFuncSeparateOES(
+        &mut self,
+        srcRGB: GLenum,
+        dstRGB: GLenum,
+        srcAlpha: GLenum,
+        dstAlpha: GLenum,
+    ) {
+        // BlendFuncSeparateCompat
+        gl21::BlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
     unsafe fn BlendEquationOES(&mut self, mode: GLenum) {
         let functions = [
             gl21::FUNC_ADD,
@@ -875,6 +885,10 @@ impl GLES for GLES1OnGL2<'_> {
         ];
         assert!(functions.contains(&mode));
         gl21::BlendEquation(mode);
+    }
+    unsafe fn BlendEquationSeparateOES(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
+        // BlendEqSeparateCompat
+        gl21::BlendEquationSeparate(modeRGB, modeAlpha);
     }
     unsafe fn ColorMask(
         &mut self,

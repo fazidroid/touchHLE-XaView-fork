@@ -275,11 +275,33 @@ impl GLES for GLES1Native<'_> {
             gles11::BlendFunc(sfactor, dfactor)
         }
     }
+    unsafe fn BlendFuncSeparateOES(
+        &mut self,
+        srcRGB: GLenum,
+        dstRGB: GLenum,
+        srcAlpha: GLenum,
+        dstAlpha: GLenum,
+    ) {
+        // BlendFuncSeparateNative
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha)
+        } else {
+            gles11::BlendFuncSeparateOES(srcRGB, dstRGB, srcAlpha, dstAlpha)
+        }
+    }
     unsafe fn BlendEquationOES(&mut self, mode: GLenum) {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::BlendEquation(mode)
         } else {
             gles11::BlendEquationOES(mode)
+        }
+    }
+    unsafe fn BlendEquationSeparateOES(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
+        // BlendEqSeparateNative
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BlendEquationSeparate(modeRGB, modeAlpha)
+        } else {
+            gles11::BlendEquationSeparateOES(modeRGB, modeAlpha)
         }
     }
     unsafe fn ColorMask(

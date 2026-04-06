@@ -104,7 +104,15 @@ pub trait GLES {
     unsafe fn AlphaFunc(&mut self, func: GLenum, ref_: GLclampf);
     unsafe fn AlphaFuncx(&mut self, func: GLenum, ref_: GLclampx);
     unsafe fn BlendFunc(&mut self, sfactor: GLenum, dfactor: GLenum);
+    unsafe fn BlendFuncSeparateOES(
+        &mut self,
+        srcRGB: GLenum,
+        dstRGB: GLenum,
+        srcAlpha: GLenum,
+        dstAlpha: GLenum,
+    );
     unsafe fn BlendEquationOES(&mut self, mode: GLenum);
+    unsafe fn BlendEquationSeparateOES(&mut self, modeRGB: GLenum, modeAlpha: GLenum);
     unsafe fn ColorMask(
         &mut self,
         red: GLboolean,
