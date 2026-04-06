@@ -197,6 +197,15 @@ fn glGetBooleanv(env: &mut Environment, pname: GLenum, params: MutPtr<GLboolean>
         unsafe { gles.GetBooleanv(pname, params) };
     });
 }
+fn glGetFloatv(env: &mut Environment, pname: GLenum, params: MutPtr<GLfloat>) {
+    assert_ne!(gles11::NUM_COMPRESSED_TEXTURE_FORMATS, pname);
+    assert_ne!(gles11::COMPRESSED_TEXTURE_FORMATS, pname);
+    with_ctx_and_mem(env, |gles, mem| {
+        let params = mem.ptr_at_mut(params, 16 /* upper bound */);
+        unsafe { gles.GetFloatv(pname, params) };
+    });
+}
+
 fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| {
         match pname {
@@ -210,15 +219,10 @@ fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
             }
             // MAX_COLOR_ATTACHMENTS_EXT or MAX_COLOR_ATTACHMENTS_OES
             0x8cdf => {
-                // According to [OES_framebuffer_object](https://registry.khronos.org/OpenGL/extensions/OES/OES_framebuffer_object.txt),
-                // MAX_COLOR_ATTACHMENTS_OES is not supported in the extension,
-                // but we return 1 to match the real device.
                 mem.write(params, 1 as _);
             }
-            MAX_SAMPLES | MAX_SAMPLES_ANGLE => { 
-                // TODO: handle GetBooleanv and GetFloatv as well
-                // 1 is an initial value
-                // TODO: This is an OpenGL ES 2.0 extension, not supported yet
+            // GL_MAX_SAMPLES or GL_MAX_SAMPLES_ANGLE
+            0x8D57 | 0x8CA2 => { 
                 mem.write(params, 1 as _);
             }
             0x8869 => mem.write(params, 16),  // MaxVertexAttribs
