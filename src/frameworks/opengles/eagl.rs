@@ -15,7 +15,7 @@ use crate::frameworks::foundation::NSUInteger;
 use crate::gles::gles11_raw as gles11; // constants only
 use crate::gles::gles11_raw::types::*;
 use crate::gles::present::{present_frame, FpsCounter};
-// Attempt to import both. If create_gles2_ctx fails to compile, see the note below.
+// FIXED: Added create_gles2_ctx to match your gles/ folder contents
 use crate::gles::{create_gles1_ctx, create_gles2_ctx, gles1_on_gl2, GLESContext, GLES};
 use crate::mem::MutPtr;
 use crate::objc::{id, msg, nil, objc_classes, release, retain, ClassExports, HostObject};
@@ -26,16 +26,29 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+// These are used by the EAGLDrawable protocol implemented by CAEAGLayer.
 pub const kEAGLDrawablePropertyColorFormat: &str = "ColorFormat";
 pub const kEAGLDrawablePropertyRetainedBacking: &str = "RetainedBacking";
 pub const kEAGLColorFormatRGBA8: &str = "RGBA8";
 pub const kEAGLColorFormatRGB565: &str = "RGB565";
 
 pub const CONSTANTS: ConstantExports = &[
-    ("_kEAGLDrawablePropertyColorFormat", HostConstant::NSString(kEAGLDrawablePropertyColorFormat)),
-    ("_kEAGLDrawablePropertyRetainedBacking", HostConstant::NSString(kEAGLDrawablePropertyRetainedBacking)),
-    ("_kEAGLColorFormatRGBA8", HostConstant::NSString(kEAGLColorFormatRGBA8)),
-    ("_kEAGLColorFormatRGB565", HostConstant::NSString(kEAGLColorFormatRGB565)),
+    (
+        "_kEAGLDrawablePropertyColorFormat",
+        HostConstant::Item(kEAGLDrawablePropertyColorFormat as *const _ as _),
+    ),
+    (
+        "_kEAGLDrawablePropertyRetainedBacking",
+        HostConstant::Item(kEAGLDrawablePropertyRetainedBacking as *const _ as _),
+    ),
+    (
+        "_kEAGLColorFormatRGBA8",
+        HostConstant::Item(kEAGLColorFormatRGBA8 as *const _ as _),
+    ),
+    (
+        "_kEAGLColorFormatRGB565",
+        HostConstant::Item(kEAGLColorFormatRGB565 as *const _ as _),
+    ),
 ];
 
 pub(super) type EAGLRenderingAPI = u32; 
@@ -81,38 +94,45 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (bool)setCurrentContext:(id)context {
     retain(env, context);
     let current_ctx = env.framework_state.opengles.current_ctx_for_thread(env.current_thread);
+
     if let Some(old_ctx) = std::mem::take(current_ctx) {
         release(env, old_ctx);
     }
+
     let current_ctx = env.framework_state.opengles.current_ctx_for_thread(env.current_thread);
     if context != nil {
         *current_ctx = Some(context);
     }
+
     true
 }
 
 - (id)initWithAPI:(EAGLRenderingAPI)api sharegroup:(id)group {
     if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
+        log!("TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil", api, group);
         return nil;
     }
+
     if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Rejecting ES 2.0 context because global 1.1 mode is active.");
+        log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
         return nil;
     }
+
     if group == nil {
         return msg![env; this initWithAPI:api];
     }
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     let prev_context = env.objc.borrow_mut::<EAGLContextHostObject>(group).gles_ctx.as_mut().unwrap();
+
     {
         let _prev_ctx = prev_context.make_current(window);
     }
     env.window.as_mut().unwrap().set_share_with_current_context(true);
 
-    // FIXED: Branch between ES 1.1 and ES 2.0
+    // FIXED: Correctly branch between ES 1.1 and ES 2.0 based on requested API
     let mut gles_ins = if api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Initializing SHARED OpenGL ES 2.0 context...");
+        log!("Initializing Shared OpenGL ES 2.0 context for modern 3D game...");
         create_gles2_ctx(env)
     } else {
         create_gles1_ctx(env)
@@ -130,21 +150,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.window.as_mut().unwrap().set_share_with_current_context(false);
     env.objc.borrow_mut::<EAGLContextHostObject>(this).renderbuffer_drawable_bindings = 
         env.objc.borrow::<EAGLContextHostObject>(group).renderbuffer_drawable_bindings.clone();
+    
     this
 }
 
 - (id)initWithAPI:(EAGLRenderingAPI)api {
     if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
-        return nil;
-    }
-    if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Rejecting ES 2.0 context because global 1.1 mode is active.");
+        log!("TODO: App requested EAGL initWithAPI:{}, returning nil", api);
         return nil;
     }
 
-    // FIXED: Branch between ES 1.1 and ES 2.0
+    if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
+        log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
+        return nil;
+    }
+
+    // FIXED: Correctly branch between ES 1.1 and ES 2.0 based on requested API
     let mut gles_ins = if api == kEAGLRenderingAPIOpenGLES2 {
-        log!("Initializing OpenGL ES 2.0 context...");
+        log!("Initializing OpenGL ES 2.0 context for modern 3D game...");
         create_gles2_ctx(env)
     } else {
         create_gles1_ctx(env)
@@ -184,7 +207,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.dealloc_object(this, &mut env.mem);
 }
 
-- (bool)renderbufferStorage:(NSUInteger)target fromDrawable:(id)drawable {
+- (bool)renderbufferStorage:(NSUInteger)target
+               fromDrawable:(id)drawable {
     assert!(drawable != nil);
     assert!(target == gles11::RENDERBUFFER_OES);
 
@@ -194,6 +218,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     let format_rgb565 = get_static_str(env, kEAGLColorFormatRGB565);
 
     let format: id = msg![env; props objectForKey:format_key];
+    if !msg![env; format isEqual:format_rgba8] && !msg![env; format isEqual:format_rgb565] {
+        log!("[renderbufferStorage:{:?} fromDrawable:{:?}] Warning: unhandled format {:?}, using RGBA8", target, drawable, format);
+    }
     let internalformat = gles11::RGBA8_OES;
 
     let scale: CGFloat = {
@@ -226,10 +253,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     retain(env, drawable);
     let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this);
-    let maybe_old_drawable = host_obj.renderbuffer_drawable_bindings.borrow_mut().insert(renderbuffer, drawable);
+    let maybe_old_drawable = host_obj.renderbuffer_drawable_bindings.borrow_mut().insert(
+        renderbuffer,
+        drawable
+    );
     if let Some(old_drawable) = maybe_old_drawable {
         release(env, old_drawable);
     }
+
     true
 }
 
@@ -238,7 +269,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     let sleep_for = limit_framerate(&mut env.objc.borrow_mut::<EAGLContextHostObject>(this).next_frame_due, &env.options);
 
     if env.options.print_fps {
-        env.objc.borrow_mut::<EAGLContextHostObject>(this).fps_counter.get_or_insert_with(FpsCounter::start).count_frame(format_args!("EAGLContext {this:?}"));
+        env
+            .objc
+            .borrow_mut::<EAGLContextHostObject>(this)
+            .fps_counter
+            .get_or_insert_with(FpsCounter::start)
+            .count_frame(format_args!("EAGLContext {this:?}"));
     }
 
     let fullscreen_layer = find_fullscreen_eagl_layer(env);
@@ -251,26 +287,48 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
 
     std::mem::drop(gles);
-    let Some(&drawable) = env.objc.borrow::<EAGLContextHostObject>(this).renderbuffer_drawable_bindings.borrow().get(&renderbuffer) else {
+    let Some(&drawable) = env
+        .objc
+        .borrow::<EAGLContextHostObject>(this)
+        .renderbuffer_drawable_bindings
+        .borrow()
+        .get(&renderbuffer) else {
+        log_dbg!("Can't present a renderbuffer {:?} not bound to a drawable!", renderbuffer);
         return false;
     };
 
     if drawable == fullscreen_layer {
-        unsafe { present_renderbuffer(env); }
+        unsafe {
+            present_renderbuffer(env);
+        }
     } else {
         if fullscreen_layer != nil {
-            if let Some(sleep_for) = sleep_for { env.sleep(sleep_for); }
+            log!(
+                "Layer {:?} is not the fullscreen layer {:?}, skipping presentation of renderbuffer {:?}!",
+                drawable,
+                fullscreen_layer,
+                renderbuffer,
+            );
+            if let Some(sleep_for) = sleep_for {
+                env.sleep(sleep_for);
+            }
             return true;
         }
+
         let pixels_vec = get_pixels_vec_for_presenting(env, drawable);
         let (pixels_vec, width, height) = {
             let mut gles = super::sync_context(&mut env.framework_state.opengles, &mut env.objc, env.window.as_mut().unwrap(), env.current_thread);
-            unsafe { read_renderbuffer(gles.as_mut(), pixels_vec) }
+            unsafe {
+                read_renderbuffer(gles.as_mut(), pixels_vec)
+            }
         };
         present_pixels(env, drawable, pixels_vec, width, height);
     }
 
-    if let Some(sleep_for) = sleep_for { env.sleep(sleep_for); }
+    if let Some(sleep_for) = sleep_for {
+        env.sleep(sleep_for);
+    }
+
     true
 }
 
@@ -279,19 +337,36 @@ pub const CLASSES: ClassExports = objc_classes! {
 };
 
 fn limit_framerate(next_frame_due: &mut Option<Instant>, options: &Options) -> Option<Duration> {
-    let interval = if let Some(fps) = options.fps_limit { 1.0 / fps } else { return None; };
+    let interval = if let Some(fps) = options.fps_limit {
+        1.0 / fps
+    } else {
+        return None;
+    };
     let interval_rust = Duration::from_secs_f64(interval);
+
     let &mut Some(current_frame_due) = next_frame_due else {
         *next_frame_due = Some(Instant::now() + interval_rust);
         return None;
     };
+
     let now = Instant::now();
     *next_frame_due = if now > current_frame_due + interval_rust {
-        Some(current_frame_due + Duration::from_secs_f64(interval * (((now - current_frame_due).as_secs_f64() / interval).ceil())))
+        log_dbg!("Too much slop accumulated, skipping an interval.");
+        Some(
+            current_frame_due
+                + Duration::from_secs_f64(
+                    interval * (((now - current_frame_due).as_secs_f64() / interval).ceil()),
+                ),
+        )
     } else {
         Some(current_frame_due + interval_rust)
     };
-    if now < current_frame_due { Some(current_frame_due.saturating_duration_since(now)) } else { None }
+
+    if now < current_frame_due {
+        Some(current_frame_due.saturating_duration_since(now))
+    } else {
+        None
+    }
 }
 
 unsafe fn get_ptr(gles: &mut dyn GLES, pname: GLenum) -> *const GLvoid {
@@ -299,28 +374,50 @@ unsafe fn get_ptr(gles: &mut dyn GLES, pname: GLenum) -> *const GLvoid {
     gles.GetPointerv(pname, &mut ptr);
     ptr
 }
+
 unsafe fn get_ints<const N: usize>(gles: &mut dyn GLES, pname: GLenum) -> [GLint; N] {
     let mut res = [0; N];
     gles.GetIntegerv(pname, res.as_mut_ptr());
     res
 }
-unsafe fn get_int(gles: &mut dyn GLES, pname: GLenum) -> GLint { get_ints::<1>(gles, pname)[0] }
-unsafe fn get_tex_env_ints<const N: usize>(gles: &mut dyn GLES, target: GLenum, pname: GLenum) -> [GLint; N] {
+
+unsafe fn get_int(gles: &mut dyn GLES, pname: GLenum) -> GLint {
+    get_ints::<1>(gles, pname)[0]
+}
+
+unsafe fn get_tex_env_ints<const N: usize>(
+    gles: &mut dyn GLES,
+    target: GLenum,
+    pname: GLenum,
+) -> [GLint; N] {
     let mut res = [0; N];
     gles.GetTexEnviv(target, pname, res.as_mut_ptr());
     res
 }
-unsafe fn get_tex_env_int(gles: &mut dyn GLES, target: GLenum, pname: GLenum) -> GLint { get_tex_env_ints::<1>(gles, target, pname)[0] }
+
+unsafe fn get_tex_env_int(gles: &mut dyn GLES, target: GLenum, pname: GLenum) -> GLint {
+    get_tex_env_ints::<1>(gles, target, pname)[0]
+}
+
 unsafe fn get_floats<const N: usize>(gles: &mut dyn GLES, pname: GLenum) -> [GLfloat; N] {
     let mut res = [0.0; N];
     gles.GetFloatv(pname, res.as_mut_ptr());
     res
 }
+
 unsafe fn get_renderbuffer_size(gles: &mut dyn GLES) -> (GLsizei, GLsizei) {
     let mut width: GLint = 0;
     let mut height: GLint = 0;
-    gles.GetRenderbufferParameterivOES(gles11::RENDERBUFFER_OES, gles11::RENDERBUFFER_WIDTH_OES, &mut width);
-    gles.GetRenderbufferParameterivOES(gles11::RENDERBUFFER_OES, gles11::RENDERBUFFER_HEIGHT_OES, &mut height);
+    gles.GetRenderbufferParameterivOES(
+        gles11::RENDERBUFFER_OES,
+        gles11::RENDERBUFFER_WIDTH_OES,
+        &mut width,
+    );
+    gles.GetRenderbufferParameterivOES(
+        gles11::RENDERBUFFER_OES,
+        gles11::RENDERBUFFER_HEIGHT_OES,
+        &mut height,
+    );
     (width, height)
 }
 
@@ -330,15 +427,43 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
     let width_u32: u32 = width.try_into().unwrap();
     let height_u32: u32 = height.try_into().unwrap();
     let old_framebuffer: GLuint = get_int(gles, gles11::FRAMEBUFFER_BINDING_OES) as _;
+
     let mut src_framebuffer = 0;
     gles.GenFramebuffersOES(1, &mut src_framebuffer);
     gles.BindFramebufferOES(gles11::FRAMEBUFFER_OES, src_framebuffer);
-    gles.FramebufferRenderbufferOES(gles11::FRAMEBUFFER_OES, gles11::COLOR_ATTACHMENT0_OES, gles11::RENDERBUFFER_OES, renderbuffer);
-    let size = (width_u32 as usize).checked_mul(height_u32 as usize).unwrap().checked_mul(4).unwrap();
+    gles.FramebufferRenderbufferOES(
+        gles11::FRAMEBUFFER_OES,
+        gles11::COLOR_ATTACHMENT0_OES,
+        gles11::RENDERBUFFER_OES,
+        renderbuffer,
+    );
+
+    let size = (width_u32 as usize)
+        .checked_mul(height_u32 as usize)
+        .unwrap()
+        .checked_mul(4)
+        .unwrap();
+
     pixel_buffer.clear();
     pixel_buffer.reserve_exact(size);
-    gles.ReadPixels(0, 0, width, height, gles11::RGBA, gles11::UNSIGNED_BYTE, pixel_buffer.as_mut_ptr() as *mut _);
+    let before = Instant::now();
+    gles.ReadPixels(
+        0,
+        0,
+        width,
+        height,
+        gles11::RGBA,
+        gles11::UNSIGNED_BYTE,
+        pixel_buffer.as_mut_ptr() as *mut _,
+    );
+    log_dbg!(
+        "glReadPixels(0, 0, {}, {}, …) took {:?}",
+        width,
+        height,
+        Instant::now().saturating_duration_since(before)
+    );
     pixel_buffer.set_len(size);
+
     gles.DeleteFramebuffersOES(1, &src_framebuffer);
     gles.BindFramebufferOES(gles11::FRAMEBUFFER_OES, old_framebuffer);
     (pixel_buffer, width_u32, height_u32)
@@ -348,23 +473,50 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let viewport = env.window.as_mut().unwrap().viewport();
     let rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
     let virtual_cursor_visible_at = env.window.as_mut().unwrap().virtual_cursor_visible_at();
-    let gles_ctx = super::get_thread_context(&mut env.framework_state.opengles, &mut env.objc, env.current_thread);
+
+    let gles_ctx = super::get_thread_context(
+        &mut env.framework_state.opengles,
+        &mut env.objc,
+        env.current_thread,
+    );
     let mut gles_boxed = gles_ctx.make_current(env.window.as_mut().unwrap());
     let gles = gles_boxed.as_mut();
+
     let renderbuffer: GLuint = get_int(gles, gles11::RENDERBUFFER_BINDING_OES) as _;
     let (width, height) = get_renderbuffer_size(gles);
     let old_framebuffer: GLuint = get_int(gles, gles11::FRAMEBUFFER_BINDING_OES) as _;
     let old_texture_2d: GLuint = get_int(gles, gles11::TEXTURE_BINDING_2D) as _;
+
     let mut src_framebuffer = 0;
     gles.GenFramebuffersOES(1, &mut src_framebuffer);
     gles.BindFramebufferOES(gles11::FRAMEBUFFER_OES, src_framebuffer);
-    gles.FramebufferRenderbufferOES(gles11::FRAMEBUFFER_OES, gles11::COLOR_ATTACHMENT0_OES, gles11::RENDERBUFFER_OES, renderbuffer);
+    gles.FramebufferRenderbufferOES(
+        gles11::FRAMEBUFFER_OES,
+        gles11::COLOR_ATTACHMENT0_OES,
+        gles11::RENDERBUFFER_OES,
+        renderbuffer,
+    );
+
     let mut texture: GLuint = 0;
     gles.GenTextures(1, &mut texture);
     gles.BindTexture(gles11::TEXTURE_2D, texture);
-    gles.CopyTexImage2D(gles11::TEXTURE_2D, 0, gles11::RGB as _, 0, 0, width, height, 0);
-    gles.TexParameteri(gles11::TEXTURE_2D, gles11::TEXTURE_MIN_FILTER, gles11::LINEAR as _);
+    gles.CopyTexImage2D(
+        gles11::TEXTURE_2D,
+        0,
+        gles11::RGB as _,
+        0,
+        0,
+        width,
+        height,
+        0,
+    );
+    gles.TexParameteri(
+        gles11::TEXTURE_2D,
+        gles11::TEXTURE_MIN_FILTER,
+        gles11::LINEAR as _,
+    );
     gles.DeleteFramebuffersOES(1, &src_framebuffer);
+
     let is_gles2 = gles.is_gles2();
     let old_arrays = {
         let mut old_arrays = [gles11::FALSE; gles1_on_gl2::ARRAYS.len()];
@@ -379,15 +531,26 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let old_capabilities = {
         let mut old_capabilities = [gles11::FALSE; gles1_on_gl2::CAPABILITIES.len()];
         if !is_gles2 {
-            for (is_enabled, &name) in old_capabilities.iter_mut().zip(gles1_on_gl2::CAPABILITIES.iter()) {
+            for (is_enabled, &name) in old_capabilities
+                .iter_mut()
+                .zip(gles1_on_gl2::CAPABILITIES.iter())
+            {
                 gles.GetBooleanv(name, is_enabled);
                 gles.Disable(name);
             }
         }
         old_capabilities
     };
-    let old_matrix_mode: GLenum = if !is_gles2 { get_int(gles, gles11::MATRIX_MODE) as _ } else { 0 };
-    let old_color: [GLfloat; 4] = if !is_gles2 { get_floats(gles, gles11::CURRENT_COLOR) } else { [0.0; 4] };
+    let old_matrix_mode: GLenum = if !is_gles2 {
+        get_int(gles, gles11::MATRIX_MODE) as _
+    } else {
+        0
+    };
+    let old_color: [GLfloat; 4] = if !is_gles2 {
+        get_floats(gles, gles11::CURRENT_COLOR)
+    } else {
+        [0.0; 4]
+    };
     if !is_gles2 {
         for mode in [gles11::MODELVIEW, gles11::PROJECTION, gles11::TEXTURE] {
             gles.MatrixMode(mode);
@@ -396,6 +559,7 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         }
         gles.Color4f(1.0, 1.0, 1.0, 1.0);
     }
+
     let old_viewport: (GLint, GLint, GLsizei, GLsizei) = {
         let [x, y, width, height] = get_ints(gles, gles11::VIEWPORT);
         (x, y, width as _, height as _)
@@ -407,18 +571,26 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let old_vertex_array_type: GLenum = get_int(gles, gles11::VERTEX_ARRAY_TYPE) as _;
     let old_vertex_array_stride: GLsizei = get_int(gles, gles11::VERTEX_ARRAY_STRIDE) as _;
     let old_vertex_array_pointer = get_ptr(gles, gles11::VERTEX_ARRAY_POINTER);
-    let old_tex_coord_array_binding: GLuint = get_int(gles, gles11::TEXTURE_COORD_ARRAY_BUFFER_BINDING) as _;
+    let old_tex_coord_array_binding: GLuint =
+        get_int(gles, gles11::TEXTURE_COORD_ARRAY_BUFFER_BINDING) as _;
     let old_tex_coord_array_size: GLint = get_int(gles, gles11::TEXTURE_COORD_ARRAY_SIZE);
     let old_tex_coord_array_type: GLenum = get_int(gles, gles11::TEXTURE_COORD_ARRAY_TYPE) as _;
-    let old_tex_coord_array_stride: GLsizei = get_int(gles, gles11::TEXTURE_COORD_ARRAY_STRIDE) as _;
+    let old_tex_coord_array_stride: GLsizei =
+        get_int(gles, gles11::TEXTURE_COORD_ARRAY_STRIDE) as _;
     let old_tex_coord_array_pointer = get_ptr(gles, gles11::TEXTURE_COORD_ARRAY_POINTER);
     let old_blend_sfactor: GLenum = get_int(gles, gles11::BLEND_SRC) as _;
     let old_blend_dfactor: GLenum = get_int(gles, gles11::BLEND_DST) as _;
     let old_tex_env_mode = get_tex_env_int(gles, gles11::TEXTURE_ENV, gles11::TEXTURE_ENV_MODE);
     let tex_env_mode_arr = [gles11::REPLACE; 1];
-    gles.TexEnviv(gles11::TEXTURE_ENV, gles11::TEXTURE_ENV_MODE, tex_env_mode_arr.as_ptr().cast());
+    gles.TexEnviv(
+        gles11::TEXTURE_ENV,
+        gles11::TEXTURE_ENV_MODE,
+        tex_env_mode_arr.as_ptr().cast(),
+    );
+
     present_frame(gles, viewport, rotation_matrix, virtual_cursor_visible_at);
     gles.DeleteTextures(1, &texture);
+
     if !is_gles2 {
         for (&is_enabled, info) in old_arrays.iter().zip(gles1_on_gl2::ARRAYS.iter()) {
             match is_enabled {
@@ -427,7 +599,10 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
                 _ => unreachable!(),
             }
         }
-        for (&is_enabled, &name) in old_capabilities.iter().zip(gles1_on_gl2::CAPABILITIES.iter()) {
+        for (&is_enabled, &name) in old_capabilities
+            .iter()
+            .zip(gles1_on_gl2::CAPABILITIES.iter())
+        {
             match is_enabled {
                 gles11::TRUE => gles.Enable(name),
                 gles11::FALSE => gles.Disable(name),
@@ -441,18 +616,45 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         gles.MatrixMode(old_matrix_mode);
         gles.Color4f(old_color[0], old_color[1], old_color[2], old_color[3]);
     }
-    gles.Viewport(old_viewport.0, old_viewport.1, old_viewport.2, old_viewport.3);
-    gles.ClearColor(old_clear_color[0], old_clear_color[1], old_clear_color[2], old_clear_color[3]);
+    gles.Viewport(
+        old_viewport.0,
+        old_viewport.1,
+        old_viewport.2,
+        old_viewport.3,
+    );
+    gles.ClearColor(
+        old_clear_color[0],
+        old_clear_color[1],
+        old_clear_color[2],
+        old_clear_color[3],
+    );
     gles.BindBuffer(gles11::ARRAY_BUFFER, old_vertex_array_binding);
-    gles.VertexPointer(old_vertex_array_size, old_vertex_array_type, old_vertex_array_stride, old_vertex_array_pointer);
+    gles.VertexPointer(
+        old_vertex_array_size,
+        old_vertex_array_type,
+        old_vertex_array_stride,
+        old_vertex_array_pointer,
+    );
     gles.BindBuffer(gles11::ARRAY_BUFFER, old_tex_coord_array_binding);
-    gles.TexCoordPointer(old_tex_coord_array_size, old_tex_coord_array_type, old_tex_coord_array_stride, old_tex_coord_array_pointer);
+    gles.TexCoordPointer(
+        old_tex_coord_array_size,
+        old_tex_coord_array_type,
+        old_tex_coord_array_stride,
+        old_tex_coord_array_pointer,
+    );
     gles.BindBuffer(gles11::ARRAY_BUFFER, old_array_buffer);
     gles.BlendFunc(old_blend_sfactor, old_blend_dfactor);
+
     let old_tex_env_mode_arr = [old_tex_env_mode; 1];
-    gles.TexEnviv(gles11::TEXTURE_ENV, gles11::TEXTURE_ENV_MODE, old_tex_env_mode_arr.as_ptr().cast());
+    gles.TexEnviv(
+        gles11::TEXTURE_ENV,
+        gles11::TEXTURE_ENV_MODE,
+        old_tex_env_mode_arr.as_ptr().cast(),
+    );
+
     std::mem::drop(gles_boxed);
     env.window.as_ref().unwrap().swap_window();
+
     let mut gles_boxed = gles_ctx.make_current(env.window.as_mut().unwrap());
     let gles = gles_boxed.as_mut();
     gles.BindTexture(gles11::TEXTURE_2D, old_texture_2d);
