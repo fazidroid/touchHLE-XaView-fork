@@ -1003,6 +1003,10 @@ impl GLES for GLES1OnGL2<'_> {
         .contains(&func));
         gl21::StencilFunc(func, ref_, mask);
     }
+    unsafe fn StencilFuncSeparate(&mut self, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+        // StencilFuncSeparateCompat
+        gl21::StencilFuncSeparate(face, func, ref_, mask);
+    }
     unsafe fn StencilOp(&mut self, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
         for enum_ in [sfail, dpfail, dppass].iter() {
             assert!([
@@ -1017,8 +1021,16 @@ impl GLES for GLES1OnGL2<'_> {
         }
         gl21::StencilOp(sfail, dpfail, dppass);
     }
+    unsafe fn StencilOpSeparate(&mut self, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+        // StencilOpSeparateCompat
+        gl21::StencilOpSeparate(face, sfail, dpfail, dppass);
+    }
     unsafe fn StencilMask(&mut self, mask: GLuint) {
         gl21::StencilMask(mask);
+    }
+    unsafe fn StencilMaskSeparate(&mut self, face: GLenum, mask: GLuint) {
+        // StencilMaskSeparateCompat
+        gl21::StencilMaskSeparate(face, mask);
     }
     unsafe fn LogicOp(&mut self, opcode: GLenum) {
         assert!([
