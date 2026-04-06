@@ -1,6 +1,7 @@
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * License, v. 2.0.
+ * If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! Implementation of OpenGL ES 1.1 on top of OpenGL 2.1 compatibility profile.
@@ -266,11 +267,9 @@ impl GLES for GLES1OnGL2<'_> {
     }
 
     unsafe fn GetIntegerv(&mut self, pname: GLenum, params: *mut GLint) {
-        // FIXED: Intercept shader binary format queries to prevent 0x8df9 panics
         if pname == 0x8df8 { *params = 0; return; }
         if pname == 0x8df9 { return; }
         
-        // FIXED: Bypass GET_PARAMS validation to allow native ES 2.0 queries from N.O.V.A. 3
         gl21::GetIntegerv(pname, params);
     }
 
@@ -409,7 +408,7 @@ impl GLES for GLES1OnGL2<'_> {
             let palette_size = palette_entry_size * palette_entry_count;
             let index_count = w as usize * h as usize;
             let (index_word_size, index_word_count) = if index_is_nibble { (1, index_count.div_ceil(2)) } else { (4, index_count.div_ceil(4)) };
-            let _indices_size = index_word_size * index_word_count; // FIXED: Added underscore to silence warning
+            let _indices_size = index_word_size * index_word_count; 
             let (palette, indices) = data.split_at(palette_size);
             let mut decoded = Vec::<u8>::with_capacity(palette_entry_size * index_count);
             for idx in 0..index_count {
@@ -498,6 +497,10 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn GetActiveUniform(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) { gl21::GetActiveUniform(program, index, bufSize, length, size, type_, name) }
     unsafe fn GetActiveAttrib(&mut self, program: GLuint, index: GLuint, bufSize: GLsizei, length: *mut GLsizei, size: *mut GLint, type_: *mut GLenum, name: *mut std::ffi::c_char) { gl21::GetActiveAttrib(program, index, bufSize, length, size, type_, name) }
     unsafe fn BlendColor(&mut self, red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) { gl21::BlendColor(red, green, blue, alpha) }
+
+    unsafe fn BlendFuncSeparate(&mut self, sfactorRGB: GLenum, dfactorRGB: GLenum, sfactorAlpha: GLenum, dfactorAlpha: GLenum) { gl21::BlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha) }
+    unsafe fn BlendEquationSeparate(&mut self, modeRGB: GLenum, modeAlpha: GLenum) { gl21::BlendEquationSeparate(modeRGB, modeAlpha) }
+
     unsafe fn GetVertexAttribiv(&mut self, index: GLuint, pname: GLenum, params: *mut GLint) { gl21::GetVertexAttribiv(index, pname, params) }
 
     unsafe fn GenFramebuffersOES(&mut self, n: GLsizei, f: *mut GLuint) { gl21::GenFramebuffersEXT(n, f) }
