@@ -141,7 +141,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (bool)fileExistsAtPath:(id)path { // NSString*
-    let path_str = if path != nil { ns_string::to_rust_string(env, path) } else { String::from("nil") }; // LogFilePath
+    let path_str = if path != nil { ns_string::to_rust_string(env, path).to_string() } else { String::from("nil") }; // FixCowType
     let res_exists = if path == nil {
         false
     } else {
@@ -176,7 +176,7 @@ pub const CLASSES: ClassExports = objc_classes! {
                 contents:(id)data // NSData*
               attributes:(id)attributes { // NSDictionary*
     let _ = attributes; // IgnoreAttributes
-    let path_str = if path != nil { ns_string::to_rust_string(env, path) } else { String::from("nil") }; // LogCreatePath
+    let path_str = if path != nil { ns_string::to_rust_string(env, path).to_string() } else { String::from("nil") }; // FixCowType
     log!("[(NSFileManager*) {:?} createFileAtPath:{:?}]", this, path_str); // ForceLogCreate
     if data == nil {
         let empty: id = msg_class![env; NSData new];
@@ -413,7 +413,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
     // FixFreeSpaceLimit
-    let path_str = if _path != nil { ns_string::to_rust_string(env, _path) } else { String::from("nil") }; // LogFSPath
+    let path_str = if _path != nil { ns_string::to_rust_string(env, _path).to_string() } else { String::from("nil") }; // FixCowType
     log!("attributesOfFileSystemForPath called for path: {}", path_str); // ForceLogFSAttr
     log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
 
