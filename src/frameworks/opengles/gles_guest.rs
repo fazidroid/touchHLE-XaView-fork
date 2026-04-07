@@ -1779,20 +1779,25 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            // GAMELOFT SUPER SANITIZER: Aggressively strip illegal #endif/else tags
-            let mut sanitized = String::new();
+            let mut sanitized_source = String::new();
             for line in full_source.lines() {
-                let t = line.trim();
-                if t.starts_with("#endif") { sanitized.push_str("#endif\n"); }
-                else if t.starts_with("#else") { sanitized.push_str("#else\n"); }
-                else { sanitized.push_str(line); sanitized.push('\n'); }
+                let trimmed = line.trim(); 
+                // Aggressively strip illegal arguments from #endif and #else
+                if trimmed.starts_with("#endif") {
+                    sanitized_source.push_str("#endif\n");
+                } else if trimmed.starts_with("#else") {
+                    sanitized_source.push_str("#else\n");
+                } else {
+                    sanitized_source.push_str(line);
+                    sanitized_source.push('\n');
+                }
             }
-            full_source = sanitized;
+            full_source = sanitized_source;
 
-            // Precision Injection
+            // Only inject precision if the game hasn't defined it itself
             if !full_source.contains("precision ") {
-                let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
-                full_source.insert_str(0, inject);
+                let precision_header = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
+                full_source.insert_str(0, precision_header);
             }
         }
 
