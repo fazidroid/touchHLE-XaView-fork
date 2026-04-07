@@ -23,55 +23,48 @@ fn objc_msgSend_inner(
     let message_type_info = env.objc.message_type_info.take();
 
     // ==========================================================
-    // 1. EA MTX & STOREFRONT BYPASS (CheckMTXController Fixes)
+    // 1. GT RACING: GRAPHICS & OPENGL SNIFFER
+    // ==========================================================
+
+    // Trace Context Creation
+    if sel_str == "initWithAPI:" {
+        let api_version = env.cpu.regs()[2]; 
+        println!("🎮 GL LOG: Game requested OpenGL ES Context API Version: {}", api_version);
+    }
+
+    // Trace the Render Surface Setup
+    if sel_str == "renderbufferStorage:fromDrawable:" {
+        println!("🎮 GL LOG: Allocating Renderbuffer from Drawable Surface!");
+    }
+    if sel_str == "setOpaque:" {
+        let is_opaque = env.cpu.regs()[2];
+        println!("🎮 GL LOG: Layer setOpaque: {}", is_opaque);
+    }
+
+    // Trace Window & Screen Setup
+    if sel_str == "makeKeyAndVisible" {
+        println!("🎮 GL LOG: UIWindow is being made visible to the screen!");
+    }
+
+    // Uncomment this to trace actual frame draws (Warning: spams the console!)
+    // if sel_str == "presentRenderbuffer:" {
+    //     println!("🎮 GL LOG: Frame Presented!"); 
+    // }
+
+    // ==========================================================
+    // 2. GAMELOFT IDENTITY & HARDWARE SPOOFS
     // ==========================================================
     
-    // Force MTX status to Success. This is CRITICAL for the Line 3193 assertion!
-    if sel_str == "canMakePayments" || sel_str == "isMTXReady" || sel_str == "isReady" || sel_str == "CheckMTXController" {
-        env.cpu.regs_mut()[0] = 1; // 1 = YES / true
-        return;
-    }
-
-    // Return dummy pointers for Store singletons to prevent nil crashes
-    if sel_str == "defaultQueue" || sel_str == "sharedController" || sel_str == "sharedManager" {
-        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
-        return;
-    }
-
-    // ==========================================================
-    // 2. RECURSION-SAFE VIDEO & NETWORK KILL-SWITCH
-    // ==========================================================
-    
-    // We return nil (0) for initialization. The game skips the video player entirely.
-    if sel_str == "initWithContentURL:" || sel_str == "initWithContentURL:error:" || 
-       sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" || 
-       sel_str == "sendSynchronousRequest:returningResponse:error:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil
-        return;
-    }
-
-    if sel_str == "playbackState" || sel_str == "loadState" {
-        env.cpu.regs_mut()[0] = 0; // 0 = Stopped/Empty
-        return;
-    }
-
-    if sel_str == "currentReachabilityStatus" || sel_str == "networkStatusForFlags:" {
-        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
-        return;
-    }
-
-    // ==========================================================
-    // 3. DEVICE IDENTITY (Fixes (null) and UDID Errors)
-    // ==========================================================
-    
-    if sel_str == "currentDevice" || sel_str == "keyWindow" {
-        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
-        return;
-    }
-
+    // Gameloft's strict UDID check
     if sel_str == "uniqueIdentifier" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // Prevent (null) devices
+    if sel_str == "currentDevice" || sel_str == "keyWindow" {
+        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
         return;
     }
 
@@ -83,13 +76,13 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "systemVersion" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "6.0".to_string());
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
 
     // ==========================================================
-    // 4. CORE DISPATCH LOGIC (Standard touchHLE)
+    // 3. CORE DISPATCH LOGIC (With Recursion Fixes)
     // ==========================================================
 
     if receiver == nil {
@@ -119,17 +112,31 @@ fn objc_msgSend_inner(
 
         if let Some(obj) = host_object.as_any().downcast_ref::<super::ClassHostObject>() {
             
-            // FIXED: The missing `super2` logic that was causing the Stack Overflow!
-            // If the game calls `[super method]`, we MUST jump to the superclass before checking methods.
+            // Fixes the Stack Overflow by properly walking up the class hierarchy
             if super2.is_some() && class == orig_class {
                 class = obj.superclass;
                 continue;
             }
 
+            let name = &obj.name;
+
+            // --- GAMELOFT VIDEO PLAYER BYPASS ---
+            // Skips the intro video by instantly telling the game it finished.
+            if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
+                let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
+                if center_class != nil {
+                    let center: id = msg![env; center_class defaultCenter];
+                    let n = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+                    let _: () = msg![env; center postNotificationName:n object:receiver];
+                }
+                env.cpu.regs_mut()[0] = 0;
+                return;
+            }
+
+            // --- NORMAL METHOD EXECUTION ---
             if let Some(imp) = obj.methods.get(&selector) {
                 match imp {
                     IMP::Host(host_imp) => {
-                        // Optional: Ensure type checking doesn't crash the game unnecessarily
                         if let Some((sent_type_id, _)) = message_type_info {
                             let (expected_type_id, _) = host_imp.type_info();
                             if sent_type_id != expected_type_id && !tolerate_type_mismatch && 
@@ -152,7 +159,7 @@ fn objc_msgSend_inner(
     }
 }
 
-// Boilerplate below is unchanged...
+// Boilerplate below is unchanged
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSend(env: &mut Environment, receiver: id, selector: SEL) {
     objc_msgSend_inner(env, receiver, selector, None, false)
