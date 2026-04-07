@@ -128,7 +128,8 @@ fn sysctl(
                 env.mem.write(oldp_u8 + 12u32, 1u8);  // ifm_index
                 
                 // 3. sockaddr_dl
-                let sdl_offset = 76u32;
+                // 3. sockaddr_dl
+                let sdl_offset = 112u32; // FIXED: 32-bit iOS if_msghdr size is 112 bytes
                 env.mem.write(oldp_u8 + sdl_offset + 0u32, 20u8); // sdl_len
                 env.mem.write(oldp_u8 + sdl_offset + 1u32, 18u8); // sdl_family
                 env.mem.write(oldp_u8 + sdl_offset + 2u32, 1u8);  // sdl_index
@@ -140,12 +141,13 @@ fn sysctl(
                 env.mem.write(oldp_u8 + sdl_offset + 9u32, b'n');
                 env.mem.write(oldp_u8 + sdl_offset + 10u32, b'0');
                 
-                env.mem.write(oldp_u8 + sdl_offset + 11u32, 0x00u8);
-                env.mem.write(oldp_u8 + sdl_offset + 12u32, 0x11u8);
-                env.mem.write(oldp_u8 + sdl_offset + 13u32, 0x22u8);
-                env.mem.write(oldp_u8 + sdl_offset + 14u32, 0x33u8);
-                env.mem.write(oldp_u8 + sdl_offset + 15u32, 0x44u8);
-                env.mem.write(oldp_u8 + sdl_offset + 16u32, 0x55u8);
+                // Real MAC address to prevent (null) UDID hash errors!
+                env.mem.write(oldp_u8 + sdl_offset + 11u32, 0x12u8);
+                env.mem.write(oldp_u8 + sdl_offset + 12u32, 0x34u8);
+                env.mem.write(oldp_u8 + sdl_offset + 13u32, 0x56u8);
+                env.mem.write(oldp_u8 + sdl_offset + 14u32, 0x78u8);
+                env.mem.write(oldp_u8 + sdl_offset + 15u32, 0x9Au8);
+                env.mem.write(oldp_u8 + sdl_offset + 16u32, 0xBCu8);
             }
             return 0;
         }
