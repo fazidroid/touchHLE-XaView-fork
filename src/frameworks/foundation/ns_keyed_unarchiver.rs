@@ -31,6 +31,7 @@ pub const CONSTANTS: ConstantExports = &[(
 struct NSKeyedUnarchiverHostObject {
     plist: Dictionary,
     current_key: Option<Uid>,
+    /// linear map of Uid => id
     already_unarchived: Vec<Option<id>>,
     delegate: id,
     temporary_buffers: Vec<MutVoidPtr>,
@@ -179,8 +180,13 @@ fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
         Value::String(s) => from_rust_string(env, s.to_string()),
         Value::Integer(int) => {
             let num: id = msg_class![env; NSNumber alloc];
-            if let Some(i) = int.as_signed() { msg![env; num initWithLongLong:i] }
-            else { msg![env; num initWithUnsignedLongLong:int.as_unsigned().unwrap()] }
+            if let Some(i) = int.as_signed() { 
+                msg![env; num initWithLongLong:i] 
+            } else { 
+                // FIXED: Extract value to avoid '.' error in msg! macro
+                let u_val = int.as_unsigned().unwrap();
+                msg![env; num initWithUnsignedLongLong:u_val] 
+            }
         }
         _ => nil,
     };
@@ -203,19 +209,36 @@ pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bo
         let len: GuestUSize = bytes.len() as GuestUSize;
         let guest_bytes = env.mem.alloc(len);
         env.mem.bytes_at_mut(guest_bytes.cast(), len).copy_from_slice(bytes);
+        
         let cls = if is_mutable { "NSMutableData" } else { "NSData" };
-        let data: id = env.objc.get_known_class(cls, &mut env.mem);
-        let data: id = msg![env; data alloc];
-        return msg![env; data initWithBytesNoCopy:guest_bytes length:len freeWhenDone:true];
+        let data_class: id = env.objc.get_known_class(cls, &mut env.mem);
+        let data_instance: id = msg![env; data_class alloc];
+        return msg![env; data_instance initWithBytesNoCopy:guest_bytes length:len freeWhenDone:true];
     }
     nil
+}
+
+pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
+    let keys = keys_for_key(env, unarchiver, "NS.objects");
+    keys.into_iter()
+        .map(|key| {
+            let new_object = unarchive_key(env, unarchiver, key);
+            retain(env, new_object)
+        })
+        .collect()
+}
+
+pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id)> {
+    let keys = keys_for_key(env, unarchiver, "NS.keys");
+    let vals = keys_for_key(env, unarchiver, "NS.objects");
+    let keys: Vec<id> = keys.into_iter().map(|key| unarchive_key(env, unarchiver, key)).collect();
+    let vals: Vec<id> = vals.into_iter().map(|val| unarchive_key(env, unarchiver, val)).collect();
+    keys.into_iter().zip(vals).collect()
 }
 
 fn keys_for_key(env: &mut Environment, unarchiver: id, key: &str) -> Vec<Uid> {
     let host_obj = borrow_host_obj(env, unarchiver);
     let objects = host_obj.plist["$objects"].as_array().unwrap();
-    
-    // SAFE BYPASS: Prevent unwrap panics for missing keys in Most Wanted
     if let Some(current_uid) = host_obj.current_key {
         if let Some(dict) = objects[current_uid.get() as usize].as_dictionary() {
             if let Some(Value::Array(keys)) = dict.get(key) {
