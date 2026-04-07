@@ -132,14 +132,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     let view_alloc: id = msg![env; view_class alloc];
     
     // FixLandscapeFrame
-    let screen: id = msg_class![env; UIScreen mainScreen];
-    let mut app_frame: crate::frameworks::core_graphics::CGRect = msg![env; screen applicationFrame];
-    if app_frame.size.width < app_frame.size.height {
-        app_frame.size = crate::frameworks::core_graphics::CGSize {
-            width: app_frame.size.height,
-            height: app_frame.size.width,
-        };
-    }
+    let app_frame = crate::frameworks::core_graphics::CGRect {
+        origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
+        size: crate::frameworks::core_graphics::CGSize { width: 480.0, height: 320.0 },
+    };
     
     let view: id = msg![env; view_alloc initWithFrame:app_frame];
     
