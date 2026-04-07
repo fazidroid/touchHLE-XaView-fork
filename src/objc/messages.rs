@@ -37,7 +37,7 @@ fn objc_msgSend_inner(
     // ===== NFS SHIFT 2: (NULL) INFO & FSTAT DEADLOCK BYPASS =====
 
     // 1. Fix the (null) Device Info so the engine initializes properly
-    if sel_str == "currentDevice" || sel_str == "mainBundle" {
+    if sel_str == "currentDevice" {
         if receiver.to_bits() != 0 {
             env.cpu.regs_mut()[0] = receiver.to_bits(); 
         } else {
