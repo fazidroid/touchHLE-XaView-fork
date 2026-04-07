@@ -8,12 +8,13 @@ fn sysctl(
     namelen: u32,
     _oldp: MutVoidPtr,
     _oldlenp: MutPtr<u32>,
-    _newp: MutVoidPtr, // FIXED: Strict MutVoidPtr matching your fork
+    _newp: MutVoidPtr, 
     _newlen: u32,
 ) -> i32 {
     let mut mib = vec![0i32; namelen as usize];
     for i in 0..namelen as u32 {
-        mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i).unwrap_or(0);
+        // FIXED: Removed .unwrap_or(0) because read() returns the i32 directly
+        mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     log!("GAMELOFT BYPASS: sysctl called for mib {:?}, faking success", mib);
     0 
@@ -24,7 +25,7 @@ fn sysctlbyname(
     name_ptr: ConstPtr<u8>,
     oldp: MutVoidPtr,
     oldlenp: MutPtr<u32>,
-    _newp: MutVoidPtr, // FIXED: Strict MutVoidPtr matching your fork
+    _newp: MutVoidPtr, 
     _newlen: u32,
 ) -> i32 {
     let name_bytes = env.mem.cstr_at(name_ptr);
@@ -35,7 +36,8 @@ fn sysctlbyname(
         log!("GAMELOFT BYPASS: Forcing hw.machine to iPhone4,1 (Enables GLES 2.0)");
         let hw = b"iPhone4,1\0";
         if !oldp.is_null() && !oldlenp.is_null() {
-            let oldlen = env.mem.read::<u32, false>(oldlenp.cast_const()).unwrap_or(0);
+            // FIXED: Removed .unwrap_or(0) because read() returns the u32 directly
+            let oldlen = env.mem.read::<u32, false>(oldlenp.cast_const());
             if oldlen as usize >= hw.len() {
                 env.mem.bytes_at_mut(oldp.cast(), hw.len() as u32).copy_from_slice(hw);
             }
@@ -48,31 +50,7 @@ fn sysctlbyname(
     0
 }
 
-// ==== NFS SHIFT 2 FONT CRASH BYPASSES ====
-// These return dummy math values so the game doesn't divide-by-zero
-fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
-fn CGFontGetAscent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 800 }
-fn CGFontGetDescent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { -200 }
-fn CGFontRetain(_env: &mut Environment, font: ConstVoidPtr) -> ConstVoidPtr { font }
-fn CGFontCreateWithDataProvider(_env: &mut Environment, provider: ConstVoidPtr) -> ConstVoidPtr { provider }
-
-// ==== NFS SHIFT 2 FILE I/O INFINITE LOOP BYPASS ====
-// Returns EOF (-1) so the game knows when to stop reading empty files
-fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 {
-    -1 
-}
-
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
     export_c_func!(sysctlbyname(_, _, _, _, _)),
-    
-    // Shift 2 Font Bypasses
-    export_c_func!(CGFontGetUnitsPerEm(_)),
-    export_c_func!(CGFontGetAscent(_)),
-    export_c_func!(CGFontGetDescent(_)),
-    export_c_func!(CGFontRetain(_)),
-    export_c_func!(CGFontCreateWithDataProvider(_)),
-    
-    // Shift 2 File I/O Bypass
-    export_c_func!(__srget(_)),
 ];
