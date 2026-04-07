@@ -129,7 +129,13 @@ pub const CLASSES: ClassExports = objc_classes! {
             log!("Fallback to EAGLView class instead of UIView!");
         }
     }
-    let view: id = msg![env; view_class alloc];
+    let view_alloc: id = msg![env; view_class alloc];
+    // InitEaglLayer
+    let bounds = crate::frameworks::core_graphics::CGRect {
+        origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
+        size: crate::frameworks::core_graphics::CGSize { width: 1024.0, height: 768.0 },
+    };
+    let view: id = msg![env; view_alloc initWithFrame:bounds];
     // Docs are saying that "an empty UIView" is created,
     // but testing reveals that frame matches the screen one
     // (at least on the simulator)
