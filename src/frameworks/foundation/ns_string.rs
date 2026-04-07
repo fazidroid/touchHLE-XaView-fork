@@ -615,6 +615,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     let mut a_iter = env.objc.borrow::<StringHostObject>(this).iter_code_units().peekable();
     let mut b_iter = env.objc.borrow::<StringHostObject>(other).iter_code_units().peekable();
 
+    // FIXED: Strip NSForcedOrderingSearch (512) to prevent crashes in EA games.
+    let mut mask = mask;
+    if (mask & 512) != 0 {
+        log_dbg!("Warning: Stripping unsupported NSStringCompareOptions bit 512 (NSForcedOrderingSearch)");
+        mask &= !512;
+    }
+
     // By default, no mask is a literal search
     let mask = if mask == 0 {
         NSLiteralSearch
@@ -750,7 +757,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())getCharacters:(MutPtr<unichar>)buffer
-              range:(NSRange)range {
+               range:(NSRange)range {
     // TODO: avoid copying
     let ranged = msg![env; this substringWithRange:range];
     msg![env; ranged getCharacters:buffer]
@@ -1060,7 +1067,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let expanded: id = msg![env; this stringByExpandingTildeInPath];
     let path = to_rust_string(env, expanded); // TODO: avoid copying
     // TODO: Removing an initial component of "/private/var/automount",
-    //       "/var/automount”, or "/private” from the path
+    //        "/var/automount”, or "/private” from the path
     assert!(!path.starts_with("/private"));
     assert!(!path.starts_with("/var/automount"));
     // TODO: Reducing empty components and references to the current directory
@@ -1107,70 +1114,70 @@ pub const CLASSES: ClassExports = objc_classes! {
     ui_font::size_with_font(env, font, &text, None)
 }
 - (CGSize)sizeWithFont:(id)font // UIFont*
-     constrainedToSize:(CGSize)size {
+      constrainedToSize:(CGSize)size {
     msg![env; this sizeWithFont:font
-              constrainedToSize:size
-                  lineBreakMode:UILineBreakModeWordWrap]
+               constrainedToSize:size
+                   lineBreakMode:UILineBreakModeWordWrap]
 }
 - (CGSize)sizeWithFont:(id)font // UIFont*
-     constrainedToSize:(CGSize)size
-         lineBreakMode:(UILineBreakMode)line_break_mode {
+      constrainedToSize:(CGSize)size
+          lineBreakMode:(UILineBreakMode)line_break_mode {
     // TODO: avoid copy
     let text = to_rust_string(env, this);
     ui_font::size_with_font(env, font, &text, Some((size, line_break_mode)))
 }
 
 - (CGSize)drawAtPoint:(CGPoint)point
-             withFont:(id)font { // UIFont*
+              withFont:(id)font { // UIFont*
     // TODO: avoid copy
     let text = to_rust_string(env, this);
     ui_font::draw_at_point(env, font, &text, point, None)
 }
 
 - (CGSize)drawAtPoint:(CGPoint)point
-             forWidth:(CGFloat)width
-             withFont:(id)font // UIFont*
-        lineBreakMode:(UILineBreakMode)line_break_mode {
+              forWidth:(CGFloat)width
+              withFont:(id)font // UIFont*
+         lineBreakMode:(UILineBreakMode)line_break_mode {
     // TODO: avoid copy
     let text = to_rust_string(env, this);
     ui_font::draw_at_point(env, font, &text, point, Some((width, line_break_mode)))
 }
 
 - (CGSize)drawInRect:(CGRect)rect
-            withFont:(id)font { // UIFont*
+             withFont:(id)font { // UIFont*
     msg![env; this drawInRect:rect
-                     withFont:font
-                lineBreakMode:UILineBreakModeWordWrap
-                    alignment:UITextAlignmentLeft]
+                      withFont:font
+                 lineBreakMode:UILineBreakModeWordWrap
+                     alignment:UITextAlignmentLeft]
 }
 - (CGSize)drawInRect:(CGRect)rect
-            withFont:(id)font // UIFont*
-       lineBreakMode:(UILineBreakMode)line_break_mode {
+             withFont:(id)font // UIFont*
+        lineBreakMode:(UILineBreakMode)line_break_mode {
     msg![env; this drawInRect:rect
-                     withFont:font
-                lineBreakMode:line_break_mode
-                    alignment:UITextAlignmentLeft]
+                      withFont:font
+                 lineBreakMode:line_break_mode
+                     alignment:UITextAlignmentLeft]
 }
 - (CGSize)drawInRect:(CGRect)rect
-            withFont:(id)font // UIFont*
-       lineBreakMode:(UILineBreakMode)line_break_mode
-           alignment:(UITextAlignment)align {
+             withFont:(id)font // UIFont*
+        lineBreakMode:(UILineBreakMode)line_break_mode
+            alignment:(UITextAlignment)align {
     // TODO: avoid copy
     let text = to_rust_string(env, this);
     ui_font::draw_in_rect(env, font, &text, rect, line_break_mode, align)
 }
 
 - (bool)writeToFile:(id)path // NSString*
-         atomically:(bool)use_aux_file {
+          atomically:(bool)use_aux_file {
     let encoding: NSStringEncoding = msg_class![env; NSString defaultCStringEncoding];
     let error: MutPtr<id> = Ptr::null();
     msg![env; this writeToFile:path atomically:use_aux_file encoding:encoding error:error]
 }
 
 - (bool)writeToFile:(id)path // NSString*
-         atomically:(bool)use_aux_file
-           encoding:(NSStringEncoding)encoding
-              error:(MutPtr<id>)error { // NSError**
+          atomically:(bool)use_aux_file
+            encoding:(NSStringEncoding)encoding
+               error:(MutPtr<id>)error { // NSError**
     assert!(encoding == NSUTF8StringEncoding || encoding == NSASCIIStringEncoding);
 
     let string = to_rust_string(env, this);
@@ -1333,7 +1340,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithFormat:(id)format, // NSString*
-                     ...args {
+                       ...args {
     init_with_format_inner(env, this, format, args.start())
 }
 
@@ -1343,8 +1350,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithBytes:(ConstPtr<u8>)bytes
-             length:(NSUInteger)len
-           encoding:(NSStringEncoding)encoding {
+              length:(NSUInteger)len
+            encoding:(NSStringEncoding)encoding {
     // TODO: error handling
     let slice = env.mem.bytes_at(bytes, len);
     let host_object = StringHostObject::decode(Cow::Borrowed(slice), encoding);
@@ -1562,8 +1569,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithBytes:(ConstPtr<u8>)bytes
-             length:(NSUInteger)len
-           encoding:(NSStringEncoding)encoding {
+              length:(NSUInteger)len
+            encoding:(NSStringEncoding)encoding {
     // TODO: error handling
     let slice = env.mem.bytes_at(bytes, len);
     let host_object = StringHostObject::decode(Cow::Borrowed(slice), encoding);
@@ -1574,7 +1581,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithFormat:(id)format, // NSString*
-                     ...args {
+                       ...args {
     init_with_format_inner(env, this, format, args.start())
 }
 
@@ -1594,7 +1601,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())appendFormat:(id)format, // NSString*
-                   ...args {
+                    ...args {
     assert_ne!(format, nil);
     let res = with_format(env, format, args.start());
     *env.objc.borrow_mut(this) = StringHostObject::Utf8(format!("{}{}", to_rust_string(env, this), res).into());
