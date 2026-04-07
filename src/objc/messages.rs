@@ -109,10 +109,11 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
-            // HookRootViewController
+            // SafeRootViewControllerHook
             if selector.as_str(&env.mem) == "setRootViewController:" {
                 let vc: id = crate::mem::Ptr::from_bits(env.cpu.regs()[2]);
-                echo!("WARNING: Hooked setRootViewController! Window: {:?}, VC: {:?}", receiver, vc);
+                echo!("SafeHook: setRootViewController: Window: {:?}, VC: {:?}", receiver, vc);
+                
                 if vc != nil {
                     let mut store_lock = ROOT_VC_STORE.lock().unwrap();
                     if store_lock.is_none() {
@@ -121,34 +122,24 @@ fn objc_msgSend_inner(
                     store_lock.as_mut().unwrap().insert(receiver.to_bits(), vc.to_bits());
                     drop(store_lock);
                     
+                    // SaveCpuState
+                    let saved_regs = env.cpu.regs().to_vec();
+                    
                     let view: id = crate::msg![env; vc view];
                     if view != nil {
-                        let screen: id = crate::msg_class![env; UIScreen mainScreen];
-                        let window_bounds: crate::frameworks::core_graphics::CGRect = crate::msg![env; screen bounds];
-                        
-                        // FixStructAbiFrame
-                        let _: () = crate::msg![env; receiver setFrame:window_bounds];
-                        let _: () = crate::msg![env; view setFrame:window_bounds];
-                        
-                        let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
-                        
-                        // ForceTouchInteraction
-                        let sel_user = env.objc.lookup_selector("setUserInteractionEnabled:").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_user, 1u32));
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_user, 1u32));
-                        
-                        let sel_multi = env.objc.lookup_selector("setMultipleTouchEnabled:").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_multi, 1u32));
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
-                        
                         let sel_add = env.objc.lookup_selector("addSubview:").unwrap();
                         let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_add, view));
                         
                         let sel_key = env.objc.lookup_selector("makeKeyAndVisible").unwrap();
                         let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_key));
+                        
+                        *crate::libc::stdlib::HACK_MAIN_WINDOW.lock().unwrap() = receiver.to_bits();
                     }
+                    
+                    // RestoreCpuState (Crucial for AppPicker stability)
+                    env.cpu.regs_mut().copy_from_slice(&saved_regs);
                 }
+                
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
