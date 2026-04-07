@@ -101,9 +101,8 @@ impl Default for Options {
             dumping_file: crate::paths::user_data_base_path().join("DUMP.txt"),
             ignore_gl_errors: false,
             
-            // === RESTORED ===
-            // GT Racing's ES 2.0 engine is an unfinished beta. We must use 1!
-            gles_version: 1, 
+            // RESTORED: Default to 2 so Need for Speed works!
+            gles_version: 2, 
         }
     }
 }
@@ -277,8 +276,16 @@ impl Options {
 /// The [Ok] value is a [Some] with the options if they could be found, or
 /// [None] if no options were found for this app.
 pub fn get_options_from_file<F: Read>(file: F, app_id: &str) -> Result<Option<String>, String> {
+    // === APP-SPECIFIC BYPASS ===
+    // If the game's bundle ID contains "gtracing", silently force GLES 1.1!
+    if app_id.to_lowercase().contains("gtracing") {
+        log!("GAMELOFT BYPASS: Automatically forcing --gles-version=1 for GT Racing!");
+        return Ok(Some("--gles-version=1".to_string()));
+    }
+
     let file = BufReader::new(file);
     for (line_no, line) in BufRead::lines(file).enumerate() {
+        // ... (the rest of the original function remains below) ...
         // Line numbering usually starts from 1
         let line_no = line_no + 1;
 
