@@ -68,6 +68,24 @@ const CLASSES: ClassExports = objc_classes! {
     log!("TODO: [(CMMotionManager *){:?} startDeviceMotionUpdates]", this);
 }
 
+- (bool)isDeviceMotionActive {
+    // FakeMotionActive
+    log!("TODO: [(CMMotionManager *){:?} isDeviceMotionActive] -> true", this);
+    true
+}
+
+- (bool)isAccelerometerActive {
+    // FakeAccelActive
+    log!("TODO: [(CMMotionManager *){:?} isAccelerometerActive] -> true", this);
+    true
+}
+
+- (bool)isGyroActive {
+    // FakeGyroActive
+    log!("TODO: [(CMMotionManager *){:?} isGyroActive] -> true", this);
+    true
+}
+
 @end
 
 };
