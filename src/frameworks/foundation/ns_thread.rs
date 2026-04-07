@@ -105,7 +105,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (())sleepForTimeInterval:(NSTimeInterval)ti {
     log_dbg!("[NSThread sleepForTimeInterval:{:?}]", ti);
-    env.sleep(Duration::from_secs_f64(ti));
+    // FIXED: Gameloft Float Crash! 
+    // Modern devices run so fast that game deltas calculate to 0 or NaN.
+    // If the time is valid and non-negative, sleep normally.
+    if ti.is_finite() && ti >= 0.0 {
+        env.sleep(Duration::from_secs_f64(ti));
+    } else {
+        log!("Warning: Ignored invalid sleep duration (NaN or infinite): {:?}", ti);
+    }
 }
 
 + (())detachNewThreadSelector:(SEL)selector
