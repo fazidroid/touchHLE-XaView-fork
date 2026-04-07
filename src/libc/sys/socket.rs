@@ -351,10 +351,17 @@ fn connect(
     address: ConstPtr<sockaddr>,
     address_len: socklen_t,
 ) -> i32 {
-    if !env.options.network_access {
-        // GAMELOFT BYPASS: Safely reject the connection here. Gameloft's engine 
-        // handles connect() failures cleanly and aborts the tracking payload!
-        crate::libc::errno::set_errno(env, 51);
+        // EXCLUSIVE HACK: Allow socket creation for Asphalt 6 even if network is disabled globally.
+    let is_asphalt6 = env.options.app_bundle_id == "com.gameloft.Asphalt6ipad";
+    
+    if !env.options.network_access && !is_asphalt6 {
+        log_dbg!(
+            "Network access is disabled, socket({}, {}, {}) => -1",
+            domain,
+            type_,
+            protocol
+        );
+        set_errno(env, EPROTONOSUPPORT);
         return -1;
     }
 
