@@ -49,8 +49,9 @@ fn sysctlbyname(
 
     // NEW: Spoof capability check for MTX/Storefront (Fixes CheckMTXController crash)
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
-        log!("EA BYPASS: Spoofing {} capability for Storefront initialization", name_str);
+        log!("EA BYPASS: Spoofing {} capability as enabled (1)", name_str);
         if !oldp.is_null() && !oldlenp.is_null() {
+            // Write 1 (enabled) as a 4-byte integer
             env.mem.write::<i32>(oldp.cast(), 1);
             env.mem.write::<u32>(oldlenp, 4);
         }
