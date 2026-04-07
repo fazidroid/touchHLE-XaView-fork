@@ -109,21 +109,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentsOfURL:(id)url {
-    // FIXED: Variables cleanly separated for macro parser safety!
-    let absolute_string: id = msg![env; url absoluteString];
-    let url_str = to_rust_string(env, absolute_string);
-    
-    if url_str.starts_with("file://") {
-        let path: id = msg![env; url path];
-        msg![env; this initWithContentsOfFile:path]
+    [span_3](start_span)// FIXED: Variables cleanly separated for macro parser safety[span_3](end_span)!
+    [span_4](start_span)let absolute_string: id = msg![env; url absoluteString];[span_4](end_span)
+    [span_5](start_span)let url_str = to_rust_string(env, absolute_string);[span_5](end_span)
+
+    [span_6](start_span)if url_str.starts_with("file://") {[span_6](end_span)
+        [span_7](start_span)let path: id = msg![env; url path];[span_7](end_span)
+        [span_8](start_span)msg![env; this initWithContentsOfFile:path][span_8](end_span)
     } else {
-        // GAMELOFT BYPASS: Return dummy valid data to appease the DRM engine!
-        log!("GAMELOFT BYPASS: Faking HTTP response for URL: {}", url_str);
-        let dummy = b"1\nOK\n";
-        let dummy_len = dummy.len() as u32;
-        let alloc = env.mem.alloc(dummy_len);
-        env.mem.bytes_at_mut(alloc.cast(), dummy_len).copy_from_slice(dummy);
-        msg![env; this initWithBytesNoCopy:alloc length:dummy_len freeWhenDone:true]
+        [span_9](start_span)// GAMELOFT BYPASS: Return dummy valid data to appease the DRM engine[span_9](end_span)!
+        [span_10](start_span)log!("GAMELOFT BYPASS: Faking HTTP response for URL: {}", url_str);[span_10](end_span)
+        [span_11](start_span)let dummy = b"1\nOK\n";[span_11](end_span)
+        [span_12](start_span)let dummy_len = dummy.len() as u32;[span_12](end_span)
+        [span_13](start_span)let alloc = env.mem.alloc(dummy_len);[span_13](end_span)
+        [span_14](start_span)env.mem.bytes_at_mut(alloc.cast(), dummy_len).copy_from_slice(dummy);[span_14](end_span)
+        [span_15](start_span)msg![env; this initWithBytesNoCopy:alloc length:dummy_len freeWhenDone:true][span_15](end_span)
     }
 }
 
