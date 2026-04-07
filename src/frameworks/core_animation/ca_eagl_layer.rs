@@ -78,7 +78,12 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
 
         let layer_host_obj: &CALayerHostObject = env.objc.borrow(layer);
         let b = layer_host_obj.bounds;
-        log!("DEBUG_CAEAGL: Inspecting layer: {:?} | bounds: x={},y={},w={},h={} | hidden: {}, opacity: {}", layer, b.origin.x, b.origin.y, b.size.width, b.size.height, layer_host_obj.hidden, layer_host_obj.opacity);
+        //FixPackedStructLog
+        let bx = b.origin.x;
+        let by = b.origin.y;
+        let bw = b.size.width;
+        let bh = b.size.height;
+        log!("DEBUG_CAEAGL: Inspecting layer: {:?} | bounds: x={},y={},w={},h={} | hidden: {}, opacity: {}", layer, bx, by, bw, bh, layer_host_obj.hidden, layer_host_obj.opacity);
 
         // BypassStrictBounds
         if layer_host_obj.hidden || layer_host_obj.opacity == 0.0 {
