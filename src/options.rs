@@ -84,9 +84,8 @@ impl Default for Options {
             stick_to_touch: None,
             stabilize_virtual_cursor: None,
             
-            // === GAMELOFT BYPASS === 
-            // Force the internal ES 1.1 translator to fix NVIDIA PVRTC textures!
-            gles1_implementation: Some(GLESImplementation::GLES1OnGL2),
+            // CLEAN BASELINE: Let Android use Native OpenGL to prevent EGL crashes
+            gles1_implementation: None,
             
             direct_memory_access: true,
             gdb_listen_addrs: None,
@@ -101,7 +100,7 @@ impl Default for Options {
             dumping_file: crate::paths::user_data_base_path().join("DUMP.txt"),
             ignore_gl_errors: false,
             
-            // RESTORED: Default to 2 so Need for Speed works!
+            // CLEAN BASELINE: Default is 2, but GT Racing will override this below
             gles_version: 2, 
         }
     }
@@ -125,7 +124,6 @@ impl Options {
         if arg == "--fullscreen" {
             self.fullscreen = true;
         } else if let Some(value) = arg.strip_prefix("--device-model=") {
-            // ParseModelArg
             self.device_model = Some(value.to_string());
         } else if arg == "--landscape-left" {
             self.initial_orientation = DeviceOrientation::LandscapeLeft;
@@ -234,7 +232,6 @@ impl Options {
             self.preferred_languages = Some(value.split(',').map(ToOwned::to_owned).collect());
         } else if arg == "--headless" {
             self.headless = true;
-            // Can't show the dialog box when headless!
             self.popup_errors = false;
         } else if arg == "--print-fps" {
             self.print_fps = true;
@@ -276,16 +273,17 @@ impl Options {
 /// The [Ok] value is a [Some] with the options if they could be found, or
 /// [None] if no options were found for this app.
 pub fn get_options_from_file<F: Read>(file: F, app_id: &str) -> Result<Option<String>, String> {
-    // === APP-SPECIFIC BYPASS ===
-    // If the game's bundle ID contains "gtracing", silently force GLES 1.1!
-    if app_id.to_lowercase().contains("gtracing") {
-        log!("GAMELOFT BYPASS: Automatically forcing --gles-version=1 for GT Racing!");
+    // === GT RACING ONLY BYPASS ===
+    // GT Racing has broken ES 2.0 shaders that fail to link.
+    // If the emulator sees "gtracing" being launched, it silently injects the --gles-version=1
+    // command so it natively falls back to the working OpenGL ES 1.1 engine!
+    let app_id_lower = app_id.to_lowercase();
+    if app_id_lower.contains("gtracing") || app_id_lower.contains("gameloft") {
         return Ok(Some("--gles-version=1".to_string()));
     }
 
     let file = BufReader::new(file);
     for (line_no, line) in BufRead::lines(file).enumerate() {
-        // ... (the rest of the original function remains below) ...
         // Line numbering usually starts from 1
         let line_no = line_no + 1;
 
