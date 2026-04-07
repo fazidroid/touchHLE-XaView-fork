@@ -143,8 +143,8 @@ impl State {
 fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> i32 {
     log_dbg!("socket({}, {}, {})", domain, type_, protocol);
 
-    // GAMELOFT BYPASS: Throw ENETUNREACH (51) to mimic Airplane Mode safely!
     if !env.options.network_access {
+        // GAMELOFT BYPASS: Throw ENETUNREACH (51) to mimic Airplane Mode safely!
         crate::libc::errno::set_errno(env, 51);
         return -1;
     }
