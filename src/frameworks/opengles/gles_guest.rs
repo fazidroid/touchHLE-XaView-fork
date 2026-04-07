@@ -46,7 +46,11 @@ type GuestGLintptr = GuestISize;
 /// List of compressed formats supported by our emulation.
 /// Currently, it's all the PVRTC and all paletted ones.
 const SUPPORTED_COMPRESSED_TEXTURE_FORMATS: &[GLenum] = &[
-    // GAMELOFT BYPASS: PVRTC formats removed here so the game falls back to uncompressed BGRA8888!
+    // RESTORED: PVRTC formats so the gles1_on_gl2 CPU translator can catch them!
+    gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG,
+    gles11::COMPRESSED_RGBA_PVRTC_4BPPV1_IMG,
+    gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG,
+    gles11::COMPRESSED_RGB_PVRTC_4BPPV1_IMG,
     // Paletted texture
     gles11::PALETTE4_R5_G6_B5_OES,
     gles11::PALETTE4_RGB5_A1_OES,
