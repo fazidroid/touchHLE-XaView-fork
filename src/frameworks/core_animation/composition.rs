@@ -179,7 +179,10 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
     let scale_hack: u32 = env.options.scale_hack.get();
     let fb_width = (screen_bounds.size.width * screen_scale).round() as u32 * scale_hack;
     let fb_height = (screen_bounds.size.height * screen_scale).round() as u32 * scale_hack;
+    //DebugCompBounds
+    log!("DEBUG_COMP: Screen Bounds: w={}, h={} | scale={} | fb_w={}, fb_h={}", screen_bounds.size.width, screen_bounds.size.height, screen_scale, fb_width, fb_height);
     if fb_width == 0 || fb_height == 0 {
+        log!("DEBUG_COMP: SKIP due to zero size");
         return new_recomposite_next; // BypassZeroSize
     }
     let present_frame_args = (

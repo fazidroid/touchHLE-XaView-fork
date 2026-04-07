@@ -70,14 +70,19 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
 
     // RevertToLoop
     let mut layer: id = msg![env; top_window layer];
+    //DebugFindLayer
+    log!("DEBUG_CAEAGL: find_fullscreen_eagl_layer START. top_window: {:?}", top_window);
 
     loop {
         assert!(layer != nil);
 
         let layer_host_obj: &CALayerHostObject = env.objc.borrow(layer);
+        let b = layer_host_obj.bounds;
+        log!("DEBUG_CAEAGL: Inspecting layer: {:?} | bounds: x={},y={},w={},h={} | hidden: {}, opacity: {}", layer, b.origin.x, b.origin.y, b.size.width, b.size.height, layer_host_obj.hidden, layer_host_obj.opacity);
 
         // BypassStrictBounds
         if layer_host_obj.hidden || layer_host_obj.opacity == 0.0 {
+            log!("DEBUG_CAEAGL: Layer hidden/transparent, returning nil.");
             return nil;
         }
 
@@ -93,10 +98,13 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
     let is_eagl: bool = msg![env; layer isKindOfClass:ca_eagl_layer_class];
     let host: &CALayerHostObject = env.objc.borrow(layer);
     
+    log!("DEBUG_CAEAGL: Deepest layer: {:?} | is_eagl: {}, has_pixels: {}", layer, is_eagl, host.presented_pixels.is_some());
     if !is_eagl && host.presented_pixels.is_none() {
+        log!("DEBUG_CAEAGL: Not EAGL and no pixels, returning nil.");
         return nil;
     }
 
+    log!("DEBUG_CAEAGL: Found valid fullscreen layer: {:?}", layer);
     layer
 }
 
