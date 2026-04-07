@@ -108,14 +108,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithBytes:bytes length:length]
 }
 
-- (id)initWithContentsOfURL:(id)url {
+- (id)initWithContentsOfURL:(id)url { // NSURL *
     let absolute_string: id = msg![env; url absoluteString];
     let url_str = crate::frameworks::foundation::ns_string::to_rust_string(env, absolute_string);
 
     if url_str.starts_with("file://") {
         let path: id = msg![env; url path];
         msg![env; this initWithContentsOfFile:path]
-    } else if env.app_bundle_id == "com.gameloft.Asphalt6ipad" {
+    } else if env.app_bundle_id == "com.gameloft.Asphalt6ipad" || env.app_bundle_id == "com.gameloft.Asphalt6" {
         // EXCLUSIVE HACK: Only Asphalt 6 gets the fake "1\nOK\n" response to pass DRM.
         log!("🛡️ EXCLUSIVE BYPASS: Faking HTTP response for Asphalt 6 URL: {}", url_str);
         let dummy = b"1\nOK\n";
