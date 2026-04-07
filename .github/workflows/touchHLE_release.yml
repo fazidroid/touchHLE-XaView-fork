@@ -5,10 +5,12 @@ on:
     branches: 
       - "trunk"
       - "Shift2"
+      - "GTRacing134"
   pull_request:
     branches: 
       - "trunk"
       - "Shift2"
+      - "GTRacing134"
   create: # for tags
   workflow_dispatch: {} # This allows you to manually run the build on the N3 branch from the Actions tab
 
