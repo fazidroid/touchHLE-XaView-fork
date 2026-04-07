@@ -35,6 +35,31 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
 
     // ===== GAMELOFT UDID & DEVICE BYPASS =====
+    // ===== GAMELOFT UDID & DEVICE BYPASS =====
+    if sel_str == "uniqueIdentifier" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "currentDevice" {
+        env.cpu.regs_mut()[0] = receiver.to_bits();
+        return;
+    }
+    if sel_str == "name" || sel_str == "model" || sel_str == "localizedModel" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "systemName" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone OS".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "systemVersion" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
     if sel_str == "uniqueIdentifier" {
         log!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier]");
         let fake_udid = crate::frameworks::foundation::ns_string::from_rust_string(
