@@ -34,6 +34,41 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
+    // ==========================================================
+    // GT RACING: GRAPHICS & OPENGL SNIFFER
+    // ==========================================================
+
+    // 1. Trace Context Creation (OpenGL ES 1.1 vs 2.0)
+    if sel_str == "initWithAPI:" {
+        // API 1 = GLES 1.1, API 2 = GLES 2.0
+        let api_version = env.cpu.regs()[2]; 
+        println!("🎮 GL LOG: Game requested OpenGL ES Context API Version: {}", api_version);
+    }
+
+    // 2. Trace the Render Surface Setup
+    if sel_str == "renderbufferStorage:fromDrawable:" {
+        println!("🎮 GL LOG: Allocating Renderbuffer from Drawable Surface!");
+    }
+    if sel_str == "setOpaque:" {
+        let is_opaque = env.cpu.regs()[2];
+        println!("🎮 GL LOG: Layer setOpaque: {}", is_opaque);
+    }
+
+    // 3. Trace Window & Screen Setup
+    if sel_str == "makeKeyAndVisible" {
+        println!("🎮 GL LOG: UIWindow is being made visible to the screen!");
+    }
+    if sel_str == "setFrame:" || sel_str == "setBounds:" {
+        // We just log that it happened to ensure it's not skipping layout
+        // println!("🎮 GL LOG: View bounds/frame updated."); 
+    }
+
+    // 4. Trace the actual Frame Draw (Warning: This will spam 60 times a second if rendering works!)
+    // Uncomment the println if you want to verify the game is actually looping.
+    if sel_str == "presentRenderbuffer:" {
+        // println!("🎮 GL LOG: Frame Presented!"); 
+    }
+
     // ===== GAMELOFT UDID BYPASS =====
     if sel_str == "uniqueIdentifier" {
         let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
