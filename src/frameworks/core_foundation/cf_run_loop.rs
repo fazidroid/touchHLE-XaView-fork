@@ -40,12 +40,18 @@ fn CFRunLoopRunInMode(
             || msg![env; mode isEqualToString:common_modes]
     );
     let current_run_loop = CFRunLoopGetCurrent(env);
-    if seconds == 0.0 {
+    
+    // --- GAMELOFT NaN FIX START ---
+    if !seconds.is_finite() || seconds < 0.0 {
+        log!("Warning: Ignored invalid CFRunLoopRunInMode duration (NaN or infinite): {:?}", seconds);
+    } else if seconds == 0.0 {
         run_run_loop_single_iteration(env, current_run_loop);
     } else {
         let limit_date: id = msg_class![env; NSDate dateWithTimeIntervalSinceNow:seconds];
         () = msg![env; current_run_loop runUntilDate:limit_date];
     }
+    // --- GAMELOFT NaN FIX END ---
+    
     1 // kCFRunLoopRunFinished
 }
 
