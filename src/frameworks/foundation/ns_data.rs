@@ -80,7 +80,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)init {
-    // FIXED: Explicitly typed the null pointer so Rust knows what it is!
     let null_ptr: MutVoidPtr = Ptr::null();
     msg![env; this initWithBytesNoCopy:null_ptr length:0 freeWhenDone:true]
 }
@@ -217,9 +216,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     let &NSDataHostObject { bytes, length, .. } = env.objc.borrow(this);
     assert!(range.location + range.length <= length);
     
-    // FIXED: Extracted offset math out of the macro
+    // FIXED: Extracted offset math and property access out of the macro
     let offset_bytes = bytes + range.location;
-    msg_class![env; NSData dataWithBytes:offset_bytes length:range.length]
+    let range_len = range.length;
+    msg_class![env; NSData dataWithBytes:offset_bytes length:range_len]
 }
 
 @end
@@ -262,7 +262,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())increaseLengthBy:(NSUInteger)add_len {
     let length = env.objc.borrow::<NSDataHostObject>(this).length;
-    // FIXED: Extracted addition math out of the macro
     let new_len = length + add_len;
     msg![env; this setLength:new_len]
 }
