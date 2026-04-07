@@ -34,6 +34,38 @@ fn objc_msgSend_inner(
         return;
     }
 
+    // ===== GAMELOFT UDID & DEVICE BYPASS =====
+    if sel_str == "uniqueIdentifier" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "currentDevice" {
+        env.cpu.regs_mut()[0] = receiver.to_bits();
+        return;
+    }
+    // NEW: Stop Most Wanted from getting (null) device info
+    if sel_str == "name" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "systemName" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone OS".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "systemVersion" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "model" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+
     // ===== URL Tracker & Telemetry Bypasses =====
     if sel_str == "HTTPMethod" || sel_str == "host" || sel_str == "addValue:forHTTPHeaderField:" || sel_str == "setValue:forHTTPHeaderField:" {
         env.cpu.regs_mut()[0..2].fill(0);
