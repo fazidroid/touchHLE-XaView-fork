@@ -107,8 +107,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("[NSThread sleepForTimeInterval:{:?}]", ti);
     // GAMELOFT NaN FIX: Handle NaN, negative, and MASSIVE float values that panic Duration!
     let safe_ti = if ti.is_finite() && ti >= 0.0 { ti.min(3600.0) } else { 0.0001 };
-    env.sleep(std::time::Duration::from_secs_f64(safe_ti));
- }
+    env.sleep(Duration::from_secs_f64(safe_ti));
 }
 
 + (())detachNewThreadSelector:(SEL)selector
