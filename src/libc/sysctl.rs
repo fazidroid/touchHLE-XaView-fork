@@ -8,14 +8,14 @@ fn sysctl(
     namelen: u32,
     _oldp: MutVoidPtr,
     _oldlenp: MutPtr<u32>,
-    _newp: ConstVoidPtr,
+    _newp: MutVoidPtr, 
     _newlen: u32,
 ) -> i32 {
     let mut mib = vec![0i32; namelen as usize];
-    for i in 0..namelen as usize {
-        mib[i] = env.mem.read::<i32, false>(name_ptr + (i as u32));
+    for i in 0..namelen as u32 {
+        mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
-    log!("GAMELOFT BYPASS: sysctl called for mib {:?}, faking success", mib);
+    log!("GAMELOFT/EA BYPASS: sysctl called for mib {:?}, faking success", mib);
     0 
 }
 
@@ -30,17 +30,13 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
-    // GLES 2.0 ENABLER: Force games to think this is an iPhone 4S
     if name_str == "hw.machine" {
         log!("GAMELOFT/EA BYPASS: Forcing hw.machine to iPhone4,1");
         let hw = b"iPhone4,1\0";
-        
         if !oldlenp.is_null() {
             if oldp.is_null() {
-                // Step 1: The game is only asking for the SIZE of the string
                 env.mem.write(oldlenp, hw.len() as u32);
             } else {
-                // Step 2: The game allocated the memory and wants the ACTUAL string
                 let oldlen = env.mem.read::<u32, false>(oldlenp.cast_const());
                 let copy_len = std::cmp::min(oldlen as usize, hw.len());
                 env.mem.bytes_at_mut(oldp.cast(), copy_len as u32).copy_from_slice(&hw[..copy_len]);
@@ -54,9 +50,52 @@ fn sysctlbyname(
     0
 }
 
+// ==== FONT CRASH BYPASSES ====
+fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
+fn CGFontGetAscent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 800 }
+fn CGFontGetDescent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { -200 }
+fn CGFontRetain(_env: &mut Environment, font: ConstVoidPtr) -> ConstVoidPtr { font }
+fn CGFontCreateWithDataProvider(_env: &mut Environment, provider: ConstVoidPtr) -> ConstVoidPtr { provider }
+fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _callbacks: ConstVoidPtr) -> ConstVoidPtr {
+    if info.is_null() { crate::mem::Ptr::from_bits(1) } else { info }
+}
+
+// ==== FILE I/O INFINITE LOOP BYPASS ====
+fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { -1 }
+fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
+fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
+
+// ==== NEW: EA GAME ENGINE ASSERTION REVEALER ====
+// This intercepts the game's fatal crashes and prints the exact reason to the log
+fn __assert_rtn(
+    env: &mut Environment,
+    func: ConstPtr<u8>,
+    file: ConstPtr<u8>,
+    line: i32,
+    expr: ConstPtr<u8>,
+) {
+    let func_str = if func.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(func)) };
+    let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
+    let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
+    
+    panic!("\n\nEA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\n\n", file_str, line, func_str, expr_str);
+}
+
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
-    // Fixed: sysctl has 6 args after env
     export_c_func!(sysctl(_, _, _, _, _, _)),
-    // Fixed: sysctlbyname has 5 args after env
     export_c_func!(sysctlbyname(_, _, _, _, _)),
+    
+    export_c_func!(CGFontGetUnitsPerEm(_)),
+    export_c_func!(CGFontGetAscent(_)),
+    export_c_func!(CGFontGetDescent(_)),
+    export_c_func!(CGFontRetain(_)),
+    export_c_func!(CGFontCreateWithDataProvider(_)),
+    export_c_func!(CGDataProviderCreateSequential(_, _)),
+    
+    export_c_func!(__srget(_)),
+    export_c_func!(flockfile(_)),
+    export_c_func!(funlockfile(_)),
+    
+    // Export the new assertion revealer
+    export_c_func!(__assert_rtn(_, _, _, _)),
 ];
