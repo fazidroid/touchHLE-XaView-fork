@@ -156,6 +156,28 @@ fn objc_msgSend_inner(
                 }
             }
 
+            // ===== GAMELOFT VIDEO HANG BYPASS =====
+            if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
+                if selector.as_str(&env.mem) == "play" || selector.as_str(&env.mem) == "stop" {
+                    log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
+                    
+                    let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
+                    if center_class != nil {
+                        let center: id = msg![env; center_class defaultCenter];
+                        
+                        // Tell the game the video state changed
+                        let notif1 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackStateDidChangeNotification".to_string());
+                        let _: () = msg![env; center postNotificationName:notif1 object:receiver];
+                        
+                        // Tell the game the video finished playing
+                        let notif2 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+                        let _: () = msg![env; center postNotificationName:notif2 object:receiver];
+                    }
+                    env.cpu.regs_mut()[0..2].fill(0);
+                    return;
+                }
+            }
+
             // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
             if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
                 log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
