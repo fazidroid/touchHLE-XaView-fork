@@ -129,9 +129,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     if url_str.starts_with("file://") {
         let path: id = msg![env; url path];
         msg![env; this initWithContentsOfFile:path]
-    } else {
+        } else {
         // GAMELOFT BYPASS: Forcing nil return on URL fetch to prevent infinite loop!
-        log!("GAMELOFT BYPASS: Forcing nil return on URL fetch to prevent infinite loop! URL was: {}", url_str);
+        log!("GAMELOFT BYPASS: Forcing nil return on URL fetch to prevent infinite loop!");
         env.objc.dealloc_object(this, &mut env.mem);
         nil
     }
