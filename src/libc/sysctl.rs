@@ -34,12 +34,16 @@ fn sysctlbyname(
     if name_str == "hw.machine" {
         log!("GAMELOFT/EA BYPASS: Forcing hw.machine to iPhone4,1");
         let hw = b"iPhone4,1\0";
-        if !oldp.is_null() && !oldlenp.is_null() {
-            let oldlen = env.mem.read::<u32, false>(oldlenp.cast_const());
-            if oldlen as usize >= hw.len() {
-                env.mem.bytes_at_mut(oldp.cast(), hw.len() as u32).copy_from_slice(hw);
+        
+        if !oldlenp.is_null() {
+            if oldp.is_null() {
+                env.mem.write(oldlenp, hw.len() as u32);
+            } else {
+                let oldlen = env.mem.read::<u32, false>(oldlenp.cast_const());
+                let copy_len = std::cmp::min(oldlen as usize, hw.len());
+                env.mem.bytes_at_mut(oldp.cast(), copy_len as u32).copy_from_slice(&hw[..copy_len]);
+                env.mem.write(oldlenp, copy_len as u32);
             }
-            env.mem.write(oldlenp, hw.len() as u32);
         }
         return 0;
     }
@@ -56,11 +60,19 @@ fn CGFontGetDescent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { -200 }
 fn CGFontRetain(_env: &mut Environment, font: ConstVoidPtr) -> ConstVoidPtr { font }
 fn CGFontCreateWithDataProvider(_env: &mut Environment, provider: ConstVoidPtr) -> ConstVoidPtr { provider }
 
+// NEW: Bypass for Custom Font Loading Data Provider
+// Returns a safe dummy pointer so the game doesn't crash on NULL
+fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _callbacks: ConstVoidPtr) -> ConstVoidPtr {
+    if info.is_null() { crate::mem::Ptr::from_bits(1) } else { info }
+}
+
 // ==== NFS SHIFT 2 FILE I/O INFINITE LOOP BYPASS ====
 // Returns EOF (-1) so the game knows when to stop reading empty files
-fn ___srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 {
-    -1 
-}
+fn ___srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { -1 }
+
+// NEW: File lock thread-safety bypasses (prevents infinite loop fallback)
+fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
+fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
@@ -72,7 +84,10 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(CGFontGetDescent(_)),
     export_c_func!(CGFontRetain(_)),
     export_c_func!(CGFontCreateWithDataProvider(_)),
+    export_c_func!(CGDataProviderCreateSequential(_, _)),
     
     // Shift 2 File I/O Bypass
     export_c_func!(___srget(_)),
+    export_c_func!(flockfile(_)),
+    export_c_func!(funlockfile(_)),
 ];
