@@ -83,7 +83,11 @@ impl Default for Options {
             dpad_to_touch: None,
             stick_to_touch: None,
             stabilize_virtual_cursor: None,
-            gles1_implementation: None,
+            
+            // === GAMELOFT BYPASS === 
+            // Force the internal ES 1.1 translator to fix NVIDIA PVRTC textures!
+            gles1_implementation: Some(GLESImplementation::GLES1OnGL2),
+            
             direct_memory_access: true,
             gdb_listen_addrs: None,
             preferred_languages: None,
@@ -96,7 +100,10 @@ impl Default for Options {
             dumping_options: Default::default(),
             dumping_file: crate::paths::user_data_base_path().join("DUMP.txt"),
             ignore_gl_errors: false,
-            gles_version: 2, // DefaultEsVer
+            
+            // === RESTORED ===
+            // GT Racing's ES 2.0 engine is an unfinished beta. We must use 1!
+            gles_version: 1, 
         }
     }
 }
