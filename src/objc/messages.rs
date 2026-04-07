@@ -20,12 +20,13 @@ fn objc_msgSend_inner(
     tolerate_type_mismatch: bool,
 ) {
     let sel_str = selector.as_str(&env.mem);
+    let message_type_info = env.objc.message_type_info.take();
 
     // ==========================================================
     // 1. EA MTX & STOREFRONT BYPASS (CheckMTXController Fixes)
     // ==========================================================
     
-    // Force status to Success/Ready
+    // Force MTX status to Success. This is CRITICAL for the Line 3193 assertion!
     if sel_str == "canMakePayments" || sel_str == "isMTXReady" || sel_str == "isReady" || sel_str == "CheckMTXController" {
         env.cpu.regs_mut()[0] = 1; // 1 = YES / true
         return;
@@ -33,45 +34,35 @@ fn objc_msgSend_inner(
 
     // Return dummy pointers for Store singletons to prevent nil crashes
     if sel_str == "defaultQueue" || sel_str == "sharedController" || sel_str == "sharedManager" {
-        // Return receiver if it's a class, otherwise a dummy safe address
         env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
         return;
     }
 
-    // Spoof System Version to avoid "Unsupported OS" blocks
-    if sel_str == "systemVersion" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "6.0".to_string());
-        env.cpu.regs_mut()[0] = val.to_bits();
-        return;
-    }
-
     // ==========================================================
-    // 2. NETWORK & VIDEO BYPASS (Fixes Silent Freezes)
+    // 2. RECURSION-SAFE VIDEO & NETWORK KILL-SWITCH
     // ==========================================================
     
-    // Kill Autolog/Reachability
-    if sel_str == "currentReachabilityStatus" || sel_str == "networkStatusForFlags:" {
-        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi (Satisfies EA online check)
-        return;
-    }
-
-    if sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" || 
-       sel_str == "sendSynchronousRequest:returningResponse:error:" || sel_str == "initWithContentURL:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil to skip
+    // We return nil (0) for initialization. The game skips the video player entirely.
+    // This removes the msg! calls that caused your stack overflow!
+    if sel_str == "initWithContentURL:" || sel_str == "initWithContentURL:error:" || 
+       sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" || 
+       sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil
         return;
     }
 
     if sel_str == "playbackState" || sel_str == "loadState" {
-        env.cpu.regs_mut()[0] = 0; // Stopped
+        env.cpu.regs_mut()[0] = 0; // 0 = Stopped/Empty
         return;
     }
 
-    if sel_str == "authenticateWithCompletionHandler:" || sel_str == "loadDefaultLeaderboardIdentifierWithCompletionHandler:" {
-        return; // No-op
+    if sel_str == "currentReachabilityStatus" || sel_str == "networkStatusForFlags:" {
+        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
+        return;
     }
 
     // ==========================================================
-    // 3. DEVICE IDENTITY (Fixes (null) and UID Errors)
+    // 3. DEVICE IDENTITY (Fixes (null) and UDID Errors)
     // ==========================================================
     
     if sel_str == "uniqueIdentifier" {
@@ -80,14 +71,15 @@ fn objc_msgSend_inner(
         return;
     }
 
-    if sel_str == "currentDevice" || sel_str == "keyWindow" {
-        env.cpu.regs_mut()[0] = receiver.to_bits();
-        return;
-    }
-
     if sel_str == "name" || sel_str == "systemName" || sel_str == "model" || sel_str == "localizedModel" {
         let name = if sel_str == "systemName" { "iPhone OS" } else { "iPhone" };
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, name.to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    if sel_str == "systemVersion" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "6.0".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
@@ -110,7 +102,9 @@ fn objc_msgSend_inner(
     let mut class = orig_class;
     loop {
         if class == nil {
-            env.cpu.regs_mut()[0..2].fill(0);
+            // Safe fallback for unrecognized methods
+            if sel_str == "self" { env.cpu.regs_mut()[0] = receiver.to_bits(); } 
+            else { env.cpu.regs_mut()[0..2].fill(0); }
             return;
         }
 
@@ -120,20 +114,6 @@ fn objc_msgSend_inner(
         };
 
         if let Some(obj) = host_object.as_any().downcast_ref::<super::ClassHostObject>() {
-            let name = &obj.name;
-            
-            // GAMELOFT/EA VIDEO NOTIFICATION BYPASS
-            if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
-                let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
-                if center_class != nil {
-                    let center: id = msg![env; center_class defaultCenter];
-                    let n1 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                    let _: () = msg![env; center postNotificationName:n1 object:receiver];
-                }
-                env.cpu.regs_mut()[0] = 0;
-                return;
-            }
-
             if let Some(imp) = obj.methods.get(&selector) {
                 match imp {
                     IMP::Host(host_imp) => host_imp.call_from_guest(env),
