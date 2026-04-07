@@ -22,7 +22,7 @@
 //! - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/index-wide.html)
 
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::libc::errno::{set_errno, EBADF, ECONNRESET, EINVAL};
+use crate::libc::errno::{set_errno, EBADF, ECONNRESET, EINVAL, EPROTONOSUPPORT};
 use crate::libc::posix_io::{close, find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
@@ -49,7 +49,6 @@ const SO_ERROR: i32 = 0x1007;
 
 #[allow(non_camel_case_types)]
 pub type sa_family_t = u8;
-
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[allow(non_camel_case_types)]
@@ -143,10 +142,11 @@ impl State {
 fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> FileDescriptor {
     // TODO: handle errno properly
     set_errno(env, 0);
-
-    // EXCLUSIVE HACK: Allow socket creation for Asphalt 6 even if network is disabled globally.
-    let is_asphalt6 = env.app_bundle_id == "com.gameloft.Asphalt6ipad" || env.app_bundle_id == "com.gameloft.Asphalt6";
     
+    // EXCLUSIVE HACK: Identify Asphalt 6 correctly using the app bundle info
+    let is_asphalt6 = env.bundle.info.bundle_identifier.as_deref() == Some("com.gameloft.Asphalt6ipad") 
+        || env.bundle.info.bundle_identifier.as_deref() == Some("com.gameloft.Asphalt6");
+
     if !env.options.network_access && !is_asphalt6 {
         log_dbg!(
             "Network access is disabled, socket({}, {}, {}) => -1",
@@ -157,8 +157,6 @@ fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> File
         set_errno(env, EPROTONOSUPPORT);
         return -1;
     }
-    
-    assert_eq!(domain, AF_INET);
 
     assert_eq!(domain, AF_INET);
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
@@ -196,7 +194,6 @@ fn getsockopt(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     log_dbg!(
         "getsockopt({}, {:#x}, {:#x}, {:?}, {:?})",
         socket,
@@ -205,14 +202,12 @@ fn getsockopt(
         option_value,
         option_len
     );
-
     assert_eq!(level, SOL_SOCKET);
     // TODO: support other options
     assert_eq!(option_name, SO_ERROR);
 
     let option_len_val = env.mem.read(option_len);
     assert_eq!(option_len_val, 4);
-
     let option_value: MutPtr<i32> = option_value.cast();
     env.mem.write(option_value, 0); // no errors
 
@@ -229,7 +224,6 @@ fn setsockopt(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     log_dbg!(
         "setsockopt({}, {:#x}, {:#x}, {:?}, {})",
         socket,
@@ -238,7 +232,6 @@ fn setsockopt(
         option_value,
         option_len
     );
-
     if option_name == SO_DEBUG {
         set_errno(env, EINVAL);
         log!(
@@ -260,7 +253,6 @@ fn setsockopt(
     assert_eq!(level, SOL_SOCKET);
     // TODO: SO_REUSEADDR is not supported in std::net (and not so portable)
     assert!(option_name == SO_REUSEADDR || option_name == SO_BROADCAST);
-
     assert_eq!(option_len, guest_size_of::<i32>());
     let tmp: ConstPtr<i32> = option_value.cast();
     assert_eq!(env.mem.read(tmp), 1);
@@ -283,7 +275,6 @@ fn bind(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
     let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
@@ -297,7 +288,6 @@ fn bind(
         sockaddr_val,
         address_len
     );
-
     let socket_address = sockaddr_val.to_sockaddr_v4();
     let type_str = match type_ {
         SOCK_STREAM => "TCP",
@@ -348,7 +338,6 @@ fn bind(
 fn listen(env: &mut Environment, socket: i32, backlog: i32) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
@@ -366,24 +355,8 @@ fn connect(
     address: ConstPtr<sockaddr>,
     address_len: socklen_t,
 ) -> i32 {
-            // EXCLUSIVE HACK: Allow socket creation for Asphalt 6 even if network is disabled globally.
-    // Changed env.options.app_bundle_id to env.app_bundle_id
-    let is_asphalt6 = env.app_bundle_id == "com.gameloft.Asphalt6ipad";
-    
-    if !env.options.network_access && !is_asphalt6 {
-        log_dbg!(
-            "Network access is disabled, socket({}, {}, {}) => -1",
-            domain,
-            type_,
-            protocol
-        );
-        set_errno(env, EPROTONOSUPPORT);
-        return -1;
-    }
-
     // TODO: handle errno properly
     set_errno(env, 0);
-
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
@@ -395,7 +368,6 @@ fn connect(
         sockaddr_val,
         address_len
     );
-
     let socket_address = sockaddr_val.to_sockaddr_v4();
     log_dbg!("connect: socket address {:?}", socket_address);
 
@@ -414,7 +386,6 @@ fn connect(
         .get_mut(&socket)
         .unwrap()
         .tcp_stream = Some(host_stream);
-
     0 // Success
 }
 
@@ -428,7 +399,6 @@ fn select(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     assert!(n_fds > 0 && n_fds < 1024);
 
     let should_block = if !timeout.is_null() {
@@ -445,7 +415,6 @@ fn select(
     } else {
         true
     };
-
     let mut count = 0;
 
     if !read_fds.is_null() {
@@ -526,7 +495,8 @@ fn select(
                             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                                 // No incoming connection is ready
                                 log_dbg!("select: TCP listener for socket {} would block on accepting, continue.", fd);
-                                assert!(!should_block); // TODO
+                                assert!(!should_block);
+                                // TODO
                                 return false;
                             }
                             Err(e) => {
@@ -607,7 +577,8 @@ fn select(
                         *bits |= 1 << bit_index;
                         true
                     } else {
-                        assert!(!should_block); // TODO
+                        assert!(!should_block);
+                        // TODO
                         false
                     }
                 }
@@ -620,7 +591,8 @@ fn select(
                         *bits |= 1 << bit_index;
                         true
                     } else {
-                        assert!(!should_block); // TODO
+                        assert!(!should_block);
+                        // TODO
                         false
                     }
                 }
@@ -699,7 +671,6 @@ fn accept(
 ) -> FileDescriptor {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     let Some(socket_host_object) = State::get(env).sockets.get(&socket) else {
         set_errno(env, EBADF);
         return -1;
@@ -790,7 +761,6 @@ fn recvfrom(
         address,
         address_len
     );
-
     if !State::get(env).sockets.contains_key(&socket) {
         set_errno(env, EBADF);
         log!(
@@ -803,7 +773,8 @@ fn recvfrom(
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
 
-    assert_eq!(flags, 0); // TODO
+    assert_eq!(flags, 0);
+    // TODO
 
     let (num_bytes_read, addr) = match type_ {
         SOCK_DGRAM => {
@@ -891,7 +862,6 @@ fn send(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
@@ -943,7 +913,6 @@ fn sendto(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_DGRAM);
 
@@ -963,7 +932,6 @@ fn sendto(
         socket_address,
         dest_address_len
     );
-
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
             if State::get(env)
@@ -1061,7 +1029,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(shutdown(_, _)),
     export_c_func!(if_nametoindex(_)), // Зарегистрировали нашу функцию
 ];
-
 /// A helper to close a socket, not a part of API
 pub fn close_socket(env: &mut Environment, socket: i32) -> bool {
     State::get_mut(env).sockets.remove(&socket).is_none()
