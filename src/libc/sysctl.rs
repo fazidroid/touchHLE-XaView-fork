@@ -15,7 +15,7 @@ fn sysctl(
     for i in 0..namelen as u32 {
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
-    log!("GAMELOFT BYPASS: sysctl called for mib {:?}, faking success", mib);
+    log!("GAMELOFT/EA BYPASS: sysctl called for mib {:?}, faking success", mib);
     0 
 }
 
@@ -45,10 +45,12 @@ fn sysctlbyname(
         }
         return 0;
     }
+
+    log!("GAMELOFT/EA BYPASS: sysctlbyname '{}', faking hardware success", name_str);
     0
 }
 
-// ==== NFS SHIFT 2 FONT CRASH BYPASSES ====
+// ==== FONT CRASH BYPASSES ====
 fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
 fn CGFontGetAscent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 800 }
 fn CGFontGetDescent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { -200 }
@@ -58,11 +60,26 @@ fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _c
     if info.is_null() { crate::mem::Ptr::from_bits(1) } else { info }
 }
 
-// ==== NFS SHIFT 2 FILE I/O INFINITE LOOP BYPASS ====
-// FIXED: Changed to TWO underscores so the macro exports it correctly as ___srget
+// ==== FILE I/O INFINITE LOOP BYPASS ====
 fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { -1 }
 fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
+
+// ==== NEW: EA GAME ENGINE ASSERTION REVEALER ====
+// This intercepts the game's fatal crashes and prints the exact reason to the log
+fn __assert_rtn(
+    env: &mut Environment,
+    func: ConstPtr<u8>,
+    file: ConstPtr<u8>,
+    line: i32,
+    expr: ConstPtr<u8>,
+) {
+    let func_str = if func.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(func)) };
+    let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
+    let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
+    
+    panic!("\n\nEA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\n\n", file_str, line, func_str, expr_str);
+}
 
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
@@ -75,8 +92,10 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(CGFontCreateWithDataProvider(_)),
     export_c_func!(CGDataProviderCreateSequential(_, _)),
     
-    // FIXED: Changed to TWO underscores
     export_c_func!(__srget(_)),
     export_c_func!(flockfile(_)),
     export_c_func!(funlockfile(_)),
+    
+    // Export the new assertion revealer
+    export_c_func!(__assert_rtn(_, _, _, _)),
 ];
