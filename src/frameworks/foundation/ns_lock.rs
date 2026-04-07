@@ -94,13 +94,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     let _ = env.lock_mutex(mutex_id);
 }
 - (())unlockWithCondition:(i32)condition {
-    // FIXED: Scope the borrow so env is free for the unlock_mutex call
+    // FIXED: Scope the borrow to drop it before calling env.unlock_mutex
     let mutex_id = {
         let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
         host_obj.condition = condition;
         host_obj.mutex_id
-    }; // The borrow of 'this' through 'env' ends here
-    
+    }; 
     let _ = env.unlock_mutex(mutex_id);
 }
 @end
