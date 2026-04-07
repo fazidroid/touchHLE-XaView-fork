@@ -58,7 +58,8 @@ fn objc_msgSend_inner(
 
     // 2. Fix the (null) Folder Paths so the game can read its save files
     if sel_str == "bundlePath" || sel_str == "resourcePath" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, ".".to_string());
+        // FIXED: Must be an absolute path starting with '/' to pass touchHLE's CFURL assertion!
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "/".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
