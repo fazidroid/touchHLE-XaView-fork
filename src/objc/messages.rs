@@ -45,6 +45,23 @@ fn objc_msgSend_inner(
         return;
     }
 
+    // ===== HARDWARE SPOOFS: Stop (null) device info =====
+    if sel_str == "systemVersion" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    if sel_str == "model" || sel_str == "localizedModel" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    if sel_str == "name" || sel_str == "systemName" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone OS".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
     // ===== URL Tracker & Telemetry Bypasses =====
     if sel_str == "HTTPMethod" || sel_str == "host" {
         env.cpu.regs_mut()[0..2].fill(0);
