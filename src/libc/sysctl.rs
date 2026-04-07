@@ -91,11 +91,19 @@ fn __assert_rtn(
     panic!("\n\nEA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\n\n", file_str, line, func_str, expr_str);
 }
 
-// ==== OBJECTIVE-C RUNTIME FIXES ====
+// ==== OBJECTIVE-C RUNTIME FIXES (Required for Most Wanted MTX) ====
 fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
-    if obj.is_null() {
-        return crate::mem::Ptr::null();
+    if obj.is_null() { 
+        return crate::mem::Ptr::null(); 
     }
+    
+    // EA Bypass: If the game passes our dummy 0xDEADBEEF pointer, 
+    // return a dummy Class pointer to prevent the engine from panicking.
+    if obj.to_bits() == 0xDEADBEEF {
+        return crate::mem::Ptr::from_bits(0x30000000); // Common base for Obj-C classes
+    }
+
+    // Standard behavior: The first 4 bytes of an Obj-C object contain the 'isa' (Class) pointer.
     let isa = env.mem.read::<u32, false>(obj.cast());
     crate::mem::Ptr::from_bits(isa)
 }
