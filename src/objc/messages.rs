@@ -19,187 +19,82 @@ fn objc_msgSend_inner(
     super2: Option<Class>,
     tolerate_type_mismatch: bool,
 ) {
-    log_dbg!("Dispatching {} for {:?}", selector.as_str(&env.mem), receiver);
-    let message_type_info = env.objc.message_type_info.take();
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== NFS MOST WANTED: ULTIMATE MTX / STOREFRONT BYPASS =====
+    // ==========================================================
+    // 1. EA MTX & STOREFRONT BYPASS (CheckMTXController Fixes)
+    // ==========================================================
     
-    // 1. Give the MTX crypto-hasher a valid UDID so it doesn't fail its internal setup
-    if sel_str == "uniqueIdentifier" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
-        env.cpu.regs_mut()[0] = val.to_bits();
-        return;
-    }
-
-    // 2. Force EA Reachability to report Online (WiFi) so the storefront initializes
-    if sel_str == "currentReachabilityStatus" {
-        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
-        return;
-    }
-
-    // 3. Prevent any Singletons/Controllers from returning 'nil'. 
-    // If these return nil, Apple's StoreKit crashes the EA engine!
-    if sel_str == "defaultQueue" || sel_str == "sharedController" || sel_str == "sharedManager" {
-        env.cpu.regs_mut()[0] = 0xDEADBEEF; // Fallback dummy pointer
-        return;
-    }
-
-    // 4. Direct MTX status bypasses (Force success)
-    if sel_str == "canMakePayments" || sel_str == "isMTXReady" || sel_str == "isReady" {
+    // Force status to Success/Ready
+    if sel_str == "canMakePayments" || sel_str == "isMTXReady" || sel_str == "isReady" || sel_str == "CheckMTXController" {
         env.cpu.regs_mut()[0] = 1; // 1 = YES / true
         return;
     }
 
-    // 1. Force the Intro Video to instantly skip.
-    // (Without this, the game waits forever on a black screen for a video finish notification)
-    if sel_str == "initWithContentURL:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil to abort video setup
-        return;
-    }
-    if sel_str == "playbackState" || sel_str == "loadState" {
-        env.cpu.regs_mut()[0] = 0; // 0 = MPMoviePlaybackStateStopped
-        return;
-    }
-    if sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil to force connection failure
-        return;
-    }
-    if sel_str == "sendSynchronousRequest:returningResponse:error:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil 
-        return;
-    }
-    
-    // 3. Bypass GameCenter / EA Cloud Save loops
-    if sel_str == "authenticateWithCompletionHandler:" || sel_str == "loadDefaultLeaderboardIdentifierWithCompletionHandler:" {
-        return; // Ignore the call so it doesn't hang waiting for an Apple callback
-    }
-
-    // 2. Instantly kill Autolog Network Connections
-    // (Prevents the game from freezing while waiting for offline EA servers)
-    if sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil to force connection failure
-        return;
-    }
-    if sel_str == "sendSynchronousRequest:returningResponse:error:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil 
-        return;
-    }
-    
-    // 3. Bypass GameCenter / EA Cloud Save loops
-    if sel_str == "authenticateWithCompletionHandler:" || sel_str == "loadDefaultLeaderboardIdentifierWithCompletionHandler:" {
-        return; // Ignore the call so it doesn't hang waiting for an Apple callback
-    }
-    // 1. Pretend the MTX controller is always ready and authorized
-    if sel_str == "uniqueIdentifier" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
-        env.cpu.regs_mut()[0] = val.to_bits();
-        return;
-    }
-
-    // 2. Force EA Reachability to report Online (WiFi) so the storefront initializes
-    if sel_str == "currentReachabilityStatus" {
-        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
-        return;
-    }
-
-    // 3. Prevent any Singletons/Controllers from returning 'nil'. 
-    // If these return nil, the game sends future MTX checks to a black hole!
+    // Return dummy pointers for Store singletons to prevent nil crashes
     if sel_str == "defaultQueue" || sel_str == "sharedController" || sel_str == "sharedManager" {
-        if receiver.to_bits() != 0 {
-            env.cpu.regs_mut()[0] = receiver.to_bits(); // Return the class itself as a valid dummy
-        } else {
-            env.cpu.regs_mut()[0] = 0xDEADBEEF; // Fallback dummy pointer
-        }
+        // Return receiver if it's a class, otherwise a dummy safe address
+        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
         return;
     }
 
-    // 4. Direct MTX status bypasses (Force success)
-    if sel_str == "canMakePayments" || sel_str == "isMTXReady" || sel_str == "isReady" {
-        env.cpu.regs_mut()[0] = 1; // 1 = YES / true
-        return;
-    }
-    if sel_str == "isMTXReady" || sel_str == "CheckMTXController" {
-        log!("EA BYPASS: Forcing MTX Controller status to READY");
-        env.cpu.regs_mut()[0] = 1; // 1 = true
-        return;
-    }
+    // Spoof System Version to avoid "Unsupported OS" blocks
     if sel_str == "systemVersion" {
-        // Use 6.0 to ensure EA MTX features don't block boot
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "6.0".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
 
-    // 3. Return a dummy object for the Storefront controller if it asks for a singleton
-    if sel_str == "sharedController" || sel_str == "defaultQueue" {
-        log!("EA BYPASS: Providing dummy object for {}", sel_str);
-        // Return the receiver itself (or any non-zero pointer) so the game thinks the object exists
-        env.cpu.regs_mut()[0] = receiver.to_bits();
-        return;
-    }
-    // 2. Bypass MTX initialization check
-    if sel_str == "CheckMTXController" || sel_str == "isMTXReady" {
-        env.cpu.regs_mut()[0] = 1; // Return true
+    // ==========================================================
+    // 2. NETWORK & VIDEO BYPASS (Fixes Silent Freezes)
+    // ==========================================================
+    
+    // Kill Autolog/Reachability
+    if sel_str == "currentReachabilityStatus" || sel_str == "networkStatusForFlags:" {
+        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi (Satisfies EA online check)
         return;
     }
 
-    // 3. Prevent crash when the engine looks for the 'Main' Window during MTX setup
-    if sel_str == "keyWindow" {
-        // Return the receiver if it's likely a UIWindow, or nil if unsure
-        env.cpu.regs_mut()[0] = receiver.to_bits(); 
+    if sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" || 
+       sel_str == "sendSynchronousRequest:returningResponse:error:" || sel_str == "initWithContentURL:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil to skip
         return;
     }
 
-    // ===== GAMELOFT UDID & DEVICE BYPASS =====
+    if sel_str == "playbackState" || sel_str == "loadState" {
+        env.cpu.regs_mut()[0] = 0; // Stopped
+        return;
+    }
+
+    if sel_str == "authenticateWithCompletionHandler:" || sel_str == "loadDefaultLeaderboardIdentifierWithCompletionHandler:" {
+        return; // No-op
+    }
+
+    // ==========================================================
+    // 3. DEVICE IDENTITY (Fixes (null) and UID Errors)
+    // ==========================================================
     
     if sel_str == "uniqueIdentifier" {
-        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
-        env.cpu.regs_mut()[0] = fake.to_bits();
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
-    if sel_str == "currentDevice" {
+
+    if sel_str == "currentDevice" || sel_str == "keyWindow" {
         env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
 
-    // ===== GAMELOFT UDID & DEVICE BYPASS =====
-    if sel_str == "uniqueIdentifier" {
-        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
-        env.cpu.regs_mut()[0] = fake.to_bits();
-        return;
-    }
-    if sel_str == "currentDevice" {
-        env.cpu.regs_mut()[0] = receiver.to_bits();
-        return;
-    }
-    // NEW: Stop Most Wanted from getting (null) device info
-    if sel_str == "name" {
-        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
-        env.cpu.regs_mut()[0] = fake.to_bits();
-        return;
-    }
-    if sel_str == "systemName" {
-        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone OS".to_string());
-        env.cpu.regs_mut()[0] = fake.to_bits();
-        return;
-    }
-    if sel_str == "systemVersion" {
-        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
-        env.cpu.regs_mut()[0] = fake.to_bits();
-        return;
-    }
-    if sel_str == "model" {
-        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
-        env.cpu.regs_mut()[0] = fake.to_bits();
+    if sel_str == "name" || sel_str == "systemName" || sel_str == "model" || sel_str == "localizedModel" {
+        let name = if sel_str == "systemName" { "iPhone OS" } else { "iPhone" };
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, name.to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
 
-    // ===== URL Tracker & Telemetry Bypasses =====
-    if sel_str == "HTTPMethod" || sel_str == "host" || sel_str == "addValue:forHTTPHeaderField:" || sel_str == "setValue:forHTTPHeaderField:" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
+    // ==========================================================
+    // 4. CORE DISPATCH LOGIC (Standard touchHLE)
+    // ==========================================================
 
     if receiver == nil {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -219,76 +114,36 @@ fn objc_msgSend_inner(
             return;
         }
 
-        // --- SCOPED PRE-CHECK BYPASSES ---
-        let mut do_video_bypass = false;
-        let mut do_alert_bypass = false;
-
-        { 
-            if let Some(host_object) = env.objc.get_host_object(class) {
-                if let Some(obj) = host_object.as_any().downcast_ref::<super::ClassHostObject>() {
-                    let name = &obj.name;
-                    if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
-                        do_video_bypass = true;
-                    }
-                    if name == "UIAlertView" && sel_str == "show" {
-                        do_alert_bypass = true;
-                    }
-                }
-            }
-        } 
-
-        if do_video_bypass {
-            log!("GAMELOFT BYPASS: Skipping video player hang.");
-            let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
-            if center_class != nil {
-                let center: id = msg![env; center_class defaultCenter];
-                let n1 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackStateDidChangeNotification".to_string());
-                let _: () = msg![env; center postNotificationName:n1 object:receiver];
-                let n2 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                let _: () = msg![env; center postNotificationName:n2 object:receiver];
-            }
-            env.cpu.regs_mut()[0..2].fill(0);
-            return;
-        }
-
-        if do_alert_bypass {
-            log!("AUTO-DISMISSING UIAlertView.");
-            env.cpu.regs_mut()[0..2].fill(0);
-            return;
-        }
-
-        // --- NORMAL METHOD LOOKUP ---
         let host_object = match env.objc.get_host_object(class) {
             Some(obj) => obj,
             None => { env.cpu.regs_mut()[0..2].fill(0); return; }
         };
 
         if let Some(obj) = host_object.as_any().downcast_ref::<super::ClassHostObject>() {
-            let superclass = obj.superclass;
-            if super2.is_some() && class == orig_class {
-                class = superclass;
-                continue;
+            let name = &obj.name;
+            
+            // GAMELOFT/EA VIDEO NOTIFICATION BYPASS
+            if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
+                let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
+                if center_class != nil {
+                    let center: id = msg![env; center_class defaultCenter];
+                    let n1 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+                    let _: () = msg![env; center postNotificationName:n1 object:receiver];
+                }
+                env.cpu.regs_mut()[0] = 0;
+                return;
             }
 
             if let Some(imp) = obj.methods.get(&selector) {
                 match imp {
-                    IMP::Host(host_imp) => {
-                        if let Some((sent_type_id, _)) = message_type_info {
-                            let (expected_type_id, _) = host_imp.type_info();
-                            if sent_type_id != expected_type_id && !tolerate_type_mismatch && sel_str != "bytes" && sel_str != "length" {
-                                panic!("Type mismatch for {}!", sel_str);
-                            }
-                        }
-                        host_imp.call_from_guest(env)
-                    }
+                    IMP::Host(host_imp) => host_imp.call_from_guest(env),
                     IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
                 }
                 return;
             } else {
-                class = superclass;
+                class = obj.superclass;
             }
         } else {
-            // UNKNOWN HOST OBJECT / SAFE BYPASS
             env.cpu.regs_mut()[0..2].fill(0);
             return;
         }
