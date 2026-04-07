@@ -80,8 +80,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)init {
-    // FIXED: Extracted Ptr::null() to a variable to satisfy the macro parser
-    let null_ptr = Ptr::null();
+    // FIXED: Explicitly typed the null pointer so Rust knows what it is!
+    let null_ptr: MutVoidPtr = Ptr::null();
     msg![env; this initWithBytesNoCopy:null_ptr length:0 freeWhenDone:true]
 }
 
@@ -182,7 +182,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let bytes: ConstVoidPtr = msg![env; this bytes];
     let length: NSUInteger = msg![env; this length];
     let new = msg_class![env; NSMutableData alloc];
-    // FIXED: Extracted method call to a variable for the macro parser
     let mut_bytes = bytes.cast_mut();
     msg![env; new initWithBytes:mut_bytes length:length]
 }
@@ -212,6 +211,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())getBytes:(MutPtr<u8>)buffer {
     let &NSDataHostObject { bytes, length, .. } = env.objc.borrow(this);
     env.mem.memmove(buffer.cast(), bytes.cast_const(), length);
+}
+
+- (id)subdataWithRange:(NSRange)range {
+    let &NSDataHostObject { bytes, length, .. } = env.objc.borrow(this);
+    assert!(range.location + range.length <= length);
+    
+    // FIXED: Extracted offset math out of the macro
+    let offset_bytes = bytes + range.location;
+    msg_class![env; NSData dataWithBytes:offset_bytes length:range.length]
 }
 
 @end
@@ -253,12 +261,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())increaseLengthBy:(NSUInteger)add_len {
-    let &NSDataHostObject { bytes, length, .. } = env.objc.borrow(this);
+    let length = env.objc.borrow::<NSDataHostObject>(this).length;
+    // FIXED: Extracted addition math out of the macro
     let new_len = length + add_len;
-    let new_bytes = env.mem.realloc(bytes, new_len);
-    let host = env.objc.borrow_mut::<NSDataHostObject>(this);
-    host.length = new_len;
-    host.bytes = new_bytes;
+    msg![env; this setLength:new_len]
 }
 
 - (())appendData:(id)other_data {
@@ -270,7 +276,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())appendBytes:(ConstPtr<u8>)append_bytes length:(NSUInteger)append_length {
     let old_len = env.objc.borrow::<NSDataHostObject>(this).length;
-    // FIXED: Extracted addition to a variable for the macro parser
     let new_len = old_len + append_length;
     () = msg![env; this setLength:new_len];
     let &NSDataHostObject { bytes, .. } = env.objc.borrow(this);
@@ -292,6 +297,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host = env.objc.borrow_mut::<NSDataHostObject>(this);
     host.length = new_length;
     host.bytes = new_bytes;
+}
+
+- (())replaceBytesInRange:(NSRange)range withBytes:(ConstVoidPtr)bytes {
+    let length = env.objc.borrow::<NSDataHostObject>(this).length;
+    assert!(range.location + range.length <= length);
+    let host_bytes = env.objc.borrow::<NSDataHostObject>(this).bytes;
+    env.mem.memmove(host_bytes + range.location, bytes, range.length);
 }
 
 @end
