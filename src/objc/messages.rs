@@ -29,7 +29,19 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = 1; // Return YES
         return;
     }
+    if sel_str == "isMTXReady" || sel_str == "CheckMTXController" {
+        log!("EA BYPASS: Forcing MTX Controller status to READY");
+        env.cpu.regs_mut()[0] = 1; // 1 = true
+        return;
+    }
 
+    // 3. Return a dummy object for the Storefront controller if it asks for a singleton
+    if sel_str == "sharedController" || sel_str == "defaultQueue" {
+        log!("EA BYPASS: Providing dummy object for {}", sel_str);
+        // Return the receiver itself (or any non-zero pointer) so the game thinks the object exists
+        env.cpu.regs_mut()[0] = receiver.to_bits();
+        return;
+    }
     // 2. Bypass MTX initialization check
     if sel_str == "CheckMTXController" || sel_str == "isMTXReady" {
         env.cpu.regs_mut()[0] = 1; // Return true
