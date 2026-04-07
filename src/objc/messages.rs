@@ -158,7 +158,7 @@ fn objc_msgSend_inner(
             if let Some(&super::ClassHostObject { superclass, ref methods, ref name, .. }) = host_object.as_any().downcast_ref() {
                 ClassType::Real {
                     superclass,
-                    imp: methods.get(&selector).copied(), // Copy the pointer so we can drop the borrow
+                    imp: methods.get(&selector).cloned(), // FIXED: Now properly clones the enum instead of copying!
                     name: name.clone(),
                 }
             } else if let Some(&super::UnimplementedClass { ref name, is_metaclass }) = host_object.as_any().downcast_ref() {
