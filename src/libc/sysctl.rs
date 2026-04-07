@@ -154,8 +154,8 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(object_getClass(_)),
     export_c_func!(class_getProperty(_, _)),
 
-    // NEW: Network Reachability Exports
-    export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _, _)),
-    export_c_func!(SCNetworkReachabilityCreateWithName(_, _, _)),
-    export_c_func!(SCNetworkReachabilityGetFlags(_, _, _)),
+    // FIXED: Changed from (_, _, _) to (_, _) to match 2 guest arguments
+    export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _)),
+    export_c_func!(SCNetworkReachabilityCreateWithName(_, _)),
+    export_c_func!(SCNetworkReachabilityGetFlags(_, _)),
 ];
