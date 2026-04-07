@@ -17,6 +17,9 @@ use crate::mem::{ConstPtr, MutVoidPtr, SafeRead};
 use crate::Environment;
 use std::any::TypeId;
 
+// StoreRootViewControllers
+static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u32, u32>>> = std::sync::Mutex::new(None);
+
 /// The core implementation of `objc_msgSend`, the main function of Objective-C.
 ///
 /// Note that while only two parameters (usually receiver and selector) are
@@ -106,14 +109,37 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
-            // BypassRootViewController
+            // HookRootViewController
             if selector.as_str(&env.mem) == "setRootViewController:" {
+                let vc: id = crate::mem::Ptr::from_bits(env.cpu.regs()[2]);
+                echo!("WARNING: Hooked setRootViewController! Window: {:?}, VC: {:?}", receiver, vc);
+                if vc != nil {
+                    let mut store_lock = ROOT_VC_STORE.lock().unwrap();
+                    if store_lock.is_none() {
+                        *store_lock = Some(std::collections::HashMap::new());
+                    }
+                    store_lock.as_mut().unwrap().insert(receiver.to_bits(), vc.to_bits());
+                    drop(store_lock);
+                    
+                    let sel_view = env.objc.lookup_selector("view").unwrap();
+                    let view: id = crate::objc::msg_send_no_type_checking(env, (vc, sel_view));
+                    if view != nil {
+                        let sel_add_subview = env.objc.lookup_selector("addSubview:").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_add_subview, view));
+                    }
+                }
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
             // FakeRootViewGetter
             if selector.as_str(&env.mem) == "rootViewController" {
-                env.cpu.regs_mut()[0..2].fill(0);
+                let mut vc_bits = 0;
+                if let Some(store) = ROOT_VC_STORE.lock().unwrap().as_ref() {
+                    vc_bits = store.get(&receiver.to_bits()).copied().unwrap_or(0);
+                }
+                echo!("WARNING: Hooked rootViewController! Returning {:#x}", vc_bits);
+                env.cpu.regs_mut()[0] = vc_bits;
+                env.cpu.regs_mut()[1] = 0;
                 return;
             }
             // BypassTimeZone
