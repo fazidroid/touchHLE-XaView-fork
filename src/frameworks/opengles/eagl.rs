@@ -610,6 +610,9 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     // state changes we make.
     let old_framebuffer: GLuint = get_int(gles, gles11::FRAMEBUFFER_BINDING_OES) as _;
     let old_texture_2d: GLuint = get_int(gles, gles11::TEXTURE_BINDING_2D) as _;
+    let active_texture: GLint = get_int(gles, gles11::ACTIVE_TEXTURE);
+    //DebugPRBState
+    log!("DEBUG_PRB: Start. RB={}, w={}, h={}. OLD_FB={}, OLD_TEX2D={}, ACTIVE_TEX={:#x}", renderbuffer, width, height, old_framebuffer, old_texture_2d, active_texture);
 
     // Create a framebuffer we can use to read from the renderbuffer
     let mut src_framebuffer = 0;
@@ -622,10 +625,20 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         renderbuffer,
     );
 
+    //DebugFBOStatus
+    let fbo_status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
+    let mut center_pixel = [0u8; 4];
+    gles.ReadPixels(width / 2, height / 2, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, center_pixel.as_mut_ptr() as *mut _);
+    log!("DEBUG_PRB: FBO Setup Status={:#x}. Center Pixel: R={}, G={}, B={}, A={}", fbo_status, center_pixel[0], center_pixel[1], center_pixel[2], center_pixel[3]);
+
     // Create a texture with a copy of the pixels in the framebuffer
     let mut texture: GLuint = 0;
     gles.GenTextures(1, &mut texture);
     gles.BindTexture(gles11::TEXTURE_2D, texture);
+    
+    // Clear error
+    while gles.GetError() != 0 {}
+    
     gles.CopyTexImage2D(
         gles11::TEXTURE_2D,
         0,
@@ -636,6 +649,13 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         height,
         0,
     );
+    
+    //DebugCopyTex
+    let err_after_copy = gles.GetError();
+    if err_after_copy != 0 {
+        log!("DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}", err_after_copy);
+    }
+    
     // The texture will not have any mip levels so we must ensure the filter
     // does not use them, else rendering will fail.
     gles.TexParameteri(
