@@ -8,7 +8,7 @@
 use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::dyld::{ConstantExports, HostConstant};
 use crate::frameworks::foundation::{NSInteger, NSUInteger};
-use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr};
+use crate::mem::{ConstVoidPtr, GuestUSize, MutVoidPtr};
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
