@@ -154,6 +154,32 @@ fn CFStringCreateWithCString(
     msg![env; ns_string initWithCString:c_string encoding:encoding]
 }
 
+// FIXED: Implemented to prevent NFS Shift 2 segfaults
+fn CFStringCreateWithCStringNoCopy(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    c_string: ConstPtr<u8>,
+    encoding: CFStringEncoding,
+    _contents_deallocator: CFAllocatorRef,
+) -> CFStringRef {
+    // Safe HLE fallback: ignore the custom deallocator and just copy the string normally.
+    CFStringCreateWithCString(env, allocator, c_string, encoding)
+}
+
+// FIXED: Implemented to prevent NFS Shift 2 segfaults
+fn CFStringCreateWithSubstring(
+    env: &mut Environment,
+    _allocator: CFAllocatorRef,
+    str: CFStringRef,
+    range: CFRange,
+) -> CFStringRef {
+    let ns_range = NSRange {
+        location: range.location.try_into().unwrap(),
+        length: range.length.try_into().unwrap(),
+    };
+    msg![env; str substringWithRange:ns_range]
+}
+
 fn CFStringCreateWithFormat(
     env: &mut Environment,
     allocator: CFAllocatorRef,
@@ -254,6 +280,56 @@ fn CFStringGetCString(
     msg![env; a getCString:buffer maxLength:buffer_size encoding:encoding]
 }
 
+// FIXED: Implemented to prevent NFS Shift 2 segfaults
+fn CFStringGetBytes(
+    env: &mut Environment,
+    the_string: CFStringRef,
+    range: CFRange,
+    encoding: CFStringEncoding,
+    _loss_byte: u8,
+    _is_external_representation: bool,
+    buffer: MutPtr<u8>,
+    max_buf_len: CFIndex,
+    used_buf_len: MutPtr<CFIndex>,
+) -> CFIndex {
+    let ns_encoding = CFStringConvertEncodingToNSStringEncoding(env, encoding);
+    let ns_range = NSRange {
+        location: range.location.try_into().unwrap(),
+        length: range.length.try_into().unwrap(),
+    };
+    
+    // Allocate a temporary pointer in guest memory for usedLength
+    let used_buf_len_guest: MutPtr<NSUInteger> = env.mem.alloc(4); 
+    env.mem.write(used_buf_len_guest, 0);
+
+    let options: NSUInteger = 0;
+    let remaining_range_ptr: MutPtr<NSRange> = MutPtr::null();
+
+    let success: bool = msg![env; 
+        the_string 
+        getBytes:buffer 
+        maxLength:(max_buf_len as NSUInteger) 
+        usedLength:used_buf_len_guest 
+        encoding:ns_encoding 
+        options:options 
+        range:ns_range 
+        remainingRange:remaining_range_ptr
+    ];
+
+    let actual_used = env.mem.read(used_buf_len_guest);
+    let _ = env.mem.free(used_buf_len_guest.cast());
+
+    if !used_buf_len.is_null() {
+        env.mem.write(used_buf_len, actual_used as CFIndex);
+    }
+
+    if success {
+        range.length
+    } else {
+        0
+    }
+}
+
 fn CFStringGetLength(env: &mut Environment, the_string: CFStringRef) -> CFIndex {
     let length: NSUInteger = msg![env; the_string length];
     length.try_into().unwrap()
@@ -350,6 +426,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringCreateMutableCopy(_, _, _)),
     export_c_func!(CFStringCreateWithBytes(_, _, _, _, _)),
     export_c_func!(CFStringCreateWithCString(_, _, _)),
+    export_c_func!(CFStringCreateWithCStringNoCopy(_, _, _, _)),
+    export_c_func!(CFStringCreateWithSubstring(_, _, _)),
     export_c_func!(CFStringCreateWithFormat(_, _, _, _)),
     export_c_func!(CFStringCreateWithFormatAndArguments(_, _, _, _)),
     export_c_func!(CFStringCompare(_, _, _)),
@@ -359,6 +437,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringGetCharacters(_, _, _)),
     export_c_func!(CFStringGetCStringPtr(_, _)),
     export_c_func!(CFStringGetCString(_, _, _, _)),
+    export_c_func!(CFStringGetBytes(_, _, _, _, _, _, _, _)),
     export_c_func!(CFStringGetIntValue(_)),
     export_c_func!(CFStringGetLength(_)),
     export_c_func!(CFStringFind(_, _, _)),
