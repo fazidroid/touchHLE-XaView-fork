@@ -34,7 +34,25 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== EA SHIFT 2 BYPASSES =====
+    // ===== NFS MOST WANTED MTX / STOREFRONT BYPASS =====
+    // 1. Pretend the MTX controller is always ready and authorized
+    if sel_str == "canMakePayments" {
+        env.cpu.regs_mut()[0] = 1; // Return YES
+        return;
+    }
+
+    // 2. Bypass MTX initialization check
+    if sel_str == "CheckMTXController" || sel_str == "isMTXReady" {
+        env.cpu.regs_mut()[0] = 1; // Return true
+        return;
+    }
+
+    // 3. Prevent crash when the engine looks for the 'Main' Window during MTX setup
+    if sel_str == "keyWindow" {
+        // Return the receiver if it's likely a UIWindow, or nil if unsure
+        env.cpu.regs_mut()[0] = receiver.to_bits(); 
+        return;
+    }
     if sel_str == "currentDevice" || sel_str == "decimalDigitCharacterSet" {
         // Return a dummy valid object so the game doesn't crash on (null)
         let dummy = crate::frameworks::foundation::ns_string::from_rust_string(env, "dummy".to_string());
