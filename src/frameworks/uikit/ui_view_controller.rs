@@ -117,8 +117,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // As a last resort, use plain UIVIew for the root view
     let class: Class = msg![env; this class];
-    log!("Unable to load {:?} {} view controller's view by nib, using plain UIView", this, env.objc.get_class_name(class).to_string());
-    let view: id = msg_class![env; UIView alloc];
+    let class_name_str = env.objc.get_class_name(class).to_string();
+    log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
+    
+    // FixNibEaglLayer
+    let mut view_class: Class = msg_class![env; UIView class];
+    if class_name_str.contains("EAGL") || class_name_str.contains("GL") {
+        let eagl_class = env.objc.link_class("EAGLView", false, &mut env.mem);
+        if eagl_class != nil {
+            view_class = eagl_class;
+            log!("Fallback to EAGLView class instead of UIView!");
+        }
+    }
+    let view: id = msg![env; view_class alloc];
     // Docs are saying that "an empty UIView" is created,
     // but testing reveals that frame matches the screen one
     // (at least on the simulator)
