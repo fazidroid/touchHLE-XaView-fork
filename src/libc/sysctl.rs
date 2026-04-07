@@ -17,7 +17,6 @@ fn sysctl(
     }
     
     // CRITICAL FIX: Return -1 (Error) so the game knows we didn't fill the buffer.
-    // This forces the EA crypto-hasher to use safe fallbacks instead of crashing!
     -1 
 }
 
@@ -32,7 +31,7 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
-    // 1. Device Spoof
+    // 1. Device Spoof (Catches hw.model so Phone Model is no longer (null))
     if name_str == "hw.machine" || name_str == "hw.model" {
         let hw = b"iPhone4,1\0";
         if !oldlenp.is_null() {
@@ -47,6 +46,10 @@ fn sysctlbyname(
         }
         return 0; // Success
     }
+
+    // Return -1 for unhandled strings to force EA safe fallbacks
+    -1
+}
 
     // 2. EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
