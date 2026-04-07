@@ -68,47 +68,36 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         return nil;
     }
 
-    // SearchForEAGLLayer
-    let root_layer: id = msg![env; top_window layer];
-    let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
-    let mut stack = vec![root_layer];
-    let mut eagl_layer = nil;
+    // RevertToLoop
+    let mut layer: id = msg![env; top_window layer];
 
-    while let Some(current) = stack.pop() {
-        if current == nil { continue; }
-        
-        // FixBorrowChecker
-        let is_hidden;
-        let has_pixels;
-        {
-            let host: &CALayerHostObject = env.objc.borrow(current);
-            is_hidden = host.hidden || host.opacity == 0.0;
-            has_pixels = host.presented_pixels.is_some();
+    loop {
+        assert!(layer != nil);
+
+        let layer_host_obj: &CALayerHostObject = env.objc.borrow(layer);
+
+        // BypassStrictBounds
+        if layer_host_obj.hidden || layer_host_obj.opacity == 0.0 {
+            return nil;
         }
 
-        if is_hidden {
-            continue;
-        }
-
-        let is_eagl: bool = msg![env; current isKindOfClass:ca_eagl_layer_class];
-        if is_eagl || has_pixels {
-            eagl_layer = current;
+        if let Some(&next) = layer_host_obj.sublayers.last() {
+            layer = next;
+        } else {
             break;
-        }
-
-        // ReborrowSublayers
-        let host: &CALayerHostObject = env.objc.borrow(current);
-        for &sub in &host.sublayers {
-            stack.push(sub);
         }
     }
 
-    if eagl_layer == nil {
-        log!("WARNING: CAEAGLLayer not found in layer tree!");
+    // IgnoreOpaqueFlag
+    let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
+    let is_eagl: bool = msg![env; layer isKindOfClass:ca_eagl_layer_class];
+    let host: &CALayerHostObject = env.objc.borrow(layer);
+    
+    if !is_eagl && host.presented_pixels.is_none() {
         return nil;
     }
 
-    eagl_layer
+    layer
 }
 
 /// For use by `EAGLContext` when presenting to a `CAEAGLLayer`:
