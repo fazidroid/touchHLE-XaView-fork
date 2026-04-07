@@ -425,9 +425,20 @@ pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bo
 fn keys_for_key(env: &mut Environment, unarchiver: id, key: &str) -> Vec<Uid> {
     let host_obj = borrow_host_obj(env, unarchiver);
     let objects = host_obj.plist["$objects"].as_array().unwrap();
-    let item = &objects[host_obj.current_key.unwrap().get() as usize];
-    let keys = item.as_dictionary().unwrap()[key].as_array().unwrap();
-    keys.iter()
-        .map(|value| value.as_uid().copied().unwrap())
-        .collect()
+    let current_idx = host_obj.current_key.unwrap().get() as usize;
+    let item = &objects[current_idx];
+    
+    // SAFE BYPASS: Prevent crashes if an array of keys is missing
+    if let Some(dict) = item.as_dictionary() {
+        if let Some(val) = dict.get(key) {
+            if let Some(arr) = val.as_array() {
+                return arr.iter()
+                    .map(|value| value.as_uid().copied().unwrap())
+                    .collect();
+            }
+        }
+    }
+    
+    log!("SAFE BYPASS: Keyed Unarchiver missing key '{}', returning empty vec.", key);
+    Vec::new()
 }
