@@ -137,7 +137,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let left_id: id = msg![env; string substringFromIndex:pos];
     let left_str = to_rust_string(env, left_id);
-    let mut current_slice = left_str.as_str();
+    
+    // FIXED: Using &left_str instead of .as_str() to avoid unstable feature errors
+    let mut current_slice: &str = &left_str;
     let mut consumed = 0;
 
     // Skip optional 0x or 0X prefix
@@ -156,7 +158,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     if hex_digit_count == 0 {
-        // Restore state if no valid hex data found
         *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
         return false;
     }
