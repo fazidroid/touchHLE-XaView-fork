@@ -123,10 +123,8 @@ fn objc_msgSend_inner(
                     
                     let view: id = crate::msg![env; vc view];
                     if view != nil {
-                        let window_bounds = crate::frameworks::core_graphics::CGRect {
-                            origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
-                            size: crate::frameworks::core_graphics::CGSize { width: 1024.0, height: 768.0 },
-                        };
+                        let screen: id = crate::msg_class![env; UIScreen mainScreen];
+                        let window_bounds: crate::frameworks::core_graphics::CGRect = crate::msg![env; screen bounds];
                         
                         // FixStructAbiFrame
                         let _: () = crate::msg![env; receiver setFrame:window_bounds];
@@ -134,6 +132,15 @@ fn objc_msgSend_inner(
                         
                         let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
                         let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
+                        
+                        // ForceTouchInteraction
+                        let sel_user = env.objc.lookup_selector("setUserInteractionEnabled:").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_user, 1u32));
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_user, 1u32));
+                        
+                        let sel_multi = env.objc.lookup_selector("setMultipleTouchEnabled:").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_multi, 1u32));
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
                         
                         let sel_add = env.objc.lookup_selector("addSubview:").unwrap();
                         let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_add, view));
