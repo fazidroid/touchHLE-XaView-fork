@@ -21,7 +21,7 @@ fn objc_msgSend_inner(
 ) {
     let sel_str = selector.as_str(&env.mem);
     let message_type_info = env.objc.message_type_info.take();
-    // ==========================================================
+   // ==========================================================
     // TARGETED RETINA DISPLAY SPOOF (GLES 2.0 HD Textures)
     // ==========================================================
 
@@ -33,8 +33,8 @@ fn objc_msgSend_inner(
 
     // 2. Safely tell the game we support Retina features ONLY
     if sel_str == "respondsToSelector:" {
-        // FIXED: Changed `Selector` to `SEL` to match touchHLE's imports
-        let target_sel = SEL::from_bits(env.cpu.regs()[2]);
+        // FIXED: Construct the SEL wrapper properly using ConstPtr
+        let target_sel = SEL(crate::mem::ConstPtr::from_bits(env.cpu.regs()[2]));
         let target_sel_str = target_sel.as_str(&env.mem);
         
         // ONLY say YES (1) if it's specifically asking about modern screen features
