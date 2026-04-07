@@ -26,17 +26,15 @@ fn objc_msgSend_inner(
     // ==========================================================
 
     // 1. Force the screen scale to 2.0 (Retina)
-    // When the game asks [UIScreen mainScreen] for its scale, we give it 2.0 instead of 1.0.
     if sel_str == "scale" {
-        // Return 2.0 as an IEEE 754 32-bit float in hex
-        env.cpu.regs_mut()[0] = 0x40000000; 
+        env.cpu.regs_mut()[0] = 0x40000000; // 2.0 in IEEE 754 f32 hex
         return;
     }
 
     // 2. Safely tell the game we support Retina features ONLY
     if sel_str == "respondsToSelector:" {
-        // The selector the game is asking about is passed in the second argument (regs[2])
-        let target_sel = Selector::from_bits(env.cpu.regs()[2]);
+        // FIXED: Changed `Selector` to `SEL` to match touchHLE's imports
+        let target_sel = SEL::from_bits(env.cpu.regs()[2]);
         let target_sel_str = target_sel.as_str(&env.mem);
         
         // ONLY say YES (1) if it's specifically asking about modern screen features
@@ -45,8 +43,7 @@ fn objc_msgSend_inner(
             return;
         }
         
-        // CRITICAL: If it asks about anything else (like Ad Manager views), 
-        // we DO NOT return here. We let the code fall through to the normal emulator logic below!
+        // Let all other requests (like Ad Managers) fall through normally!
     }
 
     // ==========================================================
