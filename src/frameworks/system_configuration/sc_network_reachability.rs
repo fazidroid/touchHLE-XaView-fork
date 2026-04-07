@@ -6,13 +6,12 @@
 //! SCNetworkReachability.
 
 use crate::dyld::{export_c_func, FunctionExports};
+use crate::mem::MutPtr;
 use crate::objc::ClassExports;
 use crate::Environment;
 
-// FIXED: Export an empty classes array to satisfy the parent module
 pub const CLASSES: ClassExports = &[];
 
-// FIXED: The number of underscores now perfectly matches the number of function arguments
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _)),
     export_c_func!(SCNetworkReachabilityCreateWithName(_, _)),
@@ -30,10 +29,12 @@ fn SCNetworkReachabilityCreateWithName(_env: &mut Environment, _allocator: u32, 
     1 // Return a dummy handle
 }
 
-fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: u32, flags_out: u32) -> u32 {
-    if flags_out != 0 {
+fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: u32, flags_out: MutPtr<u32>) -> u32 {
+    if !flags_out.is_null() {
         // FIXED: Gameloft Asphalt 6 Loop Bypass!
         // We write `2` (kSCNetworkReachabilityFlagsReachable) instead of 0.
+        // This forces the game to attempt a socket connection (which we instantly 
+        // kill in netdb.rs), breaking the infinite "Gateway is down" loop!
         env.mem.write(flags_out, 2u32);
     }
     1 // Return 1 (true) to indicate we successfully retrieved the flags
