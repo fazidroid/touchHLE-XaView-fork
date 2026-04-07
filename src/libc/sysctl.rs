@@ -8,12 +8,11 @@ fn sysctl(
     namelen: u32,
     _oldp: MutVoidPtr,
     _oldlenp: MutPtr<u32>,
-    _newp: ConstVoidPtr,
+    _newp: MutVoidPtr, // FIXED: Strict MutVoidPtr matching your fork
     _newlen: u32,
 ) -> i32 {
     let mut mib = vec![0i32; namelen as usize];
     for i in 0..namelen as u32 {
-        // FIXED: read() usage without unwrap or offset()
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i).unwrap_or(0);
     }
     log!("GAMELOFT BYPASS: sysctl called for mib {:?}, faking success", mib);
@@ -25,7 +24,7 @@ fn sysctlbyname(
     name_ptr: ConstPtr<u8>,
     oldp: MutVoidPtr,
     oldlenp: MutPtr<u32>,
-    _newp: ConstVoidPtr,
+    _newp: MutVoidPtr, // FIXED: Strict MutVoidPtr matching your fork
     _newlen: u32,
 ) -> i32 {
     let name_bytes = env.mem.cstr_at(name_ptr);
@@ -49,9 +48,31 @@ fn sysctlbyname(
     0
 }
 
+// ==== NFS SHIFT 2 FONT CRASH BYPASSES ====
+// These return dummy math values so the game doesn't divide-by-zero
+fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
+fn CGFontGetAscent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 800 }
+fn CGFontGetDescent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { -200 }
+fn CGFontRetain(_env: &mut Environment, font: ConstVoidPtr) -> ConstVoidPtr { font }
+fn CGFontCreateWithDataProvider(_env: &mut Environment, provider: ConstVoidPtr) -> ConstVoidPtr { provider }
+
+// ==== NFS SHIFT 2 FILE I/O INFINITE LOOP BYPASS ====
+// Returns EOF (-1) so the game knows when to stop reading empty files
+fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 {
+    -1 
+}
+
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
-    // 6 underscores = 6 arguments (excluding env)
     export_c_func!(sysctl(_, _, _, _, _, _)),
-    // 5 underscores = 5 arguments (excluding env)
     export_c_func!(sysctlbyname(_, _, _, _, _)),
+    
+    // Shift 2 Font Bypasses
+    export_c_func!(CGFontGetUnitsPerEm(_)),
+    export_c_func!(CGFontGetAscent(_)),
+    export_c_func!(CGFontGetDescent(_)),
+    export_c_func!(CGFontRetain(_)),
+    export_c_func!(CGFontCreateWithDataProvider(_)),
+    
+    // Shift 2 File I/O Bypass
+    export_c_func!(__srget(_)),
 ];
