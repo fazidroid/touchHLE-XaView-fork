@@ -131,13 +131,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     let view_alloc: id = msg![env; view_class alloc];
     // InitEaglLayer
-    let bounds = crate::frameworks::core_graphics::CGRect {
-        origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
-        size: crate::frameworks::core_graphics::CGSize { width: 1024.0, height: 768.0 },
-    };
+    let screen: id = msg_class![env; UIScreen mainScreen];
+    let bounds: crate::frameworks::core_graphics::CGRect = msg![env; screen bounds];
     let view: id = msg![env; view_alloc initWithFrame:bounds];
+    
     let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
+    
+    // ForceTouchInteraction
+    let sel_user = env.objc.lookup_selector("setUserInteractionEnabled:").unwrap();
+    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_user, 1u32));
+    let sel_multi = env.objc.lookup_selector("setMultipleTouchEnabled:").unwrap();
+    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
     // Docs are saying that "an empty UIView" is created,
     // but testing reveals that frame matches the screen one
     // (at least on the simulator)
