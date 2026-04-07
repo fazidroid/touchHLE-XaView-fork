@@ -140,9 +140,24 @@ impl State {
     }
 }
 
-fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> i32 {
-    log_dbg!("socket({}, {}, {})", domain, type_, protocol);
+fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> FileDescriptor {
+    // TODO: handle errno properly
+    set_errno(env, 0);
 
+    // EXCLUSIVE HACK: Allow socket creation for Asphalt 6 even if network is disabled globally.
+    let is_asphalt6 = env.app_bundle_id == "com.gameloft.Asphalt6ipad" || env.app_bundle_id == "com.gameloft.Asphalt6";
+    
+    if !env.options.network_access && !is_asphalt6 {
+        log_dbg!(
+            "Network access is disabled, socket({}, {}, {}) => -1",
+            domain,
+            type_,
+            protocol
+        );
+        set_errno(env, EPROTONOSUPPORT);
+        return -1;
+    }
+    
     assert_eq!(domain, AF_INET);
 
     assert_eq!(domain, AF_INET);
