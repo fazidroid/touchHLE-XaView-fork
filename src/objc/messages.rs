@@ -23,7 +23,34 @@ fn objc_msgSend_inner(
     let message_type_info = env.objc.message_type_info.take();
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== NFS MOST WANTED MTX / STOREFRONT BYPASS =====
+    // ===== NFS MOST WANTED: VIDEO & AUTOLOG INFINITE LOOP FIX =====
+
+    // 1. Force the Intro Video to instantly skip.
+    // (Without this, the game waits forever on a black screen for a video finish notification)
+    if sel_str == "initWithContentURL:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil to abort video setup
+        return;
+    }
+    if sel_str == "playbackState" || sel_str == "loadState" {
+        env.cpu.regs_mut()[0] = 0; // 0 = MPMoviePlaybackStateStopped
+        return;
+    }
+
+    // 2. Instantly kill Autolog Network Connections
+    // (Prevents the game from freezing while waiting for offline EA servers)
+    if sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil to force connection failure
+        return;
+    }
+    if sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil 
+        return;
+    }
+    
+    // 3. Bypass GameCenter / EA Cloud Save loops
+    if sel_str == "authenticateWithCompletionHandler:" || sel_str == "loadDefaultLeaderboardIdentifierWithCompletionHandler:" {
+        return; // Ignore the call so it doesn't hang waiting for an Apple callback
+    }
     // 1. Pretend the MTX controller is always ready and authorized
     if sel_str == "uniqueIdentifier" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
