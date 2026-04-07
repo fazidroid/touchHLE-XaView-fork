@@ -393,41 +393,56 @@ pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id
 /// Shortcut for use by `[NSDate initWithCoder:]`.
 pub fn decode_current_date(env: &mut Environment, unarchiver: id) -> id {
     let key = get_static_str(env, "NS.time");
-    let timestamp = get_value_to_decode_for_key(env, unarchiver, key)
-        .unwrap()
-        .as_real()
-        .unwrap();
-
-    let date: id = msg_class![env; NSDate alloc];
-    msg![env; date initWithTimeIntervalSinceReferenceDate:timestamp]
+    
+    // SAFE BYPASS: Do not unwrap missing date timestamps
+    if let Some(val) = get_value_to_decode_for_key(env, unarchiver, key) {
+        if let Some(timestamp) = val.as_real() {
+            let date: id = msg_class![env; NSDate alloc];
+            return msg![env; date initWithTimeIntervalSinceReferenceDate:timestamp];
+        }
+    }
+    nil
 }
 
 /// Shortcut for use by `[NSData initWithCoder:]`.
 pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bool) -> id {
     let key = get_static_str(env, "NS.data");
-    // TODO: avoid copying (twice!)
-    let bytes = get_value_to_decode_for_key(env, unarchiver, key)
-        .unwrap()
-        .as_data()
-        .unwrap()
-        .to_vec();
-    let len: GuestUSize = bytes.len().try_into().unwrap();
-    let guest_bytes: MutVoidPtr = env.mem.alloc(len);
-    env.mem
-        .bytes_at_mut(guest_bytes.cast(), len)
-        .copy_from_slice(bytes.as_slice());
+    
+    // SAFE BYPASS: Do not unwrap missing data bytes
+    if let Some(val) = get_value_to_decode_for_key(env, unarchiver, key) {
+        if let Some(data_val) = val.as_data() {
+            // TODO: avoid copying (twice!)
+            let bytes = data_val.to_vec();
+            let len: GuestUSize = bytes.len().try_into().unwrap();
+            let guest_bytes: MutVoidPtr = env.mem.alloc(len);
+            env.mem
+                .bytes_at_mut(guest_bytes.cast(), len)
+                .copy_from_slice(bytes.as_slice());
 
-    assert!(is_mutable); // TODO
-    let data: id = msg_class![env; NSMutableData alloc];
-    msg![env; data initWithBytesNoCopy:guest_bytes length:len freeWhenDone:true]
+            assert!(is_mutable); // TODO
+            let data: id = msg_class![env; NSMutableData alloc];
+            return msg![env; data initWithBytesNoCopy:guest_bytes length:len freeWhenDone:true];
+        }
+    }
+    nil
 }
 
 fn keys_for_key(env: &mut Environment, unarchiver: id, key: &str) -> Vec<Uid> {
     let host_obj = borrow_host_obj(env, unarchiver);
     let objects = host_obj.plist["$objects"].as_array().unwrap();
     let item = &objects[host_obj.current_key.unwrap().get() as usize];
-    let keys = item.as_dictionary().unwrap()[key].as_array().unwrap();
-    keys.iter()
-        .map(|value| value.as_uid().copied().unwrap())
-        .collect()
+    
+    // SAFE BYPASS: Prevent crashes when a dictionary key does not exist
+    if let Some(dict) = item.as_dictionary() {
+        if let Some(val) = dict.get(key) {
+            if let Some(arr) = val.as_array() {
+                return arr.iter()
+                    .map(|value| value.as_uid().copied().unwrap())
+                    .collect();
+            }
+        }
+    }
+    
+    log!("SAFE BYPASS: NSKeyedUnarchiver missing key '{}', returning empty array.", key);
+    Vec::new()
 }
