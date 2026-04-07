@@ -109,7 +109,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentsOfURL:(id)url {
-    let url_str = to_rust_string(env, msg![env; url absoluteString]);
+    // FIXED: Separate the macro call and the function call onto two lines
+    // to prevent Rust from borrowing `env` twice at the same time!
+    let absolute_string: id = msg![env; url absoluteString];
+    let url_str = to_rust_string(env, absolute_string);
+    
     if url_str.starts_with("file://") {
         let path: id = msg![env; url path];
         msg![env; this initWithContentsOfFile:path]
