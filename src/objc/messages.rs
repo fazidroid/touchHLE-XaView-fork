@@ -34,6 +34,16 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
+    // ===== GAMELOFT UDID BYPASS =====
+    if sel_str == "uniqueIdentifier" {
+        log!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier] to fix udid=(null) loops!");
+        // Return a standard 40-character Apple UDID
+        let fake_udid = crate::frameworks::foundation::ns_string::from_rust_string(
+            env, "1234567890abcdef1234567890abcdef12345678".to_string()
+        );
+        env.cpu.regs_mut()[0] = fake_udid.to_bits();
+        return;
+    }
     // ===== GAMELOFT GLOBAL TIMER HACK =====
     // If the background thread asks to sleep, just ignore it and return immediately.
     // This entirely bypasses the `Duration` float panics inside `ns_thread.rs` globally!
