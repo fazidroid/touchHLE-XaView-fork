@@ -6,7 +6,6 @@
 //! `CAEAGLLayer`.
 
 use super::ca_layer::CALayerHostObject;
-use crate::frameworks::core_graphics::{CGPoint, CGRect};
 use crate::objc::{id, msg, msg_class, nil, objc_classes, Class, ClassExports};
 use crate::Environment;
 
@@ -61,11 +60,7 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         return nil;
     };
 
-    let screen_bounds: CGRect = {
-        let screen: id = msg_class![env; UIScreen mainScreen];
-        msg![env; screen bounds]
-    };
-
+    // RemoveUnusedBounds
     let mut layer: id = msg![env; top_window layer];
 
     // Descend through the hierarchy, looking only at the last layer in each
@@ -76,23 +71,8 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
 
         let layer_host_obj: &CALayerHostObject = env.objc.borrow(layer);
 
-        // This is stricter than it should be. In theory we should accumulate
-        // the transforms and handle different anchor points etc, but real apps
-        // probably only use this common case.
-        if layer_host_obj.bounds.size != screen_bounds.size
-            || layer_host_obj.bounds.origin != (CGPoint { x: 0.0, y: 0.0 })
-            || layer_host_obj.anchor_point != (CGPoint { x: 0.5, y: 0.5 })
-            || layer_host_obj.position
-                != (CGPoint {
-                    x: screen_bounds.size.width / 2.0,
-                    y: screen_bounds.size.height / 2.0,
-                })
-            || layer_host_obj.hidden
-            || layer_host_obj.opacity != 1.0
-            // TODO: support affine transforms that result in a full-screen
-            //       layer (typical example is 90° rotation).
-            || !layer_host_obj.affine_transform.is_identity()
-        {
+        // BypassStrictBounds
+        if layer_host_obj.hidden || layer_host_obj.opacity == 0.0 {
             return nil;
         }
 
@@ -103,9 +83,7 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         }
     }
 
-    if !env.objc.borrow::<CALayerHostObject>(layer).opaque {
-        return nil;
-    }
+    // IgnoreOpaqueFlag
 
     let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
     if !msg![env; layer isKindOfClass:ca_eagl_layer_class] {
