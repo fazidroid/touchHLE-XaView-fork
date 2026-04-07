@@ -34,7 +34,44 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== NFS SHIFT 2: ABSOLUTE NETWORK KILL SWITCH =====
+    // ===== NFS SHIFT 2: (NULL) INFO & FSTAT DEADLOCK BYPASS =====
+
+    // 1. Fix the (null) Device Info so the engine initializes properly
+    if sel_str == "currentDevice" || sel_str == "mainBundle" {
+        if receiver.to_bits() != 0 {
+            env.cpu.regs_mut()[0] = receiver.to_bits(); 
+        } else {
+            env.cpu.regs_mut()[0] = 0xDEADBEEF; // Fallback dummy
+        }
+        return;
+    }
+    if sel_str == "model" || sel_str == "localizedModel" || sel_str == "name" || sel_str == "systemName" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone OS".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    if sel_str == "systemVersion" || sel_str == "objectForInfoDictionaryKey:" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 2. Fix the (null) Folder Paths so the game can read its save files
+    if sel_str == "bundlePath" || sel_str == "resourcePath" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, ".".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 3. Escaping the fstat() loop by instantly killing the EA Video Player!
+    if sel_str == "initWithContentURL:" || sel_str == "initWithContentURL:error:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil so it skips the video
+        return;
+    }
+    if sel_str == "playbackState" || sel_str == "loadState" {
+        env.cpu.regs_mut()[0] = 0; // 0 = MPMoviePlaybackStateStopped
+        return;
+    }
     
     // 1. Give the Fluent Mobile tracker a fake device ID so it doesn't crash on (null)
     if sel_str == "uniqueIdentifier" {
