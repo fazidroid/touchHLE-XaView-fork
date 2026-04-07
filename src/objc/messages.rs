@@ -34,7 +34,40 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== NFS SHIFT 2 TELEMETRY & LOGO STUCK BYPASS =====
+    // ===== NFS SHIFT 2: ABSOLUTE NETWORK KILL SWITCH =====
+    
+    // 1. Give the Fluent Mobile tracker a fake device ID so it doesn't crash on (null)
+    if sel_str == "uniqueIdentifier" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 2. Catch the Reachability allocators and return a dummy object
+    if sel_str == "reachabilityWithHostName:" || sel_str == "reachabilityForInternetConnection" || sel_str == "reachabilityWithAddress:" {
+        env.cpu.regs_mut()[0] = 0xDEADBEEF; // Return a fake valid pointer
+        return;
+    }
+
+    // 3. Force all Reachability checks to return "Offline"
+    if sel_str == "currentReachabilityStatus" || sel_str == "networkStatusForFlags:" {
+        env.cpu.regs_mut()[0] = 0; // 0 = NotReachable (No WiFi, No Cellular)
+        return;
+    }
+
+    // 4. Instantly fail any stubborn network connections
+    if sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil
+        return;
+    }
+    if sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil
+        return;
+    }
+    if sel_str == "start" && receiver.to_bits() != 0 {
+        // If it tries to start a connection anyway, just do nothing
+        return; 
+    }
     
     // 1. Fluent Mobile Telemetry Fixes (Prevents infinite wait for network)
     if sel_str == "setTimeoutInterval:" {
