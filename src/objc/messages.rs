@@ -79,6 +79,25 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
+    if sel_str == "currentReachabilityStatus" || sel_str == "networkStatusForFlags:" {
+        log!("EA BYPASS: Spoofing NO INTERNET to skip Autolog.");
+        env.cpu.regs_mut()[0] = 0; // 0 = NotReachable
+        return;
+    }
+
+    // 2. Kill synchronous web requests so Fluent Mobile doesn't freeze the main thread
+    if sel_str == "sendSynchronousRequest:returningResponse:error:" || sel_str == "connectionWithRequest:delegate:" {
+        log!("EA BYPASS: Blocking synchronous network request.");
+        env.cpu.regs_mut()[0] = 0; // Return nil (Failure)
+        return;
+    }
+
+    // 3. Bypass the unexpected host object crash from the log
+    if sel_str == "methodSignatureForSelector:" {
+        // If the EA engine asks for a missing method signature during network failure, return nil
+        env.cpu.regs_mut()[0] = 0; 
+        return;
+    }
     if sel_str == "platformClass" || sel_str == "model" || sel_str == "localizedModel" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
