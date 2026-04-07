@@ -109,8 +109,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentsOfURL:(id)url {
-    // FIXED: Separate the macro call and the function call onto two lines
-    // to prevent Rust from borrowing `env` twice at the same time!
+    // FIXED: Variables cleanly separated for macro parser safety!
     let absolute_string: id = msg![env; url absoluteString];
     let url_str = to_rust_string(env, absolute_string);
     
@@ -118,10 +117,13 @@ pub const CLASSES: ClassExports = objc_classes! {
         let path: id = msg![env; url path];
         msg![env; this initWithContentsOfFile:path]
     } else {
-        // GAMELOFT BYPASS: Forcing nil return on URL fetch to prevent infinite loop!
-        log!("GAMELOFT BYPASS: Forcing nil return on URL fetch to prevent infinite loop! URL was: {}", url_str);
-        env.objc.dealloc_object(this, &mut env.mem);
-        nil
+        // GAMELOFT BYPASS: Return dummy valid data to appease the DRM engine!
+        log!("GAMELOFT BYPASS: Faking HTTP response for URL: {}", url_str);
+        let dummy = b"1\nOK\n";
+        let dummy_len = dummy.len() as u32;
+        let alloc = env.mem.alloc(dummy_len);
+        env.mem.bytes_at_mut(alloc.cast(), dummy_len).copy_from_slice(dummy);
+        msg![env; this initWithBytesNoCopy:alloc length:dummy_len freeWhenDone:true]
     }
 }
 
