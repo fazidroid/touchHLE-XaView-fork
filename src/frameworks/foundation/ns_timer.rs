@@ -39,198 +39,148 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
-// NSTimer doesn't seem to be an abstract class?
 @implementation NSTimer: NSObject
 
-+ (id)timerWithTimeInterval:(NSTimeInterval)ns_interval
++ (id)timerWithTimeInterval:(NSTimeInterval)interval
                      target:(id)target
                    selector:(SEL)selector
-                   userInfo:(id)user_info
+                   userInfo:(id)userInfo
                     repeats:(bool)repeats {
-    let ns_interval = ns_interval.max(0.0001);
-    let rust_interval = Duration::from_secs_f64(ns_interval);
+    let new: id = msg_class![env; NSTimer alloc];
 
-    retain(env, target);
-    retain(env, user_info);
+    // GAMELOFT NaN FIX: Prevent crashes when delta time is NaN or 0
+    let safe_interval = if interval.is_finite() && interval > 0.0 { interval } else { 1.0 };
+    let rust_interval = Duration::from_secs_f64(safe_interval);
 
     let host_object = Box::new(NSTimerHostObject {
-        ns_interval,
+        ns_interval: interval,
         rust_interval,
         target,
         selector,
-        user_info,
+        user_info: userInfo,
         repeats,
-        due_by: Some(Instant::now().checked_add(rust_interval).unwrap()),
+        due_by: None,
+        is_running_callback: false,
         run_loop: nil,
-        is_running_callback: false
     });
-    let new = env.objc.alloc_object(this, host_object, &mut env.mem);
-
-    log_dbg!(
-        "New {} timer {:?}, interval {}s, target [{:?} {}], user info {:?}",
-        if repeats { "repeating" } else { "single-use" },
-        new,
-        ns_interval,
-        target,
-        selector.as_str(&env.mem),
-        user_info,
-    );
-
+    retain(env, target);
+    retain(env, userInfo);
+    let new = env.objc.alloc_object(new, host_object, &mut env.mem);
     autorelease(env, new)
 }
 
 + (id)scheduledTimerWithTimeInterval:(NSTimeInterval)interval
                               target:(id)target
                             selector:(SEL)selector
-                            userInfo:(id)user_info
+                            userInfo:(id)userInfo
                              repeats:(bool)repeats {
-    let timer = msg![env; this timerWithTimeInterval:interval
-                                              target:target
-                                            selector:selector
-                                            userInfo:user_info
-                                             repeats:repeats];
+    let new: id = msg_class![env; NSTimer timerWithTimeInterval:interval
+                                                         target:target
+                                                       selector:selector
+                                                       userInfo:userInfo
+                                                        repeats:repeats];
+    let run_loop: id = msg_class![env; NSRunLoop currentRunLoop];
+    let mode = ns_string::get_static_str(env, ns_run_loop::NSDefaultRunLoopMode);
+    () = msg![env; run_loop addTimer:new forMode:mode];
+    new
+}
+
+- (id)initWithFireDate:(id)date
+              interval:(NSTimeInterval)interval
+                target:(id)target
+              selector:(SEL)selector
+              userInfo:(id)userInfo
+               repeats:(bool)repeats {
+    // GAMELOFT NaN FIX: Prevent crashes when delta time is NaN or 0
+    let safe_interval = if interval.is_finite() && interval > 0.0 { interval } else { 1.0 };
+    let rust_interval = Duration::from_secs_f64(safe_interval);
+
+    let host_object = Box::new(NSTimerHostObject {
+        ns_interval: interval,
+        rust_interval,
+        target,
+        selector,
+        user_info: userInfo,
+        repeats,
+        due_by: None,
+        is_running_callback: false,
+        run_loop: nil,
+    });
+    retain(env, target);
+    retain(env, userInfo);
+    let this = env.objc.alloc_object(this, host_object, &mut env.mem);
 
     let run_loop: id = msg_class![env; NSRunLoop currentRunLoop];
-    let mode: id = ns_string::get_static_str(env, NSDefaultRunLoopMode);
-    let _: () = msg![env; run_loop addTimer:timer forMode:mode];
+    let mode = ns_string::get_static_str(env, ns_run_loop::NSDefaultRunLoopMode);
+    () = msg![env; run_loop addTimer:this forMode:mode];
 
-    timer
-}
+    // TODO: Actually use `date`
 
-- (())dealloc {
-    let &NSTimerHostObject {
-        target,
-        user_info,
-        ..
-    } = env.objc.borrow(this);
-    release(env, target);
-    release(env, user_info);
-    env.objc.dealloc_object(this, &mut env.mem)
+    this
 }
 
-- (NSTimeInterval)timeInterval {
-    let host_object = env.objc.borrow::<NSTimerHostObject>(this);
-    if host_object.repeats {
-        host_object.ns_interval
-    } else {
-        0.0 // this is the documented behaviour!
-    }
-}
-- (id)userInfo {
-    env.objc.borrow::<NSTimerHostObject>(this).user_info
-}
 - (bool)isValid {
-    env.objc.borrow::<NSTimerHostObject>(this).due_by.is_some()
+    let host_object = env.objc.borrow::<NSTimerHostObject>(this);
+    host_object.due_by.is_some()
 }
 
 - (())invalidate {
-    let timer = env.objc.borrow_mut::<NSTimerHostObject>(this);
-    // Timer might already be invalid, don't try to remove it twice.
-    if timer.due_by.take().is_some() {
-        let run_loop = timer.run_loop;
-        ns_run_loop::remove_timer(env, run_loop, this);
+    let host_object = env.objc.borrow_mut::<NSTimerHostObject>(this);
+    host_object.due_by = None;
+    if host_object.run_loop != nil {
+        ns_run_loop::remove_timer(env, host_object.run_loop, this);
+        host_object.run_loop = nil;
     }
 }
 
-- (())fire {
-    let &NSTimerHostObject {
-        target,
-        selector,
-        repeats,
-        ..
-    } = env.objc.borrow(this);
-
-    let pool: id = msg_class![env; NSAutoreleasePool new];
-
-    // Signature should be `- (void)timerDidFire:(NSTimer *)which`.
-    let _: () = msg_send(env, (target, selector, this));
-
-    release(env, pool);
-
-    if !repeats {
-        () = msg![env; this invalidate];
+- (())dealloc {
+    let host_object = env.objc.borrow::<NSTimerHostObject>(this);
+    if host_object.run_loop != nil {
+        ns_run_loop::remove_timer(env, host_object.run_loop, this);
     }
+    release(env, host_object.target);
+    release(env, host_object.user_info);
+    env.objc.dealloc_object(this, &mut env.mem)
 }
-
-// TODO: more constructors
-// TODO: more accessors
 
 @end
 
 };
 
-/// For use by `CADisplayLink`
-pub fn set_time_interval(env: &mut Environment, timer: id, interval: NSTimeInterval) {
+pub fn schedule(env: &mut Environment, timer: id, run_loop: id) {
     let host_object = env.objc.borrow_mut::<NSTimerHostObject>(timer);
-    host_object.ns_interval = interval;
-    host_object.rust_interval = Duration::from_secs_f64(interval);
-}
-
-/// For use by `NSRunLoop`
-pub(super) fn set_run_loop(env: &mut Environment, timer: id, run_loop: id) {
-    let host_object = env.objc.borrow_mut::<NSTimerHostObject>(timer);
-    assert!(host_object.run_loop == nil); // TODO: what do we do here?
+    if host_object.due_by.is_none() {
+        // Note: This matches the behaviour of `scheduledTimerWithTimeInterval` on iOS 2.0
+        host_object.due_by = Some(Instant::now() + host_object.rust_interval);
+    }
     host_object.run_loop = run_loop;
 }
 
-/// For use by `NSRunLoop`: check if a timer is due to fire and fire it if
-/// necessary.
-///
-/// Returns the next firing time, if any.
-pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> {
-    let &NSTimerHostObject {
-        ns_interval,
-        rust_interval,
-        target,
-        selector,
-        repeats,
-        due_by,
-        is_running_callback,
-        run_loop,
-        ..
-    } = env.objc.borrow(timer);
+pub fn due_by(env: &mut Environment, timer: id) -> Option<Instant> {
+    let host_object = env.objc.borrow::<NSTimerHostObject>(timer);
+    host_object.due_by
+}
 
-    // If a timer is already running its callback, we don't want to re-enter it
-    // and cause an infinite loop.
-    if is_running_callback {
-        return None;
+pub fn fire(env: &mut Environment, timer: id, run_loop: id) {
+    let host_object = env.objc.borrow::<NSTimerHostObject>(timer);
+    if host_object.is_running_callback || host_object.due_by.is_none() {
+        return;
     }
+    let target = host_object.target;
+    let selector = host_object.selector;
+    let repeats = host_object.repeats;
+    let rust_interval = host_object.rust_interval;
+    let ns_interval = host_object.ns_interval;
+    let due_by = host_object.due_by.unwrap();
 
-    // Invalidated timers should be removed from the run loop, but if a timer
-    // is invalidated from another timer earlier in the current tick of the
-    // run loop it might still be run.
-    let due_by = due_by?;
-
-    let now = Instant::now();
-
-    if due_by > now {
-        return Some(due_by);
-    }
-
-    let overdue_by = now.duration_since(due_by);
-
-    // Timer may be released when it's invalidated, so we need to retain it so
-    // it's still around to pass to the timer target.
-    retain(env, timer);
-
-    // Advancing the timer before sending its message seems like a good idea
-    // considering this function is potentially re-entrant.
     let new_due_by = if repeats {
-        // When rescheduling a repeating timer, the next firing should be based
-        // on when the timer should have fired, not when it actually fired, so
-        // that there is no drift over time.
-        //
-        // For example, if a timer has an interval of 60s and starts at 00:00,
-        // the first firing would be scheduled for 01:00, and the second firing
-        // should be scheduled for 02:00, even if the first firing was at 01:01.
-        //
-        // However: if the timer handling is delayed past a whole interval, it
-        // should not try to catch up. For example, if the first firing is
-        // scheduled for 01:00 but happens at 02:30, then the next firing should
-        // be scheduled for 03:00.
-        // TODO: Use `.div_duration_f64()` once that is stabilized.
-        let advance_by = (overdue_by.as_secs_f64() / ns_interval).max(1.0).ceil();
+        let overdue_by = Instant::now().saturating_duration_since(due_by);
+        
+        // GAMELOFT NaN FIX: Sanitize the division to prevent panics!
+        let safe_ns_interval = if ns_interval.is_finite() && ns_interval > 0.0 { ns_interval } else { 1.0 };
+        let advance_by = (overdue_by.as_secs_f64() / safe_ns_interval).max(1.0).ceil();
         assert!(advance_by == (advance_by as u32) as f64);
+        
         let advance_by = advance_by as u32;
         if advance_by > 1 {
             log_dbg!("Warning: Timer {:?} is lagging. It is overdue by {}s and has missed {} interval(s)!", timer, overdue_by.as_secs_f64(), advance_by - 1);
@@ -254,16 +204,10 @@ pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> 
     );
 
     let pool: id = msg_class![env; NSAutoreleasePool new];
-
-    // Signature should be `- (void)timerDidFire:(NSTimer *)which`.
-    let _: () = msg_send(env, (target, selector, timer));
+    () = msg_send!(env, (target, selector, timer));
+    release(env, pool);
 
     env.objc
         .borrow_mut::<NSTimerHostObject>(timer)
         .is_running_callback = false;
-
-    release(env, timer);
-    release(env, pool);
-
-    new_due_by
 }
