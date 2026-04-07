@@ -34,6 +34,17 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
+    // ===== GAMELOFT UDID BYPASS =====
+    if sel_str == "uniqueIdentifier" {
+        let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = fake.to_bits();
+        return;
+    }
+    if sel_str == "currentDevice" {
+        env.cpu.regs_mut()[0] = receiver.to_bits();
+        return;
+    }
+
     // ===== URL Tracker & Telemetry Bypasses =====
     if sel_str == "HTTPMethod" || sel_str == "host" {
         env.cpu.regs_mut()[0..2].fill(0);
