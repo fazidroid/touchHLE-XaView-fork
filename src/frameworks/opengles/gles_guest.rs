@@ -1779,25 +1779,20 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            let mut sanitized_source = String::new();
+            // AGGRESSIVE COLOR FIX: Gameloft shaders often fail to link if #endif has comments
+            let mut sanitized = String::new();
             for line in full_source.lines() {
-                let trimmed = line.trim(); 
-                // Aggressively strip illegal arguments from #endif and #else
-                if trimmed.starts_with("#endif") {
-                    sanitized_source.push_str("#endif\n");
-                } else if trimmed.starts_with("#else") {
-                    sanitized_source.push_str("#else\n");
-                } else {
-                    sanitized_source.push_str(line);
-                    sanitized_source.push('\n');
-                }
+                let t = line.trim();
+                if t.starts_with("#endif") { sanitized.push_str("#endif\n"); }
+                else if t.starts_with("#else") { sanitized.push_str("#else\n"); }
+                else { sanitized.push_str(line); sanitized.push('\n'); }
             }
-            full_source = sanitized_source;
+            full_source = sanitized;
 
-            // Only inject precision if the game hasn't defined it itself
+            // NVIDIA Specific: Force precision if it's missing to prevent "heat map" graphics
             if !full_source.contains("precision ") {
-                let precision_header = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
-                full_source.insert_str(0, precision_header);
+                let precision = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
+                full_source.insert_str(0, precision);
             }
         }
 
