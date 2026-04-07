@@ -190,7 +190,14 @@ pub unsafe fn present_frame(
                 tex_coords.as_ptr() as *const _,
             );
         }
+        
+        //DebugDrawArrays
+        while gles.GetError() != 0 {}
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);
+        let draw_err = gles.GetError();
+        if draw_err != 0 {
+            log!("DEBUG_PRESENT: ERROR after DrawArrays: {:#x}", draw_err);
+        }
 
         if let Some((x, y, pressed)) = virtual_cursor_visible_at {
             let (vx, vy, vw, vh) = viewport;
