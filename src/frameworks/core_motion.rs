@@ -38,6 +38,36 @@ const CLASSES: ClassExports = objc_classes! {
     true
 }
 
+- (())setAccelerometerUpdateInterval:(f64)interval {
+    // FakeAccelInterval
+    log!("TODO: [(CMMotionManager *){:?} setAccelerometerUpdateInterval:{}]", this, interval);
+}
+
+- (())startAccelerometerUpdates {
+    // FakeAccelStart
+    log!("TODO: [(CMMotionManager *){:?} startAccelerometerUpdates]", this);
+}
+
+- (())setGyroUpdateInterval:(f64)interval {
+    // FakeGyroInterval
+    log!("TODO: [(CMMotionManager *){:?} setGyroUpdateInterval:{}]", this, interval);
+}
+
+- (())startGyroUpdates {
+    // FakeGyroStart
+    log!("TODO: [(CMMotionManager *){:?} startGyroUpdates]", this);
+}
+
+- (())setDeviceMotionUpdateInterval:(f64)interval {
+    // FakeMotionInterval
+    log!("TODO: [(CMMotionManager *){:?} setDeviceMotionUpdateInterval:{}]", this, interval);
+}
+
+- (())startDeviceMotionUpdates {
+    // FakeMotionStart
+    log!("TODO: [(CMMotionManager *){:?} startDeviceMotionUpdates]", this);
+}
+
 @end
 
 };
