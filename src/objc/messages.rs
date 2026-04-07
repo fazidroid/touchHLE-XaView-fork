@@ -21,6 +21,33 @@ fn objc_msgSend_inner(
 ) {
     let sel_str = selector.as_str(&env.mem);
     let message_type_info = env.objc.message_type_info.take();
+    // ==========================================================
+    // TARGETED RETINA DISPLAY SPOOF (GLES 2.0 HD Textures)
+    // ==========================================================
+
+    // 1. Force the screen scale to 2.0 (Retina)
+    // When the game asks [UIScreen mainScreen] for its scale, we give it 2.0 instead of 1.0.
+    if sel_str == "scale" {
+        // Return 2.0 as an IEEE 754 32-bit float in hex
+        env.cpu.regs_mut()[0] = 0x40000000; 
+        return;
+    }
+
+    // 2. Safely tell the game we support Retina features ONLY
+    if sel_str == "respondsToSelector:" {
+        // The selector the game is asking about is passed in the second argument (regs[2])
+        let target_sel = Selector::from_bits(env.cpu.regs()[2]);
+        let target_sel_str = target_sel.as_str(&env.mem);
+        
+        // ONLY say YES (1) if it's specifically asking about modern screen features
+        if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
+            env.cpu.regs_mut()[0] = 1; 
+            return;
+        }
+        
+        // CRITICAL: If it asks about anything else (like Ad Manager views), 
+        // we DO NOT return here. We let the code fall through to the normal emulator logic below!
+    }
 
     // ==========================================================
     // 1. GRAPHICS & OPENGL SNIFFER (GLES 2.0)
