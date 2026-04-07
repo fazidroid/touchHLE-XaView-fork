@@ -34,6 +34,21 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
+    // ===== GAMELOFT UDID & DEVICE BYPASS =====
+    if sel_str == "uniqueIdentifier" {
+        log!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier]");
+        let fake_udid = crate::frameworks::foundation::ns_string::from_rust_string(
+            env, "1234567890abcdef1234567890abcdef12345678".to_string()
+        );
+        env.cpu.regs_mut()[0] = fake_udid.to_bits();
+        return;
+    }
+
+    if sel_str == "currentDevice" {
+        env.cpu.regs_mut()[0] = receiver.to_bits();
+        return;
+    }
+
     // ===== URL Tracker & Telemetry Bypasses =====
     if sel_str == "HTTPMethod" || sel_str == "host" {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -49,7 +64,6 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
-    // ============================================
 
     // SAFE: only crash-prone selectors
     if sel_str.is_empty() {
@@ -85,7 +99,6 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // Traverse the chain of superclasses to find the method implementation.
     let mut class = orig_class;
     loop {
         if class == nil {
@@ -104,7 +117,6 @@ fn objc_msgSend_inner(
                 ..
             } = class_host_object.as_any().downcast_ref().unwrap();
 
-            // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
             log!(
                 "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
                 if is_metaclass { "Class" } else { "Object" },
@@ -117,13 +129,75 @@ fn objc_msgSend_inner(
             );
             
             if sel_str == "self" {
-                env.cpu.regs_mut()[0] = receiver.to_bits(); // Return self
+                env.cpu.regs_mut()[0] = receiver.to_bits(); 
             } else {
-                env.cpu.regs_mut()[0..2].fill(0); // Return nil/0
+                env.cpu.regs_mut()[0..2].fill(0); 
             }
             return;
         }
 
+        // --- PRE-CHECK BYPASS SCOPE ---
+        let mut do_video_bypass = false;
+        let mut do_alert_bypass = false;
+
+        { 
+            if let Some(host_object) = env.objc.get_host_object(class) {
+                if let Some(&super::ClassHostObject { ref name, .. }) = host_object.as_any().downcast_ref() {
+                    if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
+                        if sel_str == "play" || sel_str == "stop" {
+                            do_video_bypass = true;
+                        }
+                    }
+                    if name == "UIAlertView" && sel_str == "show" {
+                        do_alert_bypass = true;
+                    }
+                }
+            }
+        } 
+
+        if do_video_bypass {
+            log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
+            let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
+            if center_class != nil {
+                let center: id = msg![env; center_class defaultCenter];
+                let notif1 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackStateDidChangeNotification".to_string());
+                let _: () = msg![env; center postNotificationName:notif1 object:receiver];
+                let notif2 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+                let _: () = msg![env; center postNotificationName:notif2 object:receiver];
+            }
+            env.cpu.regs_mut()[0..2].fill(0);
+            return;
+        }
+
+        if do_alert_bypass {
+            log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
+            if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
+                let delegate: id = msg![env; receiver delegate];
+                if delegate != nil {
+                    if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
+                        let zero: i32 = 0;
+                        let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
+                    }
+                    if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
+                        let zero: i32 = 0;
+                        let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
+                    }
+                }
+            }
+            if env.objc.object_has_method_named(&env.mem, receiver, "setHidden:") {
+                let _: () = msg![env; receiver setHidden:true];
+            }
+            if env.objc.object_has_method_named(&env.mem, receiver, "setUserInteractionEnabled:") {
+                let _: () = msg![env; receiver setUserInteractionEnabled:false];
+            }
+            if env.objc.object_has_method_named(&env.mem, receiver, "removeFromSuperview") {
+                let _: () = msg![env; receiver removeFromSuperview];
+            }
+            env.cpu.regs_mut()[0..2].fill(0);
+            return;
+        }
+
+        // --- NORMAL EXECUTION ---
         let host_object = match env.objc.get_host_object(class) {
             Some(obj) => obj,
             None => {
@@ -139,41 +213,6 @@ fn objc_msgSend_inner(
             ..
         }) = host_object.as_any().downcast_ref()
         {
-            
-            // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
-            if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
-                log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
-                
-                if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
-                    let delegate: id = msg![env; receiver delegate];
-                    if delegate != nil {
-                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
-                            let zero: i32 = 0;
-                            let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
-                        }
-                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
-                            let zero: i32 = 0;
-                            let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
-                        }
-                    }
-                }
-                
-                if env.objc.object_has_method_named(&env.mem, receiver, "setHidden:") {
-                    let _: () = msg![env; receiver setHidden:true];
-                }
-                if env.objc.object_has_method_named(&env.mem, receiver, "setUserInteractionEnabled:") {
-                    let _: () = msg![env; receiver setUserInteractionEnabled:false];
-                }
-                if env.objc.object_has_method_named(&env.mem, receiver, "removeFromSuperview") {
-                    let _: () = msg![env; receiver removeFromSuperview];
-                }
-                
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
-
-            // Skip method lookup on first iteration if this is the super-call
-            // variant of objc_msgSend (look up the superclass first)
             if super2.is_some() && class == orig_class {
                 class = superclass;
                 continue;
@@ -190,8 +229,11 @@ fn objc_msgSend_inner(
                                     "Type mismatch when sending message {} to {:?}!\n- Message has type: {:?} / {}\n- Method expects type: {:?} / {}",
                                     selector.as_str(&env.mem), receiver, sent_type_id, sent_type_desc, expected_type_id, expected_type_desc
                                 );
-                                if tolerate_type_mismatch {
-                                    log!("Warning: {}", msg);
+                                
+                                // FIXED: SAFE BYPASS FOR NFS SHIFT
+                                // Downgrade Type Mismatch to a warning for bytes/length to prevent crash.
+                                if tolerate_type_mismatch || sel_str == "bytes" || sel_str == "length" || sel_str == "data" {
+                                    log!("Warning: Type mismatch (SAFE BYPASS): {}", msg);
                                 } else {
                                     panic!("{}", msg);
                                 }
@@ -210,7 +252,6 @@ fn objc_msgSend_inner(
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
         {
-            // ===== THE NUCLEAR OPTION: GLOBAL CLASS PANIC BYPASS =====
             log!(
                 "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
                 name,
@@ -236,8 +277,6 @@ fn objc_msgSend_inner(
             env.cpu.regs_mut()[0..2].fill(0);
             return;
         } else {
-            // FIXED: SAFE BYPASS FOR EA GAMES
-            // Instead of panicking on unexpected host object types, we log a warning and return 0.
             log!(
                 "SAFE BYPASS: Item {:?} in superclass chain of object {:?}'s class {:?} has an unexpected host object type. Returning 0 to prevent crash.",
                 class, receiver, orig_class
