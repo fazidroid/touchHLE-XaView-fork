@@ -6,7 +6,7 @@
 //! The Core Motion framework.
 
 use crate::dyld::HostDylib;
-use crate::objc::{objc_classes, ClassExports};
+use crate::objc::{id, nil, objc_classes, ClassExports};
 
 pub const DYLIB: HostDylib = HostDylib {
     path: "/System/Library/Frameworks/CoreMotion.framework/CoreMotion",
@@ -84,6 +84,24 @@ const CLASSES: ClassExports = objc_classes! {
     // FakeGyroActive
     log!("TODO: [(CMMotionManager *){:?} isGyroActive] -> true", this);
     true
+}
+
+- (id)deviceMotion {
+    // FakeDeviceMotion
+    log!("TODO: [(CMMotionManager *){:?} deviceMotion] -> nil", this);
+    nil
+}
+
+- (id)accelerometerData {
+    // FakeAccelData
+    log!("TODO: [(CMMotionManager *){:?} accelerometerData] -> nil", this);
+    nil
+}
+
+- (id)gyroData {
+    // FakeGyroData
+    log!("TODO: [(CMMotionManager *){:?} gyroData] -> nil", this);
+    nil
 }
 
 @end
