@@ -8,7 +8,7 @@
 //! Resources:
 //! - [View Controller Programming Guide for iOS (Legacy)](https://developer.apple.com/library/archive/documentation/WindowsViews/Conceptual/ViewControllerPGforiOSLegacy/BasicViewControllers/BasicViewControllers.html)
 
-use crate::frameworks::core_graphics::CGRect;
+// RemoveUnusedImport
 use crate::frameworks::foundation::ns_objc_runtime::NSStringFromClass;
 use crate::frameworks::foundation::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::frameworks::uikit::ui_application::{
@@ -130,10 +130,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
     let view_alloc: id = msg![env; view_class alloc];
-    // InitEaglLayer
+    
+    // FixDoubleInit
     let screen: id = msg_class![env; UIScreen mainScreen];
-    let bounds: crate::frameworks::core_graphics::CGRect = msg![env; screen bounds];
-    let view: id = msg![env; view_alloc initWithFrame:bounds];
+    let app_frame: crate::frameworks::core_graphics::CGRect = msg![env; screen applicationFrame];
+    let view: id = msg![env; view_alloc initWithFrame:app_frame];
     
     let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
@@ -143,12 +144,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_user, 1u32));
     let sel_multi = env.objc.lookup_selector("setMultipleTouchEnabled:").unwrap();
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
-    // Docs are saying that "an empty UIView" is created,
-    // but testing reveals that frame matches the screen one
-    // (at least on the simulator)
-    let screen: id = msg_class![env; UIScreen mainScreen];
-    let app_frame: CGRect = msg![env; screen applicationFrame];
-    let view: id = msg![env; view initWithFrame:app_frame];
+    
     () = msg![env; this setView:view];
 }
 
