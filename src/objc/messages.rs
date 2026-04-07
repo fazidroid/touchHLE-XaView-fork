@@ -49,6 +49,27 @@ fn objc_msgSend_inner(
         return;
     }
 
+    // ==========================================================
+    // 2. GLES 2.0 RETINA & GRAPHICS ENHANCERS
+    // ==========================================================
+
+    // Force the game to believe it has a Retina display (loads HD textures)
+    if sel_str == "respondsToSelector:" {
+        // If it asks if the screen supports "displayLinkWithTarget:selector:" (a modern drawing loop)
+        // or "scale" (Retina check), say YES.
+        env.cpu.regs_mut()[0] = 1; 
+        return;
+    }
+
+    // GLES 2.0 Context Sniffer
+    if sel_str == "initWithAPI:" {
+        let api_version = env.cpu.regs()[2]; 
+        println!("🔥 GLES 2.0 LOG: Game requested OpenGL ES Context API Version: {}", api_version);
+    }
+    if sel_str == "renderbufferStorage:fromDrawable:" {
+        println!("🔥 GLES 2.0 LOG: Allocating Renderbuffer from Drawable Surface! THE ENGINE IS ALIVE!");
+    }
+
     // Forcefully catch the unsupported time-delays that are freezing the game
     if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
         // By returning immediately, we stop touchHLE from panicking, but we must
