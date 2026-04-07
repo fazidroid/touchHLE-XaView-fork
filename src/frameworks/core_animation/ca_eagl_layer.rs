@@ -52,20 +52,25 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
     let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
     // Assumes the windows in the list are ordered back-to-front.
     // TODO: this may not be correct once we support windowLevel.
-    let Some(top_window) = windows
+    let mut top_window = windows
         .into_iter()
         .rev()
         .find(|&window| !msg![env; window isHidden])
-    else {
-        return nil;
-    };
+        .unwrap_or(nil);
 
-    // RemoveUnusedBounds
+    // FallbackToHackWindow
+    let hack_bits = *crate::libc::stdlib::HACK_MAIN_WINDOW.lock().unwrap();
+    if top_window == nil && hack_bits != 0 {
+        top_window = crate::mem::Ptr::from_bits(hack_bits);
+    }
+
+    if top_window == nil {
+        return nil;
+    }
+
+    // RevertToLoop
     let mut layer: id = msg![env; top_window layer];
 
-    // Descend through the hierarchy, looking only at the last layer in each
-    // list of children, since that should be the one on top.
-    // TODO: this is not correct once we support zPosition.
     loop {
         assert!(layer != nil);
 
@@ -84,9 +89,11 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
     }
 
     // IgnoreOpaqueFlag
-
     let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
-    if !msg![env; layer isKindOfClass:ca_eagl_layer_class] {
+    let is_eagl: bool = msg![env; layer isKindOfClass:ca_eagl_layer_class];
+    let host: &CALayerHostObject = env.objc.borrow(layer);
+    
+    if !is_eagl && host.presented_pixels.is_none() {
         return nil;
     }
 
