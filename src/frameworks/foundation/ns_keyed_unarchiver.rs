@@ -7,12 +7,8 @@
 
 use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::dyld::{ConstantExports, HostConstant};
-use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::{NSInteger, NSUInteger};
-use crate::frameworks::uikit::ui_geometry::{
-    CGPointFromString, CGRectFromString, CGSizeFromString,
-};
-use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr};
+use crate::mem::{ConstVoidPtr, GuestUSize, MutVoidPtr}; 
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
@@ -56,24 +52,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)unarchiveObjectWithFile:(id)path {
     let data: id = msg_class![env; NSData dataWithContentsOfFile:path];
-    if data == nil {
-        return nil;
-    }
+    if data == nil { return nil; }
     msg![env; this unarchiveObjectWithData:data]
 }
 
 + (id)unarchiveObjectWithData:(id)data {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initForReadingWithData:data];
+    if new == nil { return nil; }
     let root_key = get_static_str(env, NSKeyedArchiveRootObjectKey);
     let result: id = msg![env; new decodeObjectForKey:root_key];
     autorelease(env, result)
 }
 
 - (id)initForReadingWithData:(id)data {
-    if data == nil {
-        return nil;
-    }
+    if data == nil { return nil; }
 
     let length: NSUInteger = msg![env; data length];
     let bytes: ConstVoidPtr = msg![env; data bytes];
@@ -82,12 +75,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_obj = env.objc.borrow_mut::<NSKeyedUnarchiverHostObject>(this);
     if let Ok(plist_val) = Value::from_reader(Cursor::new(slice)) {
         if let Some(dict) = plist_val.into_dictionary() {
-            let key_count = dict["$objects"].as_array().map(|a| a.len()).unwrap_or(0);
+            let key_count = dict.get("$objects").and_then(|o| o.as_array()).map(|a| a.len()).unwrap_or(0);
             host_obj.already_unarchived = vec![None; key_count];
             host_obj.plist = dict;
         }
     }
-
     this
 }
 
@@ -106,7 +98,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (bool)decodeBoolForKey:(id)key {
     get_value_to_decode_for_key(env, this, key)
-        .is_some_and(|value| value.as_boolean().unwrap_or(false))
+        .map_or(false, |value| value.as_boolean().unwrap_or(false))
 }
 
 - (f64)decodeDoubleForKey:(id)key {
@@ -126,32 +118,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)decodeObjectForKey:(id)key {
-    let Some(next_uid) = get_value_to_decode_for_key(env, this, key).and_then(|v| v.as_uid().copied()) else {
-        return nil;
-    };
-    let object = unarchive_key(env, this, next_uid);
-    retain(env, object);
-    autorelease(env, object)
-}
-
-- (ConstPtr<u8>)decodeBytesForKey:(id)key returnedLength:(MutPtr<NSUInteger>)length {
-    assert!(key != nil);
-    let Some(data) = get_value_to_decode_for_key(env, this, key)
-        .and_then(|value| value.as_data())
-        .map(|data| data.to_vec()) else {
-            env.mem.write(length, 0);
-            return ConstPtr::null();
-    };
-    let len: GuestUSize = data.len().try_into().unwrap();
-    let guest_bytes: MutVoidPtr = env.mem.alloc(len);
-    env.objc.borrow_mut::<NSKeyedUnarchiverHostObject>(this)
-        .temporary_buffers
-        .push(guest_bytes);
-    env.mem
-        .bytes_at_mut(guest_bytes.cast(), len)
-        .copy_from_slice(data.as_slice());
-    env.mem.write(length, len);
-    guest_bytes.cast().cast_const()
+    let val_opt = get_value_to_decode_for_key(env, this, key).and_then(|v| v.as_uid().copied());
+    if let Some(next_uid) = val_opt {
+        let object = unarchive_key(env, this, next_uid);
+        retain(env, object);
+        return autorelease(env, object);
+    }
+    nil
 }
 
 @end
@@ -164,48 +137,48 @@ fn borrow_host_obj(env: &mut Environment, unarchiver: id) -> &mut NSKeyedUnarchi
 
 fn get_value_to_decode_for_key(env: &mut Environment, unarchiver: id, key: id) -> Option<&Value> {
     let key_str = to_rust_string(env, key);
-    let host_obj = borrow_host_obj(env, unarchiver);
+    let host_obj = env.objc.borrow_mut::<NSKeyedUnarchiverHostObject>(unarchiver);
     let scope = match host_obj.current_key {
-        Some(current_uid) => &host_obj.plist["$objects"].as_array().unwrap()[current_uid.get() as usize],
+        Some(uid) => &host_obj.plist["$objects"].as_array().unwrap()[uid.get() as usize],
         None => &host_obj.plist["$top"],
     }.as_dictionary()?;
     scope.get(&*key_str)
 }
 
 fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
-    let host_obj = borrow_host_obj(env, unarchiver);
-    if let Some(existing) = host_obj.already_unarchived[key.get() as usize] {
+    if let Some(existing) = borrow_host_obj(env, unarchiver).already_unarchived[key.get() as usize] {
         return existing;
     }
-    let objects = host_obj.plist["$objects"].as_array().unwrap();
-    let item = &objects[key.get() as usize];
+
+    let item = borrow_host_obj(env, unarchiver).plist["$objects"].as_array().unwrap()[key.get() as usize].clone();
+
     let new_object = match item {
         Value::Dictionary(dict) => {
             let class_key = dict["$class"].as_uid().copied().unwrap();
-            let class = if let Some(existing) = host_obj.already_unarchived[class_key.get() as usize] {
+            let class = if let Some(existing) = borrow_host_obj(env, unarchiver).already_unarchived[class_key.get() as usize] {
                 existing
             } else {
-                let class_name = objects[class_key.get() as usize].as_dictionary().unwrap()["$classname"].as_string().unwrap().to_string();
+                let class_name = borrow_host_obj(env, unarchiver).plist["$objects"].as_array().unwrap()[class_key.get() as usize]
+                    .as_dictionary().unwrap()["$classname"].as_string().unwrap().to_string();
                 let cls = env.objc.get_known_class(&class_name, &mut env.mem);
                 borrow_host_obj(env, unarchiver).already_unarchived[class_key.get() as usize] = Some(cls);
                 cls
             };
-            let old_current_key = borrow_host_obj(env, unarchiver).current_key;
+
+            let old_key = borrow_host_obj(env, unarchiver).current_key;
             borrow_host_obj(env, unarchiver).current_key = Some(key);
             let new_obj: id = msg![env; class alloc];
             let new_obj: id = msg![env; new_obj initWithCoder:unarchiver];
-            borrow_host_obj(env, unarchiver).current_key = old_current_key;
+            borrow_host_obj(env, unarchiver).current_key = old_key;
             new_obj
         }
         Value::String(s) => from_rust_string(env, s.to_string()),
         Value::Integer(int) => {
             let num: id = msg_class![env; NSNumber alloc];
-            if let Some(i) = int.as_signed() { 
-                msg![env; num initWithLongLong:i] 
-            } else { 
-                // FIXED: Extract value first to avoid macro syntax error
-                let u_val = int.as_unsigned().unwrap_or(0);
-                msg![env; num initWithUnsignedLongLong:u_val] 
+            if let Some(i) = int.as_signed() { msg![env; num initWithLongLong:i] }
+            else { 
+                let u = int.as_unsigned().unwrap_or(0);
+                msg![env; num initWithUnsignedLongLong:u] 
             }
         }
         _ => nil,
@@ -214,9 +187,33 @@ fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
     new_object
 }
 
+// FIXED: Added missing functions required by ns_array.rs
+pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
+    let keys = keys_for_key(env, unarchiver, "NS.objects");
+    keys.into_iter()
+        .map(|k| {
+            // Separated to resolve double-mutable borrow
+            let obj = unarchive_key(env, unarchiver, k);
+            retain(env, obj)
+        })
+        .collect()
+}
+
+pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id)> {
+    let ks = keys_for_key(env, unarchiver, "NS.keys");
+    let vs = keys_for_key(env, unarchiver, "NS.objects");
+    ks.into_iter()
+        .zip(vs)
+        .map(|(k, v)| {
+            (unarchive_key(env, unarchiver, k), unarchive_key(env, unarchiver, v))
+        })
+        .collect()
+}
+
 pub fn decode_current_date(env: &mut Environment, unarchiver: id) -> id {
-    let key = get_static_str(env, "NS.time");
-    if let Some(val) = get_value_to_decode_for_key(env, unarchiver, key).and_then(|v| v.as_real()) {
+    let k = get_static_str(env, "NS.time");
+    let val_opt = get_value_to_decode_for_key(env, unarchiver, k).and_then(|v| v.as_real());
+    if let Some(val) = val_opt {
         let date: id = msg_class![env; NSDate alloc];
         return msg![env; date initWithTimeIntervalSinceReferenceDate:val];
     }
@@ -224,25 +221,24 @@ pub fn decode_current_date(env: &mut Environment, unarchiver: id) -> id {
 }
 
 pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bool) -> id {
-    let key = get_static_str(env, "NS.data");
-    if let Some(bytes_val) = get_value_to_decode_for_key(env, unarchiver, key).and_then(|v| v.as_data()) {
-        let len: GuestUSize = bytes_val.len() as GuestUSize;
-        let guest_bytes = env.mem.alloc(len);
-        env.mem.bytes_at_mut(guest_bytes.cast(), len).copy_from_slice(bytes_val);
-        
-        let cls = if is_mutable { "NSMutableData" } else { "NSData" };
-        let data_class: id = env.objc.get_known_class(cls, &mut env.mem);
-        let data_instance: id = msg![env; data_class alloc];
-        return msg![env; data_instance initWithBytesNoCopy:guest_bytes length:len freeWhenDone:true];
+    let k = get_static_str(env, "NS.data");
+    let bytes_vec = get_value_to_decode_for_key(env, unarchiver, k).and_then(|v| v.as_data().map(|d| d.to_vec()));
+    if let Some(bytes) = bytes_vec {
+        let len: GuestUSize = bytes.len() as GuestUSize;
+        let g_bytes = env.mem.alloc(len);
+        env.mem.bytes_at_mut(g_bytes.cast(), len).copy_from_slice(&bytes);
+        let cls_name = if is_mutable { "NSMutableData" } else { "NSData" };
+        let cls = env.objc.get_known_class(cls_name, &mut env.mem);
+        let data: id = msg![env; cls alloc];
+        return msg![env; data initWithBytesNoCopy:g_bytes length:len freeWhenDone:true];
     }
     nil
 }
 
 fn keys_for_key(env: &mut Environment, unarchiver: id, key: &str) -> Vec<Uid> {
     let host_obj = borrow_host_obj(env, unarchiver);
-    let objects = host_obj.plist["$objects"].as_array().unwrap();
-    if let Some(current_uid) = host_obj.current_key {
-        if let Some(dict) = objects[current_uid.get() as usize].as_dictionary() {
+    if let Some(curr) = host_obj.current_key {
+        if let Some(dict) = host_obj.plist["$objects"].as_array().unwrap()[curr.get() as usize].as_dictionary() {
             if let Some(Value::Array(keys)) = dict.get(key) {
                 return keys.iter().filter_map(|v| v.as_uid().copied()).collect();
             }
