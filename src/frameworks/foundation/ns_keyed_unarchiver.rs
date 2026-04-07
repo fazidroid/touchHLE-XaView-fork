@@ -7,11 +7,7 @@
 
 use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::dyld::{ConstantExports, HostConstant};
-use crate::frameworks::core_graphics::{CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::{NSInteger, NSUInteger};
-use crate::frameworks::uikit::ui_geometry::{
-    CGPointFromString, CGRectFromString, CGSizeFromString,
-};
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr};
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
@@ -81,12 +77,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     let slice = env.mem.bytes_at(bytes.cast(), length);
 
     let host_obj = env.objc.borrow_mut::<NSKeyedUnarchiverHostObject>(this);
-    let plist = Value::from_reader(Cursor::new(slice)).unwrap();
-    let plist = plist.into_dictionary().unwrap();
-    
-    let key_count = plist["$objects"].as_array().unwrap().len();
-    host_obj.already_unarchived = vec![None; key_count];
-    host_obj.plist = plist;
+    if let Ok(plist_val) = Value::from_reader(Cursor::new(slice)) {
+        if let Some(dict) = plist_val.into_dictionary() {
+            let key_count = dict["$objects"].as_array().map(|a| a.len()).unwrap_or(0);
+            host_obj.already_unarchived = vec![None; key_count];
+            host_obj.plist = dict;
+        }
+    }
 
     this
 }
@@ -134,6 +131,26 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, object)
 }
 
+- (ConstPtr<u8>)decodeBytesForKey:(id)key returnedLength:(MutPtr<NSUInteger>)length {
+    assert!(key != nil);
+    let Some(data) = get_value_to_decode_for_key(env, this, key)
+        .and_then(|value| value.as_data())
+        .map(|data| data.to_vec()) else {
+            env.mem.write(length, 0);
+            return ConstPtr::null();
+    };
+    let len: GuestUSize = data.len().try_into().unwrap();
+    let guest_bytes: MutVoidPtr = env.mem.alloc(len);
+    env.objc.borrow_mut::<NSKeyedUnarchiverHostObject>(this)
+        .temporary_buffers
+        .push(guest_bytes);
+    env.mem
+        .bytes_at_mut(guest_bytes.cast(), len)
+        .copy_from_slice(data.as_slice());
+    env.mem.write(length, len);
+    guest_bytes.cast().cast_const()
+}
+
 @end
 
 };
@@ -143,13 +160,13 @@ fn borrow_host_obj(env: &mut Environment, unarchiver: id) -> &mut NSKeyedUnarchi
 }
 
 fn get_value_to_decode_for_key(env: &mut Environment, unarchiver: id, key: id) -> Option<&Value> {
-    let key = to_rust_string(env, key);
+    let key_str = to_rust_string(env, key);
     let host_obj = borrow_host_obj(env, unarchiver);
     let scope = match host_obj.current_key {
         Some(current_uid) => &host_obj.plist["$objects"].as_array().unwrap()[current_uid.get() as usize],
         None => &host_obj.plist["$top"],
     }.as_dictionary()?;
-    scope.get(&key)
+    scope.get(&*key_str)
 }
 
 fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
@@ -183,8 +200,7 @@ fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
             if let Some(i) = int.as_signed() { 
                 msg![env; num initWithLongLong:i] 
             } else { 
-                // FIXED: Extract value to avoid '.' error in msg! macro
-                let u_val = int.as_unsigned().unwrap();
+                let u_val = int.as_unsigned().unwrap_or(0);
                 msg![env; num initWithUnsignedLongLong:u_val] 
             }
         }
@@ -205,10 +221,10 @@ pub fn decode_current_date(env: &mut Environment, unarchiver: id) -> id {
 
 pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bool) -> id {
     let key = get_static_str(env, "NS.data");
-    if let Some(bytes) = get_value_to_decode_for_key(env, unarchiver, key).and_then(|v| v.as_data()) {
-        let len: GuestUSize = bytes.len() as GuestUSize;
+    if let Some(bytes_val) = get_value_to_decode_for_key(env, unarchiver, key).and_then(|v| v.as_data()) {
+        let len: GuestUSize = bytes_val.len() as GuestUSize;
         let guest_bytes = env.mem.alloc(len);
-        env.mem.bytes_at_mut(guest_bytes.cast(), len).copy_from_slice(bytes);
+        env.mem.bytes_at_mut(guest_bytes.cast(), len).copy_from_slice(bytes_val);
         
         let cls = if is_mutable { "NSMutableData" } else { "NSData" };
         let data_class: id = env.objc.get_known_class(cls, &mut env.mem);
@@ -216,24 +232,6 @@ pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bo
         return msg![env; data_instance initWithBytesNoCopy:guest_bytes length:len freeWhenDone:true];
     }
     nil
-}
-
-pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
-    let keys = keys_for_key(env, unarchiver, "NS.objects");
-    keys.into_iter()
-        .map(|key| {
-            let new_object = unarchive_key(env, unarchiver, key);
-            retain(env, new_object)
-        })
-        .collect()
-}
-
-pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id)> {
-    let keys = keys_for_key(env, unarchiver, "NS.keys");
-    let vals = keys_for_key(env, unarchiver, "NS.objects");
-    let keys: Vec<id> = keys.into_iter().map(|key| unarchive_key(env, unarchiver, key)).collect();
-    let vals: Vec<id> = vals.into_iter().map(|val| unarchive_key(env, unarchiver, val)).collect();
-    keys.into_iter().zip(vals).collect()
 }
 
 fn keys_for_key(env: &mut Environment, unarchiver: id, key: &str) -> Vec<Uid> {
