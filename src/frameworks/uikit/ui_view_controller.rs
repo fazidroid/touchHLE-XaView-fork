@@ -136,6 +136,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         size: crate::frameworks::core_graphics::CGSize { width: 1024.0, height: 768.0 },
     };
     let view: id = msg![env; view_alloc initWithFrame:bounds];
+    let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
+    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
     // Docs are saying that "an empty UIView" is created,
     // but testing reveals that frame matches the screen one
     // (at least on the simulator)
