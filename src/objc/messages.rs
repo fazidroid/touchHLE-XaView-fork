@@ -124,9 +124,17 @@ fn objc_msgSend_inner(
                     let sel_view = env.objc.lookup_selector("view").unwrap();
                     let view: id = crate::objc::msg_send_no_type_checking(env, (vc, sel_view));
                     if view != nil {
-                        // FixViewFrame
                         let sel_bounds = env.objc.lookup_selector("bounds").unwrap();
-                        let window_bounds: crate::frameworks::core_graphics::CGRect = crate::objc::msg_send_no_type_checking(env, (receiver, sel_bounds));
+                        let mut window_bounds: crate::frameworks::core_graphics::CGRect = crate::objc::msg_send_no_type_checking(env, (receiver, sel_bounds));
+                        
+                        // FixZeroFrame
+                        if window_bounds.size.width == 0.0 || window_bounds.size.height == 0.0 {
+                            window_bounds.size.width = 1024.0;
+                            window_bounds.size.height = 768.0;
+                            let sel_set_frame = env.objc.lookup_selector("setFrame:").unwrap();
+                            let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_set_frame, window_bounds));
+                        }
+                        
                         let sel_set_frame = env.objc.lookup_selector("setFrame:").unwrap();
                         let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_set_frame, window_bounds));
                         
