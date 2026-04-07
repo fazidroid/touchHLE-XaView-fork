@@ -17,6 +17,13 @@ use crate::mem::{ConstPtr, MutVoidPtr, SafeRead};
 use crate::Environment;
 use std::any::TypeId;
 
+enum ClassType {
+    Real { superclass: Class, imp: Option<IMP>, name: String },
+    Unimplemented { name: String, is_metaclass: bool },
+    Fake { name: String, is_metaclass: bool },
+    Unknown,
+}
+
 #[allow(non_snake_case)]
 fn objc_msgSend_inner(
     env: &mut Environment,
@@ -34,15 +41,15 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== GAMELOFT GLOBAL TIMER HACK =====
-    // If the background thread asks to sleep, just ignore it and return immediately.
-    // This entirely bypasses the `Duration` float panics inside `ns_thread.rs` globally!
-    if sel_str == "sleepForTimeInterval:" {
-        log!("🛡️ ANTI-PANIC SHIELD: Bypassing sleepForTimeInterval: to prevent NaN crash!");
-        env.cpu.regs_mut()[0..2].fill(0);
+    // ===== GAMELOFT UDID BYPASS =====
+    if sel_str == "uniqueIdentifier" {
+        log!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier] to fix udid=(null) loops!");
+        let fake_udid = crate::frameworks::foundation::ns_string::from_rust_string(
+            env, "1234567890abcdef1234567890abcdef12345678".to_string()
+        );
+        env.cpu.regs_mut()[0] = fake_udid.to_bits();
         return;
     }
-    // ============================================
 
     // ===== URL Tracker & Telemetry Bypasses =====
     if sel_str == "HTTPMethod" || sel_str == "host" {
@@ -59,7 +66,6 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
-    // ============================================
 
     // SAFE: only crash-prone selectors
     if sel_str.is_empty() {
@@ -101,19 +107,25 @@ fn objc_msgSend_inner(
         if class == nil {
             assert!(class != orig_class);
 
-            let class_host_object = match env.objc.get_host_object(orig_class) {
-                Some(obj) => obj,
-                None => {
-                    env.cpu.regs_mut()[0..2].fill(0);
-                    return;
+            let (name, is_metaclass) = {
+                let class_host_object = match env.objc.get_host_object(orig_class) {
+                    Some(obj) => obj,
+                    None => {
+                        env.cpu.regs_mut()[0..2].fill(0);
+                        return;
+                    }
+                };
+                if let Some(obj) = class_host_object.as_any().downcast_ref::<super::ClassHostObject>() {
+                    (obj.name.clone(), obj.is_metaclass)
+                } else if let Some(obj) = class_host_object.as_any().downcast_ref::<super::UnimplementedClass>() {
+                    (obj.name.clone(), obj.is_metaclass)
+                } else if let Some(obj) = class_host_object.as_any().downcast_ref::<super::FakeClass>() {
+                    (obj.name.clone(), obj.is_metaclass)
+                } else {
+                    (String::from("Unknown"), false)
                 }
             };
-            let &super::ClassHostObject {
-                ref name,
-                is_metaclass,
-                ..
-            } = class_host_object.as_any().downcast_ref().unwrap();
-            // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
+
             log!(
                 "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
                 if is_metaclass { "Class" } else { "Object" },
@@ -126,190 +138,152 @@ fn objc_msgSend_inner(
             );
             
             if sel_str == "self" {
-                env.cpu.regs_mut()[0] = receiver.to_bits();
-// Return self
+                env.cpu.regs_mut()[0] = receiver.to_bits(); // Return self
             } else {
-                env.cpu.regs_mut()[0..2].fill(0);
-// Return nil/0
+                env.cpu.regs_mut()[0..2].fill(0); // Return nil/0
             }
             return;
         }
 
-        let host_object = match env.objc.get_host_object(class) {
-            Some(obj) => obj,
-            None => {
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
-        };
-        if let Some(&super::ClassHostObject {
-            superclass,
-            ref methods,
-            ref name,
-            ..
-        }) = host_object.as_any().downcast_ref()
-        {
-            
-            // ===== GAMELOFT VIDEO HANG BYPASS =====
-            if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
-                if selector.as_str(&env.mem) == "play" || selector.as_str(&env.mem) == "stop" {
-                    log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
-                    let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
-                    if center_class != nil {
-                        let center: id = msg![env; center_class defaultCenter];
-                        let notif_name = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                        let _: () = msg![env; center postNotificationName:notif_name object:receiver];
-                    }
+        // STEP 1: Look up class info & extract IMP safely (This isolates the immutable borrow of `env.objc`)
+        let class_info = {
+            let host_object = match env.objc.get_host_object(class) {
+                Some(obj) => obj,
+                None => {
                     env.cpu.regs_mut()[0..2].fill(0);
                     return;
                 }
-            }
+            };
 
-            // ===== GAMELOFT VIDEO HANG BYPASS =====
-            if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
-                if selector.as_str(&env.mem) == "play" || selector.as_str(&env.mem) == "stop" {
-                    log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
-                    let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
-                    if center_class != nil {
-                        let center: id = msg![env; center_class defaultCenter];
+            if let Some(&super::ClassHostObject { superclass, ref methods, ref name, .. }) = host_object.as_any().downcast_ref() {
+                ClassType::Real {
+                    superclass,
+                    imp: methods.get(&selector).copied(), // Copy the pointer so we can drop the borrow
+                    name: name.clone(),
+                }
+            } else if let Some(&super::UnimplementedClass { ref name, is_metaclass }) = host_object.as_any().downcast_ref() {
+                ClassType::Unimplemented { name: name.clone(), is_metaclass }
+            } else if let Some(&super::FakeClass { ref name, is_metaclass }) = host_object.as_any().downcast_ref() {
+                ClassType::Fake { name: name.clone(), is_metaclass }
+            } else {
+                ClassType::Unknown
+            }
+        }; // <-- The borrow is DROPPED here. It is now safe to mutate `env`.
+
+        // STEP 2: Act on the retrieved information
+        match class_info {
+            ClassType::Real { superclass, imp, name } => {
+                
+                // ===== GAMELOFT VIDEO HANG BYPASS =====
+                if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
+                    if selector.as_str(&env.mem) == "play" || selector.as_str(&env.mem) == "stop" {
+                        log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
                         
-                        // Tell the game the video state changed
-                        let notif1 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackStateDidChangeNotification".to_string());
-                        let _: () = msg![env; center postNotificationName:notif1 object:receiver];
-                        
-                        // Tell the game the video finished playing
-                        let notif2 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                        let _: () = msg![env; center postNotificationName:notif2 object:receiver];
+                        let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
+                        if center_class != nil {
+                            let center: id = msg![env; center_class defaultCenter];
+                            
+                            let notif1 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackStateDidChangeNotification".to_string());
+                            let _: () = msg![env; center postNotificationName:notif1 object:receiver];
+                            
+                            let notif2 = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+                            let _: () = msg![env; center postNotificationName:notif2 object:receiver];
+                        }
+                        env.cpu.regs_mut()[0..2].fill(0);
+                        return;
                     }
+                }
+
+                // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
+                if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
+                    log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
+                    
+                    if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
+                        let delegate: id = msg![env; receiver delegate];
+                        if delegate != nil {
+                            if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
+                                let zero: i32 = 0;
+                                let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
+                            }
+                            if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
+                                let zero: i32 = 0;
+                                let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
+                            }
+                        }
+                    }
+                    
+                    if env.objc.object_has_method_named(&env.mem, receiver, "setHidden:") {
+                        let _: () = msg![env; receiver setHidden:true];
+                    }
+                    if env.objc.object_has_method_named(&env.mem, receiver, "setUserInteractionEnabled:") {
+                        let _: () = msg![env; receiver setUserInteractionEnabled:false];
+                    }
+                    if env.objc.object_has_method_named(&env.mem, receiver, "removeFromSuperview") {
+                        let _: () = msg![env; receiver removeFromSuperview];
+                    }
+                    
                     env.cpu.regs_mut()[0..2].fill(0);
                     return;
                 }
-            }
 
-            // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
-            if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
-                log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
-                if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
-                    let delegate: id = msg![env; receiver delegate];
-                    if delegate != nil {
-                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
-                            let zero: i32 = 0;
-                            let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
-                        }
-                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
-                            let zero: i32 = 0;
-                            let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
-                        }
-                    }
+                // Skip method lookup on first iteration if this is the super-call
+                if super2.is_some() && class == orig_class {
+                    class = superclass;
+                    continue;
                 }
-                
-                if env.objc.object_has_method_named(&env.mem, receiver, "setHidden:") {
-                    let _: () = msg![env; receiver setHidden:true];
-                }
-                if env.objc.object_has_method_named(&env.mem, receiver, "setUserInteractionEnabled:") {
-                    let _: () = msg![env; receiver setUserInteractionEnabled:false];
-                }
-                if env.objc.object_has_method_named(&env.mem, receiver, "removeFromSuperview") {
-                    let _: () = msg![env; receiver removeFromSuperview];
-                }
-                
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
 
-            // Skip method lookup on first iteration if this is the super-call
-            // variant of objc_msgSend (look up the superclass first)
-            if super2.is_some() && class == orig_class {
-                class = superclass;
-                continue;
-            }
-
-            if let Some(imp) = methods.get(&selector) {
-                log_dbg!("Found method on: {}", name);
-                match imp {
-                    IMP::Host(host_imp) => {
-                        if let Some((sent_type_id, sent_type_desc)) = message_type_info {
-                            let (expected_type_id, expected_type_desc) = host_imp.type_info();
-                            if sent_type_id != expected_type_id {
-                                let msg = format!(
-                                    "Type mismatch when sending message {} to {:?}!\n- Message has type: {:?} / {}\n- Method expects type: {:?} / {}",
-                                    selector.as_str(&env.mem), receiver, sent_type_id, sent_type_desc, expected_type_id, expected_type_desc
-                                );
-                                if tolerate_type_mismatch {
-                                    log!("Warning: {}", msg);
-                                } else {
-                                    // GAMELOFT HACK: Prevent type mismatch panics!
-                                    log!("🛡️ ANTI-PANIC SHIELD: Bypassing type mismatch panic! {}", msg);
-                                    env.cpu.regs_mut()[0..2].fill(0);
-                                    return;
+                if let Some(imp) = imp {
+                    log_dbg!("Found method on: {}", name);
+                    match imp {
+                        IMP::Host(host_imp) => {
+                            if let Some((sent_type_id, sent_type_desc)) = message_type_info {
+                                let (expected_type_id, expected_type_desc) = host_imp.type_info();
+                                if sent_type_id != expected_type_id {
+                                    let msg = format!(
+                                        "Type mismatch when sending message {} to {:?}!\n- Message has type: {:?} / {}\n- Method expects type: {:?} / {}",
+                                        selector.as_str(&env.mem), receiver, sent_type_id, sent_type_desc, expected_type_id, expected_type_desc
+                                    );
+                                    if tolerate_type_mismatch {
+                                        log!("Warning: {}", msg);
+                                    } else {
+                                        panic!("{}", msg);
+                                    }
                                 }
                             }
+                            // SAFE: env is no longer borrowed immutably, so this mutable call works natively!
+                            host_imp.call_from_guest(env)
                         }
-                        
-                        // ===== THE ULTIMATE GLOBAL PANIC SHIELD =====
-                        // Instead of running the host method normally and letting a Float NaN panic 
-                        // kill the emulator, we run it inside a protected sandbox (catch_unwind).
-                        let env_ptr = env as *mut Environment;
-                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            unsafe { host_imp.call_from_guest(&mut *env_ptr) }
-                        }));
-
-                                                if result.is_err() {
-                            unsafe {
-                                log!(
-                                    "🛡️ ANTI-PANIC SHIELD ACTIVATED 🛡️\nIntercepted fatal Rust panic in method '{}'! Forcing a nil return instead of crashing.",
-                                    selector.as_str(&(*env_ptr).mem)
-                                );
-                                (*env_ptr).cpu.regs_mut()[0..2].fill(0);
-                            }
-                        }
-
-                        // ============================================
+                        IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
                     }
-                    IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
+                    return;
+                } else {
+                    class = superclass;
                 }
-                return;
-            } else {
-                class = superclass;
             }
-        } else if let Some(&super::UnimplementedClass {
-            ref name,
-            is_metaclass,
-        }) = host_object.as_any().downcast_ref()
-        {
-            // ===== THE NUCLEAR OPTION: GLOBAL CLASS PANIC BYPASS =====
-            log!(
-                "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
-                name,
-                class,
-                if is_metaclass { "class" } else { "instance" },
-                selector.as_str(&env.mem),
-            );
-            env.cpu.regs_mut()[0..2].fill(0);
-            return;
-
-        } else if let Some(&super::FakeClass {
-            ref name,
-            is_metaclass,
-        }) = host_object.as_any().downcast_ref()
-        {
-            log!(
-                "Call to faked class \"{}\" ({:?}) {} method \"{}\". Behaving as if message was sent to nil.",
-                name,
-                class,
-                if is_metaclass { "class" } else { "instance" },
-                selector.as_str(&env.mem),
-            );
-            env.cpu.regs_mut()[0..2].fill(0);
-            return;
-        } else {
-            // FIXED: SAFE BYPASS FOR EA GAMES
-            log!(
-                "SAFE BYPASS: Item {:?} in superclass chain of object {:?}'s class {:?} has an unexpected host object type. Returning 0 to prevent crash.",
-                class, receiver, orig_class
-            );
-            env.cpu.regs_mut()[0..2].fill(0);
-            return;
+            ClassType::Unimplemented { name, is_metaclass } => {
+                log!(
+                    "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
+                    name, class, if is_metaclass { "class" } else { "instance" }, selector.as_str(&env.mem),
+                );
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            ClassType::Fake { name, is_metaclass } => {
+                log!(
+                    "Call to faked class \"{}\" ({:?}) {} method \"{}\". Behaving as if message was sent to nil.",
+                    name, class, if is_metaclass { "class" } else { "instance" }, selector.as_str(&env.mem),
+                );
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            ClassType::Unknown => {
+                log!(
+                    "SAFE BYPASS: Item {:?} in superclass chain of object {:?}'s class {:?} has an unexpected host object type. Returning 0 to prevent crash.",
+                    class, receiver, orig_class
+                );
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
         }
     }
 }
