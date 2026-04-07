@@ -34,6 +34,12 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = 1; // 1 = true
         return;
     }
+    if sel_str == "systemVersion" {
+        // Use 6.0 to ensure EA MTX features don't block boot
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "6.0".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
 
     // 3. Return a dummy object for the Storefront controller if it asks for a singleton
     if sel_str == "sharedController" || sel_str == "defaultQueue" {
