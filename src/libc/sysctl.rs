@@ -15,7 +15,6 @@ fn sysctl(
     for i in 0..namelen as u32 {
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
-    log!("GAMELOFT/EA BYPASS: sysctl called for mib {:?}, faking success", mib);
     0 
 }
 
@@ -30,9 +29,7 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
-    // GLES 2.0 ENABLER: Force games to think this is an iPhone 4S
     if name_str == "hw.machine" {
-        log!("GAMELOFT/EA BYPASS: Forcing hw.machine to iPhone4,1");
         let hw = b"iPhone4,1\0";
         if !oldlenp.is_null() {
             if oldp.is_null() {
@@ -47,18 +44,14 @@ fn sysctlbyname(
         return 0;
     }
 
-    // NEW: Spoof capability check for MTX/Storefront (Fixes CheckMTXController crash)
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
-        log!("EA BYPASS: Spoofing {} capability as enabled (1)", name_str);
         if !oldp.is_null() && !oldlenp.is_null() {
-            // Write 1 (enabled) as a 4-byte integer
             env.mem.write::<i32>(oldp.cast(), 1);
             env.mem.write::<u32>(oldlenp, 4);
         }
         return 0;
     }
 
-    log!("GAMELOFT/EA BYPASS: sysctlbyname '{}', faking hardware success", name_str);
     0
 }
 
@@ -72,12 +65,11 @@ fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _c
     if info.is_null() { crate::mem::Ptr::from_bits(1) } else { info }
 }
 
-// ==== FILE I/O INFINITE LOOP BYPASS ====
+// ==== FILE I/O BYPASS ====
 fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { -1 }
 fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 
-// ==== EA GAME ENGINE ASSERTION REVEALER ====
 fn __assert_rtn(
     env: &mut Environment,
     func: ConstPtr<u8>,
@@ -88,8 +80,22 @@ fn __assert_rtn(
     let func_str = if func.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(func)) };
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
-    
     panic!("\n\nEA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\n\n", file_str, line, func_str, expr_str);
+}
+
+// ==== NEW: OBJECTIVE-C RUNTIME FIXES (Fixes MTX Crash) ====
+fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
+    if obj.is_null() {
+        return crate::mem::Ptr::null();
+    }
+    // In Objective-C, the first 4 bytes of the object struct contain the 'isa' (Class) pointer.
+    let isa = env.mem.read::<u32, false>(obj.cast());
+    crate::mem::Ptr::from_bits(isa)
+}
+
+fn class_getProperty(_env: &mut Environment, _cls: ConstVoidPtr, _name: ConstVoidPtr) -> ConstVoidPtr {
+    // Return NULL to safely indicate the property wasn't found (prevents crash)
+    crate::mem::Ptr::null()
 }
 
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
@@ -108,4 +114,8 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(funlockfile(_)),
     
     export_c_func!(__assert_rtn(_, _, _, _)),
+    
+    // Export the new runtime functions globally
+    export_c_func!(object_getClass(_, _)),
+    export_c_func!(class_getProperty(_, _, _)),
 ];
