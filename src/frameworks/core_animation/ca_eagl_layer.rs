@@ -60,37 +60,29 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         return nil;
     };
 
-    // RemoveUnusedBounds
-    let mut layer: id = msg![env; top_window layer];
-
-    // Descend through the hierarchy, looking only at the last layer in each
-    // list of children, since that should be the one on top.
-    // TODO: this is not correct once we support zPosition.
-    loop {
-        assert!(layer != nil);
-
-        let layer_host_obj: &CALayerHostObject = env.objc.borrow(layer);
-
-        // BypassStrictBounds
-        if layer_host_obj.hidden || layer_host_obj.opacity == 0.0 {
-            return nil;
-        }
-
-        if let Some(&next) = layer_host_obj.sublayers.last() {
-            layer = next;
-        } else {
-            break;
-        }
-    }
-
-    // IgnoreOpaqueFlag
-
+    // SearchAllEAGLLayers
+    let root_layer: id = msg![env; top_window layer];
     let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
-    if !msg![env; layer isKindOfClass:ca_eagl_layer_class] {
-        return nil;
+    
+    let mut stack = vec![root_layer];
+    let mut found_layer = nil;
+    
+    while let Some(current) = stack.pop() {
+        if current == nil { continue; }
+        if msg![env; current isKindOfClass:ca_eagl_layer_class] {
+            let host: &CALayerHostObject = env.objc.borrow(current);
+            if !host.hidden && host.opacity > 0.0 {
+                found_layer = current;
+                break;
+            }
+        }
+        let host: &CALayerHostObject = env.objc.borrow(current);
+        for &sub in host.sublayers.iter() {
+            stack.push(sub);
+        }
     }
-
-    layer
+    
+    found_layer
 }
 
 /// For use by `EAGLContext` when presenting to a `CAEAGLLayer`:
