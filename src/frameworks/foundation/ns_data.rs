@@ -112,12 +112,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     let absolute_string: id = msg![env; url absoluteString];
     let url_str = crate::frameworks::foundation::ns_string::to_rust_string(env, absolute_string);
 
+    // COMPILE-SAFE EXCLUSIVE HACK: Check the URL string directly instead of the env structs!
+    let is_asphalt6_drm = url_str.to_lowercase().contains("gameloft") 
+                       || url_str.contains("127.0.0.1") 
+                       || url_str.contains("localhost");
+
     if url_str.starts_with("file://") {
         let path: id = msg![env; url path];
         msg![env; this initWithContentsOfFile:path]
-    } else if env.app_bundle_id == "com.gameloft.Asphalt6ipad" || env.app_bundle_id == "com.gameloft.Asphalt6" {
-        // EXCLUSIVE HACK: Only Asphalt 6 gets the fake "1\nOK\n" response to pass DRM.
-        log!("🛡️ EXCLUSIVE BYPASS: Faking HTTP response for Asphalt 6 URL: {}", url_str);
+    } else if is_asphalt6_drm {
+        log!("🛡️ EXCLUSIVE BYPASS: Faking HTTP response for DRM URL: {}", url_str);
         let dummy = b"1\nOK\n";
         let dummy_len = dummy.len() as u32;
         let alloc = env.mem.alloc(dummy_len);
@@ -128,7 +132,6 @@ pub const CLASSES: ClassExports = objc_classes! {
         nil
     }
 }
-
 
 - (id)initWithContentsOfFile:(id)path {
     if path == nil { return nil; }
