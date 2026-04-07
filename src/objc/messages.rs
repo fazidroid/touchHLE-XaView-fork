@@ -25,8 +25,32 @@ fn objc_msgSend_inner(
 
     // ===== NFS MOST WANTED MTX / STOREFRONT BYPASS =====
     // 1. Pretend the MTX controller is always ready and authorized
-    if sel_str == "canMakePayments" {
-        env.cpu.regs_mut()[0] = 1; // Return YES
+    if sel_str == "uniqueIdentifier" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 2. Force EA Reachability to report Online (WiFi) so the storefront initializes
+    if sel_str == "currentReachabilityStatus" {
+        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
+        return;
+    }
+
+    // 3. Prevent any Singletons/Controllers from returning 'nil'. 
+    // If these return nil, the game sends future MTX checks to a black hole!
+    if sel_str == "defaultQueue" || sel_str == "sharedController" || sel_str == "sharedManager" {
+        if receiver.to_bits() != 0 {
+            env.cpu.regs_mut()[0] = receiver.to_bits(); // Return the class itself as a valid dummy
+        } else {
+            env.cpu.regs_mut()[0] = 0xDEADBEEF; // Fallback dummy pointer
+        }
+        return;
+    }
+
+    // 4. Direct MTX status bypasses (Force success)
+    if sel_str == "canMakePayments" || sel_str == "isMTXReady" || sel_str == "isReady" {
+        env.cpu.regs_mut()[0] = 1; // 1 = YES / true
         return;
     }
     if sel_str == "isMTXReady" || sel_str == "CheckMTXController" {
