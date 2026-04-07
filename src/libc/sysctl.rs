@@ -30,6 +30,7 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
+    // GLES 2.0 ENABLER: Force games to think this is an iPhone 4S
     if name_str == "hw.machine" {
         log!("GAMELOFT/EA BYPASS: Forcing hw.machine to iPhone4,1");
         let hw = b"iPhone4,1\0";
@@ -42,6 +43,16 @@ fn sysctlbyname(
                 env.mem.bytes_at_mut(oldp.cast(), copy_len as u32).copy_from_slice(&hw[..copy_len]);
                 env.mem.write(oldlenp, copy_len as u32);
             }
+        }
+        return 0;
+    }
+
+    // NEW: Spoof capability check for MTX/Storefront (Fixes CheckMTXController crash)
+    if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
+        log!("EA BYPASS: Spoofing {} capability for Storefront initialization", name_str);
+        if !oldp.is_null() && !oldlenp.is_null() {
+            env.mem.write::<i32>(oldp.cast(), 1);
+            env.mem.write::<u32>(oldlenp, 4);
         }
         return 0;
     }
@@ -65,8 +76,7 @@ fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { -1 }
 fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 
-// ==== NEW: EA GAME ENGINE ASSERTION REVEALER ====
-// This intercepts the game's fatal crashes and prints the exact reason to the log
+// ==== EA GAME ENGINE ASSERTION REVEALER ====
 fn __assert_rtn(
     env: &mut Environment,
     func: ConstPtr<u8>,
@@ -96,6 +106,5 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(flockfile(_)),
     export_c_func!(funlockfile(_)),
     
-    // Export the new assertion revealer
     export_c_func!(__assert_rtn(_, _, _, _)),
 ];
