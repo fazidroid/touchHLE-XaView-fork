@@ -143,10 +143,13 @@ impl State {
 fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> i32 {
     log_dbg!("socket({}, {}, {})", domain, type_, protocol);
 
-    // GAMELOFT BYPASS: 
-    // We intentionally ignore the `!env.options.network_access` check here.
-    // This allows the socket to be created so it can cleanly fail with 
-    // ECONNREFUSED when hitting 127.0.0.1, bypassing the infinite loop!
+    // GAMELOFT BYPASS: Throw ENETUNREACH (51) to mimic Airplane Mode safely!
+    if !env.options.network_access {
+        crate::libc::errno::set_errno(env, 51);
+        return -1;
+    }
+
+    assert_eq!(domain, AF_INET);
 
     assert_eq!(domain, AF_INET);
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
