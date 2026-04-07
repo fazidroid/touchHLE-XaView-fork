@@ -35,6 +35,19 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = 0; // 0 = MPMoviePlaybackStateStopped
         return;
     }
+    if sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil to force connection failure
+        return;
+    }
+    if sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil 
+        return;
+    }
+    
+    // 3. Bypass GameCenter / EA Cloud Save loops
+    if sel_str == "authenticateWithCompletionHandler:" || sel_str == "loadDefaultLeaderboardIdentifierWithCompletionHandler:" {
+        return; // Ignore the call so it doesn't hang waiting for an Apple callback
+    }
 
     // 2. Instantly kill Autolog Network Connections
     // (Prevents the game from freezing while waiting for offline EA servers)
