@@ -34,20 +34,33 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== NFS SHIFT 2: COMPLETE BOOT BYPASS =====
+    // ===== NFS SHIFT 2: IDENTITY & PATH RECOVERY BYPASS =====
 
-    // 1. Fix the (null) Device Info & Missing Info.plist Keys
     if sel_str == "currentDevice" {
-        if receiver.to_bits() != 0 {
-            env.cpu.regs_mut()[0] = receiver.to_bits(); 
-        } else {
-            env.cpu.regs_mut()[0] = 0xDEADBEEF; // Fallback dummy
-        }
+        env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
     if sel_str == "model" || sel_str == "localizedModel" || sel_str == "name" || sel_str == "systemName" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone OS".to_string());
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 2. Fix the Bundle Path (Fixes (null)/Info.plist search)
+    // Must be an absolute path '/' to pass touchHLE's internal security checks
+    if sel_str == "bundlePath" || sel_str == "resourcePath" || sel_str == "mainBundle" {
+        if sel_str == "mainBundle" {
+             env.cpu.regs_mut()[0] = receiver.to_bits();
+        } else {
+             let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "/".to_string());
+             env.cpu.regs_mut()[0] = val.to_bits();
+        }
+        return;
+    }
+
+    // 3. Network & Video Kill-Switch (Prevents the final logo freeze)
+    if sel_str == "initWithContentURL:" || sel_str == "connectionWithRequest:delegate:" || sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil to skip video/network
         return;
     }
     if sel_str == "systemVersion" || sel_str == "objectForInfoDictionaryKey:" {
