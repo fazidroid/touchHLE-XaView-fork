@@ -115,7 +115,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     if url_str.starts_with("file://") {
         let path: id = msg![env; url path];
         msg![env; this initWithContentsOfFile:path]
-    } else if env.options.app_bundle_id == "com.gameloft.Asphalt6ipad" {
+    } else if env.app_bundle_id == "com.gameloft.Asphalt6ipad" {
         // EXCLUSIVE HACK: Only Asphalt 6 gets the fake "1\nOK\n" response to pass DRM.
         log!("🛡️ EXCLUSIVE BYPASS: Faking HTTP response for Asphalt 6 URL: {}", url_str);
         let dummy = b"1\nOK\n";
@@ -128,6 +128,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         nil
     }
 }
+
 
 - (id)initWithContentsOfFile:(id)path {
     if path == nil { return nil; }
