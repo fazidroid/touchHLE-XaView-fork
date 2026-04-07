@@ -15,7 +15,10 @@ fn sysctl(
     for i in 0..namelen as u32 {
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
-    0 
+    
+    // CRITICAL FIX: Return -1 (Error) so the game knows we didn't fill the buffer.
+    // This forces the EA crypto-hasher to use safe fallbacks instead of crashing!
+    -1 
 }
 
 fn sysctlbyname(
@@ -30,7 +33,7 @@ fn sysctlbyname(
     let name_str = String::from_utf8_lossy(name_bytes);
     
     // 1. Device Spoof
-    if name_str == "hw.machine" {
+    if name_str == "hw.machine" || name_str == "hw.model" {
         let hw = b"iPhone4,1\0";
         if !oldlenp.is_null() {
             if oldp.is_null() {
@@ -42,8 +45,26 @@ fn sysctlbyname(
                 env.mem.write(oldlenp, copy_len as u32);
             }
         }
-        return 0;
+        return 0; // Success
     }
+
+    // 2. EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
+    if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
+        if !oldlenp.is_null() {
+            if oldp.is_null() {
+                env.mem.write::<u32>(oldlenp, 4);
+            } else {
+                env.mem.write::<i32>(oldp.cast(), 1);
+                env.mem.write::<u32>(oldlenp, 4);
+            }
+        }
+        return 0; // Success
+    }
+
+    // CRITICAL FIX: Return -1 for unhandled strings like "hw.memsize".
+    // If we return 0 here, the game thinks it has 0MB of RAM and panics!
+    -1
+}
 
     // 2. EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
