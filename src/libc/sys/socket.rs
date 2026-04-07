@@ -746,7 +746,7 @@ fn recv(
         let fake_resp = b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 2\r\n\r\nOK";
         let copy_len = std::cmp::min(length as usize, fake_resp.len());
         env.mem.bytes_at_mut(buffer.cast(), copy_len as u32).copy_from_slice(&fake_resp[..copy_len]);
-        return copy_len as isize;
+        return copy_len as i32; // FIXED: Changed isize to i32
     }
 
     recvfrom(env, socket, buffer, length, flags, Ptr::null(), Ptr::null())
@@ -874,7 +874,7 @@ fn send(
 ) -> i32 {
     if !env.options.network_access {
         // GAMELOFT BYPASS: Pretend the GET request was successfully sent!
-        return length as isize;
+        return length as i32; // FIXED: Changed isize to i32
     }
 
     // TODO: handle errno properly
