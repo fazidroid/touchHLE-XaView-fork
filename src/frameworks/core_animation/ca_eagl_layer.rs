@@ -68,36 +68,37 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         return nil;
     }
 
-    // RevertToLoop
-    let mut layer: id = msg![env; top_window layer];
+    // SearchForEAGLLayer
+    let root_layer: id = msg![env; top_window layer];
+    let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
+    let mut stack = vec![root_layer];
+    let mut eagl_layer = nil;
 
-    loop {
-        assert!(layer != nil);
+    while let Some(current) = stack.pop() {
+        if current == nil { continue; }
+        let host: &CALayerHostObject = env.objc.borrow(current);
 
-        let layer_host_obj: &CALayerHostObject = env.objc.borrow(layer);
-
-        // BypassStrictBounds
-        if layer_host_obj.hidden || layer_host_obj.opacity == 0.0 {
-            return nil;
+        if host.hidden || host.opacity == 0.0 {
+            continue;
         }
 
-        if let Some(&next) = layer_host_obj.sublayers.last() {
-            layer = next;
-        } else {
+        let is_eagl: bool = msg![env; current isKindOfClass:ca_eagl_layer_class];
+        if is_eagl || host.presented_pixels.is_some() {
+            eagl_layer = current;
             break;
+        }
+
+        for &sub in &host.sublayers {
+            stack.push(sub);
         }
     }
 
-    // IgnoreOpaqueFlag
-    let ca_eagl_layer_class: Class = msg_class![env; CAEAGLLayer class];
-    let is_eagl: bool = msg![env; layer isKindOfClass:ca_eagl_layer_class];
-    let host: &CALayerHostObject = env.objc.borrow(layer);
-    
-    if !is_eagl && host.presented_pixels.is_none() {
+    if eagl_layer == nil {
+        log!("WARNING: CAEAGLLayer not found in layer tree!");
         return nil;
     }
 
-    layer
+    eagl_layer
 }
 
 /// For use by `EAGLContext` when presenting to a `CAEAGLLayer`:
