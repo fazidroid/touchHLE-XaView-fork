@@ -17,6 +17,7 @@ fn sysctl(
     }
     
     // CRITICAL FIX: Return -1 (Error) so the game knows we didn't fill the buffer.
+    // This forces the EA crypto-hasher to use safe fallbacks instead of crashing!
     -1 
 }
 
@@ -31,7 +32,7 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
-    // 1. Device Spoof (Catches hw.model so Phone Model is no longer (null))
+    // 1. Device Spoof
     if name_str == "hw.machine" || name_str == "hw.model" {
         let hw = b"iPhone4,1\0";
         if !oldlenp.is_null() {
@@ -46,10 +47,6 @@ fn sysctlbyname(
         }
         return 0; // Success
     }
-
-    // Return -1 for unhandled strings to force EA safe fallbacks
-    -1
-}
 
     // 2. EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
@@ -67,24 +64,6 @@ fn sysctlbyname(
     // CRITICAL FIX: Return -1 for unhandled strings like "hw.memsize".
     // If we return 0 here, the game thinks it has 0MB of RAM and panics!
     -1
-}
-
-    // 2. EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
-    if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
-        if !oldlenp.is_null() {
-            if oldp.is_null() {
-                // Size query
-                env.mem.write::<u32>(oldlenp, 4);
-            } else {
-                // Value query
-                env.mem.write::<i32>(oldp.cast(), 1);
-                env.mem.write::<u32>(oldlenp, 4);
-            }
-        }
-        return 0;
-    }
-
-    0
 }
 
 // ==== FONT CRASH BYPASSES ====
@@ -124,16 +103,15 @@ fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
     // EA Bypass: If the game passes our dummy 0xDEADBEEF pointer, 
     // return a dummy Class pointer to prevent the engine from panicking.
     if obj.to_bits() == 0xDEADBEEF {
-        return crate::mem::Ptr::from_bits(0x30000000); // Common base for Obj-C classes
+        return crate::mem::Ptr::from_bits(0x30000000); 
     }
 
-    // Standard behavior: The first 4 bytes of an Obj-C object contain the 'isa' (Class) pointer.
     let isa = env.mem.read::<u32, false>(obj.cast());
     crate::mem::Ptr::from_bits(isa)
 }
 
 fn class_getProperty(_env: &mut Environment, _cls: ConstVoidPtr, _name: ConstVoidPtr) -> ConstVoidPtr {
-    crate::mem::Ptr::null()
+    crate::mem::Ptr::null() 
 }
 
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
