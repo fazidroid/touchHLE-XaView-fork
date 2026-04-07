@@ -47,8 +47,9 @@ pub const CLASSES: ClassExports = objc_classes! {
                    selector:(SEL)selector
                    userInfo:(id)user_info
                     repeats:(bool)repeats {
-    // GAMELOFT NaN FIX: Prevent crashes when delta time is NaN or 0
-    let safe_interval = if ns_interval.is_finite() && ns_interval > 0.0 { ns_interval } else { 1.0 };
+    // GAMELOFT NaN FIX: Prevent crashes when delta time is NaN. 
+    // FIXED: Properly allow 0.0 to pass through normally as 0.0001s to prevent 1-second delays!
+    let safe_interval = if ns_interval.is_finite() && ns_interval >= 0.0 { ns_interval } else { 0.0001 };
     let ns_interval_safe = safe_interval.max(0.0001);
     let rust_interval = Duration::from_secs_f64(ns_interval_safe);
 
@@ -150,9 +151,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 
-// TODO: more constructors
-// TODO: more accessors
-
 @end
 
 };
@@ -162,7 +160,7 @@ pub fn set_time_interval(env: &mut Environment, timer: id, interval: NSTimeInter
     let host_object = env.objc.borrow_mut::<NSTimerHostObject>(timer);
     
     // GAMELOFT NaN FIX
-    let safe_interval = if interval.is_finite() && interval > 0.0 { interval } else { 1.0 };
+    let safe_interval = if interval.is_finite() && interval >= 0.0 { interval } else { 0.0001 };
     
     host_object.ns_interval = safe_interval;
     host_object.rust_interval = Duration::from_secs_f64(safe_interval);
@@ -175,10 +173,7 @@ pub(super) fn set_run_loop(env: &mut Environment, timer: id, run_loop: id) {
     host_object.run_loop = run_loop;
 }
 
-/// For use by `NSRunLoop`: check if a timer is due to fire and fire it if
-/// necessary.
-///
-/// Returns the next firing time, if any.
+/// For use by `NSRunLoop`: check if a timer is due to fire and fire it if necessary.
 pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> {
     let &NSTimerHostObject {
         ns_interval,
@@ -192,17 +187,11 @@ pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> 
         ..
     } = env.objc.borrow(timer);
 
-    // If a timer is already running its callback, we don't want to re-enter it
-    // and cause an infinite loop.
     if is_running_callback {
         return None;
     }
 
-    // Invalidated timers should be removed from the run loop, but if a timer
-    // is invalidated from another timer earlier in the current tick of the
-    // run loop it might still be run.
     let due_by = due_by?;
-
     let now = Instant::now();
 
     if due_by > now {
@@ -210,36 +199,17 @@ pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> 
     }
 
     let overdue_by = now.duration_since(due_by);
-
-    // Timer may be released when it's invalidated, so we need to retain it so
-    // it's still around to pass to the timer target.
     retain(env, timer);
 
-    // Advancing the timer before sending its message seems like a good idea
-    // considering this function is potentially re-entrant.
     let new_due_by = if repeats {
-        // When rescheduling a repeating timer, the next firing should be based
-        // on when the timer should have fired, not when it actually fired, so
-        // that there is no drift over time.
-        //
-        // For example, if a timer has an interval of 60s and starts at 00:00,
-        // the first firing would be scheduled for 01:00, and the second firing
-        // should be scheduled for 02:00, even if the first firing was at 01:01.
-        //
-        // However: if the timer handling is delayed past a whole interval, it
-        // should not try to catch up. For example, if the first firing is
-        // scheduled for 01:00 but happens at 02:30, then the next firing should
-        // be scheduled for 03:00.
-        // TODO: Use `.div_duration_f64()` once that is stabilized.
-        
         // GAMELOFT NaN FIX
-        let safe_ns_interval = if ns_interval.is_finite() && ns_interval > 0.0 { ns_interval } else { 1.0 };
+        let safe_ns_interval = if ns_interval.is_finite() && ns_interval > 0.0 { ns_interval } else { 0.0001 };
         let advance_by = (overdue_by.as_secs_f64() / safe_ns_interval).max(1.0).ceil();
         
         assert!(advance_by == (advance_by as u32) as f64);
         let advance_by = advance_by as u32;
         if advance_by > 1 {
-            log_dbg!("Warning: Timer {:?} is lagging. It is overdue by {}s and has missed {} interval(s)!", timer, overdue_by.as_secs_f64(), advance_by - 1);
+            log_dbg!("Warning: Timer {:?} is lagging.", timer);
         }
         let advance_by = rust_interval.checked_mul(advance_by).unwrap();
         Some(due_by.checked_add(advance_by).unwrap())
@@ -252,15 +222,7 @@ pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> 
         .borrow_mut::<NSTimerHostObject>(timer)
         .is_running_callback = true;
 
-    log_dbg!(
-        "Timer {:?} fired, sending {:?} message to {:?}",
-        timer,
-        selector.as_str(&env.mem),
-        target
-    );
     let pool: id = msg_class![env; NSAutoreleasePool new];
-
-    // Signature should be `- (void)timerDidFire:(NSTimer *)which`.
     let _: () = msg_send(env, (target, selector, timer));
 
     env.objc
