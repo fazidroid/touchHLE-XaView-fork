@@ -7,7 +7,7 @@
 
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
-use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_DGRAM, SOCK_STREAM};
+use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_STREAM};
 use crate::mem::{guest_size_of, ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
 
@@ -75,7 +75,7 @@ unsafe impl SafeRead for addrinfo {}
 
 fn getaddrinfo(
     env: &mut Environment,
-    node_name: MutPtr<u8>,
+    _node_name: MutPtr<u8>, // FIXED: Prefixed with underscore to ignore warning
     serv_name: MutPtr<u8>,
     hints: ConstPtr<addrinfo>,
     res: MutPtr<MutPtr<addrinfo>>,
