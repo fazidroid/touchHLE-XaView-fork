@@ -34,7 +34,29 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== NFS SHIFT / EA ENGINE BYPASSES =====
+    // ===== NFS SHIFT 2 TELEMETRY & LOGO STUCK BYPASS =====
+    
+    // 1. Fluent Mobile Telemetry Fixes (Prevents infinite wait for network)
+    if sel_str == "setTimeoutInterval:" {
+        return; // Ignore the timeout setup to prevent the SAFE BYPASS warning
+    }
+    if sel_str == "connectionWithRequest:delegate:" || sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        // Return nil to immediately fail EA network connections so it stops waiting
+        env.cpu.regs_mut()[0] = 0; 
+        return;
+    }
+    if sel_str == "uniqueIdentifier" {
+        // Give the tracker a fake device ID so it doesn't crash on (null)
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 2. Aggressive Video Player Fix (Forces EA Intro to immediately report as "Finished")
+    if sel_str == "playbackState" || sel_str == "loadState" {
+        env.cpu.regs_mut()[0] = 0; // 0 = MPMoviePlaybackStateStopped
+        return;
+    }
     
     // 1. Correct Character Set Bypass (Prevents characterIsMember: crash)
     if sel_str == "decimalDigitCharacterSet" {
