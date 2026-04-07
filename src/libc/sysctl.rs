@@ -22,14 +22,35 @@ fn sysctl(
 fn sysctlbyname(
     env: &mut Environment,
     name_ptr: ConstPtr<u8>,
-    _oldp: MutVoidPtr,
-    _oldlenp: MutPtr<u32>,
-    _newp: ConstVoidPtr,
+    oldp: MutVoidPtr,
+    oldlenp: MutPtr<u32>,
+    _newp: MutVoidPtr, 
     _newlen: u32,
 ) -> i32 {
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
-    log!("GAMELOFT BYPASS: sysctlbyname '{}', faking hardware success", name_str);
+    
+    // GLES 2.0 ENABLER: Force games to think this is an iPhone 4S
+    if name_str == "hw.machine" {
+        log!("GAMELOFT/EA BYPASS: Forcing hw.machine to iPhone4,1");
+        let hw = b"iPhone4,1\0";
+        
+        if !oldlenp.is_null() {
+            if oldp.is_null() {
+                // Step 1: The game is only asking for the SIZE of the string
+                env.mem.write(oldlenp, hw.len() as u32);
+            } else {
+                // Step 2: The game allocated the memory and wants the ACTUAL string
+                let oldlen = env.mem.read::<u32, false>(oldlenp.cast_const());
+                let copy_len = std::cmp::min(oldlen as usize, hw.len());
+                env.mem.bytes_at_mut(oldp.cast(), copy_len as u32).copy_from_slice(&hw[..copy_len]);
+                env.mem.write(oldlenp, copy_len as u32);
+            }
+        }
+        return 0;
+    }
+
+    log!("GAMELOFT/EA BYPASS: sysctlbyname '{}', faking hardware success", name_str);
     0
 }
 
