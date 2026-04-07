@@ -351,14 +351,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         return nil;
     }
 
-    // FIXED: NFS Shift 2 often passes relative paths here.
-    // We remove the strict assertion to prevent the crash and let the 
-    // filesystem attempt to resolve the path normally.
     if !msg![env; path isAbsolutePath] {
         log_dbg!("Warning: contentsAtPath called with relative path: {:?}", path);
     }
 
-    // Resolved TODO: return nil if path is a directory (standard Apple behavior)
     let path_str = ns_string::to_rust_string(env, path);
     if env.fs.is_dir(crate::fs::GuestPath::new(&path_str)) {
         return nil;
