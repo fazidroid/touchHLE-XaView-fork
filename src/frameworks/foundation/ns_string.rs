@@ -991,18 +991,24 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)encoding {
-    assert!(encoding == NSASCIIStringEncoding || encoding == NSUTF8StringEncoding); // TODO: other encodings
-    // TODO: implement escaping as per RFC 2396
     let str = to_rust_string(env, this);
-    // FIXME: figure out why '[' and ']' are escaped on iOS simulator
-    assert!(str.as_bytes().iter().all(|byte| {
-        (byte.is_ascii_alphanumeric() || b"-_.~".contains(byte)) // unreserved
-        || b"!*'();:@&=+$,/?%#".contains(byte) // reserved
-    }));
-    let new: id = msg![env; this copy];
-    autorelease(env, new)
-}
+    let mut escaped = String::new();
 
+    // GAMELOFT BYPASS: Actually implement URL percent encoding instead of crashing
+    for &byte in str.as_bytes() {
+        // These characters are allowed and do not get escaped
+        if byte.is_ascii_alphanumeric() || b"-_.~!*'();:@&=+$,/?%#".contains(&byte) {
+            escaped.push(byte as char);
+        } else {
+            // Convert spaces and special characters into %XX format
+            use std::fmt::Write;
+            write!(&mut escaped, "%{:02X}", byte).unwrap();
+        }
+    }
+
+    let new_string = from_rust_string(env, escaped);
+    autorelease(env, new_string)
+}
 - (id)stringByAppendingPathComponent:(id)component { // NSString*
     // TODO: avoid copying
     let base_str = to_rust_string(env, this);
