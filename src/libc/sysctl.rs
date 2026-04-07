@@ -44,8 +44,10 @@ fn sysctlbyname(
         return 0;
     }
 
+    // EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
         if !oldp.is_null() && !oldlenp.is_null() {
+            // Write 1 (enabled) as a 4-byte integer
             env.mem.write::<i32>(oldp.cast(), 1);
             env.mem.write::<u32>(oldlenp, 4);
         }
