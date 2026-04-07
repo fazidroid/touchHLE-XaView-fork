@@ -15,8 +15,9 @@ fn sysctl(
     for i in 0..namelen as u32 {
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
-    log!("GAMELOFT/EA BYPASS: sysctl called for mib {:?}, faking success", mib);
-    0 
+    
+    // CRITICAL FIX: Return -1 (Error) so the game knows we didn't fill the buffer.
+    -1 
 }
 
 fn sysctlbyname(
@@ -30,9 +31,8 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
-    // Spoof device as iPhone 4S
-    if name_str == "hw.machine" {
-        log!("GAMELOFT/EA BYPASS: Forcing hw.machine to iPhone4,1");
+    // 1. Device Spoof (Catches hw.model so Phone Model is no longer (null))
+    if name_str == "hw.machine" || name_str == "hw.model" {
         let hw = b"iPhone4,1\0";
         if !oldlenp.is_null() {
             if oldp.is_null() {
@@ -44,8 +44,12 @@ fn sysctlbyname(
                 env.mem.write(oldlenp, copy_len as u32);
             }
         }
-        return 0;
+        return 0; // Success
     }
+
+    // Return -1 for unhandled strings to force EA safe fallbacks
+    -1
+}
 
     // NEW: Spoof capability check (Required for EA MTX Controller)
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
