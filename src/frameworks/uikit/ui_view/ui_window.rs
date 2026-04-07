@@ -124,6 +124,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     let screen: id = msg_class![env; UIScreen mainScreen];
     let bounds: CGRect = msg![env; screen bounds];
     let frame: CGRect = msg![env; this frame];
+    //DebugMakeKeyVis
+    log!("DEBUG_UIWINDOW: makeKeyAndVisible on {:?} | Screen Bounds: {:?} | Window Frame: {:?}", this, bounds, frame);
     
     if frame.size.width <= 0.0 || frame.size.height <= 0.0 {
         log!("Fixing empty window frame to {:?}", bounds);
