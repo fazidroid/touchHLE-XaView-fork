@@ -35,7 +35,35 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
 
     // ===== GAMELOFT UDID & DEVICE BYPASS =====
-    // ===== GAMELOFT UDID & DEVICE BYPASS =====
+    // ===== NFS SHIFT 2 EA LOGO & HARDWARE FIXES =====
+    // 1. Force the game to skip the EA Intro Video so it doesn't wait forever!
+    if sel_str == "initWithContentURL:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil to abort video playback
+        return;
+    }
+    
+    // 2. Fix the (null) hardware logs causing the telemetry tracker to loop
+    if sel_str == "systemVersion" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    if sel_str == "model" || sel_str == "localizedModel" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    if sel_str == "name" || sel_str == "systemName" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone OS".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 3. Fix missing UI Font math (Stops missing text/crashes)
+    if sel_str == "systemFontSize" || sel_str == "labelFontSize" || sel_str == "buttonFontSize" {
+        env.cpu.regs_mut()[0] = 0x41400000; // 12.0 in IEEE 754 f32 hex
+        return;
+    }
     if sel_str == "uniqueIdentifier" {
         let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = fake.to_bits();
