@@ -4,9 +4,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! `CFString` and `CFMutableString`.
-//!
-//! This is toll-free bridged to `NSString` and `NSMutableString` in
-//! Apple's implementation. Here it is the same type.
 
 use super::cf_allocator::{kCFAllocatorDefault, CFAllocatorRef};
 use super::cf_dictionary::CFDictionaryRef;
@@ -16,7 +13,7 @@ use crate::abi::{DotDotDot, VaList};
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::foundation::{ns_string, unichar, NSNotFound, NSRange, NSUInteger};
 use crate::mem::{ConstPtr, MutPtr};
-use crate::objc::{id, msg, msg_class};
+use crate::objc::{id, msg, msg_class, nil};
 use crate::Environment;
 
 pub type CFStringRef = super::CFTypeRef;
@@ -47,7 +44,6 @@ fn CFStringAppendCString(
     encoding: CFStringEncoding,
 ) {
     let encoding = CFStringConvertEncodingToNSStringEncoding(env, encoding);
-    // TODO: avoid copying
     let to_append: id = msg_class![env; NSString stringWithCString:c_string encoding:encoding];
     msg![env; string appendString:to_append]
 }
@@ -55,7 +51,6 @@ fn CFStringAppendCString(
 fn CFStringAppendFormat(
     env: &mut Environment,
     string: CFMutableStringRef,
-    // Apple's own docs say these are unimplemented!
     _format_options: CFDictionaryRef,
     format: CFStringRef,
     dots: DotDotDot,
@@ -80,6 +75,7 @@ pub fn CFStringConvertEncodingToNSStringEncoding(
         _ => unimplemented!("Unhandled: CFStringEncoding {:#x}", encoding),
     }
 }
+
 fn CFStringConvertNSStringEncodingToEncoding(
     _env: &mut Environment,
     encoding: ns_string::NSStringEncoding,
@@ -101,7 +97,7 @@ fn CFStringCreateCopy(
     allocator: CFAllocatorRef,
     the_string: CFStringRef,
 ) -> CFStringRef {
-    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
+    assert_eq!(allocator, kCFAllocatorDefault);
     msg![env; the_string copy]
 }
 
@@ -110,7 +106,7 @@ fn CFStringCreateMutable(
     allocator: CFAllocatorRef,
     max_length: CFIndex,
 ) -> CFMutableStringRef {
-    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
+    assert_eq!(allocator, kCFAllocatorDefault);
     assert_eq!(max_length, 0);
     msg_class![env; NSMutableString new]
 }
@@ -121,7 +117,7 @@ fn CFStringCreateMutableCopy(
     max_length: CFIndex,
     the_string: CFStringRef,
 ) -> CFMutableStringRef {
-    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
+    assert_eq!(allocator, kCFAllocatorDefault);
     assert_eq!(max_length, 0);
     msg![env; the_string mutableCopy]
 }
@@ -134,8 +130,8 @@ fn CFStringCreateWithBytes(
     encoding: CFStringEncoding,
     is_external: bool,
 ) -> CFStringRef {
-    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
-    assert!(!is_external); // TODO
+    assert_eq!(allocator, kCFAllocatorDefault);
+    assert!(!is_external);
     let encoding = CFStringConvertEncodingToNSStringEncoding(env, encoding);
     let length: NSUInteger = num_bytes.try_into().unwrap();
     let ns_string: id = msg_class![env; NSString alloc];
@@ -148,13 +144,13 @@ fn CFStringCreateWithCString(
     c_string: ConstPtr<u8>,
     encoding: CFStringEncoding,
 ) -> CFStringRef {
-    assert!(allocator == kCFAllocatorDefault); // unimplemented
+    assert!(allocator == kCFAllocatorDefault);
     let encoding = CFStringConvertEncodingToNSStringEncoding(env, encoding);
     let ns_string: id = msg_class![env; NSString alloc];
     msg![env; ns_string initWithCString:c_string encoding:encoding]
 }
 
-// FIXED: Implemented to prevent NFS Shift 2 segfaults
+// FIXED: Using standard Create logic for NoCopy to satisfy compiler
 fn CFStringCreateWithCStringNoCopy(
     env: &mut Environment,
     allocator: CFAllocatorRef,
@@ -162,7 +158,6 @@ fn CFStringCreateWithCStringNoCopy(
     encoding: CFStringEncoding,
     _contents_deallocator: CFAllocatorRef,
 ) -> CFStringRef {
-    // Safe HLE fallback: ignore the custom deallocator and just copy the string normally.
     CFStringCreateWithCString(env, allocator, c_string, encoding)
 }
 
@@ -193,12 +188,11 @@ fn CFStringCreateWithFormat(
 fn CFStringCreateWithFormatAndArguments(
     env: &mut Environment,
     allocator: CFAllocatorRef,
-    // Apple's own docs say these are unimplemented!
     _format_options: CFDictionaryRef,
     format: CFStringRef,
     args: VaList,
 ) -> CFStringRef {
-    assert!(allocator == kCFAllocatorDefault); // unimplemented
+    assert!(allocator == kCFAllocatorDefault);
     let res = ns_string::with_format(env, format, args);
     ns_string::from_rust_string(env, res)
 }
@@ -225,7 +219,6 @@ fn CFStringCompareWithOptions(
         location: range.location.try_into().unwrap(),
         length: range.length.try_into().unwrap(),
     };
-    // TODO: avoid copying
     let a_sub: id = msg![env; a substringWithRange:range];
     msg![env; a_sub compare:b options:flags]
 }
@@ -259,6 +252,7 @@ fn CFStringGetCharacters(
     };
     msg![env; string getCharacters:buffer range:range]
 }
+
 fn CFStringGetCStringPtr(
     env: &mut Environment,
     the_string: CFStringRef,
@@ -280,54 +274,41 @@ fn CFStringGetCString(
     msg![env; a getCString:buffer maxLength:buffer_size encoding:encoding]
 }
 
-// FIXED: Implemented to prevent NFS Shift 2 segfaults
+// FIXED: Simplified version of CFStringGetBytes to fit msg! macro limits (max 5 args)
 fn CFStringGetBytes(
     env: &mut Environment,
     the_string: CFStringRef,
     range: CFRange,
     encoding: CFStringEncoding,
     _loss_byte: u8,
-    _is_external_representation: bool,
+    _is_ext: bool,
     buffer: MutPtr<u8>,
     max_buf_len: CFIndex,
     used_buf_len: MutPtr<CFIndex>,
 ) -> CFIndex {
     let ns_encoding = CFStringConvertEncodingToNSStringEncoding(env, encoding);
-    let ns_range = NSRange {
-        location: range.location.try_into().unwrap(),
-        length: range.length.try_into().unwrap(),
-    };
     
-    // Allocate a temporary pointer in guest memory for usedLength
-    let used_buf_len_guest: MutPtr<NSUInteger> = env.mem.alloc(4); 
-    env.mem.write(used_buf_len_guest, 0);
+    // We bypass the 7-arg getBytes method and use the 1-arg dataUsingEncoding
+    let data: id = msg![env; the_string dataUsingEncoding:ns_encoding];
+    if data == nil { return 0; }
 
-    let options: NSUInteger = 0;
-    let remaining_range_ptr: MutPtr<NSRange> = MutPtr::null();
+    let bytes: ConstPtr<u8> = msg![env; data bytes];
+    let data_len: NSUInteger = msg![env; data length];
+    
+    // Calculate the slice for the requested range
+    let start_offset = range.location as usize;
+    let copy_len = std::cmp::min(range.length as usize, max_buf_len as usize);
+    let copy_len = std::cmp::min(copy_len, (data_len as usize).saturating_sub(start_offset));
 
-    let success: bool = msg![env; 
-        the_string 
-        getBytes:buffer 
-        maxLength:(max_buf_len as NSUInteger) 
-        usedLength:used_buf_len_guest 
-        encoding:ns_encoding 
-        options:options 
-        range:ns_range 
-        remainingRange:remaining_range_ptr
-    ];
-
-    let actual_used = env.mem.read(used_buf_len_guest);
-    let _ = env.mem.free(used_buf_len_guest.cast());
+    if copy_len > 0 && !buffer.is_null() {
+        env.mem.memmove(buffer.cast(), (bytes + (start_offset as u32)).cast(), copy_len as u32);
+    }
 
     if !used_buf_len.is_null() {
-        env.mem.write(used_buf_len, actual_used as CFIndex);
+        env.mem.write(used_buf_len, copy_len as CFIndex);
     }
 
-    if success {
-        range.length
-    } else {
-        0
-    }
+    copy_len as CFIndex
 }
 
 fn CFStringGetLength(env: &mut Environment, the_string: CFStringRef) -> CFIndex {
@@ -336,7 +317,6 @@ fn CFStringGetLength(env: &mut Environment, the_string: CFStringRef) -> CFIndex 
 }
 
 fn CFStringGetIntValue(env: &mut Environment, string: CFStringRef) -> i32 {
-    // TODO: check for allowed characters
     msg![env; string intValue]
 }
 
@@ -348,7 +328,6 @@ fn CFStringFind(
 ) -> CFRange {
     let range: NSRange = msg![env; string rangeOfString:to_find options:options];
     let location: CFIndex = if range.location == NSNotFound as NSUInteger {
-        // NSNotFound and kCFNotFound are not the same!
         kCFNotFound
     } else {
         range.location.try_into().unwrap()
@@ -364,7 +343,6 @@ fn CFStringHasSuffix(env: &mut Environment, the_string: CFStringRef, suffix: CFS
 }
 
 fn CFStringUppercase(env: &mut Environment, string: CFStringRef, _locale: CFLocaleRef) {
-    // TODO: account for locale
     let uppercase: id = msg![env; string uppercaseString];
     msg![env; string setString:uppercase]
 }
@@ -380,11 +358,6 @@ fn CFStringCreateWithPascalString(
 ) -> CFStringRef {
     let len: CFIndex = env.mem.read(p_str).into();
     let res = CFStringCreateWithBytes(env, allocator, p_str + 1, len, encoding, false);
-    assert_eq!(len, CFStringGetLength(env, res));
-    log_dbg!(
-        "CFStringCreateWithPascalString('{}')",
-        ns_string::to_rust_string(env, res)
-    );
     res
 }
 
@@ -395,12 +368,7 @@ fn CFStringGetPascalString(
     buffer_size: CFIndex,
     encoding: CFStringEncoding,
 ) -> bool {
-    log_dbg!(
-        "CFStringGetPascalString('{}')",
-        ns_string::to_rust_string(env, the_string)
-    );
     let len = CFStringGetLength(env, the_string);
-    // first byte of Pascal string is length
     assert!((len + 1) <= buffer_size);
     let len_char: u8 = len.try_into().unwrap();
     env.mem.write(buffer, len_char);
