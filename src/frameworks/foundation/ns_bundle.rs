@@ -145,7 +145,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)pathForResource:(id)name // NSString*
                ofType:(id)extension // NSString*
           inDirectory:(id)directory { // NSString*
-    assert!(name != nil); // TODO
+    
+    // SAFE BYPASS: Do not crash if game requests a nil resource name
+    if name == nil {
+        log!("SAFE BYPASS: pathForResource called with nil name, returning nil");
+        return nil;
+    }
 
     // TODO: cache result of lookups
 
@@ -202,8 +207,8 @@ pub const CLASSES: ClassExports = objc_classes! {
        withExtension:(id)extension // NSString *
         subdirectory:(id)subpath { // NSString *
     let path_string: id = msg![env; this pathForResource:name
-                                                 ofType:extension
-                                            inDirectory:subpath];
+                                                  ofType:extension
+                                             inDirectory:subpath];
     if path_string == nil {
         return nil;
     }
