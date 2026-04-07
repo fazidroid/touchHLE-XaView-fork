@@ -75,6 +75,26 @@ fn CGFontCreateWithDataProvider(_env: &mut Environment, provider: ConstVoidPtr) 
 fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _callbacks: ConstVoidPtr) -> ConstVoidPtr {
     if info.is_null() { crate::mem::Ptr::from_bits(1) } else { info }
 }
+// ==== SYSTEM CONFIGURATION / NETWORK REACHABILITY BYPASS ====
+
+fn SCNetworkReachabilityCreateWithAddress(_env: &mut Environment, _allocator: ConstVoidPtr, _address: ConstVoidPtr) -> ConstVoidPtr {
+    // Return a dummy handle so the game thinks it successfully created a network target
+    crate::mem::Ptr::from_bits(0xDEADBEEF) 
+}
+
+fn SCNetworkReachabilityCreateWithName(_env: &mut Environment, _allocator: ConstVoidPtr, _nodename: ConstVoidPtr) -> ConstVoidPtr {
+    // Return a dummy handle for named host targets (like ea.com)
+    crate::mem::Ptr::from_bits(0xDEADBEEF) 
+}
+
+fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: ConstVoidPtr, flags_out: MutPtr<u32>) -> i32 {
+    if !flags_out.is_null() {
+        // 2 = kSCNetworkReachabilityFlagsReachable
+        // This tells the EA engine "You have a solid Wi-Fi connection!"
+        env.mem.write::<u32>(flags_out, 2); 
+    }
+    1 // Return 1 (true) for Success
+}
 
 // ==== FILE I/O BYPASS ====
 fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { -1 }
@@ -133,4 +153,9 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     
     export_c_func!(object_getClass(_)),
     export_c_func!(class_getProperty(_, _)),
+
+    // NEW: Network Reachability Exports
+    export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _, _)),
+    export_c_func!(SCNetworkReachabilityCreateWithName(_, _, _)),
+    export_c_func!(SCNetworkReachabilityGetFlags(_, _, _)),
 ];
