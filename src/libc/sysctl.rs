@@ -46,16 +46,20 @@ fn sysctlbyname(
 
     // EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
-        if !oldp.is_null() && !oldlenp.is_null() {
-            // Write 1 (enabled) as a 4-byte integer
-            env.mem.write::<i32>(oldp.cast(), 1);
-            env.mem.write::<u32>(oldlenp, 4);
+        if !oldlenp.is_null() {
+            if oldp.is_null() {
+                // STEP 1: The game is asking for the size of the answer. 
+                // Tell it we need 4 bytes for an integer.
+                env.mem.write::<u32>(oldlenp, 4);
+            } else {
+                // STEP 2: The game is asking for the actual value.
+                // Write 1 (enabled) and confirm the size is 4 bytes.
+                env.mem.write::<i32>(oldp.cast(), 1);
+                env.mem.write::<u32>(oldlenp, 4);
+            }
         }
         return 0;
     }
-
-    0
-}
 
 // ==== FONT CRASH BYPASSES ====
 fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
