@@ -115,7 +115,7 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     
     export_c_func!(__assert_rtn(_, _, _, _)),
     
-    // Export the new runtime functions globally
-    export_c_func!(object_getClass(_, _)),
-    export_c_func!(class_getProperty(_, _, _)),
+    // FIXED: Removed the extra underscores so the argument counts match!
+    export_c_func!(object_getClass(_)),
+    export_c_func!(class_getProperty(_, _)),
 ];
