@@ -352,8 +352,10 @@ fn connect(
     address_len: socklen_t,
 ) -> i32 {
     if !env.options.network_access {
-        // GAMELOFT BYPASS: Pretend we instantly connected to vgold.gameloft.com!
-        return 0;
+        // GAMELOFT BYPASS: Safely reject the connection here. Gameloft's engine 
+        // handles connect() failures cleanly and aborts the tracking payload!
+        crate::libc::errno::set_errno(env, 51);
+        return -1;
     }
 
     // TODO: handle errno properly
@@ -741,14 +743,6 @@ fn recv(
     length: GuestUSize,
     flags: i32,
 ) -> i32 {
-    if !env.options.network_access {
-        // GAMELOFT BYPASS: Serve a fake HTTP 200 OK response to break the profile.sav loop!
-        let fake_resp = b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 2\r\n\r\nOK";
-        let copy_len = std::cmp::min(length as usize, fake_resp.len());
-        env.mem.bytes_at_mut(buffer.cast(), copy_len as u32).copy_from_slice(&fake_resp[..copy_len]);
-        return copy_len as i32; // FIXED: Changed isize to i32
-    }
-
     recvfrom(env, socket, buffer, length, flags, Ptr::null(), Ptr::null())
 }
 
@@ -872,11 +866,6 @@ fn send(
     length: GuestUSize,
     flags: i32,
 ) -> i32 {
-    if !env.options.network_access {
-        // GAMELOFT BYPASS: Pretend the GET request was successfully sent!
-        return length as i32; // FIXED: Changed isize to i32
-    }
-
     // TODO: handle errno properly
     set_errno(env, 0);
 
