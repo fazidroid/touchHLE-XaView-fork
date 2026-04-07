@@ -34,6 +34,16 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
+    // ===== GAMELOFT GLOBAL TIMER HACK =====
+    // If the background thread asks to sleep, just ignore it and return immediately.
+    // This entirely bypasses the `Duration` float panics inside `ns_thread.rs` globally!
+    if sel_str == "sleepForTimeInterval:" {
+        log!("🛡️ ANTI-PANIC SHIELD: Bypassing sleepForTimeInterval: to prevent NaN crash!");
+        env.cpu.regs_mut()[0..2].fill(0);
+        return;
+    }
+    // ============================================
+
     // ===== URL Tracker & Telemetry Bypasses =====
     if sel_str == "HTTPMethod" || sel_str == "host" {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -103,7 +113,6 @@ fn objc_msgSend_inner(
                 is_metaclass,
                 ..
             } = class_host_object.as_any().downcast_ref().unwrap();
-
             // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
             log!(
                 "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
@@ -117,9 +126,11 @@ fn objc_msgSend_inner(
             );
             
             if sel_str == "self" {
-                env.cpu.regs_mut()[0] = receiver.to_bits(); // Return self
+                env.cpu.regs_mut()[0] = receiver.to_bits();
+// Return self
             } else {
-                env.cpu.regs_mut()[0..2].fill(0); // Return nil/0
+                env.cpu.regs_mut()[0..2].fill(0);
+// Return nil/0
             }
             return;
         }
@@ -131,7 +142,6 @@ fn objc_msgSend_inner(
                 return;
             }
         };
-
         if let Some(&super::ClassHostObject {
             superclass,
             ref methods,
@@ -144,7 +154,6 @@ fn objc_msgSend_inner(
             if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
                 if selector.as_str(&env.mem) == "play" || selector.as_str(&env.mem) == "stop" {
                     log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
-                    
                     let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                     if center_class != nil {
                         let center: id = msg![env; center_class defaultCenter];
@@ -160,7 +169,6 @@ fn objc_msgSend_inner(
             if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
                 if selector.as_str(&env.mem) == "play" || selector.as_str(&env.mem) == "stop" {
                     log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
-                    
                     let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                     if center_class != nil {
                         let center: id = msg![env; center_class defaultCenter];
@@ -181,7 +189,6 @@ fn objc_msgSend_inner(
             // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
             if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
                 log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
-                
                 if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
                     let delegate: id = msg![env; receiver delegate];
                     if delegate != nil {
@@ -231,11 +238,32 @@ fn objc_msgSend_inner(
                                 if tolerate_type_mismatch {
                                     log!("Warning: {}", msg);
                                 } else {
-                                    panic!("{}", msg);
+                                    // GAMELOFT HACK: Prevent type mismatch panics!
+                                    log!("🛡️ ANTI-PANIC SHIELD: Bypassing type mismatch panic! {}", msg);
+                                    env.cpu.regs_mut()[0..2].fill(0);
+                                    return;
                                 }
                             }
                         }
-                        host_imp.call_from_guest(env)
+                        
+                        // ===== THE ULTIMATE GLOBAL PANIC SHIELD =====
+                        // Instead of running the host method normally and letting a Float NaN panic 
+                        // kill the emulator, we run it inside a protected sandbox (catch_unwind).
+                        let env_ptr = env as *mut Environment;
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            unsafe { host_imp.call_from_guest(&mut *env_ptr) }
+                        }));
+
+                        if result.is_err() {
+                            unsafe {
+                                crate::log!(
+                                    "🛡️ ANTI-PANIC SHIELD ACTIVATED 🛡️\nIntercepted fatal Rust panic in method '{}'! Forcing a nil return instead of crashing.",
+                                    selector.as_str(&(*env_ptr).mem)
+                                );
+                                (*env_ptr).cpu.regs_mut()[0..2].fill(0);
+                            }
+                        }
+                        // ============================================
                     }
                     IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
                 }
