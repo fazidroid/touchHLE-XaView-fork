@@ -121,29 +121,25 @@ fn objc_msgSend_inner(
                     store_lock.as_mut().unwrap().insert(receiver.to_bits(), vc.to_bits());
                     drop(store_lock);
                     
-                    let sel_view = env.objc.lookup_selector("view").unwrap();
-                    let view: id = crate::objc::msg_send_no_type_checking(env, (vc, sel_view));
+                    let view: id = crate::msg![env; vc view];
                     if view != nil {
-                        let sel_bounds = env.objc.lookup_selector("bounds").unwrap();
-                        let mut window_bounds: crate::frameworks::core_graphics::CGRect = crate::objc::msg_send_no_type_checking(env, (receiver, sel_bounds));
+                        let window_bounds = crate::frameworks::core_graphics::CGRect {
+                            origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
+                            size: crate::frameworks::core_graphics::CGSize { width: 1024.0, height: 768.0 },
+                        };
                         
-                        // FixZeroFrame
-                        if window_bounds.size.width == 0.0 || window_bounds.size.height == 0.0 {
-                            window_bounds.size.width = 1024.0;
-                            window_bounds.size.height = 768.0;
-                            let sel_set_frame = env.objc.lookup_selector("setFrame:").unwrap();
-                            let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_set_frame, window_bounds));
-                        }
+                        // FixStructAbiFrame
+                        let _: () = crate::msg![env; receiver setFrame:window_bounds];
+                        let _: () = crate::msg![env; view setFrame:window_bounds];
                         
-                        let sel_set_frame = env.objc.lookup_selector("setFrame:").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_set_frame, window_bounds));
+                        let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
                         
-                        let sel_add_subview = env.objc.lookup_selector("addSubview:").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_add_subview, view));
+                        let sel_add = env.objc.lookup_selector("addSubview:").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_add, view));
                         
-                        // ForceKeyAndVisible
-                        let sel_make_key = env.objc.lookup_selector("makeKeyAndVisible").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_make_key));
+                        let sel_key = env.objc.lookup_selector("makeKeyAndVisible").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_key));
                     }
                 }
                 env.cpu.regs_mut()[0..2].fill(0);
