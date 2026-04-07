@@ -34,9 +34,24 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== GAMELOFT UDID & DEVICE BYPASS =====
-    // ===== NFS SHIFT 2 EA LOGO & HARDWARE FIXES =====
-    // 1. Force the game to skip the EA Intro Video so it doesn't wait forever!
+    // ===== EA SHIFT 2 BYPASSES =====
+    if sel_str == "currentDevice" || sel_str == "decimalDigitCharacterSet" {
+        // Return a dummy valid object so the game doesn't crash on (null)
+        let dummy = crate::frameworks::foundation::ns_string::from_rust_string(env, "dummy".to_string());
+        env.cpu.regs_mut()[0] = dummy.to_bits();
+        return;
+    }
+    if sel_str == "platformClass" || sel_str == "model" || sel_str == "localizedModel" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    if sel_str == "systemVersion" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    
     if sel_str == "initWithContentURL:" {
         env.cpu.regs_mut()[0] = 0; // Return nil to abort video playback
         return;
