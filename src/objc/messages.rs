@@ -23,7 +23,28 @@ fn objc_msgSend_inner(
     let message_type_info = env.objc.message_type_info.take();
     let sel_str = selector.as_str(&env.mem);
 
+    // ===== NFS MOST WANTED MTX / STOREFRONT BYPASS =====
+    // 1. Pretend the MTX controller is always ready and authorized
+    if sel_str == "canMakePayments" {
+        env.cpu.regs_mut()[0] = 1; // Return YES
+        return;
+    }
+
+    // 2. Bypass MTX initialization check
+    if sel_str == "CheckMTXController" || sel_str == "isMTXReady" {
+        env.cpu.regs_mut()[0] = 1; // Return true
+        return;
+    }
+
+    // 3. Prevent crash when the engine looks for the 'Main' Window during MTX setup
+    if sel_str == "keyWindow" {
+        // Return the receiver if it's likely a UIWindow, or nil if unsure
+        env.cpu.regs_mut()[0] = receiver.to_bits(); 
+        return;
+    }
+
     // ===== GAMELOFT UDID & DEVICE BYPASS =====
+    
     if sel_str == "uniqueIdentifier" {
         let fake = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = fake.to_bits();
