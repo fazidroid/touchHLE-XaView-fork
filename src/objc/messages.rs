@@ -23,7 +23,33 @@ fn objc_msgSend_inner(
     let message_type_info = env.objc.message_type_info.take();
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== NFS MOST WANTED: VIDEO & AUTOLOG INFINITE LOOP FIX =====
+    // ===== NFS MOST WANTED: ULTIMATE MTX / STOREFRONT BYPASS =====
+    
+    // 1. Give the MTX crypto-hasher a valid UDID so it doesn't fail its internal setup
+    if sel_str == "uniqueIdentifier" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    // 2. Force EA Reachability to report Online (WiFi) so the storefront initializes
+    if sel_str == "currentReachabilityStatus" {
+        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
+        return;
+    }
+
+    // 3. Prevent any Singletons/Controllers from returning 'nil'. 
+    // If these return nil, Apple's StoreKit crashes the EA engine!
+    if sel_str == "defaultQueue" || sel_str == "sharedController" || sel_str == "sharedManager" {
+        env.cpu.regs_mut()[0] = 0xDEADBEEF; // Fallback dummy pointer
+        return;
+    }
+
+    // 4. Direct MTX status bypasses (Force success)
+    if sel_str == "canMakePayments" || sel_str == "isMTXReady" || sel_str == "isReady" {
+        env.cpu.regs_mut()[0] = 1; // 1 = YES / true
+        return;
+    }
 
     // 1. Force the Intro Video to instantly skip.
     // (Without this, the game waits forever on a black screen for a video finish notification)
