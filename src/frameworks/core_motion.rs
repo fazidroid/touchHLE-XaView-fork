@@ -23,20 +23,19 @@ const CLASSES: ClassExports = objc_classes! {
 @implementation CMMotionManager: NSObject
 
 - (bool)isGyroAvailable {
-    // It could make sense to implement gyroscope support at least for Android.
-    log!("TODO: [(CMMotionManager *){:?} isGyroAvailable] -> false", this);
-    false
+    // FakeGyroCheck
+    log!("TODO: [(CMMotionManager *){:?} isGyroAvailable] -> true", this);
+    true
 }
 - (bool)isDeviceMotionAvailable {
-    log!("TODO: [(CMMotionManager *){:?} isDeviceMotionAvailable] -> false", this);
-    // According to docs, this is functionally equivalent to `isGyroAvailable`
-    // method. (All devices have accelerometer, but only some do have gyro).
-    false
+    // FakeDeviceMotion
+    log!("TODO: [(CMMotionManager *){:?} isDeviceMotionAvailable] -> true", this);
+    true
 }
 - (bool)isAccelerometerAvailable {
     // FakeAccelerometerCheck
-    log!("TODO: [(CMMotionManager *){:?} isAccelerometerAvailable] -> false", this);
-    false
+    log!("TODO: [(CMMotionManager *){:?} isAccelerometerAvailable] -> true", this);
+    true
 }
 
 @end
