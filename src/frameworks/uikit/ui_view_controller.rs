@@ -131,9 +131,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     let view_alloc: id = msg![env; view_class alloc];
     
-    // FixDoubleInit
+    // FixLandscapeFrame
     let screen: id = msg_class![env; UIScreen mainScreen];
-    let app_frame: crate::frameworks::core_graphics::CGRect = msg![env; screen applicationFrame];
+    let mut app_frame: crate::frameworks::core_graphics::CGRect = msg![env; screen applicationFrame];
+    if app_frame.size.width < app_frame.size.height {
+        app_frame.size = crate::frameworks::core_graphics::CGSize {
+            width: app_frame.size.height,
+            height: app_frame.size.width,
+        };
+    }
+    
     let view: id = msg![env; view_alloc initWithFrame:app_frame];
     
     let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
