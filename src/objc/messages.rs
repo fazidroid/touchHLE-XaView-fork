@@ -34,16 +34,6 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
-    // ===== GAMELOFT UDID BYPASS =====
-    if sel_str == "uniqueIdentifier" {
-        log!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier] to fix udid=(null) loops!");
-        // Return a standard 40-character Apple UDID
-        let fake_udid = crate::frameworks::foundation::ns_string::from_rust_string(
-            env, "1234567890abcdef1234567890abcdef12345678".to_string()
-        );
-        env.cpu.regs_mut()[0] = fake_udid.to_bits();
-        return;
-    }
     // ===== GAMELOFT GLOBAL TIMER HACK =====
     // If the background thread asks to sleep, just ignore it and return immediately.
     // This entirely bypasses the `Duration` float panics inside `ns_thread.rs` globally!
@@ -264,15 +254,16 @@ fn objc_msgSend_inner(
                             unsafe { host_imp.call_from_guest(&mut *env_ptr) }
                         }));
 
-                        if result.is_err() {
+                                                if result.is_err() {
                             unsafe {
-                                crate::log!(
+                                log!(
                                     "🛡️ ANTI-PANIC SHIELD ACTIVATED 🛡️\nIntercepted fatal Rust panic in method '{}'! Forcing a nil return instead of crashing.",
                                     selector.as_str(&(*env_ptr).mem)
                                 );
                                 (*env_ptr).cpu.regs_mut()[0..2].fill(0);
                             }
                         }
+
                         // ============================================
                     }
                     IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
