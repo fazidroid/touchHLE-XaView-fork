@@ -34,6 +34,40 @@ fn objc_msgSend_inner(
 
     let sel_str = selector.as_str(&env.mem);
 
+    // ===== NFS SHIFT / EA ENGINE BYPASSES =====
+    
+    // 1. Correct Character Set Bypass (Prevents characterIsMember: crash)
+    if sel_str == "decimalDigitCharacterSet" {
+        env.cpu.regs_mut()[0] = 0xDEADBEEF; // Return a dummy handle
+        return;
+    }
+    if sel_str == "characterIsMember:" {
+        env.cpu.regs_mut()[0] = 1; // Pretend every character is a member
+        return;
+    }
+
+    // 2. MTX / Storefront Bypass (Fixes CheckMTXController crash)
+    if sel_str == "canMakePayments" || sel_str == "isMTXReady" {
+        env.cpu.regs_mut()[0] = 1; // Return YES/true
+        return;
+    }
+
+    // 3. Hardware Identity & Telemetry Fixes
+    if sel_str == "currentDevice" {
+        env.cpu.regs_mut()[0] = receiver.to_bits();
+        return;
+    }
+    if sel_str == "platformClass" || sel_str == "model" || sel_str == "localizedModel" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "iPhone".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+    if sel_str == "systemVersion" {
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
     // ===== NFS MOST WANTED MTX / STOREFRONT BYPASS =====
     // 1. Pretend the MTX controller is always ready and authorized
     if sel_str == "canMakePayments" {
