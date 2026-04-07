@@ -8,7 +8,7 @@
 use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::dyld::{ConstantExports, HostConstant};
 use crate::frameworks::foundation::{NSInteger, NSUInteger};
-use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr};
+use crate::mem::{ConstVoidPtr, GuestUSize, MutVoidPtr}; // Removed ConstPtr and MutPtr
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
@@ -52,9 +52,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)unarchiveObjectWithFile:(id)path {
     let data: id = msg_class![env; NSData dataWithContentsOfFile:path];
-    if data == nil {
-        return nil;
-    }
+    if data == nil { return nil; }
     msg![env; this unarchiveObjectWithData:data]
 }
 
@@ -67,9 +65,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initForReadingWithData:(id)data {
-    if data == nil {
-        return nil;
-    }
+    if data == nil { return nil; }
+
     let length: NSUInteger = msg![env; data length];
     let bytes: ConstVoidPtr = msg![env; data bytes];
     let slice = env.mem.bytes_at(bytes.cast(), length);
@@ -191,20 +188,32 @@ fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
 
 pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
     let keys = keys_for_key(env, unarchiver, "NS.objects");
-    keys.into_iter().map(|k| retain(env, unarchive_key(env, unarchiver, k))).collect()
+    keys.into_iter()
+        .map(|k| {
+            // FIXED: Separation of calls to resolve double-mutable borrow of env
+            let obj = unarchive_key(env, unarchiver, k);
+            retain(env, obj)
+        })
+        .collect()
 }
 
 pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id)> {
     let ks = keys_for_key(env, unarchiver, "NS.keys");
     let vs = keys_for_key(env, unarchiver, "NS.objects");
-    ks.into_iter().zip(vs).map(|(k, v)| (unarchive_key(env, unarchiver, k), unarchive_key(env, unarchiver, v))).collect()
+    ks.into_iter()
+        .zip(vs)
+        .map(|(k, v)| {
+            (unarchive_key(env, unarchiver, k), unarchive_key(env, unarchiver, v))
+        })
+        .collect()
 }
 
 pub fn decode_current_date(env: &mut Environment, unarchiver: id) -> id {
     let k = get_static_str(env, "NS.time");
-    if let Some(t) = get_value_to_decode_for_key(env, unarchiver, k).and_then(|v| v.as_real()) {
+    let val_opt = get_value_to_decode_for_key(env, unarchiver, k).and_then(|v| v.as_real());
+    if let Some(val) = val_opt {
         let date: id = msg_class![env; NSDate alloc];
-        return msg![env; date initWithTimeIntervalSinceReferenceDate:t];
+        return msg![env; date initWithTimeIntervalSinceReferenceDate:val];
     }
     nil
 }
@@ -216,9 +225,10 @@ pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bo
         let len: GuestUSize = bytes.len() as GuestUSize;
         let g_bytes = env.mem.alloc(len);
         env.mem.bytes_at_mut(g_bytes.cast(), len).copy_from_slice(&bytes);
-        let cls = env.objc.get_known_class(if is_mutable { "NSMutableData" } else { "NSData" }, &mut env.mem);
-        let data: id = msg![env; cls alloc];
-        return msg![env; data initWithBytesNoCopy:g_bytes length:len freeWhenDone:true];
+        let cls_name = if is_mutable { "NSMutableData" } else { "NSData" };
+        let data_class: id = env.objc.get_known_class(cls_name, &mut env.mem);
+        let data_instance: id = msg![env; data_class alloc];
+        return msg![env; data_instance initWithBytesNoCopy:g_bytes length:len freeWhenDone:true];
     }
     nil
 }
@@ -226,7 +236,8 @@ pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bo
 fn keys_for_key(env: &mut Environment, unarchiver: id, key: &str) -> Vec<Uid> {
     let host_obj = borrow_host_obj(env, unarchiver);
     if let Some(curr) = host_obj.current_key {
-        if let Some(dict) = host_obj.plist["$objects"].as_array().unwrap()[curr.get() as usize].as_dictionary() {
+        let objects = &host_obj.plist["$objects"];
+        if let Some(dict) = objects.as_array().unwrap()[curr.get() as usize].as_dictionary() {
             if let Some(Value::Array(keys)) = dict.get(key) {
                 return keys.iter().filter_map(|v| v.as_uid().copied()).collect();
             }
