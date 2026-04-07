@@ -29,6 +29,7 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
+    // 1. Device Spoof
     if name_str == "hw.machine" {
         let hw = b"iPhone4,1\0";
         if !oldlenp.is_null() {
@@ -44,22 +45,23 @@ fn sysctlbyname(
         return 0;
     }
 
-    // EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
+    // 2. EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
         if !oldlenp.is_null() {
             if oldp.is_null() {
-                // STEP 1: The game is asking for the size of the answer. 
-                // Tell it we need 4 bytes for an integer.
+                // Size query
                 env.mem.write::<u32>(oldlenp, 4);
             } else {
-                // STEP 2: The game is asking for the actual value.
-                // Write 1 (enabled) and confirm the size is 4 bytes.
+                // Value query
                 env.mem.write::<i32>(oldp.cast(), 1);
                 env.mem.write::<u32>(oldlenp, 4);
             }
         }
         return 0;
     }
+
+    0
+}
 
 // ==== FONT CRASH BYPASSES ====
 fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
@@ -89,18 +91,16 @@ fn __assert_rtn(
     panic!("\n\nEA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\n\n", file_str, line, func_str, expr_str);
 }
 
-// ==== NEW: OBJECTIVE-C RUNTIME FIXES (Fixes MTX Crash) ====
+// ==== OBJECTIVE-C RUNTIME FIXES ====
 fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
     if obj.is_null() {
         return crate::mem::Ptr::null();
     }
-    // In Objective-C, the first 4 bytes of the object struct contain the 'isa' (Class) pointer.
     let isa = env.mem.read::<u32, false>(obj.cast());
     crate::mem::Ptr::from_bits(isa)
 }
 
 fn class_getProperty(_env: &mut Environment, _cls: ConstVoidPtr, _name: ConstVoidPtr) -> ConstVoidPtr {
-    // Return NULL to safely indicate the property wasn't found (prevents crash)
     crate::mem::Ptr::null()
 }
 
@@ -121,7 +121,6 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     
     export_c_func!(__assert_rtn(_, _, _, _)),
     
-    // FIXED: Removed the extra underscores so the argument counts match!
     export_c_func!(object_getClass(_)),
     export_c_func!(class_getProperty(_, _)),
 ];
