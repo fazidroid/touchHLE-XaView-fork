@@ -105,8 +105,6 @@ fn objc_msgSend_inner(
             } = class_host_object.as_any().downcast_ref().unwrap();
 
             // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
-            // Instead of crashing the emulator when a method is missing, we safely print a warning and return 0 (nil).
-            // This instantly bypasses EVERY missing ad network and tracking method Gameloft throws at us!
             log!(
                 "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
                 if is_metaclass { "Class" } else { "Object" },
@@ -142,6 +140,22 @@ fn objc_msgSend_inner(
         }) = host_object.as_any().downcast_ref()
         {
             
+            // ===== GAMELOFT VIDEO HANG BYPASS =====
+            if name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController" {
+                if selector.as_str(&env.mem) == "play" || selector.as_str(&env.mem) == "stop" {
+                    log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
+                    
+                    let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
+                    if center_class != nil {
+                        let center: id = msg![env; center_class defaultCenter];
+                        let notif_name = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+                        let _: () = msg![env; center postNotificationName:notif_name object:receiver];
+                    }
+                    env.cpu.regs_mut()[0..2].fill(0);
+                    return;
+                }
+            }
+
             // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
             if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
                 log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
@@ -238,9 +252,13 @@ fn objc_msgSend_inner(
             env.cpu.regs_mut()[0..2].fill(0);
             return;
         } else {
-            panic!(
-                "Item {class:?} in superclass chain of object {receiver:?}'s class {orig_class:?} has an unexpected host object type."
+            // FIXED: SAFE BYPASS FOR EA GAMES
+            log!(
+                "SAFE BYPASS: Item {:?} in superclass chain of object {:?}'s class {:?} has an unexpected host object type. Returning 0 to prevent crash.",
+                class, receiver, orig_class
             );
+            env.cpu.regs_mut()[0..2].fill(0);
+            return;
         }
     }
 }
