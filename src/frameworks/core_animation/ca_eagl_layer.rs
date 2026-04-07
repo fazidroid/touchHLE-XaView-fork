@@ -76,18 +76,28 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
 
     while let Some(current) = stack.pop() {
         if current == nil { continue; }
-        let host: &CALayerHostObject = env.objc.borrow(current);
+        
+        // FixBorrowChecker
+        let is_hidden;
+        let has_pixels;
+        {
+            let host: &CALayerHostObject = env.objc.borrow(current);
+            is_hidden = host.hidden || host.opacity == 0.0;
+            has_pixels = host.presented_pixels.is_some();
+        }
 
-        if host.hidden || host.opacity == 0.0 {
+        if is_hidden {
             continue;
         }
 
         let is_eagl: bool = msg![env; current isKindOfClass:ca_eagl_layer_class];
-        if is_eagl || host.presented_pixels.is_some() {
+        if is_eagl || has_pixels {
             eagl_layer = current;
             break;
         }
 
+        // ReborrowSublayers
+        let host: &CALayerHostObject = env.objc.borrow(current);
         for &sub in &host.sublayers {
             stack.push(sub);
         }
