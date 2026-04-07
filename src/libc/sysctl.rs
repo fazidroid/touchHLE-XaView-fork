@@ -30,6 +30,7 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
+    // Spoof device as iPhone 4S
     if name_str == "hw.machine" {
         log!("GAMELOFT/EA BYPASS: Forcing hw.machine to iPhone4,1");
         let hw = b"iPhone4,1\0";
@@ -42,6 +43,16 @@ fn sysctlbyname(
                 env.mem.bytes_at_mut(oldp.cast(), copy_len as u32).copy_from_slice(&hw[..copy_len]);
                 env.mem.write(oldlenp, copy_len as u32);
             }
+        }
+        return 0;
+    }
+
+    // NEW: Spoof capability check (Required for EA MTX Controller)
+    if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
+        log!("EA BYPASS: Spoofing {} capability", name_str);
+        if !oldp.is_null() && !oldlenp.is_null() {
+            env.mem.write::<i32>(oldp.cast(), 1);
+            env.mem.write::<u32>(oldlenp, 4);
         }
         return 0;
     }
