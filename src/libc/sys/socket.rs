@@ -351,8 +351,9 @@ fn connect(
     address: ConstPtr<sockaddr>,
     address_len: socklen_t,
 ) -> i32 {
-        // EXCLUSIVE HACK: Allow socket creation for Asphalt 6 even if network is disabled globally.
-    let is_asphalt6 = env.options.app_bundle_id == "com.gameloft.Asphalt6ipad";
+            // EXCLUSIVE HACK: Allow socket creation for Asphalt 6 even if network is disabled globally.
+    // Changed env.options.app_bundle_id to env.app_bundle_id
+    let is_asphalt6 = env.app_bundle_id == "com.gameloft.Asphalt6ipad";
     
     if !env.options.network_access && !is_asphalt6 {
         log_dbg!(
