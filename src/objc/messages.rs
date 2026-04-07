@@ -44,7 +44,7 @@ fn objc_msgSend_inner(
     // 2. NFS SHIFT 2: DEVICE & HARDWARE SPOOFS
     // ==========================================================
 
-    if sel_str == "currentDevice" || sel_str == "keyWindow" || sel_str == "mainScreen" {
+    if sel_str == "currentDevice" || sel_str == "keyWindow" {
         env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
         return;
     }
