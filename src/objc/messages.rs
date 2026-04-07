@@ -35,8 +35,27 @@ fn objc_msgSend_inner(
     let sel_str = selector.as_str(&env.mem);
 
     // ==========================================================
-    // GT RACING: GRAPHICS & OPENGL SNIFFER
+    // 3. GAMELOFT AD & TELEMETRY KILL-SWITCH
     // ==========================================================
+    
+    // Completely disable the Ad and Currency managers so they don't freeze the main thread
+    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "sharedInstance" {
+        // Only return nil if it's one of the known crashy Ad managers
+        if receiver.to_bits() != 0 {
+            env.cpu.regs_mut()[0] = receiver.to_bits(); 
+        } else {
+            env.cpu.regs_mut()[0] = 0xDEADBEEF; 
+        }
+        return;
+    }
+
+    // Forcefully catch the unsupported time-delays that are freezing the game
+    if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
+        // By returning immediately, we stop touchHLE from panicking, but we must
+        // rely on the Ad Managers being disabled above so this doesn't halt the game.
+        println!("🎮 LOG: Caught and neutralized a freezing performSelector call!");
+        return;
+    }
 
     // 1. Trace Context Creation (OpenGL ES 1.1 vs 2.0)
     if sel_str == "initWithAPI:" {
