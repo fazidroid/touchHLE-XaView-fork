@@ -1951,19 +1951,25 @@ with_ctx_and_mem(env, |gles, _mem| unsafe {
 for n in n3 {
                 gles.BindAttribLocation(program, 3, n.as_ptr() as _);
 }
-            let n4 = [
+                        let n4 = [
                 c"texCoord1",
                 c"a_texCoord1",
                 c"aTexCoord1",
                 c"inTexCoord1",
                 c"rm_TexCoord1",
-     
-       ];
+            ];
             for n in n4 {
                 gles.BindAttribLocation(program, 4, n.as_ptr() as _);
-}
+            }
+            
+            // GAMELOFT BYPASS: Bind missing Tangent and Binormal maps for car reflections!
+            let n5 = [c"tangent", c"a_tangent", c"aTangent", c"inTangent", c"rm_Tangent"];
+            for n in n5 { gles.BindAttribLocation(program, 5, n.as_ptr() as _); }
+            let n6 = [c"binormal", c"a_binormal", c"aBinormal", c"inBinormal", c"rm_Binormal"];
+            for n in n6 { gles.BindAttribLocation(program, 6, n.as_ptr() as _); }
         }
         gles.LinkProgram(program);
+
 if is_gles2 {
             let mut status = 0;
 gles.GetProgramiv(program, 0x8B82 /* GL_LINK_STATUS */, &mut status);
@@ -2183,9 +2189,22 @@ fn glUniformMatrix2fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
-        gles.UniformMatrix2fv(location, count, transpose, ptr);
+        if transpose != 0 {
+            let mut transposed = vec![0.0; (count * 4) as usize];
+            for c in 0..count as usize {
+                for i in 0..2 {
+                    for j in 0..2 {
+                        transposed[c * 4 + i * 2 + j] = *ptr.add(c * 4 + j * 2 + i);
+                    }
+                }
+            }
+            gles.UniformMatrix2fv(location, count, 0, transposed.as_ptr());
+        } else {
+            gles.UniformMatrix2fv(location, count, 0, ptr);
+        }
     })
 }
+
 fn glUniformMatrix3fv(
     env: &mut Environment,
     location: GLint,
@@ -2193,12 +2212,24 @@ fn glUniformMatrix3fv(
     transpose: GLboolean,
     value: ConstPtr<GLfloat>,
 ) {
-    with_ctx_and_mem(env, 
-|gles, mem| unsafe {
+    with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 9) as u32);
-        gles.UniformMatrix3fv(location, count, transpose, ptr);
+        if transpose != 0 {
+            let mut transposed = vec![0.0; (count * 9) as usize];
+            for c in 0..count as usize {
+                for i in 0..3 {
+                    for j in 0..3 {
+                        transposed[c * 9 + i * 3 + j] = *ptr.add(c * 9 + j * 3 + i);
+                    }
+                }
+            }
+            gles.UniformMatrix3fv(location, count, 0, transposed.as_ptr());
+        } else {
+            gles.UniformMatrix3fv(location, count, 0, ptr);
+        }
     })
 }
+
 fn glUniformMatrix4fv(
     env: &mut Environment,
     location: GLint,
@@ -2208,10 +2239,23 @@ fn glUniformMatrix4fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
-        gles.UniformMatrix4fv(location, count, transpose, value_ptr);
-   
- })
+        if transpose != 0 {
+            let mut transposed = vec![0.0; (count * 16) as usize];
+            for c in 0..count as usize {
+                for i in 0..4 {
+                    for j in 0..4 {
+                        transposed[c * 16 + i * 4 + j] = *value_ptr.add(c * 16 + j * 4 + i);
+                    }
+                }
+            }
+            gles.UniformMatrix4fv(location, count, 0, transposed.as_ptr());
+        } else {
+            gles.UniformMatrix4fv(location, count, 0, value_ptr);
+        }
+    })
 }
+
+
 fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
     with_ctx_and_mem_no_skip(env, |gles, mem|
 unsafe {
