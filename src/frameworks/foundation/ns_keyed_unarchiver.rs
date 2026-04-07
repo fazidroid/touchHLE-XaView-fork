@@ -66,7 +66,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initForReadingWithData:(id)data {
-    if (data == nil) { return nil; }
+    if data == nil { return nil; }
 
     let length: NSUInteger = msg![env; data length];
     let bytes: ConstVoidPtr = msg![env; data bytes];
@@ -190,7 +190,13 @@ fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
 // FIXED: Added missing functions required by NSArray and NSDictionary
 pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
     let keys = keys_for_key(env, unarchiver, "NS.objects");
-    keys.into_iter().map(|k| retain(env, unarchive_key(env, unarchiver, k))).collect()
+    keys.into_iter()
+        .map(|k| {
+            // FIXED: Separate the calls into two steps to drop the mutable borrow
+            let obj = unarchive_key(env, unarchiver, k);
+            retain(env, obj)
+        })
+        .collect()
 }
 
 pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id)> {
