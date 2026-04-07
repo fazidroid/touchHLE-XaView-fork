@@ -18,6 +18,9 @@ use std::str::FromStr;
 
 pub mod qsort;
 
+// GlobalHackWindow
+pub static HACK_MAIN_WINDOW: std::sync::Mutex<u32> = std::sync::Mutex::new(0);
+
 #[derive(Default)]
 pub struct State {
     rand: u32,
