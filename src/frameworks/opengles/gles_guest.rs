@@ -1764,76 +1764,42 @@ fn glShaderSource(
 ) {
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
-        let mut shader_type = 0;
-        if is_gles2 {
-            gles.GetShaderiv(shader, 0x8B4F, &mut shader_type);
-        }
-
         let count_usize = count as usize;
         let string_arr = mem.ptr_at(string.cast::<ConstVoidPtr>(), count as u32);
-        let length_arr = if length.is_null() {
-            std::ptr::null()
-        } else {
-            mem.ptr_at(length, count as u32)
-        };
+        let length_arr = if length.is_null() { std::ptr::null() } else { mem.ptr_at(length, count as u32) };
 
         let mut full_source = String::new();
         for i in 0..count_usize {
             let guest_str_ptr = *string_arr.add(i);
-            let host_str_ptr = mem
-                .unchecked_ptr_at(guest_str_ptr.cast::<u8>(), 0)
-                .cast::<std::ffi::c_char>();
-            let str_len = if !length_arr.is_null() && *length_arr.add(i) >= 0 {
-                *length_arr.add(i) as usize
-            } else {
-                std::ffi::CStr::from_ptr(host_str_ptr).to_bytes().len()
-            };
-            // UnnecessaryCastFix
+            let host_str_ptr = mem.unchecked_ptr_at(guest_str_ptr.cast::<u8>(), 0).cast::<std::ffi::c_char>();
+            let str_len = if !length_arr.is_null() && *length_arr.add(i) >= 0 { *length_arr.add(i) as usize } 
+                          else { std::ffi::CStr::from_ptr(host_str_ptr).to_bytes().len() };
             let slice = std::slice::from_raw_parts(host_str_ptr.cast::<u8>(), str_len);
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
         if is_gles2 {
-            // ==========================================
-            // GAMELOFT SHADER SANITIZER:
-            // Strip illegal arguments from #endif and #else 
-            // to satisfy strict modern NVIDIA/AMD drivers.
-            // ==========================================
-            let mut sanitized_source = String::new();
+            // GAMELOFT SUPER SANITIZER: Aggressively strip illegal #endif/else tags
+            let mut sanitized = String::new();
             for line in full_source.lines() {
-                let trimmed = line.trim_start();
-                if trimmed.starts_with("#endif") {
-                    sanitized_source.push_str("#endif\n");
-                } else if trimmed.starts_with("#else") {
-                    sanitized_source.push_str("#else\n");
-                } else {
-                    sanitized_source.push_str(line);
-                    sanitized_source.push('\n');
-                }
+                let t = line.trim();
+                if t.starts_with("#endif") { sanitized.push_str("#endif\n"); }
+                else if t.starts_with("#else") { sanitized.push_str("#else\n"); }
+                else { sanitized.push_str(line); sanitized.push('\n'); }
             }
-            full_source = sanitized_source;
-            // ==========================================
+            full_source = sanitized;
 
-            // SmartPrecisionInject
-            let mut s = full_source.clone();
-            if !s.contains("precision ") {
+            // Precision Injection
+            if !full_source.contains("precision ") {
                 let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
-                if let Some(pos) = s.find("#version") {
-                    let nl = s[pos..].find('\n').unwrap_or(0);
-                    s.insert_str(pos + nl + 1, inject);
-                } else {
-                    s.insert_str(0, inject);
-                }
+                full_source.insert_str(0, inject);
             }
-            full_source = s;
         }
 
         let c_source = std::ffi::CString::new(full_source.replace("\0", "")).unwrap();
-        let c_source_ptr = c_source.as_ptr();
-        let c_len = c_source.as_bytes().len() as GLint;
-        let c_source_array = [c_source_ptr];
-        let c_len_array = [c_len];
-        gles.ShaderSource(shader, 1, c_source_array.as_ptr(), c_len_array.as_ptr());
+        let ptrs = [c_source.as_ptr()];
+        let lens = [c_source.as_bytes().len() as GLint];
+        gles.ShaderSource(shader, 1, ptrs.as_ptr(), lens.as_ptr());
     })
 }
 // GuestDeleteShaderImpl
