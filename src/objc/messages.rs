@@ -43,7 +43,6 @@ fn objc_msgSend_inner(
     // ==========================================================
     
     // We return nil (0) for initialization. The game skips the video player entirely.
-    // This removes the msg! calls that caused your stack overflow!
     if sel_str == "initWithContentURL:" || sel_str == "initWithContentURL:error:" || 
        sel_str == "connectionWithRequest:delegate:" || sel_str == "initWithRequest:delegate:" || 
        sel_str == "sendSynchronousRequest:returningResponse:error:" {
@@ -65,6 +64,11 @@ fn objc_msgSend_inner(
     // 3. DEVICE IDENTITY (Fixes (null) and UDID Errors)
     // ==========================================================
     
+    if sel_str == "currentDevice" || sel_str == "keyWindow" {
+        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
+        return;
+    }
+
     if sel_str == "uniqueIdentifier" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
@@ -114,9 +118,27 @@ fn objc_msgSend_inner(
         };
 
         if let Some(obj) = host_object.as_any().downcast_ref::<super::ClassHostObject>() {
+            
+            // FIXED: The missing `super2` logic that was causing the Stack Overflow!
+            // If the game calls `[super method]`, we MUST jump to the superclass before checking methods.
+            if super2.is_some() && class == orig_class {
+                class = obj.superclass;
+                continue;
+            }
+
             if let Some(imp) = obj.methods.get(&selector) {
                 match imp {
-                    IMP::Host(host_imp) => host_imp.call_from_guest(env),
+                    IMP::Host(host_imp) => {
+                        // Optional: Ensure type checking doesn't crash the game unnecessarily
+                        if let Some((sent_type_id, _)) = message_type_info {
+                            let (expected_type_id, _) = host_imp.type_info();
+                            if sent_type_id != expected_type_id && !tolerate_type_mismatch && 
+                               sel_str != "bytes" && sel_str != "length" {
+                                panic!("Type mismatch for {}!", sel_str);
+                            }
+                        }
+                        host_imp.call_from_guest(env)
+                    }
                     IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
                 }
                 return;
