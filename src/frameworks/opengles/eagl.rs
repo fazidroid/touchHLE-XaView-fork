@@ -258,7 +258,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         assert!((0.0..(u32::MAX as f32)).contains(&width));
         assert!((0.0..(u32::MAX as f32)).contains(&height));
         let scale_hack = env.options.scale_hack.get() as f32;
-        ((width * scale * scale_hack).round() as u32, (height * scale * scale_hack).round() as u32)
+        let final_w = (width * scale * scale_hack).round() as u32;
+        let final_h = (height * scale * scale_hack).round() as u32;
+        //DebugRenderSize
+        log!("DEBUG_EAGL: renderbufferStorage:fromDrawable: {:?} Bounds: w={}, h={} | scale={}, scale_hack={} | Final FBO: {}x{}", drawable, width, height, scale, scale_hack, final_w, final_h);
+        (final_w, final_h)
     };
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
@@ -332,9 +336,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // We're presenting to the opaque CAEAGLLayer that covers the screen.
     // We can use the fast path where we skip composition and present directly.
+    //DebugPresentPath
+    log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
     if drawable == fullscreen_layer {
-        log_dbg!(
-            "Layer {:?} is the fullscreen layer, presenting renderbuffer {:?} directly (fast path).",
+        log!(
+            "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
             drawable,
             renderbuffer,
         );
@@ -344,6 +350,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     } else {
         if fullscreen_layer != nil {
+            log!("DEBUG_EAGL: Layer {:?} is NOT fullscreen layer {:?}. Rendering to RAM (SLOW PATH) or skipped!", drawable, fullscreen_layer);
             // If there's a single layer that covers the screen, and this isn't
             // it, there's no point in presenting the output because it won't be
             // seen. Using a noisy log because it's a weird scenario and might
