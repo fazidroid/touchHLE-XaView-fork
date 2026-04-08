@@ -25,61 +25,53 @@ fn objc_msgSend_inner(
     // TARGETED RETINA DISPLAY SPOOF (GLES 2.0 HD Textures)
     // ==========================================================
 
-    // 1. Force the screen scale to 2.0 (Retina)
     if sel_str == "scale" {
-        env.cpu.regs_mut()[0] = 0x40000000; // 2.0 in IEEE 754 f32 hex
+        env.cpu.regs_mut()[0] = 0x40000000; 
         return;
     }
 
-    // 2. Safely tell the game we support Retina features ONLY
     if sel_str == "respondsToSelector:" {
-        // COMPILE-SAFE FIX: Bypass the private SEL struct entirely and read the string directly from RAM!
         let target_sel_ptr = crate::mem::ConstPtr::<u8>::from_bits(env.cpu.regs()[2]);
         let target_sel_bytes = env.mem.cstr_at(target_sel_ptr);
         let target_sel_str = String::from_utf8_lossy(target_sel_bytes);
         
-        // ONLY say YES (1) if it's specifically asking about modern screen features
         if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
             env.cpu.regs_mut()[0] = 1; 
             return;
         }
-        
-        // Let all other requests (like Ad Managers) fall through normally!
     }
-
-    // ==========================================================
-    // 1. GRAPHICS & OPENGL SNIFFER (GLES 2.0)
-    // ==========================================================
 
     if sel_str == "initWithAPI:" {
         let api_version = env.cpu.regs()[2]; 
-        println!("  GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
+        crate::log!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        println!("  GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        crate::log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
     // ==========================================================
-    // 2. NETWORK & AD KILL-SWITCH (Fixes the Loading Freeze)
+    // 2. NETWORK & AD KILL-SWITCH
     // ==========================================================
     
-    // Kill Network Connections (Prevents hanging on Gameloft Live)
     if sel_str == "connectionWithRequest:delegate:" || 
        sel_str == "initWithRequest:delegate:" || 
        sel_str == "sendSynchronousRequest:returningResponse:error:" {
-        env.cpu.regs_mut()[0] = 0; // Return nil
+        env.cpu.regs_mut()[0] = 0;
         return;
     }
 
-    // Disable Ad Managers safely
-    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" {
-        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF }; 
+    // 🛡️ SAFE POINTER BYPASS (Fixes MTX / Ad Segfaults)
+    // Returning fake raw hex like 0xDEADBEEF causes C++ to crash when dereferenced.
+    // Returning `receiver.to_bits()` gives it a real mapped object in memory!
+    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "currentDevice" || sel_str == "defaultQueue" {
+        crate::log!("🛡️ SAFE POINTER BYPASS: Spoofing {}", sel_str);
+        env.cpu.regs_mut()[0] = receiver.to_bits(); 
+        env.cpu.regs_mut()[1] = 0;
         return;
     }
 
-    // Neutralize thread-blocking delay loops
     if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
-        println!("  LOG: Caught and neutralized a freezing performSelector call!");
+        crate::log!("🎮 LOG: Caught and neutralized a freezing performSelector call!");
         return;
     }
 
@@ -90,11 +82,6 @@ fn objc_msgSend_inner(
     if sel_str == "uniqueIdentifier" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
-        return;
-    }
-
-    if sel_str == "currentDevice" {
-        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
         return;
     }
 
@@ -115,24 +102,20 @@ fn objc_msgSend_inner(
     // 3.5. EA GAMES MTX & STOREKIT BYPASS
     // ==========================================================
     
-    // Trick the EA engine into thinking Microtransactions are online and authorized.
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        println!("   EA MTX BYPASS: Faking StoreKit availability to YES!");
-        env.cpu.regs_mut()[0] = 1; // Return 1 (YES / True)
-        env.cpu.regs_mut()[1] = 0;
-        return;
-    }
-    
-    // If EA asks for the default payment queue, return a dummy object instead of nil
-    if sel_str == "defaultQueue" {
-        println!("   EA MTX BYPASS: Faking SKPaymentQueue defaultQueue!");
-        env.cpu.regs_mut()[0] = 0x30000000; // Fake safe pointer
+        crate::log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
+        env.cpu.regs_mut()[0] = 1; 
         env.cpu.regs_mut()[1] = 0;
         return;
     }
 
+    if sel_str == "transactions" {
+        env.cpu.regs_mut()[0] = 0; // Return empty/nil array safely
+        return;
+    }
+
     // ==========================================================
-    // 4. CORE DISPATCH LOGIC (With Recursion Fixes)
+    // 4. CORE DISPATCH LOGIC
     // ==========================================================
 
     if receiver == nil {
@@ -168,7 +151,6 @@ fn objc_msgSend_inner(
 
             let name = &obj.name;
 
-            // --- GAMELOFT VIDEO PLAYER BYPASS ---
             if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
                 let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                 if center_class != nil {
@@ -180,7 +162,6 @@ fn objc_msgSend_inner(
                 return;
             }
 
-            // --- NORMAL METHOD EXECUTION ---
             if let Some(imp) = obj.methods.get(&selector) {
                 match imp {
                     IMP::Host(host_imp) => {
