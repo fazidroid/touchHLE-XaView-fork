@@ -735,22 +735,9 @@ impl Dyld {
                     .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
                 Some((stubs, pic_offset))
             }) else {
-                let r12 = cpu.regs()[12];
-                let r0 = cpu.regs()[0];
-                // LogInlineSvc
-                log!("WARNING: Unresolved inline SVC at {:#010x}! Syscall ID (R12): {}, R0: {:#x}", svc_pc, r12, r0);
-                // SafeInlineSvc
+                log!("WARNING: Unresolved SVC at {:#010x}! Bypassing.", svc_pc);
+                // BypassInlineSVC
                 fn safe_fallback(env: &mut crate::Environment) {
-                    let r12 = env.cpu.regs()[12];
-                    if r12 == 10 {
-                        let r1 = env.cpu.regs()[1];
-                        let r2 = env.cpu.regs()[2];
-                        let ptr = env.mem.alloc(r2).to_bits();
-                        env.mem.write(crate::mem::MutPtr::<u32>::from_bits(r1), ptr);
-                        env.cpu.regs_mut()[0] = 0;
-                        println!("WARNING: Inline mach_vm_allocate size: {:#x} -> {:#x}", r2, ptr);
-                        return;
-                    }
                     env.cpu.regs_mut()[0] = 0;
                 }
                 return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
@@ -835,23 +822,6 @@ impl Dyld {
             }
         }
 
-        // FakeForkCall
-        if symbol == "_fork" {
-            fn fake_fork(env: &mut crate::Environment) {
-                env.cpu.regs_mut()[0] = 0xffffffff;
-            }
-            return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
-        }
-
-        // ImplDifftime
-        if symbol == "_difftime" {
-            fn impl_difftime(_env: &mut crate::Environment, time1: i32, time0: i32) -> f64 {
-                (time1 as f64) - (time0 as f64)
-            }
-            return Some(&(impl_difftime as fn(&mut crate::Environment, i32, i32) -> f64));
-        }
-
-        panic!("Call to unimplemented function {symbol}");
         log!("WARNING: unimplemented function {symbol}, using stub");
 
         fn dummy(env: &mut crate::Environment) {
@@ -859,7 +829,7 @@ impl Dyld {
         }
 
         let f: HostFunction = &(dummy as fn(&mut crate::Environment) -> ());
-        Some(f)
+        return Some(f);
     }
 
     /// Creates a guest function that will call a host function with the name

@@ -27,6 +27,7 @@ pub mod mach;
 pub mod mach_o;
 pub mod math;
 pub mod net;
+pub mod net_bypass;
 pub mod netdb;
 pub mod posix_io;
 pub mod pthread;
@@ -83,6 +84,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         pthread::mutex::FUNCTIONS,
         pthread::once::FUNCTIONS,
         pthread::thread::FUNCTIONS,
+        pthread::rwlock::FUNCTIONS,
         sched::FUNCTIONS,
         semaphore::FUNCTIONS,
         setjmp::FUNCTIONS,

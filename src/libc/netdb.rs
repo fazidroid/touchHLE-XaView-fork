@@ -8,8 +8,38 @@
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_DGRAM, SOCK_STREAM};
-use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
+use crate::mem::{guest_size_of, ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
+use super::net_bypass::NetBypass;
+
+// ... (existing structs: hostent, FakeIP, etc.) ...
+
+fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
+
+    // NEW BYPASS CHECK
+    if NetBypass::is_blocked_domain(name_str) {
+        log!("Bypass: Blackholing DNS request for dead server: {}", name_str);
+        // Returning a null pointer (MutPtr::null()) causes the game to get a
+        // 'host not found' error immediately, which is safer than spoofing 127.0.0.1.
+        return MutPtr::null();
+    }
+
+    log!(
+        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1",
+        name,
+        name_str
+    );
+
+    // ... (rest of your existing spoofing logic: FakeIP, FakeAddrList, etc.) ...
+    
+    // For reference, ensure your existing code follows:
+    let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
+    let ip_ptr = env.mem.alloc_and_write(ip_addr);
+    
+    // ... (continue with the rest of your current gethostbyname implementation)
+    MutPtr::null() // Placeholder - keep your original return logic here
+}
 
 const AI_PASSIVE: i32 = 0x1;
 
@@ -21,9 +51,45 @@ const EAI_FAIL: i32 = 4;
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// TODO: struct definition
+// ===== HOSTENT STRUCT REWRITTEN TO SPOOF SERVERS =====
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
-struct hostent {}
+pub struct hostent {
+    h_name: MutPtr<u8>,
+    h_aliases: MutPtr<u32>,
+    h_addrtype: i32,
+    h_length: i32,
+    h_addr_list: MutPtr<u32>,
+}
+unsafe impl SafeRead for hostent {}
+
+// Custom safe wrapper structs to write the DNS payload
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct FakeIP {
+    b1: u8,
+    b2: u8,
+    b3: u8,
+    b4: u8,
+}
+unsafe impl SafeRead for FakeIP {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct FakeAddrList {
+    ptr: u32,
+    null_term: u32,
+}
+unsafe impl SafeRead for FakeAddrList {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct FakeAliasList {
+    null_term: u32,
+}
+unsafe impl SafeRead for FakeAliasList {}
+// =====================================================
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -100,13 +166,36 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
     log!(
-        "TODO: gethostbyname({:?} \"{}\") => NULL",
+        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1",
         name,
-        env.mem.cstr_at_utf8(name).unwrap()
+        name_str
     );
-    // TODO: set h_errno
-    Ptr::null()
+
+    // 1. Create a fake IP address (127.0.0.1 / localhost)
+    let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
+    let ip_ptr = env.mem.alloc_and_write(ip_addr);
+
+    // 2. Create the null-terminated address list required by C structs
+    let addr_list = FakeAddrList { ptr: ip_ptr.to_bits(), null_term: 0 };
+    let addr_list_ptr = env.mem.alloc_and_write(addr_list);
+
+    // 3. Create the null-terminated aliases list
+    let aliases = FakeAliasList { null_term: 0 };
+    let aliases_ptr = env.mem.alloc_and_write(aliases);
+
+    // 4. Populate the full hostent struct so the game engine happily reads it
+    let hostent_data = hostent {
+        h_name: name.cast_mut(),
+        h_aliases: aliases_ptr.cast(),
+        h_addrtype: AF_INET,
+        h_length: 4, // IPv4 length
+        h_addr_list: addr_list_ptr.cast(),
+    };
+
+    // Allocate the structure and pass the pointer back to the game!
+    env.mem.alloc_and_write(hostent_data)
 }
 
 pub const FUNCTIONS: FunctionExports = &[
