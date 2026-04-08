@@ -312,7 +312,7 @@ fn substitute_classes(
         assert!(name == metaclass_name);
     }
 
-    log!(
+    println!(
         "Note: substituting fake class for {} to improve compatibility",
         name
     );
@@ -484,7 +484,6 @@ impl ObjC {
         let mut found_ns_object = false;
         let mut inverted_inheritance = HashMap::<Class, Vec<Class>>::new();
         for (name, class) in self.classes.iter() {
-            log_dbg!("class name {}", name);
             if name == "NSObject" {
                 assert!(!found_ns_object);
                 found_ns_object = true;
@@ -517,11 +516,6 @@ impl ObjC {
                 let ClassHostObject {
                     name, superclass, ..
                 } = self.borrow(next);
-                log_dbg!(
-                    "Class {} need ivar reconciliation with superclass {}!",
-                    name,
-                    &self.borrow::<ClassHostObject>(*superclass).name
-                );
 
                 let ClassHostObject {
                     ref mut instance_start,
@@ -563,21 +557,15 @@ impl ObjC {
     fn need_ivar_reconciliation(&mut self, class: Class) -> (bool, u32) {
         let class_host_object = self.get_host_object(class).unwrap().as_any().downcast_ref();
         let Some(ClassHostObject {
-            name,
+            name: _,
             superclass,
             instance_start,
-            instance_size,
+            instance_size: _,
             ..
         }) = class_host_object
         else {
             return (false, 0);
         };
-        log_dbg!(
-            "Checking need_ivar_reconciliation for {}, start {}, size {}",
-            name,
-            instance_start,
-            instance_size
-        );
 
         if *superclass == nil {
             return (false, 0);
@@ -688,23 +676,7 @@ impl ObjC {
                         ivars: Default::default(),
                     },
                 );
-                log_dbg!(
-                    "Adding {} methods from guest app category \"{}\" {:?} to {} \"{}\" {:?}",
-                    if host_obj.is_metaclass {
-                        "class"
-                    } else {
-                        "instance"
-                    },
-                    name,
-                    cat_ptr,
-                    if host_obj.is_metaclass {
-                        "metaclass"
-                    } else {
-                        "class"
-                    },
-                    host_obj.name,
-                    class,
-                );
+                
                 host_obj.add_methods_from_bin(methods, mem, self);
                 *self.borrow_mut::<ClassHostObject>(class) = host_obj;
             }
