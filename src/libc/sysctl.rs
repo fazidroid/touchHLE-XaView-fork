@@ -16,7 +16,6 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
-    //  THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
     if mib.len() >= 5 && mib[0] == 4 && mib[1] == 17 && mib[3] == 18 && mib[4] == 3 {
         let req_size = 152;
         if oldp.is_null() && !oldlenp.is_null() {
@@ -24,18 +23,15 @@ fn sysctl(
             return 0;
         } else if !oldp.is_null() && !oldlenp.is_null() {
             let len = env.mem.read::<u32, false>(oldlenp.cast_const());
-            if len >= 93 { // Safe bounds check
+            if len >= 93 {
                 let buf = env.mem.bytes_at_mut(oldp.cast(), len);
                 buf.fill(0);
-                
                 buf[0] = 76; buf[2] = 5; buf[3] = 14; 
                 buf[76] = 20; buf[77] = 18; buf[80] = 6; 
                 buf[81] = 3; buf[82] = 6; 
-                
                 buf[84] = b'e'; buf[85] = b'n'; buf[86] = b'0';
                 buf[87] = 0x02; buf[88] = 0x11; buf[89] = 0x22; 
                 buf[90] = 0x33; buf[91] = 0x44; buf[92] = 0x55;
-                
                 env.mem.write::<u32>(oldlenp, len);
                 return 0;
             }
@@ -45,8 +41,7 @@ fn sysctl(
     if !oldp.is_null() && !oldlenp.is_null() {
         let len = env.mem.read::<u32, false>(oldlenp.cast_const());
         if len > 0 {
-            let buf = env.mem.bytes_at_mut(oldp.cast(), len);
-            buf.fill(0);
+            env.mem.bytes_at_mut(oldp.cast(), len).fill(0);
         }
     }
     0
@@ -105,8 +100,7 @@ fn sysctlbyname(
     if !oldp.is_null() && !oldlenp.is_null() {
         let len = env.mem.read::<u32, false>(oldlenp.cast_const());
         if len > 0 {
-            let buf = env.mem.bytes_at_mut(oldp.cast(), len);
-            buf.fill(0);
+            env.mem.bytes_at_mut(oldp.cast(), len).fill(0);
         }
     }
     0
@@ -130,9 +124,7 @@ fn SCNetworkReachabilityCreateWithName(_env: &mut Environment, _allocator: Const
 }
 
 fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: ConstVoidPtr, flags_out: MutPtr<u32>) -> i32 {
-    if !flags_out.is_null() { 
-        //  OFFLINE MODE BYPASS: Return 0 (Not Reachable) instead of 2.
-        // This forces the EA engine to skip the broken online Synergy MTX checks!
+    if !flags_out.is_null() {
         env.mem.write::<u32>(flags_out, 0); 
     }
     1
@@ -154,13 +146,16 @@ fn __assert_rtn(
     let func_str = if func.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(func)) };
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
-    
     panic!("EA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}", file_str, line, func_str, expr_str);
 }
 
 fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
-    if obj.is_null() { return crate::mem::Ptr::null(); }
-    if obj.to_bits() == 0xDEADBEEF { return crate::mem::Ptr::from_bits(0x30000000); }
+    if obj.is_null() { 
+        return crate::mem::Ptr::null(); 
+    }
+    if obj.to_bits() == 0xDEADBEEF {
+        return crate::mem::Ptr::from_bits(0x30000000); 
+    }
     let isa = env.mem.read::<u32, false>(obj.cast());
     crate::mem::Ptr::from_bits(isa)
 }
@@ -181,7 +176,7 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(__srget(_)),
     export_c_func!(flockfile(_)),
     export_c_func!(funlockfile(_)),
-    export_c_func!(xmlFree(_)), 
+    export_c_func!(xmlFree(_)),
     export_c_func!(__assert_rtn(_, _, _, _)),
     export_c_func!(object_getClass(_)),
     export_c_func!(class_getProperty(_, _)),
