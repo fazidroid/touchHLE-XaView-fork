@@ -136,6 +136,8 @@ fn AudioComponentFindNext(
 
     let out_component: AudioComponent = state.audio_component;
 
+    // TraceComponentFind
+    println!("AUDIO_TRACE: AudioComponentFindNext({:?}) -> {:?}", in_desc, out_component);
     log!(
         "TODO: AudioComponentFindNext({:?}, {:?}) -> {:?}",
         in_component,
@@ -162,8 +164,9 @@ fn AudioComponentInstanceNew(
     env.mem.write(out_instance, guest_instance);
 
     let result = 0; // success
-    log_dbg!(
-        "AudioComponentInstanceNew({:?}, {:?}) -> {:?}",
+    // TraceNewInstance
+    println!(
+        "AUDIO_TRACE: AudioComponentInstanceNew({:?}, {:?}) -> {:?}",
         in_component,
         out_instance,
         result
@@ -184,8 +187,9 @@ fn AudioComponentInstanceDispose(
         env.mem.free(in_instance.cast());
         0
     };
-    log_dbg!(
-        "AudioComponentInstanceDispose({:?}) -> {:?}",
+    // TraceDisposeInstance
+    println!(
+        "AUDIO_TRACE: AudioComponentInstanceDispose({:?}) -> {:?}",
         in_instance,
         result
     );

@@ -22,7 +22,7 @@
 //! - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/index-wide.html)
 
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::libc::errno::{set_errno, EBADF, ECONNRESET, EINVAL, EPROTONOSUPPORT};
+use crate::libc::errno::{set_errno, EBADF, ECONNRESET, EINVAL};
 use crate::libc::posix_io::{close, find_or_create_socket, is_socket, FileDescriptor};
 use crate::libc::time::timeval;
 use crate::mem::{
@@ -77,8 +77,13 @@ impl sockaddr {
     ///
     /// Port is returned in the native endian format.
     fn to_ipv4_parts(self) -> ([u8; 4], u16) {
-        assert!(self.sa_len == 16 || self.sa_len == 0);
-        assert_eq!(self.sa_family, AF_INET as u8);
+        // RelaxSockaddrAssert
+        if self.sa_len != 16 && self.sa_len != 0 {
+            println!("WARNING: invalid sa_len {}", self.sa_len);
+        }
+        if self.sa_family != AF_INET as u8 {
+            println!("WARNING: invalid sa_family {}", self.sa_family);
+        }
         let port = u16::from_be_bytes([self.sa_data[0], self.sa_data[1]]);
         let ip = [
             self.sa_data[2],
@@ -143,6 +148,10 @@ fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> File
     // TODO: handle errno properly
     set_errno(env, 0);
 
+    // OfflineSocketBypass
+    if !env.options.network_access {
+        println!("WARNING: Creating offline socket!");
+    }
     // COMPILE-SAFE HACK: We removed the `!env.options.network_access` block entirely!
     // This allows Asphalt 6 to create its socket without infinite looping, 
     // and completely bypasses the `NullableBox` struct errors. 
@@ -193,6 +202,18 @@ fn getsockopt(
         option_value,
         option_len
     );
+
+    // RelaxGetsockopt
+    if level != SOL_SOCKET || option_name != SO_ERROR {
+        println!("WARNING: Ignoring getsockopt for level {}, option {}", level, option_name);
+        return 0;
+    }
+
+    let option_len_val = env.mem.read(option_len);
+    if option_len_val >= 4 {
+        let option_value: MutPtr<i32> = option_value.cast();
+        env.mem.write(option_value, 0); // no errors
+    }
     assert_eq!(level, SOL_SOCKET);
     // TODO: support other options
     assert_eq!(option_name, SO_ERROR);
@@ -241,6 +262,15 @@ fn setsockopt(
 
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
 
+    // RelaxSetsockopt
+    if level != SOL_SOCKET {
+        println!("WARNING: Ignoring setsockopt for level {}, option {}", level, option_name);
+        return 0;
+    }
+    if option_name != SO_REUSEADDR && option_name != SO_BROADCAST {
+        println!("WARNING: Ignoring setsockopt unsupported option {}", option_name);
+        return 0;
+    }
     assert_eq!(level, SOL_SOCKET);
     // TODO: SO_REUSEADDR is not supported in std::net (and not so portable)
     assert!(option_name == SO_REUSEADDR || option_name == SO_BROADCAST);
@@ -286,6 +316,11 @@ fn bind(
         _ => unreachable!(),
     };
     log_dbg!("bind: {} socket address {:?}", type_str, socket_address);
+
+    // OfflineBindBypass
+    if !env.options.network_access {
+        return 0;
+    }
 
     // re-borrow
     let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
@@ -368,6 +403,14 @@ fn connect(
         .unwrap()
         .tcp_stream
         .is_none());
+
+    // OfflineConnectBypass
+    if !env.options.network_access {
+        println!("WARNING: Bypassing connect() for offline mode!");
+        return 0;
+    }
+
+    let host_stream = TcpStream::connect(socket_address).unwrap();
         
     // 🛡️ ANTI-PANIC SHIELD: Safely handle dead servers instead of crashing!
     let host_stream = match TcpStream::connect(socket_address) {
@@ -419,6 +462,26 @@ fn select(
     } else {
         true
     };
+
+    // OfflineSelectBypass
+    if !env.options.network_access {
+        let mut count = 0;
+        if !read_fds.is_null() {
+            let set = env.mem.read(read_fds);
+            let bits = set.fds_bits;
+            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        }
+        if !write_fds.is_null() {
+            let set = env.mem.read(write_fds);
+            let bits = set.fds_bits;
+            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        }
+        if !error_fds.is_null() {
+            env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
+        }
+        return count;
+    }
+
     let mut count = 0;
 
     if !read_fds.is_null() {
@@ -682,6 +745,10 @@ fn accept(
     let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM);
 
+    // OfflineAcceptBypass
+    if !env.options.network_access {
+        return -1;
+    }
     if let Some(stream) = State::get_mut(env)
         .sockets
         .get_mut(&socket)
@@ -780,6 +847,10 @@ fn recvfrom(
     assert_eq!(flags, 0);
     // TODO
 
+    // OfflineRecvBypass
+    if !env.options.network_access {
+        return 0;
+    }
     let (num_bytes_read, addr) = match type_ {
         SOCK_DGRAM => {
             let udp_socket = env
@@ -871,6 +942,10 @@ fn send(
 
     assert_eq!(flags, 0); // TODO
 
+    // OfflineSendBypass
+    if !env.options.network_access {
+        return length as i32;
+    }
     let num_bytes_written = match type_ {
         SOCK_STREAM => {
             let mut tcp_stream = env
@@ -936,6 +1011,11 @@ fn sendto(
         socket_address,
         dest_address_len
     );
+
+    // OfflineSendtoBypass
+    if !env.options.network_access {
+        return length as i32;
+    }
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
             if State::get(env)

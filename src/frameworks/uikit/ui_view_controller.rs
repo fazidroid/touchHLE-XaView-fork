@@ -8,7 +8,7 @@
 //! Resources:
 //! - [View Controller Programming Guide for iOS (Legacy)](https://developer.apple.com/library/archive/documentation/WindowsViews/Conceptual/ViewControllerPGforiOSLegacy/BasicViewControllers/BasicViewControllers.html)
 
-use crate::frameworks::core_graphics::CGRect;
+// RemoveUnusedImport
 use crate::frameworks::foundation::ns_objc_runtime::NSStringFromClass;
 use crate::frameworks::foundation::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::frameworks::uikit::ui_application::{
@@ -117,14 +117,37 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // As a last resort, use plain UIVIew for the root view
     let class: Class = msg![env; this class];
-    log!("Unable to load {:?} {} view controller's view by nib, using plain UIView", this, env.objc.get_class_name(class).to_string());
-    let view: id = msg_class![env; UIView alloc];
-    // Docs are saying that "an empty UIView" is created,
-    // but testing reveals that frame matches the screen one
-    // (at least on the simulator)
-    let screen: id = msg_class![env; UIScreen mainScreen];
-    let app_frame: CGRect = msg![env; screen applicationFrame];
-    let view: id = msg![env; view initWithFrame:app_frame];
+    let class_name_str = env.objc.get_class_name(class).to_string();
+    log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
+    
+    // FixNibEaglLayer
+    let mut view_class: Class = msg_class![env; UIView class];
+    if class_name_str.contains("EAGL") || class_name_str.contains("GL") {
+        let eagl_class = env.objc.link_class("EAGLView", false, &mut env.mem);
+        if eagl_class != nil {
+            view_class = eagl_class;
+            log!("Fallback to EAGLView class instead of UIView!");
+        }
+    }
+    let view_alloc: id = msg![env; view_class alloc];
+    
+    // FixLandscapeFrame
+    let app_frame = crate::frameworks::core_graphics::CGRect {
+        origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
+        size: crate::frameworks::core_graphics::CGSize { width: 480.0, height: 320.0 },
+    };
+    
+    let view: id = msg![env; view_alloc initWithFrame:app_frame];
+    
+    let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
+    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
+    
+    // ForceTouchInteraction
+    let sel_user = env.objc.lookup_selector("setUserInteractionEnabled:").unwrap();
+    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_user, 1u32));
+    let sel_multi = env.objc.lookup_selector("setMultipleTouchEnabled:").unwrap();
+    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
+    
     () = msg![env; this setView:view];
 }
 

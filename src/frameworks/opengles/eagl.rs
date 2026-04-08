@@ -195,7 +195,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         let bounds: CGRect = msg![env; drawable bounds];
         let CGSize { width, height } = bounds.size;
         let scale_hack = env.options.scale_hack.get() as f32;
-        ((width * scale * scale_hack).round() as u32, (height * scale * scale_hack).round() as u32)
+        let final_w = (width * scale * scale_hack).round() as u32;
+        let final_h = (height * scale * scale_hack).round() as u32;
+        //DebugRenderSize
+        log!("DEBUG_EAGL: renderbufferStorage:fromDrawable: {:?} Bounds: w={}, h={} | scale={}, scale_hack={} | Final FBO: {}x{}", drawable, width, height, scale, scale_hack, final_w, final_h);
+        (final_w, final_h)
     };
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
@@ -255,12 +259,27 @@ pub const CLASSES: ClassExports = objc_classes! {
         return false;
     };
 
+    // We're presenting to the opaque CAEAGLLayer that covers the screen.
+    // We can use the fast path where we skip composition and present directly.
+    //DebugPresentPath
+    log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
     if drawable == fullscreen_layer {
+        log!(
+            "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
+            drawable,
+            renderbuffer,
+        );
+        // re-borrow
         unsafe {
             present_renderbuffer(env);
         }
     } else {
         if fullscreen_layer != nil {
+            log!("DEBUG_EAGL: Layer {:?} is NOT fullscreen layer {:?}. Rendering to RAM (SLOW PATH) or skipped!", drawable, fullscreen_layer);
+            // If there's a single layer that covers the screen, and this isn't
+            // it, there's no point in presenting the output because it won't be
+            // seen. Using a noisy log because it's a weird scenario and might
+            // indicate a bug.
             log!(
                 "Layer {:?} is not the fullscreen layer {:?}, skipping presentation of renderbuffer {:?}!",
                 drawable,
@@ -429,7 +448,7 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
 
 unsafe fn present_renderbuffer(env: &mut Environment) {
     let viewport = env.window.as_mut().unwrap().viewport();
-    let rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
+    let mut rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
     let virtual_cursor_visible_at = env.window.as_mut().unwrap().virtual_cursor_visible_at();
 
     let gles_ctx = super::get_thread_context(
@@ -444,6 +463,9 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let (width, height) = get_renderbuffer_size(gles);
     let old_framebuffer: GLuint = get_int(gles, gles11::FRAMEBUFFER_BINDING_OES) as _;
     let old_texture_2d: GLuint = get_int(gles, gles11::TEXTURE_BINDING_2D) as _;
+    let active_texture: GLint = get_int(gles, gles11::ACTIVE_TEXTURE);
+    //DebugPRBState
+    log!("DEBUG_PRB: Start. RB={}, w={}, h={}. OLD_FB={}, OLD_TEX2D={}, ACTIVE_TEX={:#x}", renderbuffer, width, height, old_framebuffer, old_texture_2d, active_texture);
 
     let mut src_framebuffer = 0;
     gles.GenFramebuffersOES(1, &mut src_framebuffer);
@@ -455,9 +477,31 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         renderbuffer,
     );
 
+    // DebugFboStatusExt
+    let fbo_status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
+    let mut px = [0u8; 20];
+    let hw = width.saturating_sub(1);
+    let hh = height.saturating_sub(1);
+    gles.ReadPixels(0, 0, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[0..4].as_mut_ptr() as *mut _);
+    gles.ReadPixels(hw, 0, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[4..8].as_mut_ptr() as *mut _);
+    gles.ReadPixels(0, hh, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[8..12].as_mut_ptr() as *mut _);
+    gles.ReadPixels(hw, hh, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[12..16].as_mut_ptr() as *mut _);
+    gles.ReadPixels(width / 2, height / 2, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[16..20].as_mut_ptr() as *mut _);
+    log!("DEBUG_PRB: FBO={:#x}. w={}, h={}. Pixels: BL[{},{},{},{}] BR[{},{},{},{}] TL[{},{},{},{}] TR[{},{},{},{}] C[{},{},{},{}]",
+        fbo_status, width, height,
+        px[0], px[1], px[2], px[3], px[4], px[5], px[6], px[7],
+        px[8], px[9], px[10], px[11], px[12], px[13], px[14], px[15],
+        px[16], px[17], px[18], px[19]
+    );
+
+    // Create a texture with a copy of the pixels in the framebuffer
     let mut texture: GLuint = 0;
     gles.GenTextures(1, &mut texture);
     gles.BindTexture(gles11::TEXTURE_2D, texture);
+    
+    // Clear error
+    while gles.GetError() != 0 {}
+    
     gles.CopyTexImage2D(
         gles11::TEXTURE_2D,
         0,
@@ -468,6 +512,15 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         height,
         0,
     );
+    
+    //DebugCopyTex
+    let err_after_copy = gles.GetError();
+    if err_after_copy != 0 {
+        log!("DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}", err_after_copy);
+    }
+    
+    // The texture will not have any mip levels so we must ensure the filter
+    // does not use them, else rendering will fail.
     gles.TexParameteri(
         gles11::TEXTURE_2D,
         gles11::TEXTURE_MIN_FILTER,
@@ -546,6 +599,24 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         tex_env_mode_arr.as_ptr().cast(),
     );
 
+    // SmartRotationFix
+    let rb_w = width as f32;
+    let rb_h = height as f32;
+    let cols = rotation_matrix.columns();
+    let is_rotated = cols[0][0].abs() < 0.1 && cols[0][1].abs() > 0.9;
+    
+    if is_rotated && rb_w > rb_h {
+        unsafe {
+            let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
+            *m_ptr = [
+                [1.0, 0.0],
+                [0.0, 1.0],
+            ];
+        }
+        log!("DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}", rb_w, rb_h);
+    }
+
+    // Draw the quad
     present_frame(gles, viewport, rotation_matrix, virtual_cursor_visible_at);
     gles.DeleteTextures(1, &texture);
 
