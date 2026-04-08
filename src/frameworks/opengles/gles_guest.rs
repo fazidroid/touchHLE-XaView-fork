@@ -196,6 +196,15 @@ fn glGetFloatv(env: &mut Environment, pname: GLenum, params: MutPtr<GLfloat>) {
 fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| {
         match pname {
+            // ViewportHack
+            0x0BA2 => {
+                let params = mem.ptr_at_mut(params, 4);
+                mem.write(params + 0, 0);
+                mem.write(params + 1, 0);
+                mem.write(params + 2, 480);
+                mem.write(params + 3, 320);
+                log!("DEBUG_GL: glGetIntegerv(GL_VIEWPORT) -> Fake 480x320");
+            }
             gles11::NUM_COMPRESSED_TEXTURE_FORMATS => {
                 mem.write(params, SUPPORTED_COMPRESSED_TEXTURE_FORMATS.len() as _);
             }
@@ -228,6 +237,7 @@ fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
             _ => {
                 let params = mem.ptr_at_mut(params, 16 /* upper bound */);
                 unsafe { gles.GetIntegerv(pname, params) };
+                log!("DEBUG_GL: glGetIntegerv(pname={:#x}) fallback", pname); // GetIntegervLog
             }
         }
     });
@@ -2176,8 +2186,29 @@ fn glUniformMatrix4fv(
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
         // DebugUniformMat4
         let slice = std::slice::from_raw_parts(value_ptr, (count * 16) as usize);
-        log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
-        gles.UniformMatrix4fv(location, count, transpose, value_ptr);
+        
+        // ZeroMatrixFix
+        let mut is_zero = true;
+        for &v in slice.iter().take(16) {
+            if v.abs() > 0.0001 {
+                is_zero = false;
+                break;
+            }
+        }
+        
+        if is_zero && count == 1 {
+            let identity: [GLfloat; 16] = [
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            ];
+            log!("DEBUG_GL: glUniformMatrix4fv(loc={}) DETECTED ZERO MATRIX! Injecting Identity!", location);
+            gles.UniformMatrix4fv(location, count, transpose, identity.as_ptr());
+        } else {
+            log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
+            gles.UniformMatrix4fv(location, count, transpose, value_ptr);
+        }
     })
 }
 fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
