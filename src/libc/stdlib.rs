@@ -899,9 +899,16 @@ fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd:
     }
 }
 
+fn setrlimit(_env: &mut Environment, resource: i32, _rlp: ConstVoidPtr) -> i32 {
+    // FakeSetrlimit
+    log!("WARNING: setrlimit called with resource: {}. Faking success.", resource);
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(dladdr(_, _)),
     export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
+    export_c_func!(setrlimit(_, _)),
     export_c_func!(syscall(_, _, _, _)),
     export_c_func!(gethostbyname(_)),
     export_c_func!(class_respondsToSelector(_, _)),
