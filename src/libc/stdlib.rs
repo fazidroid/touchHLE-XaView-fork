@@ -905,7 +905,19 @@ fn setrlimit(_env: &mut Environment, resource: i32, _rlp: ConstVoidPtr) -> i32 {
     0
 }
 
+fn CGColorGetComponents(env: &mut Environment, _color: ConstVoidPtr) -> MutVoidPtr {
+    // FakeColorComponents
+    let ptr = env.mem.alloc(16);
+    let f32_ptr: crate::mem::MutPtr<f32> = ptr.cast();
+    env.mem.write(f32_ptr, 0.0);
+    env.mem.write(f32_ptr + 1, 0.0);
+    env.mem.write(f32_ptr + 2, 0.0);
+    env.mem.write(f32_ptr + 3, 0.0);
+    ptr
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(CGColorGetComponents(_)),
     export_c_func!(dladdr(_, _)),
     export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
     export_c_func!(setrlimit(_, _)),
