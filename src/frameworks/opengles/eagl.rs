@@ -757,13 +757,12 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     );
 
     // SmartRotationFix
-    let guest_w = old_viewport.2 as f32;
-    let guest_h = old_viewport.3 as f32;
-    let guest_ar = if guest_h > 0.0 { guest_w / guest_h } else { 1.0 };
+    let rb_w = width as f32;
+    let rb_h = height as f32;
     let cols = rotation_matrix.columns();
     let is_rotated = cols[0][0].abs() < 0.1 && cols[0][1].abs() > 0.9;
     
-    if is_rotated && guest_ar > 2.0 {
+    if is_rotated && rb_w > rb_h {
         unsafe {
             let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
             *m_ptr = [
@@ -771,7 +770,7 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
                 [0.0, 1.0],
             ];
         }
-        log!("DEBUG_EAGL: SmartRotationFix bypassed matrix! guest_ar={:.2}", guest_ar);
+        log!("DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}", rb_w, rb_h);
     }
 
     // Draw the quad
