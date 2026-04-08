@@ -585,7 +585,7 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
 unsafe fn present_renderbuffer(env: &mut Environment) {
     // Save these for when we need to draw the frame
     let viewport = env.window.as_mut().unwrap().viewport();
-    let rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
+    let mut rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
     let virtual_cursor_visible_at = env.window.as_mut().unwrap().virtual_cursor_visible_at();
 
     let gles_ctx = super::get_thread_context(
@@ -755,6 +755,24 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         gles11::TEXTURE_ENV_MODE,
         tex_env_mode_arr.as_ptr().cast(),
     );
+
+    // SmartRotationFix
+    let guest_w = old_viewport.2 as f32;
+    let guest_h = old_viewport.3 as f32;
+    let guest_ar = if guest_h > 0.0 { guest_w / guest_h } else { 1.0 };
+    let cols = rotation_matrix.columns();
+    let is_rotated = cols[0][0].abs() < 0.1 && cols[0][1].abs() > 0.9;
+    
+    if is_rotated && guest_ar > 2.0 {
+        unsafe {
+            let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
+            *m_ptr = [
+                [1.0, 0.0],
+                [0.0, 1.0],
+            ];
+        }
+        log!("DEBUG_EAGL: SmartRotationFix bypassed matrix! guest_ar={:.2}", guest_ar);
+    }
 
     // Draw the quad
     present_frame(gles, viewport, rotation_matrix, virtual_cursor_visible_at);
