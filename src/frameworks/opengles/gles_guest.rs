@@ -1605,7 +1605,7 @@ fn glGetBufferParameteriv(
     })
 }
 // TrackMappedBuffers
-static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLuint, u32, u32)>> = std::sync::Mutex::new(Vec::new());
+static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLuint, u32, u32, bool)>> = std::sync::Mutex::new(Vec::new());
 
 // FixUnusedAccessLint
 fn glMapBufferOES(env: &mut Environment, target: GLenum, _access: GLenum) -> MutPtr<GLvoid> {
@@ -1623,18 +1623,32 @@ fn glMapBufferOES(env: &mut Environment, target: GLenum, _access: GLenum) -> Mut
     
     let mut allocated_ptr = 0;
     if let Ok(mut map) = MAPPED_BUFFERS.lock() {
-        // FixMapBufferKey
-        if let Some(&mut (_, ref mut ptr, ref mut alloc_size)) = map.iter_mut().find(|(id, _, _)| *id == buffer_id) {
-            if *alloc_size >= size as u32 {
-                allocated_ptr = *ptr;
+        // PoolReuseFindId
+        if let Some(buf) = map.iter_mut().find(|b| b.0 == buffer_id) {
+            if buf.2 >= size as u32 {
+                buf.3 = true;
+                allocated_ptr = buf.1;
             } else {
-                allocated_ptr = env.mem.alloc(size as u32).to_bits();
-                *ptr = allocated_ptr;
-                *alloc_size = size as u32;
+                buf.0 = 0; // Orphan
+                buf.3 = false;
             }
-        } else {
+        }
+        
+        // PoolReuseFindFree
+        if allocated_ptr == 0 {
+            if let Some(buf) = map.iter_mut().find(|b| !b.3 && b.2 >= size as u32) {
+                buf.0 = buffer_id;
+                buf.3 = true;
+                allocated_ptr = buf.1;
+            }
+        }
+        
+        // PoolAllocateNew
+        if allocated_ptr == 0 {
             allocated_ptr = env.mem.alloc(size as u32).to_bits();
-            map.push((buffer_id, allocated_ptr, size as u32));
+            if allocated_ptr != 0 {
+                map.push((buffer_id, allocated_ptr, size as u32, true));
+            }
         }
     }
     
@@ -1647,10 +1661,11 @@ fn glUnmapBufferOES(env: &mut Environment, target: GLenum) -> GLboolean {
     let buffer_id = _get_currently_bound_buffer_object_name(env, target);
     let mut guest_ptr_bits = 0;
     
-    if let Ok(map) = MAPPED_BUFFERS.lock() {
-        // FixUnmapBufferKey
-        if let Some(&(_, ptr, _)) = map.iter().find(|&&(id, _, _)| id == buffer_id) {
-            guest_ptr_bits = ptr;
+    if let Ok(mut map) = MAPPED_BUFFERS.lock() {
+        // PoolFreeMark
+        if let Some(buf) = map.iter_mut().find(|b| b.0 == buffer_id && b.3) {
+            guest_ptr_bits = buf.1;
+            buf.3 = false;
         }
     }
     
