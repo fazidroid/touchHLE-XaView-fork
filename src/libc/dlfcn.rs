@@ -22,18 +22,16 @@ fn dlopen(env: &mut Environment, path: ConstPtr<u8>, _mode: i32) -> MutVoidPtr {
         return RTLD_DEFAULT;
     }
     
-    // 🛡️ BORROW CHECKER BYPASS: Convert to owned String immediately!
     let path_str = env.mem.cstr_at_utf8(path).unwrap_or("").to_string();
     
-    // 🛡️ THE PHANTOM STOREKIT BYPASS
-    // If EA looks for StoreKit, intercept it and manually inject the classes into the runtime!
+    //  THE PHANTOM STOREKIT BYPASS
     if path_str.contains("StoreKit") {
-        println!("🛡️ DLOPEN BYPASS: Intercepted StoreKit! Injecting Phantom Classes...");
+        println!(" DLOPEN BYPASS: Intercepted StoreKit! Injecting Phantom Classes...");
         env.objc.link_class("SKPaymentQueue", false, &mut env.mem);
         env.objc.link_class("SKProductsRequest", false, &mut env.mem);
         env.objc.link_class("SKPayment", false, &mut env.mem);
         env.objc.link_class("SKMutablePayment", false, &mut env.mem);
-        return path.cast_mut().cast(); // Return valid fake handle
+        return path.cast_mut().cast(); 
     }
     
     assert!(is_known_library(&path_str));
@@ -49,10 +47,10 @@ fn dlsym(env: &mut Environment, handle: MutVoidPtr, symbol: ConstPtr<u8>) -> Mut
 
     let sym_str = env.mem.cstr_at_utf8(symbol).unwrap_or("").to_string();
 
-    // 🛡️ DLSYM SAFE NULL: Silently absorb missing StoreKit functions without crashing!
+    //  DLSYM SAFE NULL: Silently absorb missing StoreKit functions!
     if handle_str.contains("StoreKit") || sym_str.contains("SK") || sym_str.contains("StoreKit") {
-        println!("🛡️ DLSYM BYPASS: Absorbed missing StoreKit symbol: {}", sym_str);
-        return crate::mem::Ptr::null(); // Safe NULL pointer
+        println!(" DLSYM BYPASS: Absorbed missing StoreKit symbol: {}", sym_str);
+        return crate::mem::Ptr::null(); 
     }
 
     assert!(
