@@ -16,8 +16,7 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
-    //  THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
-    // mib = [CTL_NET(4), AF_ROUTE(17), 0, AF_LINK(18), NET_RT_IFLIST(3), ...]
+    // 🛡️ THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
     if mib.len() >= 5 && mib[0] == 4 && mib[1] == 17 && mib[3] == 18 && mib[4] == 3 {
         let req_size = 152;
         if oldp.is_null() && !oldlenp.is_null() {
@@ -25,35 +24,17 @@ fn sysctl(
             return 0;
         } else if !oldp.is_null() && !oldlenp.is_null() {
             let len = env.mem.read::<u32, false>(oldlenp.cast_const());
-            if len >= 88 {
+            if len >= 93 { // Safe bounds check
                 let buf = env.mem.bytes_at_mut(oldp.cast(), len);
                 buf.fill(0);
                 
-                // Fake if_msghdr structure
-                buf[0] = 76; // ifm_msglen (lower byte)
-                buf[1] = 0;  // ifm_msglen (upper byte)
-                buf[2] = 5;  // ifm_version
-                buf[3] = 14; // ifm_type = RTM_IFINFO
+                buf[0] = 76; buf[2] = 5; buf[3] = 14; 
+                buf[76] = 20; buf[77] = 18; buf[80] = 6; 
+                buf[81] = 3; buf[82] = 6; 
                 
-                // Fake sockaddr_dl structure at offset 76
-                buf[76] = 20; // sdl_len
-                buf[77] = 18; // sdl_family = AF_LINK
-                buf[80] = 6;  // sdl_type = IFT_ETHER
-                buf[81] = 3;  // sdl_nlen ("en0" length)
-                buf[82] = 6;  // sdl_alen (MAC address length)
-                
-                // sdl_data ("en0")
-                buf[84] = b'e';
-                buf[85] = b'n';
-                buf[86] = b'0';
-                
-                // MAC Address (02:11:22:33:44:55)
-                buf[87] = 0x02;
-                buf[88] = 0x11;
-                buf[89] = 0x22;
-                buf[90] = 0x33;
-                buf[91] = 0x44;
-                buf[92] = 0x55;
+                buf[84] = b'e'; buf[85] = b'n'; buf[86] = b'0';
+                buf[87] = 0x02; buf[88] = 0x11; buf[89] = 0x22; 
+                buf[90] = 0x33; buf[91] = 0x44; buf[92] = 0x55;
                 
                 env.mem.write::<u32>(oldlenp, len);
                 return 0;
@@ -61,7 +42,6 @@ fn sysctl(
         }
     }
     
-    // Universal fallback for other sysctls
     if !oldp.is_null() && !oldlenp.is_null() {
         let len = env.mem.read::<u32, false>(oldlenp.cast_const());
         if len > 0 {
@@ -150,16 +130,18 @@ fn SCNetworkReachabilityCreateWithName(_env: &mut Environment, _allocator: Const
 }
 
 fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: ConstVoidPtr, flags_out: MutPtr<u32>) -> i32 {
-    if !flags_out.is_null() {
-        env.mem.write::<u32>(flags_out, 2); 
-    }
+    if !flags_out.is_null() { env.mem.write::<u32>(flags_out, 2); }
     1
 }
 
-// Return 0 instead of -1 to prevent C++ EOF stream crashes in XML parsing!
 fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { 0 }
 fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
+
+// 🛡️ LIBXML2 SAFE STUB: Prevents the game from jumping into a null pointer!
+fn xmlFree(_env: &mut Environment, _ptr: ConstVoidPtr) {
+    log!("🛡️ XML BYPASS: Absorbed missing libxml2 xmlFree call safely!");
+}
 
 fn __assert_rtn(
     env: &mut Environment,
@@ -172,18 +154,8 @@ fn __assert_rtn(
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
     
-    // Use println! to guarantee 100% compilation safety without macro import issues.
-    println!("\n\n EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
-    
-    //  THE INDESTRUCTIBLE MUZZLER: SKIP THE NORETURN TRAP!
-    // Compilers put a trap instruction (like `udf`) immediately after a call to a noreturn function.
-    // If we just return, the trap executes and segfaults. We advance the Link Register to jump over it!
-    let lr = env.cpu.regs()[14];
-    let is_thumb = (lr & 1) != 0;
-    let trap_size = if is_thumb { 2 } else { 4 };
-    
-    println!(" MUZZLER: Advancing Link Register by {} bytes to skip trap!", trap_size);
-    env.cpu.regs_mut()[14] = lr + trap_size;
+    // We MUST panic here so the emulator can flush the log instead of silently segfaulting into garbage memory!
+    panic!("EA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}", file_str, line, func_str, expr_str);
 }
 
 fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
@@ -211,12 +183,11 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(__srget(_)),
     export_c_func!(flockfile(_)),
     export_c_func!(funlockfile(_)),
+    export_c_func!(xmlFree(_)), // Exported our safe stub!
     
     export_c_func!(__assert_rtn(_, _, _, _)),
-    
     export_c_func!(object_getClass(_)),
     export_c_func!(class_getProperty(_, _)),
-
     export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _)),
     export_c_func!(SCNetworkReachabilityCreateWithName(_, _)),
     export_c_func!(SCNetworkReachabilityGetFlags(_, _)),
