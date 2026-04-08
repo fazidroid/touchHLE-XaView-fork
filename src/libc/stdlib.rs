@@ -920,8 +920,13 @@ fn CGContextSetFillColor(_env: &mut Environment, _context: ConstVoidPtr, _compon
     // FakeSetFillColor
 }
 
+fn CGContextBeginPath(_env: &mut Environment, _context: ConstVoidPtr) {
+    // FakeBeginPath
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGColorGetComponents(_)),
+    export_c_func!(CGContextBeginPath(_)),
     export_c_func!(CGContextSetFillColor(_, _)),
     export_c_func!(dladdr(_, _)),
     export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
