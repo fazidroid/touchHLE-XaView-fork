@@ -368,10 +368,23 @@ fn connect(
         .unwrap()
         .tcp_stream
         .is_none());
-    let host_stream = TcpStream::connect(socket_address).unwrap();
+        
+    // 🛡️ ANTI-PANIC SHIELD: Safely handle dead servers instead of crashing!
+    let host_stream = match TcpStream::connect(socket_address) {
+        Ok(stream) => stream,
+        Err(e) => {
+            log!("🛡️ ANTI-PANIC SHIELD: Connection to {:?} refused/failed: {}. Safely returning offline status.", socket_address, e);
+            // Return -1 to safely tell the game the server is offline, avoiding the unwrap() panic!
+            return -1;
+        }
+    };
+
     // We set host socket as non-blocking in order to have
     // more control of how and when it's used
-    host_stream.set_nonblocking(true).unwrap();
+    if let Err(e) = host_stream.set_nonblocking(true) {
+         log!("Warning: failed to set nonblocking: {}", e);
+    }
+    
     State::get_mut(env)
         .sockets
         .get_mut(&socket)
