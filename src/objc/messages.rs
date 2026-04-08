@@ -43,10 +43,10 @@ fn objc_msgSend_inner(
 
     if sel_str == "initWithAPI:" {
         let api_version = env.cpu.regs()[2]; 
-        log!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
+        crate::log!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        crate::log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
     if sel_str == "connectionWithRequest:delegate:" || 
@@ -56,9 +56,26 @@ fn objc_msgSend_inner(
         return;
     }
 
-    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "currentDevice" || sel_str == "defaultQueue" {
-        log!("🛡️ SAFE POINTER BYPASS: Spoofing {}", sel_str);
-        env.cpu.regs_mut()[0] = receiver.to_bits(); 
+    // 🛡️ SAFE POINTER BYPASS FOR CLASSES
+    if sel_str == "currentDevice" {
+        crate::log!("🛡️ SAFE POINTER BYPASS: Spoofing {}", sel_str);
+        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0x30000000 }; 
+        env.cpu.regs_mut()[1] = 0;
+        return;
+    }
+
+    // 🛡️ DUMMY SINGLETON BYPASS (Fixes CheckMTXController asserting on nil)
+    // By creating a fake NSObject, the EA C++ Engine thinks the Store is loaded!
+    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "defaultQueue" {
+        crate::log!("🛡️ DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
+        let cls = env.objc.get_known_class("NSObject", &mut env.mem);
+        if cls != nil {
+            let obj: id = crate::msg![env; cls alloc];
+            let obj: id = crate::msg![env; obj init];
+            env.cpu.regs_mut()[0] = obj.to_bits();
+        } else {
+            env.cpu.regs_mut()[0] = 0x30000000; 
+        }
         env.cpu.regs_mut()[1] = 0;
         return;
     }
@@ -92,19 +109,19 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
+        crate::log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
         env.cpu.regs_mut()[0] = 1; 
         env.cpu.regs_mut()[1] = 0;
         return;
     }
 
     if sel_str == "addTransactionObserver:" || sel_str == "removeTransactionObserver:" {
-        log!("🛡️ EA MTX BYPASS: Absorbed {} safely!", sel_str);
+        crate::log!("🛡️ EA MTX BYPASS: Absorbed {} safely!", sel_str);
         return;
     }
 
     if sel_str == "transactions" {
-        log!("🛡️ EA MTX BYPASS: Returning valid empty NSArray for transactions!");
+        crate::log!("🛡️ EA MTX BYPASS: Returning valid empty NSArray for transactions!");
         let array_class = env.objc.get_known_class("NSArray", &mut env.mem);
         if array_class != nil {
             let empty_array: id = crate::msg![env; array_class array];
