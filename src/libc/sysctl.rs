@@ -1,14 +1,13 @@
 use crate::mem::{ConstPtr, MutPtr, ConstVoidPtr, MutVoidPtr};
 use crate::Environment;
 use crate::dyld::export_c_func;
-use crate::log; // Added to ensure the logging macro works safely
 
 fn sysctl(
     env: &mut Environment,
     name_ptr: ConstPtr<i32>,
     namelen: u32,
-    _oldp: MutVoidPtr,
-    _oldlenp: MutPtr<u32>,
+    oldp: MutVoidPtr,
+    oldlenp: MutPtr<u32>,
     _newp: MutVoidPtr, 
     _newlen: u32,
 ) -> i32 {
@@ -17,9 +16,17 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
-    // CRITICAL FIX: Return -1 (Error) so the game knows we didn't fill the buffer.
-    // This forces the EA crypto-hasher to use safe fallbacks instead of crashing!
-    -1 
+    //  THE MAC ADDRESS / DEVICE ID SPOOF (Fixes ValidateDeviceId)
+    // By returning 0 and zeroing the buffer, EA's crypto-hasher hashes a clean 00:00:00 MAC.
+    if !oldp.is_null() && !oldlenp.is_null() {
+        let len = env.mem.read::<u32, false>(oldlenp.cast_const());
+        if len > 0 {
+            let buf = env.mem.bytes_at_mut(oldp.cast(), len);
+            buf.fill(0);
+        }
+    }
+    
+    0 // Return Success
 }
 
 fn sysctlbyname(
@@ -49,7 +56,7 @@ fn sysctlbyname(
         return 0; // Success
     }
 
-    // 2. EA STOREFRONT BYPASS: Spoof high-end hardware capabilities
+    // 2. EA STOREFRONT BYPASS
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
         if !oldlenp.is_null() {
             if oldp.is_null() {
@@ -62,9 +69,28 @@ fn sysctlbyname(
         return 0; // Success
     }
 
-    // CRITICAL FIX: Return -1 for unhandled strings like "hw.memsize".
-    // If we return 0 here, the game thinks it has 0MB of RAM and panics!
-    -1
+    // 3. RAM SPOOF (Fixes memory assertion crashes)
+    if name_str == "hw.memsize" || name_str == "hw.physmem" || name_str == "hw.usermem" {
+        if !oldlenp.is_null() {
+            if oldp.is_null() {
+                env.mem.write::<u32>(oldlenp, 4);
+            } else {
+                env.mem.write::<u32>(oldp.cast(), 536870912); // Tell EA we have 512 MB RAM
+                env.mem.write::<u32>(oldlenp, 4);
+            }
+        }
+        return 0;
+    }
+
+    // 4. UNIVERSAL SUCCESS FALLBACK
+    if !oldp.is_null() && !oldlenp.is_null() {
+        let len = env.mem.read::<u32, false>(oldlenp.cast_const());
+        if len > 0 {
+            let buf = env.mem.bytes_at_mut(oldp.cast(), len);
+            buf.fill(0);
+        }
+    }
+    0
 }
 
 // ==== FONT CRASH BYPASSES ====
@@ -79,22 +105,18 @@ fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _c
 
 // ==== SYSTEM CONFIGURATION / NETWORK REACHABILITY BYPASS ====
 fn SCNetworkReachabilityCreateWithAddress(_env: &mut Environment, _allocator: ConstVoidPtr, _address: ConstVoidPtr) -> ConstVoidPtr {
-    // Return a dummy handle so the game thinks it successfully created a network target
     crate::mem::Ptr::from_bits(0xDEADBEEF) 
 }
 
 fn SCNetworkReachabilityCreateWithName(_env: &mut Environment, _allocator: ConstVoidPtr, _nodename: ConstVoidPtr) -> ConstVoidPtr {
-    // Return a dummy handle for named host targets (like ea.com)
     crate::mem::Ptr::from_bits(0xDEADBEEF) 
 }
 
 fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: ConstVoidPtr, flags_out: MutPtr<u32>) -> i32 {
     if !flags_out.is_null() {
-        // 2 = kSCNetworkReachabilityFlagsReachable
-        // This tells the EA engine "You have a solid Wi-Fi connection!"
         env.mem.write::<u32>(flags_out, 2); 
     }
-    1 // Return 1 (true) for Success
+    1
 }
 
 // ==== FILE I/O BYPASS ====
@@ -113,19 +135,15 @@ fn __assert_rtn(
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
     
-    // 🛡️ THE MUZZLER: Log it, but DO NOT PANIC. 
-    // This forces the EA engine to ignore its own crashes and limp forward!
-    log!("\n\n🛡️ EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
+    crate::log!("\n\n EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
 }
 
-// ==== OBJECTIVE-C RUNTIME FIXES (Required for Most Wanted MTX) ====
+// ==== OBJECTIVE-C RUNTIME FIXES ====
 fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
     if obj.is_null() { 
         return crate::mem::Ptr::null(); 
     }
     
-    // EA Bypass: If the game passes our dummy 0xDEADBEEF pointer, 
-    // return a dummy Class pointer to prevent the engine from panicking.
     if obj.to_bits() == 0xDEADBEEF {
         return crate::mem::Ptr::from_bits(0x30000000); 
     }
