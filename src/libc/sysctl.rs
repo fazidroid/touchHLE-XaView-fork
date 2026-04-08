@@ -16,7 +16,7 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
-    //  THE MAC ADDRESS / DEVICE ID SPOOF (Fixes ValidateDeviceId)
+    // 🛡️ THE MAC ADDRESS / DEVICE ID SPOOF (Fixes ValidateDeviceId)
     // By returning 0 and zeroing the buffer, EA's crypto-hasher hashes a clean 00:00:00 MAC.
     if !oldp.is_null() && !oldlenp.is_null() {
         let len = env.mem.read::<u32, false>(oldlenp.cast_const());
@@ -135,7 +135,7 @@ fn __assert_rtn(
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
     
-    crate::log!("\n\n EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
+    log!("\n\n🛡️ EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
 }
 
 // ==== OBJECTIVE-C RUNTIME FIXES ====
