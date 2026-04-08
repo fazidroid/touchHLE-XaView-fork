@@ -16,6 +16,7 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
+    // 🛡️ THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
     if mib.len() >= 5 && mib[0] == 4 && mib[1] == 17 && mib[3] == 18 && mib[4] == 3 {
         let req_size = 152;
         if oldp.is_null() && !oldlenp.is_null() {
@@ -23,28 +24,25 @@ fn sysctl(
             return 0;
         } else if !oldp.is_null() && !oldlenp.is_null() {
             let len = env.mem.read::<u32, false>(oldlenp.cast_const());
-            if len >= 93 {
+            if len >= 93 { // Safe bounds check
                 let buf = env.mem.bytes_at_mut(oldp.cast(), len);
                 buf.fill(0);
+                
                 buf[0] = 76; buf[2] = 5; buf[3] = 14; 
                 buf[76] = 20; buf[77] = 18; buf[80] = 6; 
                 buf[81] = 3; buf[82] = 6; 
                 buf[84] = b'e'; buf[85] = b'n'; buf[86] = b'0';
                 buf[87] = 0x02; buf[88] = 0x11; buf[89] = 0x22; 
                 buf[90] = 0x33; buf[91] = 0x44; buf[92] = 0x55;
+                
                 env.mem.write::<u32>(oldlenp, len);
                 return 0;
             }
         }
     }
     
-    if !oldp.is_null() && !oldlenp.is_null() {
-        let len = env.mem.read::<u32, false>(oldlenp.cast_const());
-        if len > 0 {
-            env.mem.bytes_at_mut(oldp.cast(), len).fill(0);
-        }
-    }
-    0
+    // 🛡️ CRITICAL FIX: Return -1 for everything else to prevent EA C++ asserts!
+    -1
 }
 
 fn sysctlbyname(
@@ -97,13 +95,8 @@ fn sysctlbyname(
         return 0;
     }
 
-    if !oldp.is_null() && !oldlenp.is_null() {
-        let len = env.mem.read::<u32, false>(oldlenp.cast_const());
-        if len > 0 {
-            env.mem.bytes_at_mut(oldp.cast(), len).fill(0);
-        }
-    }
-    0
+    // 🛡️ CRITICAL FIX: Return -1 for unknown strings to prevent EA C++ asserts!
+    -1
 }
 
 fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
@@ -150,12 +143,8 @@ fn __assert_rtn(
 }
 
 fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
-    if obj.is_null() { 
-        return crate::mem::Ptr::null(); 
-    }
-    if obj.to_bits() == 0xDEADBEEF {
-        return crate::mem::Ptr::from_bits(0x30000000); 
-    }
+    if obj.is_null() { return crate::mem::Ptr::null(); }
+    if obj.to_bits() == 0xDEADBEEF { return crate::mem::Ptr::from_bits(0x30000000); }
     let isa = env.mem.read::<u32, false>(obj.cast());
     crate::mem::Ptr::from_bits(isa)
 }
