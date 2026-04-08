@@ -76,7 +76,14 @@ fn access(env: &mut Environment, path: ConstPtr<u8>, mode: i32) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let binding = env.mem.cstr_at_utf8(path).unwrap();
+    // BypassAccessUnwrap
+    let binding = match env.mem.cstr_at_utf8(path) {
+        Ok(s) => s,
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return -1;
+        }
+    };
     let guest_path = GuestPath::new(&binding);
     let (exists, read, write, execute) = env.fs.access(guest_path);
     // TODO: support ORing
@@ -122,9 +129,17 @@ fn unlink(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    log_dbg!("unlink({:?} '{:?}')", path, env.mem.cstr_at_utf8(path));
+    // BypassUnlinkUnwrap
+    let path_str = match env.mem.cstr_at_utf8(path) {
+        Ok(s) => s,
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return -1;
+        }
+    };
 
-    let path_str = env.mem.cstr_at_utf8(path).unwrap();
+    log_dbg!("unlink({:?} '{:?}')", path, path_str);
+
     let guest_path = GuestPath::new(&path_str);
     match env.fs.remove(guest_path) {
         Ok(()) => 0,
@@ -162,10 +177,12 @@ fn readlink(
     buf: MutPtr<u8>,
     buf_size: GuestISize,
 ) -> GuestISize {
+    // BypassReadlinkUnwrap
+    let path_str = env.mem.cstr_at_utf8(path).unwrap_or_default();
     log!(
         "TODO: readlink({:?} '{}', {:?}, {}) -> -1",
         path,
-        env.mem.cstr_at_utf8(path).unwrap(),
+        path_str,
         buf,
         buf_size,
     );

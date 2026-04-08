@@ -427,10 +427,17 @@ fn realpath(
 ) -> MutPtr<u8> {
     assert!(!resolve_name.is_null());
 
-    let file_name_str = env.mem.cstr_at_utf8(file_name).unwrap();
+    // BypassRealpathUnwrap
+    let file_name_str = match env.mem.cstr_at_utf8(file_name) {
+        Ok(s) => s,
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return crate::mem::Ptr::null();
+        }
+    };
     // TOD0: resolve symbolic links
     let resolved = resolve_path(
-        GuestPath::new(file_name_str),
+        GuestPath::new(&file_name_str),
         Some(env.fs.working_directory()),
     );
     let result = format!("/{}", resolved.join("/"));
