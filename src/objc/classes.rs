@@ -293,7 +293,7 @@ fn substitute_classes(
         || name.starts_with("OpenFeint")
         || name.starts_with("Tapjoy")
         || name.starts_with("Chartboost")
-        // 🛡️ EA STOREKIT & DRM BYPASS: Silently auto-stub all Store/Network classes!
+        // 🛡️ EA STOREKIT & DRM BYPASS:
         || name.starts_with("SK") // Apple StoreKit
         || name.starts_with("Synergy") // EA Network Engine
         || name.starts_with("EAM") // EA Microtransactions
