@@ -21,49 +21,78 @@ fn objc_msgSend_inner(
 ) {
     let sel_str = selector.as_str(&env.mem);
     let message_type_info = env.objc.message_type_info.take();
+   // ==========================================================
+    // TARGETED RETINA DISPLAY SPOOF (GLES 2.0 HD Textures)
+    // ==========================================================
+
+    // 1. Force the screen scale to 2.0 (Retina)
+    if sel_str == "scale" {
+        env.cpu.regs_mut()[0] = 0x40000000; // 2.0 in IEEE 754 f32 hex
+        return;
+    }
+
+    // 2. Safely tell the game we support Retina features ONLY
+    if sel_str == "respondsToSelector:" {
+        // FIXED: Construct the SEL wrapper properly using ConstPtr
+        let target_sel = SEL(crate::mem::ConstPtr::from_bits(env.cpu.regs()[2]));
+        let target_sel_str = target_sel.as_str(&env.mem);
+        
+        // ONLY say YES (1) if it's specifically asking about modern screen features
+        if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
+            env.cpu.regs_mut()[0] = 1; 
+            return;
+        }
+        
+        // Let all other requests (like Ad Managers) fall through normally!
+    }
 
     // ==========================================================
-    // 1. GT RACING: GRAPHICS & OPENGL SNIFFER
+    // 1. GRAPHICS & OPENGL SNIFFER (GLES 2.0)
     // ==========================================================
 
-    // Trace Context Creation
     if sel_str == "initWithAPI:" {
         let api_version = env.cpu.regs()[2]; 
-        println!("🎮 GL LOG: Game requested OpenGL ES Context API Version: {}", api_version);
+        println!(" GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
-
-    // Trace the Render Surface Setup
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        println!("🎮 GL LOG: Allocating Renderbuffer from Drawable Surface!");
+        println!(" GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
-    if sel_str == "setOpaque:" {
-        let is_opaque = env.cpu.regs()[2];
-        println!("🎮 GL LOG: Layer setOpaque: {}", is_opaque);
-    }
-
-    // Trace Window & Screen Setup
-    if sel_str == "makeKeyAndVisible" {
-        println!("🎮 GL LOG: UIWindow is being made visible to the screen!");
-    }
-
-    // Uncomment this to trace actual frame draws (Warning: spams the console!)
-    // if sel_str == "presentRenderbuffer:" {
-    //     println!("🎮 GL LOG: Frame Presented!"); 
-    // }
 
     // ==========================================================
-    // 2. GAMELOFT IDENTITY & HARDWARE SPOOFS
+    // 2. NETWORK & AD KILL-SWITCH (Fixes the Loading Freeze)
     // ==========================================================
     
-    // Gameloft's strict UDID check
+    // Kill Network Connections (Prevents hanging on Gameloft Live)
+    if sel_str == "connectionWithRequest:delegate:" || 
+       sel_str == "initWithRequest:delegate:" || 
+       sel_str == "sendSynchronousRequest:returningResponse:error:" {
+        env.cpu.regs_mut()[0] = 0; // Return nil
+        return;
+    }
+
+    // Disable Ad Managers safely
+    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" {
+        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF }; 
+        return;
+    }
+
+    // Neutralize thread-blocking delay loops
+    if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
+        println!(" LOG: Caught and neutralized a freezing performSelector call!");
+        return;
+    }
+
+    // ==========================================================
+    // 3. GAMELOFT IDENTITY & HARDWARE SPOOFS
+    // ==========================================================
+    
     if sel_str == "uniqueIdentifier" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
 
-    // Prevent (null) devices
-    if sel_str == "currentDevice" || sel_str == "keyWindow" {
+    if sel_str == "currentDevice" {
         env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
         return;
     }
@@ -82,7 +111,27 @@ fn objc_msgSend_inner(
     }
 
     // ==========================================================
-    // 3. CORE DISPATCH LOGIC (With Recursion Fixes)
+    // 3.5. EA GAMES MTX & STOREKIT BYPASS
+    // ==========================================================
+    
+    // Trick the EA engine into thinking Microtransactions are online and authorized.
+    if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
+        println!(" EA MTX BYPASS: Faking StoreKit availability to YES!");
+        env.cpu.regs_mut()[0] = 1; // Return 1 (YES / True)
+        env.cpu.regs_mut()[1] = 0;
+        return;
+    }
+    
+    // If EA asks for the default payment queue, return a dummy object instead of nil
+    if sel_str == "defaultQueue" {
+        println!(" EA MTX BYPASS: Faking SKPaymentQueue defaultQueue!");
+        env.cpu.regs_mut()[0] = 0x30000000; // Fake safe pointer
+        env.cpu.regs_mut()[1] = 0;
+        return;
+    }
+
+    // ==========================================================
+    // 4. CORE DISPATCH LOGIC (With Recursion Fixes)
     // ==========================================================
 
     if receiver == nil {
@@ -99,7 +148,6 @@ fn objc_msgSend_inner(
     let mut class = orig_class;
     loop {
         if class == nil {
-            // Safe fallback for unrecognized methods
             if sel_str == "self" { env.cpu.regs_mut()[0] = receiver.to_bits(); } 
             else { env.cpu.regs_mut()[0..2].fill(0); }
             return;
@@ -112,7 +160,6 @@ fn objc_msgSend_inner(
 
         if let Some(obj) = host_object.as_any().downcast_ref::<super::ClassHostObject>() {
             
-            // Fixes the Stack Overflow by properly walking up the class hierarchy
             if super2.is_some() && class == orig_class {
                 class = obj.superclass;
                 continue;
@@ -121,7 +168,6 @@ fn objc_msgSend_inner(
             let name = &obj.name;
 
             // --- GAMELOFT VIDEO PLAYER BYPASS ---
-            // Skips the intro video by instantly telling the game it finished.
             if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
                 let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                 if center_class != nil {
