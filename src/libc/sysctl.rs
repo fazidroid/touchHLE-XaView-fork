@@ -16,7 +16,7 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
-    // 🛡️ THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
+    //  THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
     if mib.len() >= 5 && mib[0] == 4 && mib[1] == 17 && mib[3] == 18 && mib[4] == 3 {
         let req_size = 152;
         if oldp.is_null() && !oldlenp.is_null() {
@@ -130,7 +130,11 @@ fn SCNetworkReachabilityCreateWithName(_env: &mut Environment, _allocator: Const
 }
 
 fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: ConstVoidPtr, flags_out: MutPtr<u32>) -> i32 {
-    if !flags_out.is_null() { env.mem.write::<u32>(flags_out, 2); }
+    if !flags_out.is_null() { 
+        //  OFFLINE MODE BYPASS: Return 0 (Not Reachable) instead of 2.
+        // This forces the EA engine to skip the broken online Synergy MTX checks!
+        env.mem.write::<u32>(flags_out, 0); 
+    }
     1
 }
 
@@ -138,10 +142,7 @@ fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { 0 }
 fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 
-// 🛡️ LIBXML2 SAFE STUB: Prevents the game from jumping into a null pointer!
-fn xmlFree(_env: &mut Environment, _ptr: ConstVoidPtr) {
-    log!("🛡️ XML BYPASS: Absorbed missing libxml2 xmlFree call safely!");
-}
+fn xmlFree(_env: &mut Environment, _ptr: ConstVoidPtr) {}
 
 fn __assert_rtn(
     env: &mut Environment,
@@ -154,7 +155,6 @@ fn __assert_rtn(
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
     
-    // We MUST panic here so the emulator can flush the log instead of silently segfaulting into garbage memory!
     panic!("EA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}", file_str, line, func_str, expr_str);
 }
 
@@ -172,19 +172,16 @@ fn class_getProperty(_env: &mut Environment, _cls: ConstVoidPtr, _name: ConstVoi
 pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
     export_c_func!(sysctlbyname(_, _, _, _, _)),
-    
     export_c_func!(CGFontGetUnitsPerEm(_)),
     export_c_func!(CGFontGetAscent(_)),
     export_c_func!(CGFontGetDescent(_)),
     export_c_func!(CGFontRetain(_)),
     export_c_func!(CGFontCreateWithDataProvider(_)),
     export_c_func!(CGDataProviderCreateSequential(_, _)),
-    
     export_c_func!(__srget(_)),
     export_c_func!(flockfile(_)),
     export_c_func!(funlockfile(_)),
-    export_c_func!(xmlFree(_)), // Exported our safe stub!
-    
+    export_c_func!(xmlFree(_)), 
     export_c_func!(__assert_rtn(_, _, _, _)),
     export_c_func!(object_getClass(_)),
     export_c_func!(class_getProperty(_, _)),
