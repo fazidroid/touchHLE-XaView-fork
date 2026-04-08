@@ -10,7 +10,6 @@ on:
       - "trunk"
       - "GTRacing134"
       - "Shift2"
-      - "GTRacing134"
       - "mostwanted"
   pull_request:
     branches: 
