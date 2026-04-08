@@ -2073,18 +2073,23 @@ fn glVertexAttrib4fv(env: &mut Environment, indx: GLuint, values: ConstPtr<GLflo
         gles.VertexAttrib4fv(indx, mem.ptr_at(values, 4))
     })
 }
+// UniformLocationHack helper
+fn unhack_loc(loc: GLint) -> GLint {
+    if loc >= 1000 { loc - 1000 } else { loc }
+}
+
 fn glUniform1i(env: &mut Environment, location: GLint, x: GLint) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1i(location, x) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1i(unhack_loc(location), x) })
 }
 fn glUniform1f(env: &mut Environment, location: GLint, x: GLfloat) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1f(location, x) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1f(unhack_loc(location), x) })
 }
 fn glUniform2f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform2f(location, x, y) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform2f(unhack_loc(location), x, y) })
 }
 fn glUniform3f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat, z: GLfloat) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.Uniform3f(location, x, y, z)
+        gles.Uniform3f(unhack_loc(location), x, y, z)
     })
 }
 // GuestUniformArrays
@@ -2097,57 +2102,57 @@ fn glUniform4f(
     w: GLfloat,
 ) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.Uniform4f(location, x, y, z, w)
+        gles.Uniform4f(unhack_loc(location), x, y, z, w)
     })
 }
 // IdentityOpFixOne
 fn glUniform1fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, count as u32);
-        gles.Uniform1fv(location, count, ptr);
+        gles.Uniform1fv(unhack_loc(location), count, ptr);
     })
 }
 fn glUniform2fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 2) as u32);
-        gles.Uniform2fv(location, count, ptr);
+        gles.Uniform2fv(unhack_loc(location), count, ptr);
     })
 }
 fn glUniform3fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 3) as u32);
-        gles.Uniform3fv(location, count, ptr);
+        gles.Uniform3fv(unhack_loc(location), count, ptr);
     })
 }
 fn glUniform4fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
-        gles.Uniform4fv(location, count, ptr);
+        gles.Uniform4fv(unhack_loc(location), count, ptr);
     })
 }
 // IdentityOpFixTwo
 fn glUniform1iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, count as u32);
-        gles.Uniform1iv(location, count, ptr);
+        gles.Uniform1iv(unhack_loc(location), count, ptr);
     })
 }
 fn glUniform2iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 2) as u32);
-        gles.Uniform2iv(location, count, ptr);
+        gles.Uniform2iv(unhack_loc(location), count, ptr);
     })
 }
 fn glUniform3iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 3) as u32);
-        gles.Uniform3iv(location, count, ptr);
+        gles.Uniform3iv(unhack_loc(location), count, ptr);
     })
 }
 fn glUniform4iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
-        gles.Uniform4iv(location, count, ptr);
+        gles.Uniform4iv(unhack_loc(location), count, ptr);
     })
 }
 fn glUniformMatrix2fv(
@@ -2159,7 +2164,7 @@ fn glUniformMatrix2fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
-        gles.UniformMatrix2fv(location, count, transpose, ptr);
+        gles.UniformMatrix2fv(unhack_loc(location), count, transpose, ptr);
     })
 }
 fn glUniformMatrix3fv(
@@ -2171,7 +2176,7 @@ fn glUniformMatrix3fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 9) as u32);
-        gles.UniformMatrix3fv(location, count, transpose, ptr);
+        gles.UniformMatrix3fv(unhack_loc(location), count, transpose, ptr);
     })
 }
 fn glUniformMatrix4fv(
@@ -2183,13 +2188,12 @@ fn glUniformMatrix4fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
-        // DebugUniformMat4
         let slice = std::slice::from_raw_parts(value_ptr, (count * 16) as usize);
-        
-        // ZeroMatrixFix
+        let real_loc = unhack_loc(location);
+
         let mut is_zero = true;
         for &v in slice.iter().take(16) {
-            if v.abs() > 0.0001 {
+            if v != 0.0 && v.abs() > 0.0001 {
                 is_zero = false;
                 break;
             }
@@ -2202,11 +2206,11 @@ fn glUniformMatrix4fv(
                 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,
             ];
-            log!("DEBUG_GL: glUniformMatrix4fv(loc={}) DETECTED ZERO MATRIX! Injecting Identity!", location);
-            gles.UniformMatrix4fv(location, count, transpose, identity.as_ptr());
+            log!("DEBUG_GL: glUniformMatrix4fv(loc={}) DETECTED ZERO MATRIX! Injecting Identity!", real_loc);
+            gles.UniformMatrix4fv(real_loc, count, transpose, identity.as_ptr());
         } else {
-            log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
-            gles.UniformMatrix4fv(location, count, transpose, value_ptr);
+            log!("DEBUG_GL: glUniformMatrix4fv(loc={}, orig={}, count={}, ptr={:#x}) -> {:?}", real_loc, location, count, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
+            gles.UniformMatrix4fv(real_loc, count, transpose, value_ptr);
         }
     })
 }
@@ -2214,18 +2218,19 @@ fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidP
     with_ctx_and_mem_no_skip(env, |gles, mem| unsafe {
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
         let res = gles.GetUniformLocation(program, host_name);
-        let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // UniformLog
-        log!("DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {}", program, name_str, res); // UniformLog
-        res
+        let res_hack = if res >= 0 { res + 1000 } else { -1 };
+        let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); 
+        log!("DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {} (returning {})", program, name_str, res, res_hack); 
+        res_hack
     })
 }
 fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
     with_ctx_and_mem_no_skip(env, |gles, mem| unsafe {
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
-        let res = gles.GetAttribLocation(program, host_name); // LogAttribLoc
-        let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // LogAttribLoc
-        log!("DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}", program, name_str, res); // LogAttribLoc
-        res // LogAttribLoc
+        let res = gles.GetAttribLocation(program, host_name); 
+        let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); 
+        log!("DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}", program, name_str, res); 
+        res 
     })
 }
 // ActiveUniformFix
