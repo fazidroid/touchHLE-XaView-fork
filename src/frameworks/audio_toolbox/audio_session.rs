@@ -57,6 +57,7 @@ impl Default for State {
     }
 }
 
+// TraceSessionInit
 fn AudioSessionInitialize(
     _env: &mut Environment,
     in_run_loop: CFRunLoopRef,
@@ -65,6 +66,7 @@ fn AudioSessionInitialize(
     in_client_data: MutVoidPtr,
 ) -> OSStatus {
     let result = 0; // success
+    println!("AUDIO_TRACE: AudioSessionInitialize()");
     log!(
         "TODO: AudioSessionInitialize({:?}, {:?}, {:?}, {:?}) -> {:?}",
         in_run_loop,
@@ -188,8 +190,10 @@ fn AudioSessionSetProperty(
     result
 }
 
+// TraceSessionActive
 fn AudioSessionSetActive(_env: &mut Environment, active: bool) -> OSStatus {
     let result = 0; // success
+    println!("AUDIO_TRACE: AudioSessionSetActive({:?}) -> {:?}", active, result);
     log!("TODO: AudioSessionSetActive({:?}) -> {:?}", active, result);
     result
 }

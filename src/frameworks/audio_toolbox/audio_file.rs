@@ -113,6 +113,8 @@ pub fn AudioFileOpenURL(
 
     env.mem.write(out_audio_file, guest_audio_file);
 
+    // TraceFileOpenURL
+    println!("AUDIO_TRACE: AudioFileOpenURL({:?})", in_file_ref);
     log_dbg!(
         "AudioFileOpenURL() opened path {:?}, new audio file handle: {:?}",
         in_file_ref,
@@ -211,6 +213,8 @@ pub fn AudioFileOpenWithCallbacks(
 
     env.mem.write(out_audio_file, guest_audio_file);
 
+    // TraceFileOpenCB
+    println!("AUDIO_TRACE: AudioFileOpenWithCallbacks()");
     log_dbg!(
         "AudioFileOpenWithCallbacks() opened, new audio file handle: {:?}",
         guest_audio_file
