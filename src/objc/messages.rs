@@ -43,10 +43,10 @@ fn objc_msgSend_inner(
 
     if sel_str == "initWithAPI:" {
         let api_version = env.cpu.regs()[2]; 
-        log!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
+        println!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        println!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
     if sel_str == "connectionWithRequest:delegate:" || 
@@ -56,20 +56,30 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // 🛡️ DUMMY SINGLETON BYPASS (Fixes CheckMTXController asserting on nil)
-    // By creating a fake NSObject, the EA C++ Engine thinks the Store is loaded!
     if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "defaultQueue" {
-        log!("🛡️ DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
+        println!("🛡️ DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
         let cls = env.objc.get_known_class("NSObject", &mut env.mem);
         if cls != nil {
-            let obj: id = msg![env; cls alloc];
-            let obj: id = msg![env; obj init];
+            let obj: id = crate::msg![env; cls alloc];
+            let obj: id = crate::msg![env; obj init];
             env.cpu.regs_mut()[0] = obj.to_bits();
         } else {
             env.cpu.regs_mut()[0] = 0x30000000; 
         }
         env.cpu.regs_mut()[1] = 0;
         return;
+    }
+    
+    // 🛡️ EA CURRENCY BYPASS (Fixes the missing NSLocaleCurrencyCode assert)
+    if sel_str == "objectForKey:" {
+        let key = env.cpu.regs()[2];
+        if key == 0 { // If EA passes NULL (because the locale symbol is missing)
+            println!("🛡️ EA MTX BYPASS: objectForKey: called with NULL key! Faking 'USD' currency string!");
+            let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "USD".to_string());
+            env.cpu.regs_mut()[0] = val.to_bits();
+            env.cpu.regs_mut()[1] = 0;
+            return;
+        }
     }
 
     if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
@@ -94,29 +104,30 @@ fn objc_msgSend_inner(
         return;
     }
 
+    // 🛡️ EA MODERN OS BYPASS (Force iOS 6.0)
     if sel_str == "systemVersion" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "6.0.0".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
 
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
+        println!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
         env.cpu.regs_mut()[0] = 1; 
         env.cpu.regs_mut()[1] = 0;
         return;
     }
 
     if sel_str == "addTransactionObserver:" || sel_str == "removeTransactionObserver:" {
-        log!("🛡️ EA MTX BYPASS: Absorbed {} safely!", sel_str);
+        println!("🛡️ EA MTX BYPASS: Absorbed {} safely!", sel_str);
         return;
     }
 
     if sel_str == "transactions" {
-        log!("🛡️ EA MTX BYPASS: Returning valid empty NSArray for transactions!");
+        println!("🛡️ EA MTX BYPASS: Returning valid empty NSArray for transactions!");
         let array_class = env.objc.get_known_class("NSArray", &mut env.mem);
         if array_class != nil {
-            let empty_array: id = msg![env; array_class array];
+            let empty_array: id = crate::msg![env; array_class array];
             env.cpu.regs_mut()[0] = empty_array.to_bits();
         } else {
             env.cpu.regs_mut()[0] = 0;
@@ -160,9 +171,9 @@ fn objc_msgSend_inner(
             if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
                 let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                 if center_class != nil {
-                    let center: id = msg![env; center_class defaultCenter];
+                    let center: id = crate::msg![env; center_class defaultCenter];
                     let n = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                    let _: () = msg![env; center postNotificationName:n object:receiver];
+                    let _: () = crate::msg![env; center postNotificationName:n object:receiver];
                 }
                 env.cpu.regs_mut()[0] = 0;
                 return;
@@ -304,6 +315,6 @@ macro_rules! msg_class {
     }
 }
 pub use crate::msg_class;
-pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object retain] }
-pub fn release(env: &mut Environment, object: id) { if object == nil { return; } msg![env; object release] }
-pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object autorelease] }
+pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object retain] }
+pub fn release(env: &mut Environment, object: id) { if object == nil { return; } crate::msg![env; object release] }
+pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object autorelease] }
