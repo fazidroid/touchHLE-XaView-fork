@@ -43,10 +43,10 @@ fn objc_msgSend_inner(
 
     if sel_str == "initWithAPI:" {
         let api_version = env.cpu.regs()[2]; 
-        crate::log!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
+        log!(" GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        crate::log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        log!(" GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
     if sel_str == "connectionWithRequest:delegate:" || 
@@ -56,22 +56,22 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // 🛡️ SAFE POINTER BYPASS FOR CLASSES
+    //  SAFE POINTER BYPASS FOR CLASSES
     if sel_str == "currentDevice" {
-        crate::log!("🛡️ SAFE POINTER BYPASS: Spoofing {}", sel_str);
+        log!(" SAFE POINTER BYPASS: Spoofing {}", sel_str);
         env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0x30000000 }; 
         env.cpu.regs_mut()[1] = 0;
         return;
     }
 
-    // 🛡️ DUMMY SINGLETON BYPASS (Fixes CheckMTXController asserting on nil)
+    //  DUMMY SINGLETON BYPASS (Fixes CheckMTXController asserting on nil)
     // By creating a fake NSObject, the EA C++ Engine thinks the Store is loaded!
     if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "defaultQueue" {
-        crate::log!("🛡️ DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
+        log!(" DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
         let cls = env.objc.get_known_class("NSObject", &mut env.mem);
         if cls != nil {
-            let obj: id = crate::msg![env; cls alloc];
-            let obj: id = crate::msg![env; obj init];
+            let obj: id = msg![env; cls alloc];
+            let obj: id = msg![env; obj init];
             env.cpu.regs_mut()[0] = obj.to_bits();
         } else {
             env.cpu.regs_mut()[0] = 0x30000000; 
@@ -109,22 +109,22 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        crate::log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
+        log!(" EA MTX BYPASS: Faking StoreKit availability to YES!");
         env.cpu.regs_mut()[0] = 1; 
         env.cpu.regs_mut()[1] = 0;
         return;
     }
 
     if sel_str == "addTransactionObserver:" || sel_str == "removeTransactionObserver:" {
-        crate::log!("🛡️ EA MTX BYPASS: Absorbed {} safely!", sel_str);
+        log!(" EA MTX BYPASS: Absorbed {} safely!", sel_str);
         return;
     }
 
     if sel_str == "transactions" {
-        crate::log!("🛡️ EA MTX BYPASS: Returning valid empty NSArray for transactions!");
+        log!(" EA MTX BYPASS: Returning valid empty NSArray for transactions!");
         let array_class = env.objc.get_known_class("NSArray", &mut env.mem);
         if array_class != nil {
-            let empty_array: id = crate::msg![env; array_class array];
+            let empty_array: id = msg![env; array_class array];
             env.cpu.regs_mut()[0] = empty_array.to_bits();
         } else {
             env.cpu.regs_mut()[0] = 0;
@@ -168,9 +168,9 @@ fn objc_msgSend_inner(
             if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
                 let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                 if center_class != nil {
-                    let center: id = crate::msg![env; center_class defaultCenter];
+                    let center: id = msg![env; center_class defaultCenter];
                     let n = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                    let _: () = crate::msg![env; center postNotificationName:n object:receiver];
+                    let _: () = msg![env; center postNotificationName:n object:receiver];
                 }
                 env.cpu.regs_mut()[0] = 0;
                 return;
@@ -201,6 +201,7 @@ fn objc_msgSend_inner(
     }
 }
 
+// Boilerplate below is unchanged
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSend(env: &mut Environment, receiver: id, selector: SEL) {
     objc_msgSend_inner(env, receiver, selector, None, false)
@@ -311,6 +312,6 @@ macro_rules! msg_class {
     }
 }
 pub use crate::msg_class;
-pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object retain] }
-pub fn release(env: &mut Environment, object: id) { if object == nil { return; } crate::msg![env; object release] }
-pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object autorelease] }
+pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object retain] }
+pub fn release(env: &mut Environment, object: id) { if object == nil { return; } msg![env; object release] }
+pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object autorelease] }
