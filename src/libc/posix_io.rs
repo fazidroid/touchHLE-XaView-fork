@@ -395,6 +395,11 @@ fn fcntl(env: &mut Environment, fd: FileDescriptor, cmd: FileControlCommand, arg
             println!("WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.", cmd, fd);
             return 0;
         }
+        _ => {
+            // BypassFcntl
+            println!("WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.", cmd, fd);
+            return 0;
+        }
     }
 }
 

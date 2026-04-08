@@ -32,6 +32,26 @@ fn SCNetworkReachabilityUnscheduleFromRunLoop(
     true
 }
 
+fn SCNetworkReachabilityScheduleWithRunLoop(
+    _env: &mut Environment,
+    _target: SCNetworkReachabilityRef,
+    _run_loop: MutVoidPtr,
+    _run_loop_mode: MutVoidPtr,
+) -> bool {
+    // FakeNetSchedule
+    true
+}
+
+fn SCNetworkReachabilityUnscheduleFromRunLoop(
+    _env: &mut Environment,
+    _target: SCNetworkReachabilityRef,
+    _run_loop: MutVoidPtr,
+    _run_loop_mode: MutVoidPtr,
+) -> bool {
+    // FakeNetUnschedule
+    true
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _)),
     export_c_func!(SCNetworkReachabilityCreateWithName(_, _)),
