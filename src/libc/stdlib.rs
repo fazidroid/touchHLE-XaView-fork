@@ -916,8 +916,13 @@ fn CGColorGetComponents(env: &mut Environment, _color: ConstVoidPtr) -> MutVoidP
     ptr
 }
 
+fn CGContextSetFillColor(_env: &mut Environment, _context: ConstVoidPtr, _components: ConstVoidPtr) {
+    // FakeSetFillColor
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGColorGetComponents(_)),
+    export_c_func!(CGContextSetFillColor(_, _)),
     export_c_func!(dladdr(_, _)),
     export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
     export_c_func!(setrlimit(_, _)),
