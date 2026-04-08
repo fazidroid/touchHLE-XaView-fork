@@ -125,6 +125,11 @@ pub unsafe fn present_frame(
     let tex_coords: [f32; 12] = [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
     let matrix = Matrix::<4>::from(&rotation_matrix);
 
+    // DebugPresentGeom
+    log!("DEBUG_PRESENT: Quad Vertices: {:?}", vertices);
+    log!("DEBUG_PRESENT: Quad TexCoords: {:?}", tex_coords);
+    log!("DEBUG_PRESENT: Applied TexMatrix: {:?}", matrix.columns());
+
     if is_gles2 {
         let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
         // RemoveDebugTint
