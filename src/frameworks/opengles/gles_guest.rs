@@ -1608,7 +1608,7 @@ fn glGetBufferParameteriv(
     })
 }
 // TrackMappedBuffers
-static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLenum, u32, u32)>> = std::sync::Mutex::new(Vec::new());
+static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLuint, u32, u32)>> = std::sync::Mutex::new(Vec::new());
 
 fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutPtr<GLvoid> {
     let size: GLint = _get_buffer_size(env, target);
@@ -1616,9 +1616,15 @@ fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutP
         return Ptr::null();
     }
     
+    let buffer_id = _get_currently_bound_buffer_object_name(env, target);
+    if buffer_id == 0 {
+        return Ptr::null();
+    }
+    
     let mut allocated_ptr = 0;
     if let Ok(mut map) = MAPPED_BUFFERS.lock() {
-        if let Some(&mut (_, ref mut ptr, ref mut alloc_size)) = map.iter_mut().find(|(t, _, _)| *t == target) {
+        // FixMapBufferKey
+        if let Some(&mut (_, ref mut ptr, ref mut alloc_size)) = map.iter_mut().find(|(id, _, _)| *id == buffer_id) {
             if *alloc_size >= size as u32 {
                 allocated_ptr = *ptr;
             } else {
@@ -1628,20 +1634,22 @@ fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutP
             }
         } else {
             allocated_ptr = env.mem.alloc(size as u32).to_bits();
-            map.push((target, allocated_ptr, size as u32));
+            map.push((buffer_id, allocated_ptr, size as u32));
         }
     }
     
     let guest_ptr = Ptr::from_bits(allocated_ptr);
-    // BetterDebugInfo
-    log_dbg!("glMapBufferOES(target: {}, access: {}) -> {:?}", target, access, guest_ptr);
+    log!("DEBUG_GL: glMapBufferOES(target={:#x}, buf={}, size={}) -> {:#x}", target, buffer_id, size, guest_ptr.to_bits()); // LogMapBuffer
     guest_ptr
 }
 
 fn glUnmapBufferOES(env: &mut Environment, target: GLenum) -> GLboolean {
+    let buffer_id = _get_currently_bound_buffer_object_name(env, target);
     let mut guest_ptr_bits = 0;
+    
     if let Ok(map) = MAPPED_BUFFERS.lock() {
-        if let Some(&(_, ptr, _)) = map.iter().find(|&&(t, _, _)| t == target) {
+        // FixUnmapBufferKey
+        if let Some(&(_, ptr, _)) = map.iter().find(|&&(id, _, _)| id == buffer_id) {
             guest_ptr_bits = ptr;
         }
     }
@@ -1657,8 +1665,7 @@ fn glUnmapBufferOES(env: &mut Environment, target: GLenum) -> GLboolean {
             });
         }
     }
-    // BetterDebugInfo
-    log_dbg!("glUnmapBufferOES(target: {}) -> 1", target);
+    log!("DEBUG_GL: glUnmapBufferOES(target={:#x}, buf={}) -> 1", target, buffer_id); // LogUnmapBuffer
     1 // GL_TRUE
 }
 
@@ -2514,11 +2521,12 @@ fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum
         let pname = match target {
             ARRAY_BUFFER => VERTEX_ARRAY_BUFFER_BINDING,
             ELEMENT_ARRAY_BUFFER => ELEMENT_ARRAY_BUFFER_BINDING,
-            _ => panic!(),
+            _ => return 0,
         };
-        let currently_bound_buffer_name: GLuint = 0;
-        gles.GetIntegerv(pname, &mut (currently_bound_buffer_name as GLint));
-        currently_bound_buffer_name
+        // FixBufferNameCast
+        let mut buffer_name: GLint = 0;
+        gles.GetIntegerv(pname, &mut buffer_name);
+        buffer_name as GLuint
     })
 }
 
