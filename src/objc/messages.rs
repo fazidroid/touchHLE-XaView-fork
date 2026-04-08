@@ -43,10 +43,10 @@ fn objc_msgSend_inner(
 
     if sel_str == "initWithAPI:" {
         let api_version = env.cpu.regs()[2]; 
-        crate::log!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
+        log!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        crate::log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
     // ==========================================================
@@ -64,14 +64,14 @@ fn objc_msgSend_inner(
     // Returning fake raw hex like 0xDEADBEEF causes C++ to crash when dereferenced.
     // Returning `receiver.to_bits()` gives it a real mapped object in memory!
     if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "currentDevice" || sel_str == "defaultQueue" {
-        crate::log!("🛡️ SAFE POINTER BYPASS: Spoofing {}", sel_str);
+        log!("🛡️ SAFE POINTER BYPASS: Spoofing {}", sel_str);
         env.cpu.regs_mut()[0] = receiver.to_bits(); 
         env.cpu.regs_mut()[1] = 0;
         return;
     }
 
     if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
-        crate::log!("🎮 LOG: Caught and neutralized a freezing performSelector call!");
+        log!("🎮 LOG: Caught and neutralized a freezing performSelector call!");
         return;
     }
 
@@ -103,7 +103,7 @@ fn objc_msgSend_inner(
     // ==========================================================
     
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        crate::log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
+        log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
         env.cpu.regs_mut()[0] = 1; 
         env.cpu.regs_mut()[1] = 0;
         return;
