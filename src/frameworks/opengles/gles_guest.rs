@@ -198,11 +198,10 @@ fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
         match pname {
             // ViewportHack
             0x0BA2 => {
-                let params = mem.ptr_at_mut(params, 4);
-                mem.write(params + 0, 0);
-                mem.write(params + 1, 0);
-                mem.write(params + 2, 480);
-                mem.write(params + 3, 320);
+                mem.write(params, 0);
+                mem.write(params + 1u32, 0);
+                mem.write(params + 2u32, 480);
+                mem.write(params + 3u32, 320);
                 log!("DEBUG_GL: glGetIntegerv(GL_VIEWPORT) -> Fake 480x320");
             }
             gles11::NUM_COMPRESSED_TEXTURE_FORMATS => {
