@@ -136,20 +136,20 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this bundleURL]
 }
 
-- (id)executablePath {
-    let exec_path_str = env.bundle.executable_path().as_str().to_string();
-    let exec_path = from_rust_string(env, exec_path_str);
-    autorelease(env, exec_path)
-}
-
 - (id)pathForResource:(id)name // NSString*
                ofType:(id)extension // NSString*
           inDirectory:(id)directory { // NSString*
-    assert!(name != nil); // TODO
+    
+    // 🛡️ NATIVE FIX: Shift 2 passes nil here. Safely return nil instead of crashing!
+    if name == nil {
+        return nil; 
+    }
 
     // TODO: cache result of lookups
 
     let path = path_for_resource_helper(env, this, name, nil, directory, extension);
+// ... (leave the rest of the function the same)
+
     if path != nil {
         return path
     }

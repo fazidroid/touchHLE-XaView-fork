@@ -133,50 +133,53 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (bool)scanHexInt:(MutPtr<u32>)result {
-    assert!(!result.is_null());
-    skip_characters(env, this);
-
-    let NSScannerHostObject { to_be_skipped: _set, string, len, pos } = env.objc.borrow::<NSScannerHostObject>(this).clone();
-    assert!(pos < len);
-    let susbstring: id = msg![env; string substringFromIndex:pos];
-    let tmp = to_rust_string(env, susbstring);
-    assert!(!tmp.starts_with("0x") && !tmp.starts_with("0X"));
-    assert!(!tmp.chars().next().unwrap().is_ascii_hexdigit()); // TODO
-    env.mem.write(result, 0);
-    false
-}
-
-- (bool)scanUpToString:(id)stop_string // NSString *
-            intoString:(MutPtr<id>)result { // NSString **
+    // 🛡️ NATIVE FIX: EA DRM uses this to parse hex strings!
+    // We removed the panic assertions and actually implemented the hex parser.
     skip_characters(env, this);
 
     let NSScannerHostObject { to_be_skipped, string, len, pos } = std::mem::take(env.objc.borrow_mut::<NSScannerHostObject>(this));
-    log_dbg!("scanUpToString:'{}' intoString: from '{}' at {}", to_rust_string(env, stop_string), to_rust_string(env, string), pos);
-
-    // TODO: avoid string copying
-    let left: id = msg![env; string substringFromIndex:pos];
-    let range: NSRange = msg![env; left rangeOfString:stop_string];
-    if range.location == 0 {
+    
+    if pos >= len {
         *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
         return false;
     }
 
-    let scan_len = if range.location == NSNotFound as NSUInteger {
-        len - pos
-    } else {
-        range.location
-    };
-    assert!(pos + scan_len <= len);
-    *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos: pos + scan_len };
-
-    if !result.is_null() {
-        let copy: id = msg![env; left substringToIndex:scan_len];
-        log_dbg!("scanned '{}' up to {}", to_rust_string(env, copy), pos + scan_len);
-        // Note: substring is already autoreleased
-        env.mem.write(result, copy);
+    let left: id = msg![env; string substringFromIndex:pos];
+    let st = to_rust_string(env, left);
+    let trimmed = st.trim_start();
+    let skipped = st.len() - trimmed.len();
+    
+    let mut hex_str = trimmed;
+    let mut prefix_len = 0;
+    if hex_str.starts_with("0x") || hex_str.starts_with("0X") {
+        hex_str = &hex_str[2..];
+        prefix_len = 2;
     }
+    
+    // Count contiguous hex characters
+    let hex_len = hex_str.chars().take_while(|c| c.is_ascii_hexdigit()).count();
+    
+    if hex_len == 0 {
+        *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
+        return false;
+    }
+    
+    if !result.is_null() {
+        let parse_len = std::cmp::min(hex_len, 8); // u32 maxes out at 8 hex chars
+        let parsed_val = u32::from_str_radix(&hex_str[..parse_len], 16).unwrap_or(u32::MAX);
+        env.mem.write(result, parsed_val);
+    }
+    
+    let total_consumed = skipped + prefix_len + hex_len;
+    *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { 
+        to_be_skipped, 
+        string, 
+        len, 
+        pos: pos + total_consumed as NSUInteger 
+    };
     true
 }
+
 
 - (bool)scanString:(id)scan_string // NSString *
         intoString:(MutPtr<id>)result { // NSString **
