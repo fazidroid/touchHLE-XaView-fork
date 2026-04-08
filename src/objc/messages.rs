@@ -164,6 +164,11 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
+            // BypassDictCreate
+            if selector.as_str(&env.mem) == "dictionaryWithObjects:forKeys:count:" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
