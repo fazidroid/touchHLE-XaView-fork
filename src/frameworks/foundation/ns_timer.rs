@@ -47,9 +47,8 @@ pub const CLASSES: ClassExports = objc_classes! {
                    selector:(SEL)selector
                    userInfo:(id)user_info
                     repeats:(bool)repeats {
-    // GAMELOFT NaN FIX: Prevent crashes when delta time is NaN. 
-    // FIXED: Properly allow 0.0 to pass through normally as 0.0001s to prevent 1-second delays!
-    let safe_interval = if ns_interval.is_finite() && ns_interval >= 0.0 { ns_interval } else { 0.0001 };
+    // GAMELOFT NaN FIX: Clamp the max value so massive finite floats or NaNs don't panic Duration!
+    let safe_interval = if ns_interval.is_finite() && ns_interval >= 0.0 { ns_interval.min(3600.0) } else { 0.0001 };
     let ns_interval_safe = safe_interval.max(0.0001);
     let rust_interval = Duration::from_secs_f64(ns_interval_safe);
 
@@ -159,8 +158,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 pub fn set_time_interval(env: &mut Environment, timer: id, interval: NSTimeInterval) {
     let host_object = env.objc.borrow_mut::<NSTimerHostObject>(timer);
     
-    // GAMELOFT NaN FIX
-    let safe_interval = if interval.is_finite() && interval >= 0.0 { interval } else { 0.0001 };
+    // GAMELOFT NaN FIX: Clamp the max value
+    let safe_interval = if interval.is_finite() && interval >= 0.0 { interval.min(3600.0) } else { 0.0001 };
     
     host_object.ns_interval = safe_interval;
     host_object.rust_interval = Duration::from_secs_f64(safe_interval);
@@ -202,8 +201,8 @@ pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> 
     retain(env, timer);
 
     let new_due_by = if repeats {
-        // GAMELOFT NaN FIX
-        let safe_ns_interval = if ns_interval.is_finite() && ns_interval > 0.0 { ns_interval } else { 0.0001 };
+        // GAMELOFT NaN FIX: Clamp the max value
+        let safe_ns_interval = if ns_interval.is_finite() && ns_interval > 0.0 { ns_interval.min(3600.0) } else { 0.0001 };
         let advance_by = (overdue_by.as_secs_f64() / safe_ns_interval).max(1.0).ceil();
         
         assert!(advance_by == (advance_by as u32) as f64);

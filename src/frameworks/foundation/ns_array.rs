@@ -433,8 +433,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<ArrayHostObject>(this).array.len().try_into().unwrap()
 }
 - (id)objectAtIndex:(NSUInteger)index {
-    // TODO: throw real exception rather than panic if out-of-bounds?
-    env.objc.borrow::<ArrayHostObject>(this).array[index as usize]
+    // BypassOutOfBounds
+    let arr = &env.objc.borrow::<ArrayHostObject>(this).array;
+    if index as usize >= arr.len() {
+        return nil;
+    }
+    arr[index as usize]
 }
 
 - (id)description {
@@ -643,8 +647,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<ArrayHostObject>(this).array.len().try_into().unwrap()
 }
 - (id)objectAtIndex:(NSUInteger)index {
-    // TODO: throw real exception rather than panic if out-of-bounds?
-    env.objc.borrow::<ArrayHostObject>(this).array[index as usize]
+    // BypassOutOfBounds
+    let arr = &env.objc.borrow::<ArrayHostObject>(this).array;
+    if index as usize >= arr.len() {
+        return nil;
+    }
+    arr[index as usize]
 }
 
 - (id)description {

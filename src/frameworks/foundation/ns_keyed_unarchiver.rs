@@ -59,6 +59,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)unarchiveObjectWithData:(id)data {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initForReadingWithData:data];
+    if new == nil { return nil; } // Removed parentheses
     let root_key = get_static_str(env, NSKeyedArchiveRootObjectKey);
     let result: id = msg![env; new decodeObjectForKey:root_key];
     autorelease(env, result)

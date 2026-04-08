@@ -441,6 +441,38 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this dataUsingEncoding:encoding allowLossyConversion:false]
 }
 
+- (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)encoding {
+    // ImplLengthOfBytes
+    let string = to_rust_string(env, this);
+    let safe_string = if encoding == NSASCIIStringEncoding
+        || encoding == NSMacOSRomanStringEncoding
+        || encoding == NSISOLatin1StringEncoding
+    {
+        if !string.as_bytes().iter().all(|byte| byte.is_ascii()) {
+            let sanitized: String = string.chars().map(|c| if c.is_ascii() { c } else { '?' }).collect();
+            Cow::Owned(sanitized)
+        } else {
+            string
+        }
+    } else {
+        string
+    };
+
+    match encoding {
+        NSASCIIStringEncoding | NSMacOSRomanStringEncoding | NSISOLatin1StringEncoding | NSUTF8StringEncoding => {
+            // FixClippyLen
+            safe_string.len() as NSUInteger
+        },
+        NSUTF16StringEncoding | NSUTF16LittleEndianStringEncoding | NSUTF16BigEndianStringEncoding => {
+            (safe_string.encode_utf16().count() * 2) as NSUInteger
+        },
+        _ => {
+            log!("WARNING: lengthOfBytesUsingEncoding unimplemented for encoding {}", encoding);
+            0
+        }
+    }
+}
+
 // These are the two methods that have to be overridden by subclasses, so these
 // implementations don't have to care about foreign subclasses.
 - (NSUInteger)length {
@@ -459,21 +491,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     utf16.len().try_into().unwrap()
 }
 - (u16)characterAtIndex:(NSUInteger)index {
-    let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+        let host_object = env.objc.borrow_mut::<StringHostObject>(this);
 
-    // The string has to be in UTF-16 to get O(1) rather than O(n) indexing, and
-    // it's likely this method will be called many times, so converting it to
-    // UTF-16 as early as possible and persisting that representation is
-    // probably best for performance. This is a heuristic though and won't
-    // always be optimal.
-    let (utf16, did_convert) = host_object.convert_to_utf16_inplace();
-    if did_convert {
-        log_dbg!("[{:?} characterAtIndex:{:?}]: converted string to UTF-16", this, index);
+        let (utf16, did_convert) = host_object.convert_to_utf16_inplace();
+        if did_convert {
+            log_dbg!("[{:?} characterAtIndex:{:?}]: converted string to UTF-16", this, index);
+        }
+
+        // SafeCharIndex
+        if index as usize >= utf16.len() {
+            println!("WARNING: characterAtIndex out of bounds! Index: {}, Len: {}", index, utf16.len());
+            return 0;
+        }
+
+        utf16[index as usize]
     }
-
-    // TODO: raise exception instead of panicking?
-    utf16[index as usize]
-}
 
 - (NSRange)rangeOfString:(id)search_string {
     msg![env; this rangeOfString:search_string options:0u32]
@@ -1477,16 +1509,23 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)substringWithRange:(NSRange)range {
-    let host_object = env.objc.borrow_mut::<StringHostObject>(this);
-    let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
-    if did_convert {
-        log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
+        let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+        let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
+        if did_convert {
+            log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
+        }
+        // SafeSubBounds
+        let start = range.location as usize;
+        let length = range.length as usize;
+        let end = start + length;
+        if start > orig_string.len() || end > orig_string.len() {
+            println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", start, length, orig_string.len());
+            return crate::objc::nil;
+        }
+        let host_string = orig_string[start..end].to_vec();
+        let res = from_u16_vec(env, host_string);
+        autorelease(env, res)
     }
-    let host_string =
-        orig_string[(range.location as usize)..((range.location + range.length) as usize)].to_vec();
-    let res = from_u16_vec(env, host_string);
-    autorelease(env, res)
-}
 
 - (NSRange)lineRangeForRange:(NSRange)range {
     let host_object = env.objc.borrow_mut::<StringHostObject>(this);
@@ -1619,14 +1658,50 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)substringWithRange:(NSRange)range {
-    let host_object = env.objc.borrow_mut::<StringHostObject>(this);
-    let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
-    if did_convert {
-        log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
-    }
-    let host_string =
-        orig_string[(range.location as usize)..((range.location + range.length) as usize)].to_vec();
-    let res = from_u16_vec(env, host_string);
+            let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+            let (orig_string, did_convert) = host_object.convert_to_utf16_inplace();
+            if did_convert {
+                log_dbg!("[{:?} substringWithRange]: converted string to UTF-16", this);
+            }
+            // SafeSubBounds
+            let start = range.location as usize;
+            let length = range.length as usize;
+            let end = start + length;
+            if start > orig_string.len() || end > orig_string.len() {
+                println!("WARNING: substringWithRange out of bounds! Range: {}:{}, Len: {}", start, length, orig_string.len());
+                return crate::objc::nil;
+            }
+            let host_string = orig_string[start..end].to_vec();
+            let res = from_u16_vec(env, host_string);
+            autorelease(env, res)
+        }
+
+@end
+
+@implementation NSUUID: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    // FakeNSUUIDAlloc
+    let host_object = Box::new(StringHostObject::Utf8(Cow::Borrowed("")));
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
++ (id)UUID {
+    // FakeNSUUIDCreate
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new init];
+    autorelease(env, new)
+}
+
+- (id)init {
+    // FakeNSUUIDInit
+    this
+}
+
+- (id)UUIDString {
+    // FakeNSUUIDString
+    let uuid_str = "12345678-1234-1234-1234-1234567890AB";
+    let res = from_rust_string(env, uuid_str.to_string());
     autorelease(env, res)
 }
 

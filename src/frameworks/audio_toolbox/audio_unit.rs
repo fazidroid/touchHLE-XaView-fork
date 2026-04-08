@@ -64,6 +64,8 @@ const kAudioUnitProperty_StreamFormat: AudioUnitPropertyID = 8;
 const kAudioOutputUnitProperty_EnableIO: AudioUnitPropertyID = 2003;
 
 fn AudioUnitInitialize(env: &mut Environment, in_unit: AudioUnit) -> OSStatus {
+    // TraceUnitInit
+    println!("AUDIO_TRACE: AudioUnitInitialize({:?})", in_unit);
     let run_loop = CFRunLoopGetMain(env);
     ns_run_loop::add_audio_unit(env, run_loop, in_unit);
     0 // success
@@ -101,7 +103,8 @@ fn AudioUnitSetProperty(
             let render_callback = env.mem.read(in_data.cast::<AURenderCallbackStruct>());
             host_object.render_callback = Some(render_callback);
             result = 0;
-            log_dbg!("AudioUnitSetProperty({:?}, kAudioUnitProperty_SetRenderCallback, {:?}, {:?}, {:?}, {:?}) -> {:?}", in_unit, in_scope, in_element, render_callback, in_data_size, result);
+            // TraceSetCallback
+            println!("AUDIO_TRACE: AudioUnitSetProperty({:?}, kAudioUnitProperty_SetRenderCallback, {:?}, {:?}, {:?}, {:?}) -> {:?}", in_unit, in_scope, in_element, render_callback, in_data_size, result);
         }
         kAudioUnitProperty_StreamFormat => {
             assert_eq!(in_data_size, guest_size_of::<AudioStreamBasicDescription>());
@@ -114,7 +117,8 @@ fn AudioUnitSetProperty(
                 _ => unimplemented!("in_scope {}", in_scope),
             };
             result = 0;
-            log_dbg!("AudioUnitSetProperty({:?}, kAudioUnitProperty_StreamFormat, {:?}, {:?}, {:?}, {:?}) -> {:?}", in_unit, in_scope, in_element, stream_format, in_data_size, result);
+            // TraceSetFormat
+            println!("AUDIO_TRACE: AudioUnitSetProperty({:?}, kAudioUnitProperty_StreamFormat, {:?}, {:?}, {:?}, {:?}) -> {:?}", in_unit, in_scope, in_element, stream_format, in_data_size, result);
         }
         kAudioOutputUnitProperty_EnableIO => {
             assert_eq!(in_scope, kAudioUnitScope_Output);
@@ -123,7 +127,8 @@ fn AudioUnitSetProperty(
             // Output is enabled by default.
             assert_eq!(enabled, 1);
             result = 0;
-            log_dbg!("AudioUnitSetProperty({:?}, kAudioOutputUnitProperty_EnableIO, {:?}, {:?}, {:?}, {:?}) -> {:?}", in_unit, in_scope, in_element, enabled, in_data_size, result);
+            // TraceEnableIO
+            println!("AUDIO_TRACE: AudioUnitSetProperty({:?}, kAudioOutputUnitProperty_EnableIO, {:?}, {:?}, {:?}, {:?}) -> {:?}", in_unit, in_scope, in_element, enabled, in_data_size, result);
         }
         _ => unimplemented!(),
     };
@@ -220,7 +225,8 @@ fn AudioOutputUnitStart(env: &mut Environment, ci: AudioUnit) -> OSStatus {
     audio_unit_state.started = true;
 
     let result = 0; // Success
-    log_dbg!("AudioOutputUnitStart({:?}) -> {:?}", ci, result);
+    // TraceUnitStart
+    println!("AUDIO_TRACE: AudioOutputUnitStart({:?}) -> {:?}", ci, result);
     result
 }
 
@@ -250,7 +256,8 @@ fn AudioOutputUnitStop(env: &mut Environment, ci: AudioUnit) -> OSStatus {
     } else {
         -1
     };
-    log_dbg!("AudioOutputUnitStop({:?}) -> {:?}", ci, result);
+    // TraceUnitStop
+    println!("AUDIO_TRACE: AudioOutputUnitStop({:?}) -> {:?}", ci, result);
     result
 }
 

@@ -2,6 +2,8 @@ XaView FORK:
 
 OpenGL ES 2.0: Partically ✅
 
+ES 2.0 Asphalt 8: Shows screen on half of swcond and dissapear (black screen), working on fixes 🕐
+
 ES 2.0 Asphalt 7: Fully working
 
 ES 2.0 Asphalt 6: 1.0.2 Demo (Debug shaders)
@@ -20,11 +22,13 @@ Audi RS3: 1.0.0, 1.0.1 (Missing buttons, screens, textures)
 
 =Retina and its scaling support
 
-=Asphalt 7 (IOS 4.0-4.3) support: ✅
+=Asphalt 8 (IOS 5.0 Only) support: 🕐
 
-Fully Working: 1.0.0k, 1.0.2a, 1.0.4c, 1.0.9a (1.0.1, 1.0.5, 1.0.6, 1.0.7, 1.0.8 untested because i didnt find ipa's)
+=Asphalt 7 (IOS 4.0-5.0) support: ✅
 
-Not working: 1.1.0, 1.8.1 (1.1.1 not finded ipa = untested)
+Fully Working: [IOS 4.0]: 1.0.0k, 1.0.2a, 1.0.4c [IOS 4.3]: 1.0.9a [IOS 5.0]: 1.1.0, 1.8.1 (Black screen on first launch, you need to touch screen, white button will appear, click it)
+
+*1.0.1, 1.0.5, 1.0.6, 1.0.7, 1.0.8, 1.1.1 untested because i didnt find ipa's
 
 =Asphalt 6 support: ✅
 
