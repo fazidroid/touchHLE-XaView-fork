@@ -1684,6 +1684,11 @@ fn glUnmapBufferOES(env: &mut Environment, target: GLenum) -> GLboolean {
             let guest_ptr: MutPtr<u8> = Ptr::from_bits(guest_ptr_bits);
             let host_ptr = env.mem.bytes_at(guest_ptr, size as u32).as_ptr() as *const GLvoid;
             with_ctx_and_mem(env, |gles, _mem| unsafe {
+                // PeekGeometry
+                if target == 0x8892 /* GL_ARRAY_BUFFER */ && size >= 16 {
+                    let floats = std::slice::from_raw_parts(host_ptr as *const f32, 4);
+                    log!("DEBUG_GL: glUnmapBufferOES(ARRAY_BUFFER) Peek 4 floats: {:?}", floats);
+                }
                 // BufferSubDataHack
                 gles.BufferSubData(target, 0, size as _, host_ptr);
             });
@@ -2079,6 +2084,7 @@ fn unhack_loc(loc: GLint) -> GLint {
 }
 
 fn glUniform1i(env: &mut Environment, location: GLint, x: GLint) {
+    log!("DEBUG_GL: glUniform1i(loc={}, orig={}, val={})", unhack_loc(location), location, x); // LogU1i
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1i(unhack_loc(location), x) })
 }
 fn glUniform1f(env: &mut Environment, location: GLint, x: GLfloat) {
@@ -2127,6 +2133,8 @@ fn glUniform3fv(env: &mut Environment, location: GLint, count: GLsizei, value: C
 fn glUniform4fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
+        let slice = std::slice::from_raw_parts(ptr, (count * 4) as usize); // LogU4fv
+        log!("DEBUG_GL: glUniform4fv(loc={}, orig={}, count={}) -> {:?}", unhack_loc(location), location, count, &slice[0..std::cmp::min(8, slice.len())]); // LogU4fv
         gles.Uniform4fv(unhack_loc(location), count, ptr);
     })
 }
