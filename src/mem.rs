@@ -137,8 +137,7 @@ impl<T, const MUT: bool> std::ops::Add<GuestUSize> for Ptr<T, MUT> {
         assert_ne!(size, 0);
         Self::from_bits(
             self.to_bits()
-                .checked_add(other.checked_mul(size).unwrap())
-                .unwrap(),
+                .wrapping_add(other.wrapping_mul(size))
         )
     }
 }
@@ -155,8 +154,7 @@ impl<T, const MUT: bool> std::ops::Sub<GuestUSize> for Ptr<T, MUT> {
         assert_ne!(size, 0);
         Self::from_bits(
             self.to_bits()
-                .checked_sub(other.checked_mul(size).unwrap())
-                .unwrap(),
+                .wrapping_sub(other.wrapping_mul(size))
         )
     }
 }
@@ -165,6 +163,7 @@ impl<T, const MUT: bool> std::ops::SubAssign<GuestUSize> for Ptr<T, MUT> {
         *self = *self - rhs;
     }
 }
+
 
 /// Marker trait for types that can be safely read from guest memory.
 ///

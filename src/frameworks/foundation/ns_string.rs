@@ -118,7 +118,7 @@ impl StringHostObject {
                 StringHostObject::Utf8(Cow::Owned(string))
             }
             NSUTF8StringEncoding => {
-                let string = String::from_utf8(bytes.into_owned()).unwrap();
+                let string = String::from_utf8_lossy(&bytes).into_owned();
                 StringHostObject::Utf8(Cow::Owned(string))
             }
             NSWindowsCP1252StringEncoding => {
@@ -278,7 +278,7 @@ pub fn with_format(env: &mut Environment, format: id, args: VaList) -> String {
         args,
     );
     // TODO: what if it's not valid UTF-8?
-    String::from_utf8(res).unwrap()
+    String::from_utf8_lossy(&res).into_owned()
 }
 
 pub fn from_rust_ordering(ordering: std::cmp::Ordering) -> NSComparisonResult {
@@ -1765,10 +1765,10 @@ pub fn register_constant_strings(bin: &MachO, mem: &mut Mem, objc: &mut ObjC) {
         // See https://lists.llvm.org/pipermail/cfe-dev/2008-August/002518.html
         let (host_object, class_name) = if flags == 0x7C8 {
             // ASCII
-            let decoded = std::str::from_utf8(mem.bytes_at(bytes, length)).unwrap();
+            let decoded = String::from_utf8_lossy(mem.bytes_at(bytes, length)).into_owned();
 
             (
-                StringHostObject::Utf8(Cow::Owned(String::from(decoded))),
+                StringHostObject::Utf8(Cow::Owned(decoded)),
                 "_touchHLE_NSString_CFConstantString_UTF8",
             )
         } else if flags == 0x7D0 {
@@ -1845,7 +1845,7 @@ pub fn to_rust_string(env: &mut Environment, string: id) -> Cow<'static, str> {
     env.objc
         .borrow_mut::<StringHostObject>(string)
         .to_utf8()
-        .unwrap()
+        .unwrap_or_else(|_| Cow::Owned(String::from("[INVALID STRING]")))
 }
 
 pub fn for_each_code_unit<F>(env: &mut Environment, string: id, mut f: F)

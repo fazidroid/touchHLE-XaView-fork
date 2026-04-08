@@ -88,6 +88,72 @@ fn sysctl(
         newlen
     );
 
+    // --- GAMELOFT MAC ADDRESS BYPASS START ---
+    if name_len == 6 {
+        let mut mib = [0i32; 6];
+        for i in 0..6 {
+            mib[i] = env.mem.read(name + (i as u32));
+        }
+
+        // Check for CTL_NET (4), AF_ROUTE (17), AF_LINK (18), NET_RT_IFLIST (3)
+        if mib[0] == 4 && mib[1] == 17 && mib[3] == 18 && mib[4] == 3 {
+            log!("sysctl: Faking MAC address response for Gameloft FederationManager");
+            
+            let fake_size = 152u32; 
+            
+            if !oldlenp.is_null() {
+                env.mem.write(oldlenp, fake_size);
+            }
+            
+            if !oldp.is_null() {
+                let oldlen = env.mem.read(oldlenp);
+                if oldlen < fake_size {
+                    log!("sysctl MAC bypass: buffer too small ({} < {})", oldlen, fake_size);
+                    return -1;
+                }
+
+                // Safely cast to a u8 pointer for byte writing
+                let oldp_u8 = oldp.cast::<u8>();
+
+                // 1. Zero memory
+                for i in 0..fake_size {
+                    env.mem.write(oldp_u8 + i, 0u8);
+                }
+                
+                // 2. if_msghdr
+                env.mem.write(oldp_u8 + 0u32, 152u8); // ifm_msglen
+                env.mem.write(oldp_u8 + 1u32, 0u8);
+                env.mem.write(oldp_u8 + 2u32, 5u8);   // ifm_version
+                env.mem.write(oldp_u8 + 3u32, 14u8);  // ifm_type
+                env.mem.write(oldp_u8 + 12u32, 1u8);  // ifm_index
+                
+                // 3. sockaddr_dl
+                // 3. sockaddr_dl
+                let sdl_offset = 112u32; // FIXED: 32-bit iOS if_msghdr size is 112 bytes
+                env.mem.write(oldp_u8 + sdl_offset + 0u32, 20u8); // sdl_len
+                env.mem.write(oldp_u8 + sdl_offset + 1u32, 18u8); // sdl_family
+                env.mem.write(oldp_u8 + sdl_offset + 2u32, 1u8);  // sdl_index
+                env.mem.write(oldp_u8 + sdl_offset + 4u32, 6u8);  // sdl_type
+                env.mem.write(oldp_u8 + sdl_offset + 5u32, 3u8);  // sdl_nlen
+                env.mem.write(oldp_u8 + sdl_offset + 6u32, 6u8);  // sdl_alen
+                
+                env.mem.write(oldp_u8 + sdl_offset + 8u32, b'e');
+                env.mem.write(oldp_u8 + sdl_offset + 9u32, b'n');
+                env.mem.write(oldp_u8 + sdl_offset + 10u32, b'0');
+                
+                // Real MAC address to prevent (null) UDID hash errors!
+                env.mem.write(oldp_u8 + sdl_offset + 11u32, 0x12u8);
+                env.mem.write(oldp_u8 + sdl_offset + 12u32, 0x34u8);
+                env.mem.write(oldp_u8 + sdl_offset + 13u32, 0x56u8);
+                env.mem.write(oldp_u8 + sdl_offset + 14u32, 0x78u8);
+                env.mem.write(oldp_u8 + sdl_offset + 15u32, 0x9Au8);
+                env.mem.write(oldp_u8 + sdl_offset + 16u32, 0xBCu8);
+            }
+            return 0;
+        }
+    }
+    // --- GAMELOFT MAC ADDRESS BYPASS END ---
+
     if name_len != 2 {
         log!(
             "TODO: sysctl called with name_len = {} (expected 2). Faking empty response to avoid crash.",

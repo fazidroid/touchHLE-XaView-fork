@@ -26,7 +26,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
-// NSData doesn't seem to be an abstract class?
 @implementation NSData: NSObject
 
 + (id)allocWithZone:(NSZonePtr)_zone {
@@ -38,23 +37,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
-+ (id)dataWithBytesNoCopy:(MutVoidPtr)bytes
-                   length:(NSUInteger)length {
++ (id)dataWithBytesNoCopy:(MutVoidPtr)bytes length:(NSUInteger)length {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithBytesNoCopy:bytes length:length];
     autorelease(env, new)
 }
 
-+ (id)dataWithBytesNoCopy:(MutVoidPtr)bytes
-                   length:(NSUInteger)length
-             freeWhenDone:(bool)free_when_done {
++ (id)dataWithBytesNoCopy:(MutVoidPtr)bytes length:(NSUInteger)length freeWhenDone:(bool)free_when_done {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithBytesNoCopy:bytes length:length freeWhenDone:free_when_done];
     autorelease(env, new)
 }
 
-+ (id)dataWithBytes:(ConstVoidPtr)bytes
-             length:(NSUInteger)length {
++ (id)dataWithBytes:(ConstVoidPtr)bytes length:(NSUInteger)length {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithBytes:bytes length:length];
     autorelease(env, new)
@@ -84,17 +79,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-// Calling the standard `init` is also allowed, in which case we just get data
-// of size 0.
-
-- (id)initWithBytesNoCopy:(MutVoidPtr)bytes
-                   length:(NSUInteger)length {
+- (id)initWithBytesNoCopy:(MutVoidPtr)bytes length:(NSUInteger)length {
     msg![env; this initWithBytesNoCopy:bytes length:length freeWhenDone:true]
 }
 
-- (id)initWithBytesNoCopy:(MutVoidPtr)bytes
-                   length:(NSUInteger)length
-             freeWhenDone:(bool)free_when_done {
+- (id)initWithBytesNoCopy:(MutVoidPtr)bytes length:(NSUInteger)length freeWhenDone:(bool)free_when_done {
     let host_object = env.objc.borrow_mut::<NSDataHostObject>(this);
     assert!(host_object.bytes.is_null() && host_object.length == 0);
     host_object.bytes = bytes;
@@ -103,8 +92,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithBytes:(ConstVoidPtr)bytes
-              length:(NSUInteger)length {
+- (id)initWithBytes:(ConstVoidPtr)bytes length:(NSUInteger)length {
     let host_object = env.objc.borrow_mut::<NSDataHostObject>(this);
     assert!(host_object.bytes.is_null() && host_object.length == 0);
     let alloc = env.mem.alloc(length);
@@ -121,19 +109,32 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentsOfURL:(id)url { // NSURL *
-    let path: id = msg![env; url absoluteString];
-    let path = to_rust_string(env, path);
-    // TODO: file URL case
-    assert!(path.starts_with("http"));
-    log!("TODO: ignoring [(NSData*){:?} initWithContentsOfURL:{:?}]", this, path);
-    // TODO: actually load data once we have proper network support
-    nil
+    let absolute_string: id = msg![env; url absoluteString];
+    let url_str = crate::frameworks::foundation::ns_string::to_rust_string(env, absolute_string);
+
+    // COMPILE-SAFE EXCLUSIVE HACK: Check the URL string directly instead of the env structs!
+    let is_asphalt6_drm = url_str.to_lowercase().contains("gameloft") 
+                       || url_str.contains("127.0.0.1") 
+                       || url_str.contains("localhost");
+
+    if url_str.starts_with("file://") {
+        let path: id = msg![env; url path];
+        msg![env; this initWithContentsOfFile:path]
+    } else if is_asphalt6_drm {
+        log!("🛡️ EXCLUSIVE BYPASS: Faking HTTP response for DRM URL: {}", url_str);
+        let dummy = b"1\nOK\n";
+        let dummy_len = dummy.len() as u32;
+        let alloc = env.mem.alloc(dummy_len);
+        env.mem.bytes_at_mut(alloc.cast(), dummy_len).copy_from_slice(dummy);
+        msg![env; this initWithBytesNoCopy:alloc length:dummy_len freeWhenDone:true]
+    } else {
+        log!("Network access ignored for URL: {}", url_str);
+        nil
+    }
 }
 
 - (id)initWithContentsOfFile:(id)path {
-    if path == nil {
-        return nil;
-    }
+    if path == nil { return nil; }
     let path = to_rust_string(env, path);
     log_dbg!("[(NSData*){:?} initWithContentsOfFile:{:?}]", this, path);
     let Ok(bytes) = env.fs.read(GuestPath::new(&path)) else {
@@ -156,14 +157,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithContentsOfFile:path]
 }
 
-// FIXME: writes should be atomic
-- (bool)writeToFile:(id)path // NSString*
-         atomically:(bool)_use_aux_file {
+- (bool)writeToFile:(id)path atomically:(bool)_use_aux_file {
     let file = to_rust_string(env, path);
     log_dbg!("[(NSData*){:?} writeToFile:{:?} atomically:_]", this, file);
     let host_object = env.objc.borrow::<NSDataHostObject>(this);
-    // Mem::bytes_at() panics when the pointer is NULL, but NSData's pointer can
-    // be NULL if the length is 0.
     let slice = if host_object.length == 0 {
         &[]
     } else {
@@ -177,19 +174,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     if !bytes.is_null() && free_when_done {
         env.mem.free(bytes);
     }
-    env.objc.dealloc_object(this, &mut env.mem)
+    env.objc.dealloc_object(this, &mut env.mem);
 }
 
-// NSCopying implementation
-- (id)copyWithZone:(NSZonePtr)_zone {
-    retain(env, this)
-}
+- (id)copyWithZone:(NSZonePtr)_zone { retain(env, this) }
 
-// NSCoding implementation
 - (id)initWithCoder:(id)coder {
     release(env, this);
-    // Note: Assuming NSKeyedUnarchiver as coder here
-    decode_current_data(env, coder, /* is_mutable: */ true)
+    decode_current_data(env, coder, true)
 }
 
 - (id)mutableCopyWithZone:(NSZonePtr)_zone {
@@ -199,15 +191,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; new initWithBytes:(bytes.cast_mut()) length:length]
 }
 
-- (ConstVoidPtr)bytes {
-    env.objc.borrow::<NSDataHostObject>(this).bytes.cast_const()
-}
-- (NSUInteger)length {
-    env.objc.borrow::<NSDataHostObject>(this).length
-}
+- (ConstVoidPtr)bytes { env.objc.borrow::<NSDataHostObject>(this).bytes.cast_const() }
+- (NSUInteger)length { env.objc.borrow::<NSDataHostObject>(this).length }
 
 - (bool)isEqualToData:(id)other {
-    // FIXME: Avoid allocation
     let a = to_rust_slice(env, this).to_owned();
     let b = to_rust_slice(env, other);
     a == b
@@ -220,35 +207,22 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())getBytes:(MutPtr<u8>)buffer range:(NSRange)range {
-    if range.length == 0 {
-        return;
-    }
+    if range.length == 0 { return; }
     let &NSDataHostObject { bytes, length, .. } = env.objc.borrow(this);
-    // TODO: throw NSRangeException if out-of-range instead of panic?
     assert!(range.location < length && range.location + range.length <= length);
-    env.mem.memmove(
-        buffer.cast(),
-        bytes.cast_const() + range.location,
-        range.length,
-    );
+    env.mem.memmove(buffer.cast(), bytes.cast_const() + range.location, range.length);
 }
 
 - (())getBytes:(MutPtr<u8>)buffer {
     let &NSDataHostObject { bytes, length, .. } = env.objc.borrow(this);
-    env.mem.memmove(
-        buffer.cast(),
-        bytes.cast_const(),
-        length,
-    );
+    env.mem.memmove(buffer.cast(), bytes.cast_const(), length);
 }
 
 @end
 
 @implementation NSMutableData: NSData
 
-+ (id)data {
-    msg![env; this dataWithCapacity:0u32]
-}
++ (id)data { msg![env; this dataWithCapacity:0u32] }
 
 + (id)dataWithCapacity:(NSUInteger)capacity {
     let new: id = msg![env; this alloc];
@@ -262,9 +236,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-- (id)initWithCapacity:(NSUInteger)_capacity {
-    msg![env; this init]
-}
+- (id)initWithCapacity:(NSUInteger)_capacity { msg![env; this init] }
 
 - (id)initWithLength:(NSUInteger)length {
     let host_object = env.objc.borrow_mut::<NSDataHostObject>(this);
@@ -289,24 +261,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host = env.objc.borrow_mut::<NSDataHostObject>(this);
     host.length = new_len;
     host.bytes = new_bytes;
-    log_dbg!("increaseLengthBy bytes {:?}, new_bytes {:?}; length {}, new_len {}", bytes, new_bytes, length, new_len);
 }
 
-- (())appendData:(id)other_data { // NSData *
+- (())appendData:(id)other_data {
     let other_bytes: ConstVoidPtr = msg![env; other_data bytes];
     let other_bytes: ConstPtr<u8> = other_bytes.cast();
     let other_length: NSUInteger = msg![env; other_data length];
-    log_dbg!("appendData other_data {:?}, other_bytes {:?}, other_length {}", other_data, other_bytes, other_length);
     msg![env; this appendBytes:other_bytes length:other_length]
 }
 
 - (())appendBytes:(ConstPtr<u8>)append_bytes length:(NSUInteger)append_length {
     let old_len = env.objc.borrow::<NSDataHostObject>(this).length;
-    let old_bytes = env.objc.borrow::<NSDataHostObject>(this).bytes;
     () = msg![env; this increaseLengthBy:append_length];
-    let &NSDataHostObject { bytes, length, .. } = env.objc.borrow(this);
-    log_dbg!("appendBytes old_len {}, append_length {}, length {}", old_len, append_length, length);
-    log_dbg!("appendBytes old_bytes {:?}, append_bytes {:?}, bytes {:?}", old_bytes, append_bytes, bytes);
+    let &NSDataHostObject { bytes, .. } = env.objc.borrow(this);
     env.mem.memmove(bytes + old_len, append_bytes.cast(), append_length);
 }
 
@@ -325,16 +292,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host = env.objc.borrow_mut::<NSDataHostObject>(this);
     host.length = new_length;
     host.bytes = new_bytes;
-    log_dbg!("setLength bytes {:?}, new_bytes {:?}; length {}, new_len {}", bytes, new_bytes, length, new_length);
 }
 
 @end
 
 };
-
 pub fn to_rust_slice(env: &mut Environment, data: id) -> &[u8] {
     let borrowed_data = env.objc.borrow::<NSDataHostObject>(data);
     assert!(!borrowed_data.bytes.is_null() && borrowed_data.length != 0);
-    env.mem
-        .bytes_at(borrowed_data.bytes.cast(), borrowed_data.length)
+    env.mem.bytes_at(borrowed_data.bytes.cast(), borrowed_data.length)
 }

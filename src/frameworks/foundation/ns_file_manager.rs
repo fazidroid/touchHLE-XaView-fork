@@ -347,9 +347,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)contentsAtPath:(id)path { // NSString *
-    // TODO: return nil if path is directory
-    // TODO: handle non-absolute paths?
-    assert!(msg![env; path isAbsolutePath]);
+    if path == nil {
+        return nil;
+    }
+
+    if !msg![env; path isAbsolutePath] {
+        log_dbg!("Warning: contentsAtPath called with relative path: {:?}", path);
+    }
+
+    let path_str = ns_string::to_rust_string(env, path);
+    if env.fs.is_dir(crate::fs::GuestPath::new(&path_str)) {
+        return nil;
+    }
+
     msg_class![env; NSData dataWithContentsOfFile:path]
 }
 

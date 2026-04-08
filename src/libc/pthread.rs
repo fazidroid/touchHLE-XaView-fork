@@ -33,6 +33,7 @@ pub mod key;
 pub mod mutex;
 pub mod once;
 pub mod thread;
+pub mod rwlock;
 
 #[derive(Default)]
 pub struct State {

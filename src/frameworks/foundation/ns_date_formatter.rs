@@ -60,11 +60,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     format = format.replace("mm", format!("{minute:02}").as_str());
     format = format.replace("ss", format!("{second:02}").as_str());
 
-    for c in format.chars() {
-        if let pattern @ ('A'..='Z' | 'a'..='z') = c {
-            unimplemented!("date string contains unsubstituted format pattern: {pattern}");
+    // Ignore unsupported date format patterns instead of crashing
+    format = format.chars().map(|c: char| {
+        if c.is_ascii_alphabetic() {
+            ' '
+        } else {
+            c
         }
-    }
+    }).collect();
     log_dbg!("date_format after: {:?}", format);
 
     let res = ns_string::from_rust_string(env, format);

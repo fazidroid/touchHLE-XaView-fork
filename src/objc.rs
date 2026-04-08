@@ -127,6 +127,17 @@ fn _Block_object_dispose(_env: &mut Environment, object: ConstVoidPtr, flags: i3
     );
 }
 
+// ==== DEADLOCK FIX FOR OUTCOUNT GARBAGE DATA ====
+fn class_copyPropertyList(env: &mut Environment, _cls: Class, out_count: crate::mem::MutPtr<u32>) -> crate::mem::MutVoidPtr {
+    if !out_count.is_null() {
+        // Explicitly initialize the outCount to 0 so the game doesn't read garbage data
+        env.mem.write(out_count, 0);
+    }
+    // Safely return a null array of properties
+    crate::mem::MutVoidPtr::null()
+}
+// ================================================
+
 const FUNCTIONS: FunctionExports = &[
     export_c_func!(objc_msgSend(_, _)),
     export_c_func!(objc_msgSend_stret(_, _, _)),
@@ -138,4 +149,5 @@ const FUNCTIONS: FunctionExports = &[
     export_c_func!(objc_sync_exit(_)),
     export_c_func!(sel_registerName(_)),
     export_c_func!(_Block_object_dispose(_, _)),
+    export_c_func!(class_copyPropertyList(_, _)), // <--- REGISTERS OUR NEW FIX
 ];
