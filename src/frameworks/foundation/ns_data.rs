@@ -108,39 +108,66 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithBytes:bytes length:length]
 }
 
-- (id)initWithContentsOfURL:(id)url { // NSURL *
+- (id)initWithContentsOfURL:(id)url {
+    if url == nil { return msg![env; this init]; }
     let absolute_string: id = msg![env; url absoluteString];
-    let url_str = crate::frameworks::foundation::ns_string::to_rust_string(env, absolute_string);
-
-    // COMPILE-SAFE EXCLUSIVE HACK: Check the URL string directly instead of the env structs!
-    let is_asphalt6_drm = url_str.to_lowercase().contains("gameloft") 
-                       || url_str.contains("127.0.0.1") 
-                       || url_str.contains("localhost");
-
+    if absolute_string == nil { return msg![env; this init]; }
+    let url_str = to_rust_string(env, absolute_string);
+    
     if url_str.starts_with("file://") {
         let path: id = msg![env; url path];
-        msg![env; this initWithContentsOfFile:path]
-    } else if is_asphalt6_drm {
-        log!("🛡️ EXCLUSIVE BYPASS: Faking HTTP response for DRM URL: {}", url_str);
-        let dummy = b"1\nOK\n";
-        let dummy_len = dummy.len() as u32;
-        let alloc = env.mem.alloc(dummy_len);
-        env.mem.bytes_at_mut(alloc.cast(), dummy_len).copy_from_slice(dummy);
-        msg![env; this initWithBytesNoCopy:alloc length:dummy_len freeWhenDone:true]
-    } else {
-        log!("Network access ignored for URL: {}", url_str);
-        nil
+        return msg![env; this initWithContentsOfFile:path];
     }
+    
+    // 🛡️ EA SYNERGY XML BYPASS: Feed the C++ engine dummy XML to stop asserts!
+    if url_str.contains("ea.com") || url_str.contains("synergy") {
+        log!("🛡️ EA XML BYPASS: Faking server XML response for {}", url_str);
+        let dummy = b"<?xml version=\"1.0\"?><store></store>";
+        let size = dummy.len() as u32;
+        let alloc = env.mem.alloc(size);
+        let slice = env.mem.bytes_at_mut(alloc.cast(), size);
+        slice.copy_from_slice(dummy);
+        
+        let host_object = env.objc.borrow_mut::<NSDataHostObject>(this);
+        host_object.bytes = alloc;
+        host_object.length = size;
+        return this;
+    }
+
+    // GAMELOFT BYPASS: Return dummy valid data to appease the Gameloft DRM engine!
+    log!("GAMELOFT BYPASS: Faking HTTP response for URL: {}", url_str);
+    let dummy = b"1\nOK\n";
+    let dummy_len = dummy.len() as u32;
+    let alloc = env.mem.alloc(dummy_len);
+    env.mem.bytes_at_mut(alloc.cast(), dummy_len).copy_from_slice(dummy);
+    msg![env; this initWithBytesNoCopy:alloc length:dummy_len freeWhenDone:true]
 }
 
 - (id)initWithContentsOfFile:(id)path {
     if path == nil { return nil; }
-    let path = to_rust_string(env, path);
-    log_dbg!("[(NSData*){:?} initWithContentsOfFile:{:?}]", this, path);
-    let Ok(bytes) = env.fs.read(GuestPath::new(&path)) else {
+    let path_str = to_rust_string(env, path);
+    log_dbg!("[(NSData*){:?} initWithContentsOfFile:{:?}]", this, path_str);
+    
+    let Ok(bytes) = env.fs.read(GuestPath::new(&path_str)) else {
+        // 🛡️ EA FILE BYPASS: Faking missing offline store configurations!
+        if path_str.contains(".xml") || path_str.contains(".plist") {
+            log!("🛡️ EA FILE BYPASS: Faking missing config file: {}", path_str);
+            let dummy = b"<?xml version=\"1.0\"?><plist><dict></dict></plist>";
+            let size = dummy.len() as u32;
+            let alloc = env.mem.alloc(size);
+            let slice = env.mem.bytes_at_mut(alloc.cast(), size);
+            slice.copy_from_slice(dummy);
+
+            let host_object = env.objc.borrow_mut::<NSDataHostObject>(this);
+            host_object.bytes = alloc;
+            host_object.length = size;
+            return this;
+        }
+        
         release(env, this);
         return nil;
     };
+    
     let size = bytes.len().try_into().unwrap();
     let alloc = env.mem.alloc(size);
     let slice = env.mem.bytes_at_mut(alloc.cast(), size);

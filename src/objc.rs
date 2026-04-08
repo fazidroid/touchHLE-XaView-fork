@@ -44,7 +44,7 @@ pub use selectors::{selector, SEL};
 
 use crate::mem::ConstVoidPtr;
 use crate::Environment;
-use classes::{ClassHostObject, FakeClass, UnimplementedClass};
+use classes::ClassHostObject;
 use messages::{
     objc_msgSend, objc_msgSendSuper2, objc_msgSend_stret, MsgSendSignature, MsgSendSuperSignature,
 };

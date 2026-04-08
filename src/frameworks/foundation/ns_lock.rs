@@ -15,82 +15,83 @@ struct NSLockHostObject {
 }
 impl HostObject for NSLockHostObject {}
 
+struct NSConditionLockHostObject {
+    mutex_id: MutexId,
+    condition: i32,
+}
+impl HostObject for NSConditionLockHostObject {}
+
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
 @implementation NSLock: NSObject
-
 + (id)alloc {
     let mutex_id = env.mutex_state.init_mutex(PTHREAD_MUTEX_DEFAULT);
     let host_object = NSLockHostObject { mutex_id, name: nil };
     env.objc.alloc_object(this, Box::new(host_object), &mut env.mem)
 }
-
 - (())lock {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    let _ = env.lock_mutex(host_object.mutex_id);
+    let mutex_id = env.objc.borrow::<NSLockHostObject>(this).mutex_id;
+    let _ = env.lock_mutex(mutex_id);
 }
-
 - (())unlock {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    let _ = env.unlock_mutex(host_object.mutex_id);
+    let mutex_id = env.objc.borrow::<NSLockHostObject>(this).mutex_id;
+    let _ = env.unlock_mutex(mutex_id);
 }
-
 - (bool)tryLock {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
-        return false;
-    }
-    env.lock_mutex(host_object.mutex_id).is_ok()
+    let mutex_id = env.objc.borrow::<NSLockHostObject>(this).mutex_id;
+    env.lock_mutex(mutex_id).is_ok()
 }
-
-- (())setName:(id)name {
-    env.objc.borrow_mut::<NSLockHostObject>(this).name = name;
-}
-
-- (id)name {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    host_object.name
-}
-
 @end
 
 @implementation NSRecursiveLock: NSObject
-
 + (id)alloc {
     let mutex_id = env.mutex_state.init_mutex(PTHREAD_MUTEX_RECURSIVE);
     let host_object = NSLockHostObject { mutex_id, name: nil };
     env.objc.alloc_object(this, Box::new(host_object), &mut env.mem)
 }
-
 - (())lock {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    let _ = env.lock_mutex(host_object.mutex_id);
+    let mutex_id = env.objc.borrow::<NSLockHostObject>(this).mutex_id;
+    let _ = env.lock_mutex(mutex_id);
 }
-
 - (())unlock {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    let _ = env.unlock_mutex(host_object.mutex_id);
+    let mutex_id = env.objc.borrow::<NSLockHostObject>(this).mutex_id;
+    let _ = env.unlock_mutex(mutex_id);
 }
+@end
 
-- (bool)tryLock {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
-        return false; 
-    }
-    env.lock_mutex(host_object.mutex_id).is_ok()
+// FIXED: Added NSConditionLock for NFS Most Wanted
+@implementation NSConditionLock: NSObject
++ (id)alloc {
+    let mutex_id = env.mutex_state.init_mutex(PTHREAD_MUTEX_DEFAULT);
+    let host_object = NSConditionLockHostObject { mutex_id, condition: 0 };
+    env.objc.alloc_object(this, Box::new(host_object), &mut env.mem)
 }
-
-- (())setName:(id)name {
-    env.objc.borrow_mut::<NSLockHostObject>(this).name = name;
+- (id)initWithCondition:(i32)condition {
+    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+    host_obj.condition = condition;
+    this
 }
-
-- (id)name {
-    let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    host_object.name
+- (i32)condition {
+    env.objc.borrow::<NSConditionLockHostObject>(this).condition
 }
-
+- (())lock {
+    let mutex_id = env.objc.borrow::<NSConditionLockHostObject>(this).mutex_id;
+    let _ = env.lock_mutex(mutex_id);
+}
+- (())unlock {
+    let mutex_id = env.objc.borrow::<NSConditionLockHostObject>(this).mutex_id;
+    let _ = env.unlock_mutex(mutex_id);
+}
+- (())unlockWithCondition:(i32)condition {
+    let mutex_id = {
+        let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+        host_obj.condition = condition;
+        host_obj.mutex_id
+    };
+    let _ = env.unlock_mutex(mutex_id);
+}
 @end
 
 };
