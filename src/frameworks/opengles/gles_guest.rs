@@ -1610,7 +1610,8 @@ fn glGetBufferParameteriv(
 // TrackMappedBuffers
 static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLuint, u32, u32)>> = std::sync::Mutex::new(Vec::new());
 
-fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutPtr<GLvoid> {
+// FixUnusedAccessLint
+fn glMapBufferOES(env: &mut Environment, target: GLenum, _access: GLenum) -> MutPtr<GLvoid> {
     let size: GLint = _get_buffer_size(env, target);
     if size <= 0 {
         return Ptr::null();
