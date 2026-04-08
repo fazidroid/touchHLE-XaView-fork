@@ -821,7 +821,7 @@ fn glDrawElements(
     type_: GLenum,
     indices: ConstVoidPtr,
 ) {
-    log!("DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x})", mode, count, type_); // DrawElementsLog
+    log!("DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x}, indices={:#x})", mode, count, type_, indices.to_bits()); // DrawElementsLog
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let fog_state_backup = clamp_fog_state_values(gles);
         let indices = translate_pointer_or_offset_to_host(
@@ -1960,6 +1960,7 @@ fn glVertexAttribPointer(
     stride: GLsizei,
     ptr: ConstVoidPtr,
 ) {
+    log!("DEBUG_GL: glVertexAttribPointer(indx={}, size={}, type={:#x}, norm={}, stride={}, ptr={:#x})", indx, size, type_, normalized, stride, ptr.to_bits()); // LogAttribPointer
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr_host =
             translate_pointer_or_offset_to_host(gles, mem, ptr, gles11::ARRAY_BUFFER_BINDING);
@@ -1967,11 +1968,13 @@ fn glVertexAttribPointer(
     })
 }
 fn glDisableVertexAttribArray(env: &mut Environment, index: GLuint) {
+    log!("DEBUG_GL: glDisableVertexAttribArray(index={})", index); // LogDisableAttrib
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.DisableVertexAttribArray(index)
     })
 }
 fn glEnableVertexAttribArray(env: &mut Environment, index: GLuint) {
+    log!("DEBUG_GL: glEnableVertexAttribArray(index={})", index); // LogEnableAttrib
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.EnableVertexAttribArray(index)
     })
@@ -2141,7 +2144,7 @@ fn glUniformMatrix4fv(
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
         // DebugUniformMat4
         let slice = std::slice::from_raw_parts(value_ptr, (count * 16) as usize);
-        log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}) -> 1st_mat: {:?}", location, count, transpose, &slice[0..std::cmp::min(16, slice.len())]);
+        log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
         gles.UniformMatrix4fv(location, count, transpose, value_ptr);
     })
 }
@@ -2157,7 +2160,10 @@ fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidP
 fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
     with_ctx_and_mem_no_skip(env, |gles, mem| unsafe {
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
-        gles.GetAttribLocation(program, host_name)
+        let res = gles.GetAttribLocation(program, host_name); // LogAttribLoc
+        let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // LogAttribLoc
+        log!("DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}", program, name_str, res); // LogAttribLoc
+        res // LogAttribLoc
     })
 }
 // ActiveUniformFix
@@ -2232,6 +2238,10 @@ fn glGetActiveAttrib(
         gles.GetActiveAttrib(
             program, index, bufSize, length_ptr, size_ptr, type_ptr, name_ptr,
         );
+        if !name_ptr.is_null() {
+            let name_str = std::ffi::CStr::from_ptr(name_ptr).to_string_lossy(); // LogActiveAttrib
+            log!("DEBUG_GL: glGetActiveAttrib(program={}, index={}) -> name='{}'", program, index, name_str); // LogActiveAttrib
+        }
     })
 }
 fn glBlendColor(
