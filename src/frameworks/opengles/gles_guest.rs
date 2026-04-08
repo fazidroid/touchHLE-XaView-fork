@@ -193,16 +193,28 @@ fn glGetFloatv(env: &mut Environment, pname: GLenum, params: MutPtr<GLfloat>) {
         unsafe { gles.GetFloatv(pname, params) };
     });
 }
+// State Tracking
+static BOUND_FBO: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static BOUND_RBO: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static BOUND_TEX: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 fn glGetIntegerv(env: &mut Environment, pname: GLenum, params: MutPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| {
         match pname {
-            // ViewportHack
-            0x0BA2 => {
+            0x0BA2 /* GL_VIEWPORT */ => {
                 mem.write(params, 0);
                 mem.write(params + 1u32, 0);
                 mem.write(params + 2u32, 480);
                 mem.write(params + 3u32, 320);
-                log!("DEBUG_GL: glGetIntegerv(GL_VIEWPORT) -> Fake 480x320");
+            }
+            0x8CA6 /* GL_FRAMEBUFFER_BINDING_OES */ => {
+                mem.write(params, BOUND_FBO.load(std::sync::atomic::Ordering::SeqCst) as _);
+            }
+            0x8CA7 /* GL_RENDERBUFFER_BINDING_OES */ => {
+                mem.write(params, BOUND_RBO.load(std::sync::atomic::Ordering::SeqCst) as _);
+            }
+            0x8069 /* GL_TEXTURE_BINDING_2D */ => {
+                mem.write(params, BOUND_TEX.load(std::sync::atomic::Ordering::SeqCst) as _);
             }
             gles11::NUM_COMPRESSED_TEXTURE_FORMATS => {
                 mem.write(params, SUPPORTED_COMPRESSED_TEXTURE_FORMATS.len() as _);
@@ -1053,6 +1065,9 @@ fn glIsTexture(env: &mut Environment, texture: GLuint) -> GLboolean {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.IsTexture(texture) })
 }
 fn glBindTexture(env: &mut Environment, target: GLenum, texture: GLuint) {
+    if target == 0x0DE1 /* GL_TEXTURE_2D */ {
+        BOUND_TEX.store(texture, std::sync::atomic::Ordering::SeqCst);
+    }
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindTexture(target, texture)
     })
@@ -1394,13 +1409,14 @@ fn glIsRenderbufferOES(env: &mut Environment, renderbuffer: GLuint) -> GLboolean
     })
 }
 fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLuint) {
-    // DebugBindFbo
+    BOUND_FBO.store(framebuffer, std::sync::atomic::Ordering::SeqCst);
     log!("DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})", target, framebuffer);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindFramebufferOES(target, framebuffer)
     })
 }
 fn glBindRenderbufferOES(env: &mut Environment, target: GLenum, renderbuffer: GLuint) {
+    BOUND_RBO.store(renderbuffer, std::sync::atomic::Ordering::SeqCst);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindRenderbufferOES(target, renderbuffer)
     })
@@ -2078,24 +2094,18 @@ fn glVertexAttrib4fv(env: &mut Environment, indx: GLuint, values: ConstPtr<GLflo
         gles.VertexAttrib4fv(indx, mem.ptr_at(values, 4))
     })
 }
-// UniformLocationHack helper
-fn unhack_loc(loc: GLint) -> GLint {
-    if loc >= 1000 { loc - 1000 } else { loc }
-}
-
 fn glUniform1i(env: &mut Environment, location: GLint, x: GLint) {
-    log!("DEBUG_GL: glUniform1i(loc={}, orig={}, val={})", unhack_loc(location), location, x); // LogU1i
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1i(unhack_loc(location), x) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1i(location, x) })
 }
 fn glUniform1f(env: &mut Environment, location: GLint, x: GLfloat) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1f(unhack_loc(location), x) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform1f(location, x) })
 }
 fn glUniform2f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat) {
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform2f(unhack_loc(location), x, y) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Uniform2f(location, x, y) })
 }
 fn glUniform3f(env: &mut Environment, location: GLint, x: GLfloat, y: GLfloat, z: GLfloat) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.Uniform3f(unhack_loc(location), x, y, z)
+        gles.Uniform3f(location, x, y, z)
     })
 }
 // GuestUniformArrays
@@ -2108,59 +2118,57 @@ fn glUniform4f(
     w: GLfloat,
 ) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.Uniform4f(unhack_loc(location), x, y, z, w)
+        gles.Uniform4f(location, x, y, z, w)
     })
 }
 // IdentityOpFixOne
 fn glUniform1fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, count as u32);
-        gles.Uniform1fv(unhack_loc(location), count, ptr);
+        gles.Uniform1fv(location, count, ptr);
     })
 }
 fn glUniform2fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 2) as u32);
-        gles.Uniform2fv(unhack_loc(location), count, ptr);
+        gles.Uniform2fv(location, count, ptr);
     })
 }
 fn glUniform3fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 3) as u32);
-        gles.Uniform3fv(unhack_loc(location), count, ptr);
+        gles.Uniform3fv(location, count, ptr);
     })
 }
 fn glUniform4fv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLfloat>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
-        let slice = std::slice::from_raw_parts(ptr, (count * 4) as usize); // LogU4fv
-        log!("DEBUG_GL: glUniform4fv(loc={}, orig={}, count={}) -> {:?}", unhack_loc(location), location, count, &slice[0..std::cmp::min(8, slice.len())]); // LogU4fv
-        gles.Uniform4fv(unhack_loc(location), count, ptr);
+        gles.Uniform4fv(location, count, ptr);
     })
 }
 // IdentityOpFixTwo
 fn glUniform1iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, count as u32);
-        gles.Uniform1iv(unhack_loc(location), count, ptr);
+        gles.Uniform1iv(location, count, ptr);
     })
 }
 fn glUniform2iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 2) as u32);
-        gles.Uniform2iv(unhack_loc(location), count, ptr);
+        gles.Uniform2iv(location, count, ptr);
     })
 }
 fn glUniform3iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 3) as u32);
-        gles.Uniform3iv(unhack_loc(location), count, ptr);
+        gles.Uniform3iv(location, count, ptr);
     })
 }
 fn glUniform4iv(env: &mut Environment, location: GLint, count: GLsizei, value: ConstPtr<GLint>) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
-        gles.Uniform4iv(unhack_loc(location), count, ptr);
+        gles.Uniform4iv(location, count, ptr);
     })
 }
 fn glUniformMatrix2fv(
@@ -2172,7 +2180,7 @@ fn glUniformMatrix2fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 4) as u32);
-        gles.UniformMatrix2fv(unhack_loc(location), count, transpose, ptr);
+        gles.UniformMatrix2fv(location, count, transpose, ptr);
     })
 }
 fn glUniformMatrix3fv(
@@ -2184,7 +2192,7 @@ fn glUniformMatrix3fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr = mem.ptr_at(value, (count * 9) as u32);
-        gles.UniformMatrix3fv(unhack_loc(location), count, transpose, ptr);
+        gles.UniformMatrix3fv(location, count, transpose, ptr);
     })
 }
 fn glUniformMatrix4fv(
@@ -2197,8 +2205,8 @@ fn glUniformMatrix4fv(
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
         let slice = std::slice::from_raw_parts(value_ptr, (count * 16) as usize);
-        let real_loc = unhack_loc(location);
-
+        
+        // ZeroMatrixFix
         let mut is_zero = true;
         for &v in slice.iter().take(16) {
             if v != 0.0 && v.abs() > 0.0001 {
@@ -2214,31 +2222,23 @@ fn glUniformMatrix4fv(
                 0.0, 0.0, 1.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,
             ];
-            log!("DEBUG_GL: glUniformMatrix4fv(loc={}) DETECTED ZERO MATRIX! Injecting Identity!", real_loc);
-            gles.UniformMatrix4fv(real_loc, count, transpose, identity.as_ptr());
+            log!("DEBUG_GL: glUniformMatrix4fv(loc={}) DETECTED ZERO MATRIX! Injecting Identity!", location);
+            gles.UniformMatrix4fv(location, count, transpose, identity.as_ptr());
         } else {
-            log!("DEBUG_GL: glUniformMatrix4fv(loc={}, orig={}, count={}, ptr={:#x}) -> {:?}", real_loc, location, count, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
-            gles.UniformMatrix4fv(real_loc, count, transpose, value_ptr);
+            gles.UniformMatrix4fv(location, count, transpose, value_ptr);
         }
     })
 }
 fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
     with_ctx_and_mem_no_skip(env, |gles, mem| unsafe {
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
-        let res = gles.GetUniformLocation(program, host_name);
-        let res_hack = if res >= 0 { res + 1000 } else { -1 };
-        let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); 
-        log!("DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {} (returning {})", program, name_str, res, res_hack); 
-        res_hack
+        gles.GetUniformLocation(program, host_name)
     })
 }
 fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPtr) -> GLint {
     with_ctx_and_mem_no_skip(env, |gles, mem| unsafe {
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
-        let res = gles.GetAttribLocation(program, host_name); 
-        let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); 
-        log!("DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}", program, name_str, res); 
-        res 
+        gles.GetAttribLocation(program, host_name)
     })
 }
 // ActiveUniformFix
