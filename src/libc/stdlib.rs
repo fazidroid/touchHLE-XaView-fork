@@ -885,11 +885,6 @@ fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) 
     -1
 }
 
-fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32 {
-    // FakeDladdr
-    0
-}
-
 fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd: ConstVoidPtr, val: MutVoidPtr, offset: i32) {
     // ImplSetPropertyNonatomic
     if !self_ptr.is_null() {
@@ -924,9 +919,19 @@ fn CGContextBeginPath(_env: &mut Environment, _context: ConstVoidPtr) {
     // FakeBeginPath
 }
 
+fn CGContextMoveToPoint(_env: &mut Environment, _context: ConstVoidPtr, _x: f32, _y: f32) {
+    // FakeMoveToPoint
+}
+
+fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32 {
+    // FakeDladdr
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGColorGetComponents(_)),
     export_c_func!(CGContextBeginPath(_)),
+    export_c_func!(CGContextMoveToPoint(_, _, _)),
     export_c_func!(CGContextSetFillColor(_, _)),
     export_c_func!(dladdr(_, _)),
     export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
