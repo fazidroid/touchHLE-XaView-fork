@@ -19,7 +19,10 @@ fn objc_msgSend_inner(
     super2: Option<Class>,
     tolerate_type_mismatch: bool,
 ) {
-    let sel_str = selector.as_str(&env.mem);
+    //  BORROW CHECKER BYPASS: Convert the string into an owned String instantly!
+    // This cleanly drops the immutable borrow of env.mem before any mutations occur.
+    let sel_string = selector.as_str(&env.mem).to_string();
+    let sel_str = sel_string.as_str();
     let message_type_info = env.objc.message_type_info.take();
 
     if sel_str == "scale" {
@@ -98,6 +101,7 @@ fn objc_msgSend_inner(
         return;
     }
 
+    //  DUMMY SINGLETON BYPASS
     if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "defaultQueue" {
         println!(" DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
         let cls = env.objc.get_known_class("NSObject", &mut env.mem);
@@ -112,6 +116,7 @@ fn objc_msgSend_inner(
         return;
     }
 
+    //  EA CURRENCY BYPASS 
     if sel_str == "objectForKey:" {
         let key = env.cpu.regs()[2];
         if key == 0 { 
@@ -244,6 +249,7 @@ fn objc_msgSend_inner(
     }
 }
 
+// Boilerplate below is unchanged
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSend(env: &mut Environment, receiver: id, selector: SEL) {
     objc_msgSend_inner(env, receiver, selector, None, false)
