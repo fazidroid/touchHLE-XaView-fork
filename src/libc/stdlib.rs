@@ -757,22 +757,18 @@ fn class_respondsToSelector(
 }
 
 fn __cxa_guard_acquire(env: &mut Environment, guard: MutPtr<u8>) -> i32 {
-    // FakeCxaGuardAcquire
-    let status = env.mem.read(guard);
-    if status == 0 {
-        env.mem.write(guard, 1);
-        return 1;
-    }
-    0
+    // CxaGuardAcquireFix
+    let is_init = env.mem.read(guard);
+    if is_init == 0 { 1 } else { 0 }
 }
 
 fn __cxa_guard_release(env: &mut Environment, guard: MutPtr<u8>) {
-    // FakeCxaGuardRelease
-    env.mem.write(guard, 2);
+    // CxaGuardReleaseFix
+    env.mem.write(guard, 1);
 }
 
 fn __cxa_guard_abort(env: &mut Environment, guard: MutPtr<u8>) {
-    // FakeCxaGuardAbort
+    // CxaGuardAbortFix
     env.mem.write(guard, 0);
 }
 
