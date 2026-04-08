@@ -12,10 +12,7 @@
 //! depending on the value of `pname`, using the upper bound (4 in this case)
 //! every time is never going to cause a problem in practice.
 
-use touchHLE_gl_bindings::gles11::{
-    ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER_BINDING, VERTEX_ARRAY_BUFFER_BINDING,
-};
-
+// Убрали неиспользуемые импорты ARRAY_BUFFER и прочих
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::opengles::eagl::EAGLContextHostObject;
 use crate::gles::{gles11_raw as gles11, GLES}; // constants only
