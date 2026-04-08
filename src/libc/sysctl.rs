@@ -118,7 +118,7 @@ fn SCNetworkReachabilityCreateWithName(_env: &mut Environment, _allocator: Const
 
 fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: ConstVoidPtr, flags_out: MutPtr<u32>) -> i32 {
     if !flags_out.is_null() {
-        env.mem.write::<u32>(flags_out, 0); // 0 = OFFLINE MODE
+        env.mem.write::<u32>(flags_out, 0); 
     }
     1
 }
