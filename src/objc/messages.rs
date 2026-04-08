@@ -45,17 +45,19 @@ fn objc_msgSend_inner(
         selector.as_str(&env.mem),
         receiver
     );
+
     // TraceAudioCalls
     let sel_name = selector.as_str(&env.mem);
     if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
         println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
-    let message_type_info = env.objc.message_type_info.take();
+    } // 🛡️ FIX 1: This closing bracket was accidentally deleted!
 
+    let message_type_info = env.objc.message_type_info.take();
     let sel_str = selector.as_str(&env.mem);
 
     // ===== GAMELOFT UDID BYPASS =====
     if sel_str == "uniqueIdentifier" {
-        log!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier] to fix udid=(null) loops!");
+        println!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier] to fix udid=(null) loops!");
         let fake_udid = crate::frameworks::foundation::ns_string::from_rust_string(
             env, "1234567890abcdef1234567890abcdef12345678".to_string()
         );
@@ -84,9 +86,12 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
-    let message_type_info = env.objc.message_type_info.take();
 
-    if sel_str == "keyEnumerator" || sel_str == "globallyUniqueString" || sel_str == "sharedHTTPCookieStorage" || sel_str == "isSecureTextEntry" || sel_str == "query" || sel_str == "encodeWithCoder:" || sel_str == "keysSortedByValueUsingSelector:" || sel_str == "description" || sel_str == "addPort:forMode:" || sel_str == "port" || sel_str == "defaultTimeZone" || sel_str == "stringByEvaluatingJavaScriptFromString:" || sel_str == "setTimeZone:" || sel_str == "knownTimeZoneNames" || sel_str == "stringWithContentsOfURL:encoding:error:" || sel_str == "sendSynchronousRequest:returningResponse:error:" || sel_str == "localizedDescription" || sel_str == "localizedFailureReason" || sel_str == "connection:didFailWithError:" {
+    if sel_str == "keyEnumerator" || sel_str == "globallyUniqueString" ||
+       sel_str == "sharedHTTPCookieStorage" || sel_str == "isSecureTextEntry" || sel_str == "query" || sel_str == "encodeWithCoder:" || sel_str == "keysSortedByValueUsingSelector:" ||
+       sel_str == "description" || sel_str == "addPort:forMode:" || sel_str == "port" || sel_str == "defaultTimeZone" || sel_str == "stringByEvaluatingJavaScriptFromString:" ||
+       sel_str == "setTimeZone:" || sel_str == "knownTimeZoneNames" || sel_str == "stringWithContentsOfURL:encoding:error:" || sel_str == "sendSynchronousRequest:returningResponse:error:" || sel_str == "localizedDescription" ||
+       sel_str == "localizedFailureReason" || sel_str == "connection:didFailWithError:" {
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
@@ -118,7 +123,6 @@ fn objc_msgSend_inner(
     loop {
         if class == nil {
             assert!(class != orig_class);
-
             let class_host_object = match env.objc.get_host_object(orig_class) {
                 Some(obj) => obj,
                 None => {
@@ -150,7 +154,7 @@ fn objc_msgSend_inner(
             // SafeRootViewControllerHook
             if selector.as_str(&env.mem) == "setRootViewController:" {
                 let vc: id = crate::mem::Ptr::from_bits(env.cpu.regs()[2]);
-                echo!("SafeHook: setRootViewController: Window: {:?}, VC: {:?}", receiver, vc);
+                println!("SafeHook: setRootViewController: Window: {:?}, VC: {:?}", receiver, vc);
                 
                 if vc != nil {
                     let mut store_lock = ROOT_VC_STORE.lock().unwrap();
@@ -162,7 +166,6 @@ fn objc_msgSend_inner(
                     
                     // SaveCpuState
                     let saved_regs = env.cpu.regs().to_vec();
-                    
                     let view: id = crate::msg![env; vc view];
                     if view != nil {
                         let sel_add = env.objc.lookup_selector("addSubview:").unwrap();
@@ -170,7 +173,6 @@ fn objc_msgSend_inner(
                         
                         let sel_key = env.objc.lookup_selector("makeKeyAndVisible").unwrap();
                         let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_key));
-                        
                         *crate::libc::stdlib::HACK_MAIN_WINDOW.lock().unwrap() = receiver.to_bits();
                     }
                     
@@ -187,7 +189,7 @@ fn objc_msgSend_inner(
                 if let Some(store) = ROOT_VC_STORE.lock().unwrap().as_ref() {
                     vc_bits = store.get(&receiver.to_bits()).copied().unwrap_or(0);
                 }
-                echo!("WARNING: Hooked rootViewController! Returning {:#x}", vc_bits);
+                println!("WARNING: Hooked rootViewController! Returning {:#x}", vc_bits);
                 env.cpu.regs_mut()[0] = vc_bits;
                 env.cpu.regs_mut()[1] = 0;
                 return;
@@ -203,9 +205,8 @@ fn objc_msgSend_inner(
                 return;
             }
 
-            panic!(
-                "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
-            log!(
+            // 🛡️ FIX 2: Removed dangling panic!( and unclosed log!( macros
+            println!(
                 "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
                 if is_metaclass { "Class" } else { "Object" },
                 receiver,
@@ -213,7 +214,7 @@ fn objc_msgSend_inner(
                 name,
                 orig_class,
                 if super2.is_some() { "'s superclass" } else { "" },
-                selector.as_str(&env.mem),
+                selector.as_str(&env.mem)
             );
             
             if sel_str == "self" {
@@ -249,7 +250,7 @@ fn objc_msgSend_inner(
         // EXECUTE BYPASSES: Safe to use `msg!` because `env.objc` is no longer borrowed
         // =========================================================================
         if do_video_bypass {
-            log!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
+            println!("GAMELOFT BYPASS: Auto-finishing movie player to prevent infinite hang!");
             let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
             if center_class != nil {
                 let center: id = msg![env; center_class defaultCenter];
@@ -263,7 +264,7 @@ fn objc_msgSend_inner(
         }
 
         if do_alert_bypass {
-            log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
+            println!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
             if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
                 let delegate: id = msg![env; receiver delegate];
                 if delegate != nil {
@@ -300,7 +301,6 @@ fn objc_msgSend_inner(
                 return;
             }
         };
-
         if let Some(&super::ClassHostObject {
             superclass,
             ref methods,
@@ -325,7 +325,7 @@ fn objc_msgSend_inner(
                                     selector.as_str(&env.mem), receiver, sent_type_id, sent_type_desc, expected_type_id, expected_type_desc
                                 );
                                 if tolerate_type_mismatch {
-                                    log!("Warning: {}", msg);
+                                    println!("Warning: {}", msg);
                                 } else {
                                     panic!("{}", msg);
                                 }
@@ -374,14 +374,14 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
-            panic!(
-                "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
-            log!(
+
+            // 🛡️ FIX 3: Removed dangling panic!( and unclosed log!( macros
+            println!(
                 "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
                 name,
                 class,
                 if is_metaclass { "class" } else { "instance" },
-                selector.as_str(&env.mem),
+                selector.as_str(&env.mem)
             );
             env.cpu.regs_mut()[0..2].fill(0);
             return;
@@ -391,17 +391,17 @@ fn objc_msgSend_inner(
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
         {
-            log!(
+            println!(
                 "Call to faked class \"{}\" ({:?}) {} method \"{}\". Behaving as if message was sent to nil.",
                 name,
                 class,
                 if is_metaclass { "class" } else { "instance" },
-                selector.as_str(&env.mem),
+                selector.as_str(&env.mem)
             );
             env.cpu.regs_mut()[0..2].fill(0);
             return;
         } else {
-            log!(
+            println!(
                 "SAFE BYPASS: Item {:?} in superclass chain of object {:?}'s class {:?} has an unexpected host object type. Returning 0 to prevent crash.",
                 class, receiver, orig_class
             );
@@ -559,7 +559,6 @@ macro_rules! msg_super {
             let sel = $crate::objc::selector!($($arg1;)? $name $($(, $($namen)?)*)?);
             let sel = $env.objc.lookup_selector(sel)
                 .expect("Unknown selector");
-
             let sp = &mut $env.cpu.regs_mut()[$crate::cpu::Cpu::SP];
             let old_sp = *sp;
             *sp -= $crate::mem::guest_size_of::<$crate::objc::objc_super>();
@@ -568,12 +567,10 @@ macro_rules! msg_super {
                 receiver: $receiver,
                 class,
             });
-
             let args = (super_ptr.cast_const(), sel, $($arg1, $($argn),*)?);
             let res = $crate::objc::msg_send_super2($env, args);
 
             $env.cpu.regs_mut()[$crate::cpu::Cpu::SP] = old_sp;
-
             res
         }
     }
