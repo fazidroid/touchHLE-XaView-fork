@@ -21,9 +21,6 @@ fn objc_msgSend_inner(
 ) {
     let sel_str = selector.as_str(&env.mem);
     let message_type_info = env.objc.message_type_info.take();
-   // ==========================================================
-    // TARGETED RETINA DISPLAY SPOOF (GLES 2.0 HD Textures)
-    // ==========================================================
 
     if sel_str == "scale" {
         env.cpu.regs_mut()[0] = 0x40000000; 
@@ -31,13 +28,16 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "respondsToSelector:" {
-        let target_sel_ptr = crate::mem::ConstPtr::<u8>::from_bits(env.cpu.regs()[2]);
-        let target_sel_bytes = env.mem.cstr_at(target_sel_ptr);
-        let target_sel_str = String::from_utf8_lossy(target_sel_bytes);
-        
-        if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
-            env.cpu.regs_mut()[0] = 1; 
-            return;
+        let ptr = env.cpu.regs()[2];
+        if ptr != 0 {
+            let target_sel_ptr = crate::mem::ConstPtr::<u8>::from_bits(ptr);
+            let target_sel_bytes = env.mem.cstr_at(target_sel_ptr);
+            let target_sel_str = String::from_utf8_lossy(target_sel_bytes);
+            
+            if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
+                env.cpu.regs_mut()[0] = 1; 
+                return;
+            }
         }
     }
 
@@ -49,10 +49,6 @@ fn objc_msgSend_inner(
         log!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
-    // ==========================================================
-    // 2. NETWORK & AD KILL-SWITCH
-    // ==========================================================
-    
     if sel_str == "connectionWithRequest:delegate:" || 
        sel_str == "initWithRequest:delegate:" || 
        sel_str == "sendSynchronousRequest:returningResponse:error:" {
@@ -60,9 +56,6 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // 🛡️ SAFE POINTER BYPASS (Fixes MTX / Ad Segfaults)
-    // Returning fake raw hex like 0xDEADBEEF causes C++ to crash when dereferenced.
-    // Returning `receiver.to_bits()` gives it a real mapped object in memory!
     if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "currentDevice" || sel_str == "defaultQueue" {
         log!("🛡️ SAFE POINTER BYPASS: Spoofing {}", sel_str);
         env.cpu.regs_mut()[0] = receiver.to_bits(); 
@@ -71,14 +64,14 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
-        log!("🎮 LOG: Caught and neutralized a freezing performSelector call!");
+        return;
+    }
+    
+    if sel_str == "show" {
+        env.cpu.regs_mut()[0] = 0;
         return;
     }
 
-    // ==========================================================
-    // 3. GAMELOFT IDENTITY & HARDWARE SPOOFS
-    // ==========================================================
-    
     if sel_str == "uniqueIdentifier" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
@@ -98,10 +91,6 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // ==========================================================
-    // 3.5. EA GAMES MTX & STOREKIT BYPASS
-    // ==========================================================
-    
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
         log!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
         env.cpu.regs_mut()[0] = 1; 
@@ -109,14 +98,22 @@ fn objc_msgSend_inner(
         return;
     }
 
-    if sel_str == "transactions" {
-        env.cpu.regs_mut()[0] = 0; // Return empty/nil array safely
+    if sel_str == "addTransactionObserver:" || sel_str == "removeTransactionObserver:" {
+        log!("🛡️ EA MTX BYPASS: Absorbed {} safely!", sel_str);
         return;
     }
 
-    // ==========================================================
-    // 4. CORE DISPATCH LOGIC
-    // ==========================================================
+    if sel_str == "transactions" {
+        log!("🛡️ EA MTX BYPASS: Returning valid empty NSArray for transactions!");
+        let array_class = env.objc.get_known_class("NSArray", &mut env.mem);
+        if array_class != nil {
+            let empty_array: id = crate::msg![env; array_class array];
+            env.cpu.regs_mut()[0] = empty_array.to_bits();
+        } else {
+            env.cpu.regs_mut()[0] = 0;
+        }
+        return;
+    }
 
     if receiver == nil {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -154,9 +151,9 @@ fn objc_msgSend_inner(
             if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
                 let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                 if center_class != nil {
-                    let center: id = msg![env; center_class defaultCenter];
+                    let center: id = crate::msg![env; center_class defaultCenter];
                     let n = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                    let _: () = msg![env; center postNotificationName:n object:receiver];
+                    let _: () = crate::msg![env; center postNotificationName:n object:receiver];
                 }
                 env.cpu.regs_mut()[0] = 0;
                 return;
@@ -187,7 +184,6 @@ fn objc_msgSend_inner(
     }
 }
 
-// Boilerplate below is unchanged
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSend(env: &mut Environment, receiver: id, selector: SEL) {
     objc_msgSend_inner(env, receiver, selector, None, false)
@@ -298,6 +294,6 @@ macro_rules! msg_class {
     }
 }
 pub use crate::msg_class;
-pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object retain] }
-pub fn release(env: &mut Environment, object: id) { if object == nil { return; } msg![env; object release] }
-pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object autorelease] }
+pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object retain] }
+pub fn release(env: &mut Environment, object: id) { if object == nil { return; } crate::msg![env; object release] }
+pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object autorelease] }
