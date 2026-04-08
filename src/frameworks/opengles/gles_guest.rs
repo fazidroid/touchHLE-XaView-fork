@@ -1614,11 +1614,13 @@ static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLuint, u32, u32)>> = std::sync::Mu
 fn glMapBufferOES(env: &mut Environment, target: GLenum, _access: GLenum) -> MutPtr<GLvoid> {
     let size: GLint = _get_buffer_size(env, target);
     if size <= 0 {
+        log!("DEBUG_GL: glMapBufferOES fail size <= 0: tgt {:#x}", target); // MapSizeFail
         return Ptr::null();
     }
     
     let buffer_id = _get_currently_bound_buffer_object_name(env, target);
     if buffer_id == 0 {
+        log!("DEBUG_GL: glMapBufferOES fail buf == 0: tgt {:#x}", target); // MapBufFail
         return Ptr::null();
     }
     
@@ -2520,8 +2522,8 @@ pub const FUNCTIONS: FunctionExports = &[
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         let pname = match target {
-            ARRAY_BUFFER => VERTEX_ARRAY_BUFFER_BINDING,
-            ELEMENT_ARRAY_BUFFER => ELEMENT_ARRAY_BUFFER_BINDING,
+            0x8892 /* GL_ARRAY_BUFFER */ => 0x8894, /* GL_ARRAY_BUFFER_BINDING */
+            0x8893 /* GL_ELEMENT_ARRAY_BUFFER */ => 0x8895, /* GL_ELEMENT_ARRAY_BUFFER_BINDING */
             _ => return 0,
         };
         // FixBufferNameCast
