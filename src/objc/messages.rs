@@ -19,136 +19,81 @@ fn objc_msgSend_inner(
     super2: Option<Class>,
     tolerate_type_mismatch: bool,
 ) {
-    let sel_string = selector.as_str(&env.mem).to_string();
-    let sel_str = sel_string.as_str();
+    let sel_str = selector.as_str(&env.mem);
     let message_type_info = env.objc.message_type_info.take();
+   // ==========================================================
+    // TARGETED RETINA DISPLAY SPOOF (GLES 2.0 HD Textures)
+    // ==========================================================
 
-    //  NSBundle NIL BYPASS (Fixes NFS Shift 2 crash)
-    if sel_str == "pathForResource:ofType:" || 
-       sel_str == "pathForResource:ofType:inDirectory:" || 
-       sel_str == "URLForResource:withExtension:" ||
-       sel_str == "URLForResource:withExtension:subdirectory:" {
-        let name_ptr = env.cpu.regs()[2];
-        if name_ptr == 0 {
-            println!(" NSBundle BYPASS: Prevented panic from nil resource name!");
-            env.cpu.regs_mut()[0] = 0; 
-            env.cpu.regs_mut()[1] = 0;
-            return;
-        }
-    }
-
+    // 1. Force the screen scale to 2.0 (Retina)
     if sel_str == "scale" {
-        env.cpu.regs_mut()[0] = 0x40000000; 
+        env.cpu.regs_mut()[0] = 0x40000000; // 2.0 in IEEE 754 f32 hex
         return;
     }
 
+    // 2. Safely tell the game we support Retina features ONLY
     if sel_str == "respondsToSelector:" {
-        let ptr = env.cpu.regs()[2];
-        if ptr != 0 {
-            let target_sel_ptr = crate::mem::ConstPtr::<u8>::from_bits(ptr);
-            let target_sel_bytes = env.mem.cstr_at(target_sel_ptr);
-            let target_sel_str = String::from_utf8_lossy(target_sel_bytes);
-            
-            if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
-                env.cpu.regs_mut()[0] = 1; 
-                return;
-            }
+        // FIXED: Construct the SEL wrapper properly using ConstPtr
+        let target_sel = SEL(crate::mem::ConstPtr::from_bits(env.cpu.regs()[2]));
+        let target_sel_str = target_sel.as_str(&env.mem);
+        
+        // ONLY say YES (1) if it's specifically asking about modern screen features
+        if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
+            env.cpu.regs_mut()[0] = 1; 
+            return;
         }
+        
+        // Let all other requests (like Ad Managers) fall through normally!
     }
+
+    // ==========================================================
+    // 1. GRAPHICS & OPENGL SNIFFER (GLES 2.0)
+    // ==========================================================
 
     if sel_str == "initWithAPI:" {
-        println!(" GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", env.cpu.regs()[2]);
+        let api_version = env.cpu.regs()[2]; 
+        println!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        println!(" GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        println!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
+    // ==========================================================
+    // 2. NETWORK & AD KILL-SWITCH (Fixes the Loading Freeze)
+    // ==========================================================
+    
+    // Kill Network Connections (Prevents hanging on Gameloft Live)
     if sel_str == "connectionWithRequest:delegate:" || 
        sel_str == "initWithRequest:delegate:" || 
        sel_str == "sendSynchronousRequest:returningResponse:error:" {
-        env.cpu.regs_mut()[0] = 0;
+        env.cpu.regs_mut()[0] = 0; // Return nil
         return;
     }
 
-    //  THE NSScanner SHIELD
-    let is_scan_int = sel_str == "scanHexInt:"; 
-    if is_scan_int || sel_str == "scanHexLongLong:" {
-        let out_ptr_bits = env.cpu.regs()[2];
-        let loc: u32 = crate::msg![env; receiver scanLocation];
-        let string: id = crate::msg![env; receiver string];
-        
-        if string != nil {
-            let ns_str = crate::frameworks::foundation::ns_string::to_rust_string(env, string);
-            if (loc as usize) < ns_str.len() {
-                let remaining = &ns_str[(loc as usize)..];
-                let trimmed = remaining.trim_start();
-                let skipped = remaining.len() - trimmed.len();
-                
-                let hex_len = trimmed.chars().take_while(|c| c.is_ascii_hexdigit()).count();
-                
-                if hex_len > 0 {
-                    if out_ptr_bits != 0 {
-                        if is_scan_int {
-                            let parse_len = std::cmp::min(hex_len, 8); 
-                            let parsed_val = u32::from_str_radix(&trimmed[..parse_len], 16).unwrap_or(u32::MAX);
-                            let out_ptr = crate::mem::MutPtr::<u32>::from_bits(out_ptr_bits);
-                            env.mem.write(out_ptr, parsed_val);
-                        } else {
-                            let parse_len = std::cmp::min(hex_len, 16); 
-                            let parsed_val = u64::from_str_radix(&trimmed[..parse_len], 16).unwrap_or(u64::MAX);
-                            let out_ptr = crate::mem::MutPtr::<u64>::from_bits(out_ptr_bits);
-                            env.mem.write(out_ptr, parsed_val);
-                        }
-                    }
-                    
-                    let new_loc = loc + skipped as u32 + hex_len as u32;
-                    let _: () = crate::msg![env; receiver setScanLocation:new_loc];
-                    env.cpu.regs_mut()[0] = 1; // YES
-                    return;
-                }
-            }
-        }
-        env.cpu.regs_mut()[0] = 0; // NO
+    // Disable Ad Managers safely
+    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" {
+        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF }; 
         return;
     }
 
-    if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "defaultQueue" {
-        println!(" DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
-        let cls = env.objc.get_known_class("NSObject", &mut env.mem);
-        if cls != nil {
-            let obj: id = crate::msg![env; cls alloc];
-            let obj: id = crate::msg![env; obj init];
-            env.cpu.regs_mut()[0] = obj.to_bits();
-        } else {
-            env.cpu.regs_mut()[0] = 0x30000000; 
-        }
-        env.cpu.regs_mut()[1] = 0;
-        return;
-    }
-
-    if sel_str == "objectForKey:" {
-        let key = env.cpu.regs()[2];
-        if key == 0 { 
-            println!(" EA MTX BYPASS: objectForKey: called with NULL key! Faking 'USD' currency string!");
-            let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "USD".to_string());
-            env.cpu.regs_mut()[0] = val.to_bits();
-            env.cpu.regs_mut()[1] = 0;
-            return;
-        }
-    }
-
+    // Neutralize thread-blocking delay loops
     if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
-        return;
-    }
-    
-    if sel_str == "show" {
-        env.cpu.regs_mut()[0] = 0;
+        println!("🎮 LOG: Caught and neutralized a freezing performSelector call!");
         return;
     }
 
+    // ==========================================================
+    // 3. GAMELOFT IDENTITY & HARDWARE SPOOFS
+    // ==========================================================
+    
     if sel_str == "uniqueIdentifier" {
         let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "1234567890abcdef1234567890abcdef12345678".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
+        return;
+    }
+
+    if sel_str == "currentDevice" {
+        env.cpu.regs_mut()[0] = if receiver.to_bits() != 0 { receiver.to_bits() } else { 0xDEADBEEF };
         return;
     }
 
@@ -160,34 +105,14 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "systemVersion" {
-        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "6.0.0".to_string());
+        let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "4.3.5".to_string());
         env.cpu.regs_mut()[0] = val.to_bits();
         return;
     }
 
-    if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        println!(" EA MTX BYPASS: Faking StoreKit availability to YES!");
-        env.cpu.regs_mut()[0] = 1; 
-        env.cpu.regs_mut()[1] = 0;
-        return;
-    }
-
-    if sel_str == "addTransactionObserver:" || sel_str == "removeTransactionObserver:" {
-        println!(" EA MTX BYPASS: Absorbed {} safely!", sel_str);
-        return;
-    }
-
-    if sel_str == "transactions" {
-        println!(" EA MTX BYPASS: Returning valid empty NSArray for transactions!");
-        let array_class = env.objc.get_known_class("NSArray", &mut env.mem);
-        if array_class != nil {
-            let empty_array: id = crate::msg![env; array_class array];
-            env.cpu.regs_mut()[0] = empty_array.to_bits();
-        } else {
-            env.cpu.regs_mut()[0] = 0;
-        }
-        return;
-    }
+    // ==========================================================
+    // 4. CORE DISPATCH LOGIC (With Recursion Fixes)
+    // ==========================================================
 
     if receiver == nil {
         env.cpu.regs_mut()[0..2].fill(0);
@@ -222,17 +147,19 @@ fn objc_msgSend_inner(
 
             let name = &obj.name;
 
+            // --- GAMELOFT VIDEO PLAYER BYPASS ---
             if (name == "MPMoviePlayerController" || name == "MPMoviePlayerViewController") && (sel_str == "play" || sel_str == "stop") {
                 let center_class = env.objc.get_known_class("NSNotificationCenter", &mut env.mem);
                 if center_class != nil {
-                    let center: id = crate::msg![env; center_class defaultCenter];
+                    let center: id = msg![env; center_class defaultCenter];
                     let n = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-                    let _: () = crate::msg![env; center postNotificationName:n object:receiver];
+                    let _: () = msg![env; center postNotificationName:n object:receiver];
                 }
                 env.cpu.regs_mut()[0] = 0;
                 return;
             }
 
+            // --- NORMAL METHOD EXECUTION ---
             if let Some(imp) = obj.methods.get(&selector) {
                 match imp {
                     IMP::Host(host_imp) => {
@@ -258,6 +185,7 @@ fn objc_msgSend_inner(
     }
 }
 
+// Boilerplate below is unchanged
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSend(env: &mut Environment, receiver: id, selector: SEL) {
     objc_msgSend_inner(env, receiver, selector, None, false)
@@ -368,6 +296,6 @@ macro_rules! msg_class {
     }
 }
 pub use crate::msg_class;
-pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object retain] }
-pub fn release(env: &mut Environment, object: id) { if object == nil { return; } crate::msg![env; object release] }
-pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } crate::msg![env; object autorelease] }
+pub fn retain(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object retain] }
+pub fn release(env: &mut Environment, object: id) { if object == nil { return; } msg![env; object release] }
+pub fn autorelease(env: &mut Environment, object: id) -> id { if object == nil { return nil; } msg![env; object autorelease] }

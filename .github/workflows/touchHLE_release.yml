@@ -4,6 +4,11 @@ on:
   push:
     branches: 
       - "trunk"
+      - "GTRacing134"
+  pull_request:
+    branches: 
+      - "trunk"
+      - "GTRacing134"
       - "Shift2"
       - "GTRacing134"
       - "mostwanted"

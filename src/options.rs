@@ -83,7 +83,10 @@ impl Default for Options {
             dpad_to_touch: None,
             stick_to_touch: None,
             stabilize_virtual_cursor: None,
+            
+            // CLEAN BASELINE: Let Android use Native OpenGL to prevent EGL crashes
             gles1_implementation: None,
+            
             direct_memory_access: true,
             gdb_listen_addrs: None,
             preferred_languages: None,
@@ -96,7 +99,9 @@ impl Default for Options {
             dumping_options: Default::default(),
             dumping_file: crate::paths::user_data_base_path().join("DUMP.txt"),
             ignore_gl_errors: false,
-            gles_version: 2, // DefaultEsVer
+            
+            // CLEAN BASELINE: Default is 2, but GT Racing will override this below
+            gles_version: 2, 
         }
     }
 }
@@ -119,7 +124,6 @@ impl Options {
         if arg == "--fullscreen" {
             self.fullscreen = true;
         } else if let Some(value) = arg.strip_prefix("--device-model=") {
-            // ParseModelArg
             self.device_model = Some(value.to_string());
         } else if arg == "--landscape-left" {
             self.initial_orientation = DeviceOrientation::LandscapeLeft;
@@ -228,7 +232,6 @@ impl Options {
             self.preferred_languages = Some(value.split(',').map(ToOwned::to_owned).collect());
         } else if arg == "--headless" {
             self.headless = true;
-            // Can't show the dialog box when headless!
             self.popup_errors = false;
         } else if arg == "--print-fps" {
             self.print_fps = true;
@@ -270,6 +273,15 @@ impl Options {
 /// The [Ok] value is a [Some] with the options if they could be found, or
 /// [None] if no options were found for this app.
 pub fn get_options_from_file<F: Read>(file: F, app_id: &str) -> Result<Option<String>, String> {
+    // === GT RACING ONLY BYPASS ===
+    // GT Racing has broken ES 2.0 shaders that fail to link.
+    // If the emulator sees "gtracing" being launched, it silently injects the --gles-version=1
+    // command so it natively falls back to the working OpenGL ES 1.1 engine!
+    let app_id_lower = app_id.to_lowercase();
+    if app_id_lower.contains("gtracing") || app_id_lower.contains("gameloft") {
+        return Ok(Some("--gles-version=1".to_string()));
+    }
+
     let file = BufReader::new(file);
     for (line_no, line) in BufRead::lines(file).enumerate() {
         // Line numbering usually starts from 1

@@ -8,7 +8,7 @@
 use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::dyld::{ConstantExports, HostConstant};
 use crate::frameworks::foundation::{NSInteger, NSUInteger};
-use crate::mem::{ConstVoidPtr, GuestUSize, MutVoidPtr};
+use crate::mem::{ConstVoidPtr, GuestUSize, MutVoidPtr}; // Removed ConstPtr and MutPtr
 use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
@@ -52,7 +52,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)unarchiveObjectWithFile:(id)path {
     let data: id = msg_class![env; NSData dataWithContentsOfFile:path];
-    if data == nil { return nil; } // Removed parentheses
+    if data == nil { return nil; }
     msg![env; this unarchiveObjectWithData:data]
 }
 
@@ -187,12 +187,11 @@ fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
     new_object
 }
 
-// FIXED: Added missing functions required by NSArray and NSDictionary
 pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
     let keys = keys_for_key(env, unarchiver, "NS.objects");
     keys.into_iter()
         .map(|k| {
-            // FIXED: Separate the calls into two steps to drop the mutable borrow
+            // FIXED: Separation of calls to resolve double-mutable borrow of env
             let obj = unarchive_key(env, unarchiver, k);
             retain(env, obj)
         })
@@ -202,7 +201,12 @@ pub fn decode_current_array(env: &mut Environment, unarchiver: id) -> Vec<id> {
 pub fn decode_current_dict(env: &mut Environment, unarchiver: id) -> Vec<(id, id)> {
     let ks = keys_for_key(env, unarchiver, "NS.keys");
     let vs = keys_for_key(env, unarchiver, "NS.objects");
-    ks.into_iter().zip(vs).map(|(k, v)| (unarchive_key(env, unarchiver, k), unarchive_key(env, unarchiver, v))).collect()
+    ks.into_iter()
+        .zip(vs)
+        .map(|(k, v)| {
+            (unarchive_key(env, unarchiver, k), unarchive_key(env, unarchiver, v))
+        })
+        .collect()
 }
 
 pub fn decode_current_date(env: &mut Environment, unarchiver: id) -> id {
@@ -215,7 +219,6 @@ pub fn decode_current_date(env: &mut Environment, unarchiver: id) -> id {
     nil
 }
 
-// FIXED: Resolved double mutable borrow of env.mem
 pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bool) -> id {
     let k = get_static_str(env, "NS.data");
     let bytes_vec = get_value_to_decode_for_key(env, unarchiver, k).and_then(|v| v.as_data().map(|d| d.to_vec()));
@@ -224,9 +227,9 @@ pub fn decode_current_data(env: &mut Environment, unarchiver: id, is_mutable: bo
         let g_bytes = env.mem.alloc(len);
         env.mem.bytes_at_mut(g_bytes.cast(), len).copy_from_slice(&bytes);
         let cls_name = if is_mutable { "NSMutableData" } else { "NSData" };
-        let cls = env.objc.get_known_class(cls_name, &mut env.mem);
-        let data: id = msg![env; cls alloc];
-        return msg![env; data initWithBytesNoCopy:g_bytes length:len freeWhenDone:true];
+        let data_class: id = env.objc.get_known_class(cls_name, &mut env.mem);
+        let data_instance: id = msg![env; data_class alloc];
+        return msg![env; data_instance initWithBytesNoCopy:g_bytes length:len freeWhenDone:true];
     }
     nil
 }
