@@ -23,14 +23,14 @@ fn objc_msgSend_inner(
     let sel_str = sel_string.as_str();
     let message_type_info = env.objc.message_type_info.take();
 
-    // 🛡️ NSBundle NIL BYPASS (Fixes NFS Shift 2 crash in ns_bundle.rs)
+    //  NSBundle NIL BYPASS (Fixes NFS Shift 2 crash in ns_bundle.rs)
     if sel_str == "pathForResource:ofType:" || 
        sel_str == "pathForResource:ofType:inDirectory:" || 
        sel_str == "URLForResource:withExtension:" ||
        sel_str == "URLForResource:withExtension:subdirectory:" {
         let name_ptr = env.cpu.regs()[2];
         if name_ptr == 0 {
-            println!("🛡️ NSBundle BYPASS: Prevented panic from nil resource name!");
+            println!(" NSBundle BYPASS: Prevented panic from nil resource name!");
             env.cpu.regs_mut()[0] = 0; // Return nil cleanly
             env.cpu.regs_mut()[1] = 0;
             return;
@@ -57,10 +57,10 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "initWithAPI:" {
-        println!("🔥 GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", env.cpu.regs()[2]);
+        println!(" GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", env.cpu.regs()[2]);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        println!("🔥 GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        println!(" GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
     if sel_str == "connectionWithRequest:delegate:" || 
@@ -70,13 +70,13 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // 🛡️ THE NSScanner SHIELD
+    //  THE NSScanner SHIELD
     let is_scan_int = sel_str == "scanHexInt:"; 
     if is_scan_int || sel_str == "scanHexLongLong:" {
         if is_scan_int {
-            println!("🛡️ NSScanner BYPASS: Safely intercepting scanHexInt: to prevent emulator panic!");
+            println!(" NSScanner BYPASS: Safely intercepting scanHexInt: to prevent emulator panic!");
         } else {
-            println!("🛡️ NSScanner BYPASS: Safely intercepting scanHexLongLong: to prevent emulator panic!");
+            println!(" NSScanner BYPASS: Safely intercepting scanHexLongLong: to prevent emulator panic!");
         }
 
         let out_ptr_bits = env.cpu.regs()[2];
@@ -119,7 +119,7 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "sharedManager" || sel_str == "sharedAdsManager" || sel_str == "defaultQueue" {
-        println!("🛡️ DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
+        println!(" DUMMY SINGLETON BYPASS: Creating fake instance for {}", sel_str);
         let cls = env.objc.get_known_class("NSObject", &mut env.mem);
         if cls != nil {
             let obj: id = crate::msg![env; cls alloc];
@@ -135,7 +135,7 @@ fn objc_msgSend_inner(
     if sel_str == "objectForKey:" {
         let key = env.cpu.regs()[2];
         if key == 0 { 
-            println!("🛡️ EA MTX BYPASS: objectForKey: called with NULL key! Faking 'USD' currency string!");
+            println!(" EA MTX BYPASS: objectForKey: called with NULL key! Faking 'USD' currency string!");
             let val = crate::frameworks::foundation::ns_string::from_rust_string(env, "USD".to_string());
             env.cpu.regs_mut()[0] = val.to_bits();
             env.cpu.regs_mut()[1] = 0;
@@ -172,19 +172,19 @@ fn objc_msgSend_inner(
     }
 
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        println!("🛡️ EA MTX BYPASS: Faking StoreKit availability to YES!");
+        println!(" EA MTX BYPASS: Faking StoreKit availability to YES!");
         env.cpu.regs_mut()[0] = 1; 
         env.cpu.regs_mut()[1] = 0;
         return;
     }
 
     if sel_str == "addTransactionObserver:" || sel_str == "removeTransactionObserver:" {
-        println!("🛡️ EA MTX BYPASS: Absorbed {} safely!", sel_str);
+        println!(" EA MTX BYPASS: Absorbed {} safely!", sel_str);
         return;
     }
 
     if sel_str == "transactions" {
-        println!("🛡️ EA MTX BYPASS: Returning valid empty NSArray for transactions!");
+        println!(" EA MTX BYPASS: Returning valid empty NSArray for transactions!");
         let array_class = env.objc.get_known_class("NSArray", &mut env.mem);
         if array_class != nil {
             let empty_array: id = crate::msg![env; array_class array];
@@ -264,7 +264,6 @@ fn objc_msgSend_inner(
     }
 }
 
-// Boilerplate below is unchanged
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSend(env: &mut Environment, receiver: id, selector: SEL) {
     objc_msgSend_inner(env, receiver, selector, None, false)
