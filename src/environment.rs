@@ -286,6 +286,11 @@ impl Environment {
                     // This appears to be an older way set the orientation.
                     // From testing, it seems to correspond to left.
                     "UIInterfaceOrientationLandscape" => window::DeviceOrientation::LandscapeLeft,
+                    "UIInterfaceOrientationPortraitUpsideDown" => {
+                        // AllowUpsideDown
+                        log!("WARNING: App specifically requested PortraitUpsideDown orientation!");
+                        window::DeviceOrientation::PortraitUpsideDown
+                    }
                     other => unimplemented!("Unsupported startup orientation: {:?}", other),
                 };
                 log!("App needs non-portrait user interface orientation {:?}, applying device orientation {:?}.", non_portrait_orientation, options.initial_orientation);
