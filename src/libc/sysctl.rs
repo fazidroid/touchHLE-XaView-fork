@@ -16,7 +16,7 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
-    //  THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
+    // 🛡️ THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
     if mib.len() >= 5 && mib[0] == 4 && mib[1] == 17 && mib[3] == 18 && mib[4] == 3 {
         let req_size = 152;
         if oldp.is_null() && !oldlenp.is_null() {
@@ -24,7 +24,7 @@ fn sysctl(
             return 0;
         } else if !oldp.is_null() && !oldlenp.is_null() {
             let len = env.mem.read::<u32, false>(oldlenp.cast_const());
-            if len >= 93 { // Safe bounds check
+            if len >= 93 { 
                 let buf = env.mem.bytes_at_mut(oldp.cast(), len);
                 buf.fill(0);
                 
@@ -41,7 +41,7 @@ fn sysctl(
         }
     }
     
-    //  CRITICAL FIX: Return -1 for everything else to prevent EA C++ asserts!
+    // 🛡️ CRITICAL FIX: Return -1 for everything else to prevent EA C++ asserts!
     -1
 }
 
@@ -95,7 +95,7 @@ fn sysctlbyname(
         return 0;
     }
 
-    //  CRITICAL FIX: Return -1 for unknown strings to prevent EA C++ asserts!
+    // 🛡️ CRITICAL FIX: Return -1 for unknown strings to prevent EA C++ asserts!
     -1
 }
 
