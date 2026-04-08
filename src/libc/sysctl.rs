@@ -1,6 +1,7 @@
 use crate::mem::{ConstPtr, MutPtr, ConstVoidPtr, MutVoidPtr};
 use crate::Environment;
 use crate::dyld::export_c_func;
+use crate::log; // Added to ensure the logging macro works safely
 
 fn sysctl(
     env: &mut Environment,
@@ -75,8 +76,8 @@ fn CGFontCreateWithDataProvider(_env: &mut Environment, provider: ConstVoidPtr) 
 fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _callbacks: ConstVoidPtr) -> ConstVoidPtr {
     if info.is_null() { crate::mem::Ptr::from_bits(1) } else { info }
 }
-// ==== SYSTEM CONFIGURATION / NETWORK REACHABILITY BYPASS ====
 
+// ==== SYSTEM CONFIGURATION / NETWORK REACHABILITY BYPASS ====
 fn SCNetworkReachabilityCreateWithAddress(_env: &mut Environment, _allocator: ConstVoidPtr, _address: ConstVoidPtr) -> ConstVoidPtr {
     // Return a dummy handle so the game thinks it successfully created a network target
     crate::mem::Ptr::from_bits(0xDEADBEEF) 
@@ -111,7 +112,10 @@ fn __assert_rtn(
     let func_str = if func.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(func)) };
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
-    panic!("\n\nEA GAME ENGINE ASSERTION FAILED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\n\n", file_str, line, func_str, expr_str);
+    
+    // 🛡️ THE MUZZLER: Log it, but DO NOT PANIC. 
+    // This forces the EA engine to ignore its own crashes and limp forward!
+    log!("\n\n🛡️ EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
 }
 
 // ==== OBJECTIVE-C RUNTIME FIXES (Required for Most Wanted MTX) ====
@@ -154,7 +158,6 @@ pub const FUNCTIONS: crate::dyld::FunctionExports = &[
     export_c_func!(object_getClass(_)),
     export_c_func!(class_getProperty(_, _)),
 
-    // FIXED: Changed from (_, _, _) to (_, _) to match 2 guest arguments
     export_c_func!(SCNetworkReachabilityCreateWithAddress(_, _)),
     export_c_func!(SCNetworkReachabilityCreateWithName(_, _)),
     export_c_func!(SCNetworkReachabilityGetFlags(_, _)),
