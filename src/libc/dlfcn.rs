@@ -21,35 +21,65 @@ fn dlopen(env: &mut Environment, path: ConstPtr<u8>, _mode: i32) -> MutVoidPtr {
     if path.is_null() {
         return RTLD_DEFAULT;
     }
-    // TODO: dlopen() support for real dynamic libraries.
-    assert!(is_known_library(env.mem.cstr_at_utf8(path).unwrap()));
-    // For convenience, use the path as the handle.
-    // TODO: Find out whether the handle is truly opaque on iPhone OS, and if
-    // not, where it points.
+    
+    // 🛡️ BORROW CHECKER BYPASS: Convert to owned String immediately!
+    let path_str = env.mem.cstr_at_utf8(path).unwrap().to_string();
+    
+    // 🛡️ THE PHANTOM STOREKIT BYPASS
+    // If EA looks for StoreKit, intercept it and manually inject the classes into the runtime!
+    if path_str.contains("StoreKit") {
+        println!("🛡️ DLOPEN BYPASS: Intercepted StoreKit! Injecting Phantom Classes...");
+        env.objc.link_class("SKPaymentQueue", false, &mut env.mem);
+        env.objc.link_class("SKProductsRequest", false, &mut env.mem);
+        env.objc.link_class("SKPayment", false, &mut env.mem);
+        env.objc.link_class("SKMutablePayment", false, &mut env.mem);
+        return path.cast_mut().cast(); // Return valid fake handle
+    }
+    
+    assert!(is_known_library(&path_str));
     path.cast_mut().cast()
 }
 
 fn dlsym(env: &mut Environment, handle: MutVoidPtr, symbol: ConstPtr<u8>) -> MutVoidPtr {
+    let handle_str = if handle == RTLD_DEFAULT { 
+        String::new() 
+    } else { 
+        env.mem.cstr_at_utf8(handle.cast()).unwrap_or("").to_string() 
+    };
+
+    let sym_str = env.mem.cstr_at_utf8(symbol).unwrap().to_string();
+
+    // 🛡️ DLSYM SAFE NULL: Silently absorb missing StoreKit functions without crashing!
+    if handle_str.contains("StoreKit") || sym_str.contains("SK") || sym_str.contains("StoreKit") {
+        println!("🛡️ DLSYM BYPASS: Absorbed missing StoreKit symbol: {}", sym_str);
+        return crate::mem::Ptr::from_bits(0); // Safe NULL pointer
+    }
+
     assert!(
-        handle == RTLD_DEFAULT || is_known_library(env.mem.cstr_at_utf8(handle.cast()).unwrap())
+        handle == RTLD_DEFAULT || is_known_library(&handle_str)
     );
-    // For some reason, the symbols passed to dlsym() don't have the leading _.
-    let symbol = format!("_{}", env.mem.cstr_at_utf8(symbol).unwrap());
-    // TODO: error handling. dlsym() should just return NULL in this case, but
-    // currently it's probably more useful to have the emulator crash if there's
-    // no symbol found, since it most likely indicates a missing host function.
-    // TODO: Symbol lookup should be scoped to the specific library requested,
-    // where appropriate!
+    let symbol_fmt = format!("_{}", sym_str);
+    
     let addr = env
         .dyld
-        .create_proc_address(&mut env.mem, &mut env.cpu, &symbol)
-        .unwrap_or_else(|_| panic!("dlsym() for unimplemented function {symbol}"));
+        .create_proc_address(&mut env.mem, &mut env.cpu, &symbol_fmt)
+        .unwrap_or_else(|_| panic!("dlsym() for unimplemented function {symbol_fmt}"));
     Ptr::from_bits(addr.addr_with_thumb_bit())
 }
 
 fn dlclose(env: &mut Environment, handle: MutVoidPtr) -> i32 {
+    let handle_str = if handle == RTLD_DEFAULT { 
+        String::new() 
+    } else { 
+        env.mem.cstr_at_utf8(handle.cast()).unwrap_or("").to_string() 
+    };
+    
+    if handle_str.contains("StoreKit") {
+        return 0; // Fake success
+    }
+
     assert!(
-        handle == RTLD_DEFAULT || is_known_library(env.mem.cstr_at_utf8(handle.cast()).unwrap())
+        handle == RTLD_DEFAULT || is_known_library(&handle_str)
     );
     0 // success
 }
@@ -59,3 +89,4 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(dlsym(_, _)),
     export_c_func!(dlclose(_)),
 ];
+            
