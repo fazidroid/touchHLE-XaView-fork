@@ -16,8 +16,52 @@ fn sysctl(
         mib[i as usize] = env.mem.read::<i32, false>(name_ptr + i);
     }
     
-    // 🛡️ THE MAC ADDRESS / DEVICE ID SPOOF (Fixes ValidateDeviceId)
-    // By returning 0 and zeroing the buffer, EA's crypto-hasher hashes a clean 00:00:00 MAC.
+    //  THE MAC ADDRESS SPOOF (Fixes EA ValidateDeviceId natively)
+    // mib = [CTL_NET(4), AF_ROUTE(17), 0, AF_LINK(18), NET_RT_IFLIST(3), ...]
+    if mib.len() >= 5 && mib[0] == 4 && mib[1] == 17 && mib[3] == 18 && mib[4] == 3 {
+        let req_size = 152;
+        if oldp.is_null() && !oldlenp.is_null() {
+            env.mem.write::<u32>(oldlenp, req_size);
+            return 0;
+        } else if !oldp.is_null() && !oldlenp.is_null() {
+            let len = env.mem.read::<u32, false>(oldlenp.cast_const());
+            if len >= 88 {
+                let buf = env.mem.bytes_at_mut(oldp.cast(), len);
+                buf.fill(0);
+                
+                // Fake if_msghdr structure
+                buf[0] = 76; // ifm_msglen (lower byte)
+                buf[1] = 0;  // ifm_msglen (upper byte)
+                buf[2] = 5;  // ifm_version
+                buf[3] = 14; // ifm_type = RTM_IFINFO
+                
+                // Fake sockaddr_dl structure at offset 76
+                buf[76] = 20; // sdl_len
+                buf[77] = 18; // sdl_family = AF_LINK
+                buf[80] = 6;  // sdl_type = IFT_ETHER
+                buf[81] = 3;  // sdl_nlen ("en0" length)
+                buf[82] = 6;  // sdl_alen (MAC address length)
+                
+                // sdl_data ("en0")
+                buf[84] = b'e';
+                buf[85] = b'n';
+                buf[86] = b'0';
+                
+                // MAC Address (02:11:22:33:44:55)
+                buf[87] = 0x02;
+                buf[88] = 0x11;
+                buf[89] = 0x22;
+                buf[90] = 0x33;
+                buf[91] = 0x44;
+                buf[92] = 0x55;
+                
+                env.mem.write::<u32>(oldlenp, len);
+                return 0;
+            }
+        }
+    }
+    
+    // Universal fallback for other sysctls
     if !oldp.is_null() && !oldlenp.is_null() {
         let len = env.mem.read::<u32, false>(oldlenp.cast_const());
         if len > 0 {
@@ -25,8 +69,7 @@ fn sysctl(
             buf.fill(0);
         }
     }
-    
-    0 // Return Success
+    0
 }
 
 fn sysctlbyname(
@@ -40,7 +83,6 @@ fn sysctlbyname(
     let name_bytes = env.mem.cstr_at(name_ptr);
     let name_str = String::from_utf8_lossy(name_bytes);
     
-    // 1. Device Spoof
     if name_str == "hw.machine" || name_str == "hw.model" {
         let hw = b"iPhone4,1\0";
         if !oldlenp.is_null() {
@@ -53,10 +95,9 @@ fn sysctlbyname(
                 env.mem.write(oldlenp, copy_len as u32);
             }
         }
-        return 0; // Success
+        return 0;
     }
 
-    // 2. EA STOREFRONT BYPASS
     if name_str == "hw.optional.floatingpoint" || name_str == "hw.optional.neon" {
         if !oldlenp.is_null() {
             if oldp.is_null() {
@@ -66,23 +107,21 @@ fn sysctlbyname(
                 env.mem.write::<u32>(oldlenp, 4);
             }
         }
-        return 0; // Success
+        return 0;
     }
 
-    // 3. RAM SPOOF (Fixes memory assertion crashes)
     if name_str == "hw.memsize" || name_str == "hw.physmem" || name_str == "hw.usermem" {
         if !oldlenp.is_null() {
             if oldp.is_null() {
                 env.mem.write::<u32>(oldlenp, 4);
             } else {
-                env.mem.write::<u32>(oldp.cast(), 536870912); // Tell EA we have 512 MB RAM
+                env.mem.write::<u32>(oldp.cast(), 536870912);
                 env.mem.write::<u32>(oldlenp, 4);
             }
         }
         return 0;
     }
 
-    // 4. UNIVERSAL SUCCESS FALLBACK
     if !oldp.is_null() && !oldlenp.is_null() {
         let len = env.mem.read::<u32, false>(oldlenp.cast_const());
         if len > 0 {
@@ -93,7 +132,6 @@ fn sysctlbyname(
     0
 }
 
-// ==== FONT CRASH BYPASSES ====
 fn CGFontGetUnitsPerEm(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 1000 }
 fn CGFontGetAscent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { 800 }
 fn CGFontGetDescent(_env: &mut Environment, _font: ConstVoidPtr) -> i32 { -200 }
@@ -103,7 +141,6 @@ fn CGDataProviderCreateSequential(_env: &mut Environment, info: ConstVoidPtr, _c
     if info.is_null() { crate::mem::Ptr::from_bits(1) } else { info }
 }
 
-// ==== SYSTEM CONFIGURATION / NETWORK REACHABILITY BYPASS ====
 fn SCNetworkReachabilityCreateWithAddress(_env: &mut Environment, _allocator: ConstVoidPtr, _address: ConstVoidPtr) -> ConstVoidPtr {
     crate::mem::Ptr::from_bits(0xDEADBEEF) 
 }
@@ -119,8 +156,8 @@ fn SCNetworkReachabilityGetFlags(env: &mut Environment, _target: ConstVoidPtr, f
     1
 }
 
-// ==== FILE I/O BYPASS ====
-fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { -1 }
+// Return 0 instead of -1 to prevent C++ EOF stream crashes in XML parsing!
+fn __srget(_env: &mut Environment, _fp: ConstVoidPtr) -> i32 { 0 }
 fn flockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 fn funlockfile(_env: &mut Environment, _file: ConstVoidPtr) -> i32 { 0 }
 
@@ -135,19 +172,23 @@ fn __assert_rtn(
     let file_str = if file.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(file)) };
     let expr_str = if expr.is_null() { "(unknown)".into() } else { String::from_utf8_lossy(env.mem.cstr_at(expr)) };
     
-    log!("\n\n🛡️ EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
+    // Use println! to guarantee 100% compilation safety without macro import issues.
+    println!("\n\n EA ASSERTION BYPASSED!\nFile: {}\nLine: {}\nFunction: {}\nExpression: {}\nEngine tried to crash but was denied!\n\n", file_str, line, func_str, expr_str);
+    
+    //  THE INDESTRUCTIBLE MUZZLER: SKIP THE NORETURN TRAP!
+    // Compilers put a trap instruction (like `udf`) immediately after a call to a noreturn function.
+    // If we just return, the trap executes and segfaults. We advance the Link Register to jump over it!
+    let lr = env.cpu.regs()[14];
+    let is_thumb = (lr & 1) != 0;
+    let trap_size = if is_thumb { 2 } else { 4 };
+    
+    println!(" MUZZLER: Advancing Link Register by {} bytes to skip trap!", trap_size);
+    env.cpu.regs_mut()[14] = lr + trap_size;
 }
 
-// ==== OBJECTIVE-C RUNTIME FIXES ====
 fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
-    if obj.is_null() { 
-        return crate::mem::Ptr::null(); 
-    }
-    
-    if obj.to_bits() == 0xDEADBEEF {
-        return crate::mem::Ptr::from_bits(0x30000000); 
-    }
-
+    if obj.is_null() { return crate::mem::Ptr::null(); }
+    if obj.to_bits() == 0xDEADBEEF { return crate::mem::Ptr::from_bits(0x30000000); }
     let isa = env.mem.read::<u32, false>(obj.cast());
     crate::mem::Ptr::from_bits(isa)
 }
