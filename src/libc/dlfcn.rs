@@ -23,7 +23,7 @@ fn dlopen(env: &mut Environment, path: ConstPtr<u8>, _mode: i32) -> MutVoidPtr {
     }
     
     // 🛡️ BORROW CHECKER BYPASS: Convert to owned String immediately!
-    let path_str = env.mem.cstr_at_utf8(path).unwrap().to_string();
+    let path_str = env.mem.cstr_at_utf8(path).unwrap_or("").to_string();
     
     // 🛡️ THE PHANTOM STOREKIT BYPASS
     // If EA looks for StoreKit, intercept it and manually inject the classes into the runtime!
@@ -47,12 +47,12 @@ fn dlsym(env: &mut Environment, handle: MutVoidPtr, symbol: ConstPtr<u8>) -> Mut
         env.mem.cstr_at_utf8(handle.cast()).unwrap_or("").to_string() 
     };
 
-    let sym_str = env.mem.cstr_at_utf8(symbol).unwrap().to_string();
+    let sym_str = env.mem.cstr_at_utf8(symbol).unwrap_or("").to_string();
 
     // 🛡️ DLSYM SAFE NULL: Silently absorb missing StoreKit functions without crashing!
     if handle_str.contains("StoreKit") || sym_str.contains("SK") || sym_str.contains("StoreKit") {
         println!("🛡️ DLSYM BYPASS: Absorbed missing StoreKit symbol: {}", sym_str);
-        return crate::mem::Ptr::from_bits(0); // Safe NULL pointer
+        return crate::mem::Ptr::null(); // Safe NULL pointer
     }
 
     assert!(
@@ -89,4 +89,3 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(dlsym(_, _)),
     export_c_func!(dlclose(_)),
 ];
-            
