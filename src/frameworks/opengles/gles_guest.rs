@@ -459,6 +459,8 @@ fn glScissor(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: 
 fn glViewport(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
     let r_scale = get_smart_retina_scale(env, width, height);
     let scale_total = env.options.scale_hack.get() as f32 * r_scale;
+    // DebugViewport
+    log!("DEBUG_GL: glViewport Guest(x={}, y={}, w={}, h={}) -> Scale={}", x, y, width, height, scale_total);
     let (x, y) = (
         (x as f32 * scale_total).round() as GLint,
         (y as f32 * scale_total).round() as GLint,
@@ -833,6 +835,8 @@ fn glDrawElements(
 
 // Clearing
 fn glClear(env: &mut Environment, mask: GLbitfield) {
+    // DebugClearMask
+    log!("DEBUG_GL: glClear(mask={:#x})", mask);
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Clear(mask) });
 }
 fn glClearColor(
@@ -842,6 +846,8 @@ fn glClearColor(
     blue: GLclampf,
     alpha: GLclampf,
 ) {
+    // DebugClearColor
+    log!("DEBUG_GL: glClearColor(R={}, G={}, B={}, A={})", red, green, blue, alpha);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.ClearColor(red, green, blue, alpha)
     });
@@ -1380,6 +1386,8 @@ fn glIsRenderbufferOES(env: &mut Environment, renderbuffer: GLuint) -> GLboolean
     })
 }
 fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLuint) {
+    // DebugBindFbo
+    log!("DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})", target, framebuffer);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindFramebufferOES(target, framebuffer)
     })
@@ -2121,6 +2129,9 @@ fn glUniformMatrix4fv(
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
+        // DebugUniformMat4
+        let slice = std::slice::from_raw_parts(value_ptr, (count * 16) as usize);
+        log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}) -> 1st_mat: {:?}", location, count, transpose, &slice[0..std::cmp::min(16, slice.len())]);
         gles.UniformMatrix4fv(location, count, transpose, value_ptr);
     })
 }

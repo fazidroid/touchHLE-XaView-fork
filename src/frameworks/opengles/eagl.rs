@@ -625,11 +625,22 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         renderbuffer,
     );
 
-    //DebugFBOStatus
+    // DebugFboStatusExt
     let fbo_status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
-    let mut center_pixel = [0u8; 4];
-    gles.ReadPixels(width / 2, height / 2, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, center_pixel.as_mut_ptr() as *mut _);
-    log!("DEBUG_PRB: FBO Setup Status={:#x}. Center Pixel: R={}, G={}, B={}, A={}", fbo_status, center_pixel[0], center_pixel[1], center_pixel[2], center_pixel[3]);
+    let mut px = [0u8; 20];
+    let hw = width.saturating_sub(1);
+    let hh = height.saturating_sub(1);
+    gles.ReadPixels(0, 0, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[0..4].as_mut_ptr() as *mut _);
+    gles.ReadPixels(hw, 0, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[4..8].as_mut_ptr() as *mut _);
+    gles.ReadPixels(0, hh, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[8..12].as_mut_ptr() as *mut _);
+    gles.ReadPixels(hw, hh, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[12..16].as_mut_ptr() as *mut _);
+    gles.ReadPixels(width / 2, height / 2, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[16..20].as_mut_ptr() as *mut _);
+    log!("DEBUG_PRB: FBO={:#x}. w={}, h={}. Pixels: BL[{},{},{},{}] BR[{},{},{},{}] TL[{},{},{},{}] TR[{},{},{},{}] C[{},{},{},{}]",
+        fbo_status, width, height,
+        px[0], px[1], px[2], px[3], px[4], px[5], px[6], px[7],
+        px[8], px[9], px[10], px[11], px[12], px[13], px[14], px[15],
+        px[16], px[17], px[18], px[19]
+    );
 
     // Create a texture with a copy of the pixels in the framebuffer
     let mut texture: GLuint = 0;
