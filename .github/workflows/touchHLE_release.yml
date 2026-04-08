@@ -3,17 +3,13 @@ name: Build touchHLE
 on:
   push:
     branches: 
-      - "trunk"
-      - "GTRacing134"
-  pull_request:
-    branches: 
-      - "trunk"
-      - "GTRacing134"
+      - "master"
       - "Shift2"
+      - "GTRacing134"
       - "mostwanted"
   pull_request:
     branches: 
-      - "trunk"
+      - "master"
       - "Shift2"
       - "GTRacing134"
       - "mostwanted"
