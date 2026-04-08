@@ -890,8 +890,18 @@ fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32
     0
 }
 
+fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd: ConstVoidPtr, val: MutVoidPtr, offset: i32) {
+    // ImplSetPropertyNonatomic
+    if !self_ptr.is_null() {
+        let addr = (self_ptr.to_bits() as i32 + offset) as u32;
+        let addr_ptr = crate::mem::MutPtr::<MutVoidPtr>::from_bits(addr);
+        env.mem.write(addr_ptr, val);
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(dladdr(_, _)),
+    export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
     export_c_func!(syscall(_, _, _, _)),
     export_c_func!(gethostbyname(_)),
     export_c_func!(class_respondsToSelector(_, _)),
