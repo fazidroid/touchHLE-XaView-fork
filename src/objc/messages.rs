@@ -33,9 +33,10 @@ fn objc_msgSend_inner(
 
     // 2. Safely tell the game we support Retina features ONLY
     if sel_str == "respondsToSelector:" {
-        // FIXED: Construct the SEL wrapper properly using ConstPtr
-        let target_sel = SEL(crate::mem::ConstPtr::from_bits(env.cpu.regs()[2]));
-        let target_sel_str = target_sel.as_str(&env.mem);
+        // COMPILE-SAFE FIX: Bypass the private SEL struct entirely and read the string directly from RAM!
+        let target_sel_ptr = crate::mem::ConstPtr::<u8>::from_bits(env.cpu.regs()[2]);
+        let target_sel_bytes = env.mem.cstr_at(target_sel_ptr);
+        let target_sel_str = String::from_utf8_lossy(target_sel_bytes);
         
         // ONLY say YES (1) if it's specifically asking about modern screen features
         if target_sel_str == "scale" || target_sel_str == "displayLinkWithTarget:selector:" {
@@ -52,10 +53,10 @@ fn objc_msgSend_inner(
 
     if sel_str == "initWithAPI:" {
         let api_version = env.cpu.regs()[2]; 
-        println!(" GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
+        println!("  GLES 2.0 LOG: Game requested OpenGL ES API Version: {}", api_version);
     }
     if sel_str == "renderbufferStorage:fromDrawable:" {
-        println!(" GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
+        println!("  GLES 2.0 LOG: Allocating Renderbuffer! 3D ENGINE IS ALIVE!");
     }
 
     // ==========================================================
@@ -78,7 +79,7 @@ fn objc_msgSend_inner(
 
     // Neutralize thread-blocking delay loops
     if sel_str == "performSelector:withObject:afterDelay:" || sel_str == "performSelector:onThread:withObject:waitUntilDone:" {
-        println!(" LOG: Caught and neutralized a freezing performSelector call!");
+        println!("  LOG: Caught and neutralized a freezing performSelector call!");
         return;
     }
 
@@ -116,7 +117,7 @@ fn objc_msgSend_inner(
     
     // Trick the EA engine into thinking Microtransactions are online and authorized.
     if sel_str == "canMakePayments" || sel_str == "isStoreLoaded" || sel_str == "isAuthorized" {
-        println!(" EA MTX BYPASS: Faking StoreKit availability to YES!");
+        println!("   EA MTX BYPASS: Faking StoreKit availability to YES!");
         env.cpu.regs_mut()[0] = 1; // Return 1 (YES / True)
         env.cpu.regs_mut()[1] = 0;
         return;
@@ -124,7 +125,7 @@ fn objc_msgSend_inner(
     
     // If EA asks for the default payment queue, return a dummy object instead of nil
     if sel_str == "defaultQueue" {
-        println!(" EA MTX BYPASS: Faking SKPaymentQueue defaultQueue!");
+        println!("   EA MTX BYPASS: Faking SKPaymentQueue defaultQueue!");
         env.cpu.regs_mut()[0] = 0x30000000; // Fake safe pointer
         env.cpu.regs_mut()[1] = 0;
         return;
