@@ -23,6 +23,8 @@ static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 18] = [
     ((6,1), "hw.machine" , String(b"iPhone1,1")),
     ((6,2), "hw.model" , String(b"M68AP")),
     ((6,3), "hw.ncpu" , SysInfoType::Int32(1)),
+    ((6,4), "hw.physmem" , SysInfoType::Int32(512 * 1024 * 1024)), 
+    ((0,0), "hw.cputype" , SysInfoType::Int32(12)),
     ((0,0), "hw.cputype" , SysInfoType::Int32(12)),
     ((0,0), "hw.cpusubtype" , SysInfoType::Int32(6)),
     ((6,15), "hw.cpufrequency" , SysInfoType::Int64(412000000)),
@@ -130,10 +132,10 @@ fn sysctl(
                         "iPhone3,1" => b"iPhone3,1",
                         "iPhone2,1" => b"iPhone2,1",
                         "iPhone1,2" => b"iPhone1,2",
-                        _ => b"iPhone1,1",
+                        _ => b"M68AP",
                     };
                     val.1 = SysInfoType::String(hw_machine); // OverrideMachine
-                } else if name0 == 6 && name1 == 2 {
+                } else if name0 == 6 && name1 == 4 {
                     let hw_model: &[u8] = match model.as_str() {
                         // MatchHwModel
                         "iPod5,1" => b"N78AP",
@@ -154,7 +156,7 @@ fn sysctl(
                         "iPhone1,2" => b"N82AP",
                         _ => b"M68AP",
                     };
-                    val.1 = SysInfoType::String(hw_model); // OverrideModel
+                    val.1 = SysInfoType::Int32(512 * 1024 * 1024); // OverrideModel
                 }
             }
             val
