@@ -331,7 +331,7 @@ fn __strncat_chk(
     dest
 }
 
-fn _strspn(env: &mut Environment, s: ConstPtr<u8>, accept: ConstPtr<u8>) -> GuestUSize {
+fn strspn(env: &mut Environment, s: ConstPtr<u8>, accept: ConstPtr<u8>) -> GuestUSize {
     let s_slice = env.mem.cstr_at(s);
     let accept_slice = env.mem.cstr_at(accept);
     
@@ -409,7 +409,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(strncpy(_, _, _)),
     export_c_func!(__strncpy_chk(_, _, _, _)),
     export_c_func!(__strncat_chk(_, _, _, _)),
-    export_c_func!(_strspn(_, _)),
+    export_c_func!(strspn(_, _)),
     export_c_func!(strsep(_, _)),
     export_c_func!(strdup(_)),
     export_c_func!(strcmp(_, _)),
