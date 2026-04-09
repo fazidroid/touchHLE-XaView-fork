@@ -628,27 +628,13 @@ pub const CLASSES: ClassExports = objc_classes! {
         // Traverse subviews in reverse order (top-most first)
         for i in (0..count).rev() {
             let subview: id = msg![env; subviews objectAtIndex:i];
-            let subview_frame: crate::frameworks::core_graphics::CGRect = msg![env; subview frame];
             
-            let sub_point = crate::frameworks::core_graphics::CGPoint {
-                x: point.x - subview_frame.origin.x,
-                y: point.y - subview_frame.origin.y,
-            };
+            // 🎯 PROPER CONVERSION: Let UIKit handle the rotation/scaling transform math!
+            let sub_point: crate::frameworks::core_graphics::CGPoint = msg![env; this convertPoint:point toView:subview];
             
             let hit: id = msg![env; subview hitTest:sub_point withEvent:event];
             if hit != nil {
-                let uiview_cls = env.objc.get_known_class("UIView", &mut env.mem);
-                let is_generic_uiview: bool = msg![env; hit isMemberOfClass:uiview_cls];
-                
-                println!("🔥 DEBUG_TOUCH: Touch intercepted by View {:?} (Is Generic UIView: {})", hit, is_generic_uiview);
-                
-                // 🛡️ ASPHALT 8 BYPASS: Ignore generic UIViews swallowing touches!
-                if is_generic_uiview {
-                    println!("🔥 DEBUG_TOUCH: Swallowed by generic UIView! Forcing bypass to EAGLView...");
-                    continue; // Skip this view and check the layer underneath!
-                }
-                
-                return hit;
+                return hit; // Return the exact view that was touched
             }
         }
     }
