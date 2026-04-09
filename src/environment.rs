@@ -1732,6 +1732,21 @@ impl Environment {
                     }
                 }
 
+                // BypassAsphaltOverdriveDeadlocks
+                let lr = self.cpu.regs()[cpu::Cpu::LR];
+                if (pc == 0x009d7784 && (lr == 0x0039418f || lr == 0x0039419b)) ||
+                   (pc == 0x009d7464 && lr == 0x0078df65) ||
+                   (pc == 0x009d8334 && lr == 0x001722e1) {
+                    echo!("WARNING: Unwinding Asphalt Overdrive Deadlock at PC: {:#010x}, LR: {:#010x}", pc, lr);
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                }
+
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
                     let lr = self.cpu.regs()[cpu::Cpu::LR];
