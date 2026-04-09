@@ -975,6 +975,18 @@ fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32
     0
 }
 
+fn _times(env: &mut Environment, buf: MutVoidPtr) -> i32 {
+    // FakeTimes
+    if !buf.is_null() {
+        let ptr: crate::mem::MutPtr<u32> = buf.cast();
+        env.mem.write(ptr, 0);
+        env.mem.write(ptr + 1, 0);
+        env.mem.write(ptr + 2, 0);
+        env.mem.write(ptr + 3, 0);
+    }
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGColorGetComponents(_)),
     export_c_func!(CGContextAddLineToPoint(_, _, _)),
@@ -1064,6 +1076,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(wcstombs(_, _, _)),
     export_c_func!(system(_)),
     export_c_func!(div(_, _)),
+    export_c_func!(_times(_)),
 ];
 
 /// A simple wrapper around [atof_inner_generic] for the case of C string.
