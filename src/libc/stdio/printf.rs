@@ -134,23 +134,13 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             }
             b'l' => {
                     if get_format_char(&env.mem, format_char_idx + 1) == b'l' {
-                        // it's an 8-byte integer
-                        let specifier = get_format_char(&env.mem, format_char_idx + 2);
+                        // 🛡️ GAMELOFT BYPASS: Safely swallow %llu, %llx, etc. without crashing.
+                        // We trick the emulator into treating them all as standard "lld".
                         format_char_idx += 2;
-                        
-                        let val: i64 = va_args.get(env);
-                        
-                        // 🛡️ GAMELOFT BYPASS: Safely handle %llu, %llx, and %llX instead of panicking!
-                        let string = match specifier {
-                            b'u' => format!("{}", val as u64),
-                            b'x' => format!("{:x}", val as u64),
-                            b'X' => format!("{:X}", val as u64),
-                            _ => format!("{}", val), // Standard 'd', 'i', or safe fallback
-                        };
-                        
-                        output.extend_from_slice(string.as_bytes());
+                        Some("lld")
                     } else {
-                        todo!("unsupported format char: l{}", get_format_char(&env.mem, format_char_idx + 1) as char);
+                        format_char_idx += 1;
+                        Some("l")
                     }
                 }
             // q seems to be an equivalent of 'll'
