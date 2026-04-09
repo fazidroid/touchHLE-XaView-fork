@@ -292,14 +292,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
-@implementation NSTimeZone: NSObject
+@implementation GCController: NSObject
+    + (id)controllers {
+        println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers");
+        crate::objc::nil
+    }
+    @end
 
-+ (id)knownTimeZoneNames {
-    println!("🛡️ GAMELOFT BYPASS: Ignored NSTimeZone knownTimeZoneNames");
-    crate::objc::nil
-}
+    @implementation NSTimeZone: NSObject
+    + (id)knownTimeZoneNames {
+        println!("🛡️ GAMELOFT BYPASS: Ignored NSTimeZone knownTimeZoneNames");
+        crate::objc::nil
+    }
+    @end
 
-};
+}; // <--- This cleanly closes the macro AFTER the @end tags!
 
 /// Window life-cycle notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
