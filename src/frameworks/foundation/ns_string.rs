@@ -300,7 +300,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSString: NSObject
 
 // 🛡️ GAMELOFT BYPASS: Simulate offline mode so the game doesn't crash trying to download data
-+ (id)stringWithContentsOfURL:(id)url encoding:(u32)enc error:(id)error {
++ (id)stringWithContentsOfURL:(id)_url encoding:(u32)_enc error:(id)_error {
     println!("🛡️ GAMELOFT BYPASS: Ignored stringWithContentsOfURL (Simulating offline mode)");
     crate::objc::nil 
 }
