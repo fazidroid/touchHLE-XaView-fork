@@ -306,7 +306,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)allocWithZone:(NSZonePtr)_zone {
-    let host_object = Box::<StringHostObject>::default();
+    // 🛠️ FIX: Safely initialize with an empty string instead of trying to use .default()
+    let host_object = Box::new(StringHostObject::Utf8(Cow::Borrowed("")));
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
