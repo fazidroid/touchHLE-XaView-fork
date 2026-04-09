@@ -317,19 +317,20 @@ fn ___strncat_chk(
     let src_len = strlen(env, src);
     let to_copy = n.min(src_len);
 
-    // Verify we aren't about to blow past the buffer size
     if current_dest_len + to_copy >= dest_len {
         panic!("🛡️ SAFETY TRIGGER: ___strncat_chk detected a buffer overflow attempt!");
     }
 
-    // 🛠️ FIX: Convert to usize for Rust indexing
     let to_copy_usize = to_copy as usize;
 
-    let dest_slice = env.mem.bytes_at_mut(dest + current_dest_len, to_copy + 1);
-    let src_slice = env.mem.bytes_at(src, to_copy);
+    // 🛠️ STEP 1: Copy src into a temporary Vec to end the immutable borrow immediately
+    let src_data = env.mem.bytes_at(src, to_copy).to_vec(); 
 
-    dest_slice[..to_copy_usize].copy_from_slice(src_slice);
-    dest_slice[to_copy_usize] = b'\0'; // Ensure it's null-terminated
+    // 🛠️ STEP 2: Now that src_data is local, we can safely borrow env.mem mutably
+    let dest_slice = env.mem.bytes_at_mut(dest + current_dest_len, to_copy + 1);
+
+    dest_slice[..to_copy_usize].copy_from_slice(&src_data);
+    dest_slice[to_copy_usize] = b'\0'; 
 
     dest
 }
