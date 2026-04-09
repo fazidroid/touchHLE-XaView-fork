@@ -281,18 +281,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
-@implementation AVAudioSession: NSObject
+@implementation AVAudioSessionDelegate: NSObject
+    @end
 
-+ (id)sharedInstance {
-    // 🛡️ GAMELOFT BYPASS: Return nil so all complex audio setup messages are safely swallowed!
-    crate::objc::nil
-}
-
-@end
-
-};
-
-@implementation GCController: NSObject
+    @implementation GCController: NSObject
     + (id)controllers {
         println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers");
         crate::objc::nil
@@ -305,7 +297,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         crate::objc::nil
     }
     @end
-};
+}; // <--- This now correctly closes the macro AFTER all implementation blocks.
 
 /// Window life-cycle notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
