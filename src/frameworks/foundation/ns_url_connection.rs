@@ -13,6 +13,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSURLConnection: NSObject
 
++ (id)sendSynchronousRequest:(id)request returningResponse:(u32)response error:(u32)error {
+    println!("🛡️ GAMELOFT BYPASS: Ignored NSURLConnection sendSynchronousRequest (Simulating offline mode)");
+    crate::objc::nil
+}
+
 + (id)connectionWithRequest:(id)request
                    delegate:(id)delegate {
     let new: id = msg![env; this alloc];
