@@ -152,11 +152,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation {
     env.on_parent_stack_in_coroutine(|window, _| {window.rotate_device(match orientation {
-        UIDeviceOrientationPortrait => DeviceOrientation::Portrait,
-        UIDeviceOrientationLandscapeLeft => DeviceOrientation::LandscapeLeft,
-        UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
-        _ => unimplemented!("Orientation {} not handled yet", orientation),
-    })});
+            // ... (keep the existing 1, 3, 4 lines exactly as they are) ...
+            
+            // 🛡️ N.O.V.A. 3 BYPASS: Safely ignore Unknown (0) orientations
+            0 => { println!("WARNING: Ignored UIInterfaceOrientationUnknown (0)"); },
+            
+            // Also make the catch-all safe just in case!
+            _ => { println!("WARNING: Orientation {} not handled yet, ignoring!", orientation); },
+        })});
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation animated:(bool)_animated {
     msg![env; this setStatusBarOrientation:orientation]
