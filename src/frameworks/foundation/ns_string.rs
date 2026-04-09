@@ -1765,10 +1765,11 @@ pub fn register_constant_strings(bin: &MachO, mem: &mut Mem, objc: &mut ObjC) {
         // See https://lists.llvm.org/pipermail/cfe-dev/2008-August/002518.html
         let (host_object, class_name) = if flags == 0x7C8 {
             // ASCII
-            let decoded = std::str::from_utf8(mem.bytes_at(bytes, length)).unwrap();
+            let raw_bytes = mem.bytes_at(bytes, length);
+            let decoded = String::from_utf8_lossy(raw_bytes).into_owned();
 
             (
-                StringHostObject::Utf8(Cow::Owned(String::from(decoded))),
+                StringHostObject::Utf8(Cow::Owned(decoded)),
                 "_touchHLE_NSString_CFConstantString_UTF8",
             )
         } else if flags == 0x7D0 {
