@@ -281,10 +281,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+@implementation AVAudioSession: NSObject
+
++ (id)sharedInstance {
+    // 🛡️ GAMELOFT BYPASS: Return nil so all complex audio setup messages are safely swallowed!
+    crate::objc::nil
+}
+
+@end
+
 };
 
 /// Window life-cycle notifications
-/// TODO: more notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
 /// Keyboard notifications
 /// TODO: more keyboard notifications
