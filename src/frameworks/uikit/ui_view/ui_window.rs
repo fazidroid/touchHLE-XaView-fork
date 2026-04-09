@@ -295,11 +295,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation GCController: NSObject
 
 + (id)controllers {
-    println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers (Simulating no gamepads connected)");
+    println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers");
     crate::objc::nil
 }
-
-@end
 
 };
 
