@@ -156,9 +156,13 @@ pub const CLASSES: ClassExports = objc_classes! {
         UIDeviceOrientationLandscapeLeft => DeviceOrientation::LandscapeLeft,
         UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
         
-        // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASS
+        // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASSES
         0 => {
-            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to Portrait for orientation 0");
+            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to Portrait for orientation 0 (Unknown)");
+            DeviceOrientation::Portrait
+        },
+        2 => {
+            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to Portrait for orientation 2 (Upside Down)");
             DeviceOrientation::Portrait
         },
         
