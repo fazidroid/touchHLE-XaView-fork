@@ -306,7 +306,7 @@ fn strlcpy(
 ) -> GuestUSize {
     GenericChar::<u8>::strlcpy(env, dst, src, size)
 }
-fn ___strncat_chk(
+fn __strncat_chk(
     env: &mut Environment,
     dest: MutPtr<u8>,
     src: ConstPtr<u8>,
@@ -318,15 +318,11 @@ fn ___strncat_chk(
     let to_copy = n.min(src_len);
 
     if current_dest_len + to_copy >= dest_len {
-        panic!("🛡️ SAFETY TRIGGER: ___strncat_chk detected a buffer overflow attempt!");
+        panic!("🛡️ SAFETY TRIGGER: __strncat_chk detected a buffer overflow attempt!");
     }
 
     let to_copy_usize = to_copy as usize;
-
-    // 🛠️ STEP 1: Copy src into a temporary Vec to end the immutable borrow immediately
     let src_data = env.mem.bytes_at(src, to_copy).to_vec(); 
-
-    // 🛠️ STEP 2: Now that src_data is local, we can safely borrow env.mem mutably
     let dest_slice = env.mem.bytes_at_mut(dest + current_dest_len, to_copy + 1);
 
     dest_slice[..to_copy_usize].copy_from_slice(&src_data);
@@ -412,7 +408,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(__strcat_chk(_, _, _)),
     export_c_func!(strncpy(_, _, _)),
     export_c_func!(__strncpy_chk(_, _, _, _)),
-    export_c_func!(___strncat_chk(_, _, _, _)),
+    export_c_func!(__strncat_chk(_, _, _, _)),
     export_c_func!(_strspn(_, _)),
     export_c_func!(strsep(_, _)),
     export_c_func!(strdup(_)),
