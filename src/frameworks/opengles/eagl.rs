@@ -263,24 +263,20 @@ pub const CLASSES: ClassExports = objc_classes! {
     // We can use the fast path where we skip composition and present directly.
     //DebugPresentPath
     log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
+    
+    // 🛡️ FIX: Removed the duplicate unclosed 'if' statement that caused the macro crash!
     if drawable == fullscreen_layer {
         log!(
             "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
             drawable,
             renderbuffer,
         );
-        // re-borrow
-    if drawable == fullscreen_layer {
         unsafe {
             present_renderbuffer(env);
         }
     } else {
         if fullscreen_layer != nil {
             log!("DEBUG_EAGL: Layer {:?} is NOT fullscreen layer {:?}. Rendering to RAM (SLOW PATH) or skipped!", drawable, fullscreen_layer);
-            // If there's a single layer that covers the screen, and this isn't
-            // it, there's no point in presenting the output because it won't be
-            // seen. Using a noisy log because it's a weird scenario and might
-            // indicate a bug.
             log!(
                 "Layer {:?} is not the fullscreen layer {:?}, skipping presentation of renderbuffer {:?}!",
                 drawable,
@@ -689,4 +685,6 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let gles = gles_boxed.as_mut();
     gles.BindTexture(gles11::TEXTURE_2D, old_texture_2d);
     gles.BindFramebufferOES(gles11::FRAMEBUFFER_OES, old_framebuffer);
+}
+
 }
