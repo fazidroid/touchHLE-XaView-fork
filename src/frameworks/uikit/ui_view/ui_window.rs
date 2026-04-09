@@ -255,42 +255,27 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())sendEvent:(id)event {
     let touches: id = msg![env; event allTouches];
     let count: u32 = msg![env; touches count];
-    
-    println!("🔥 DEBUG_WINDOW: UIWindow {:?} received sendEvent with {} touches!", this, count);
 
     if count > 0 {
         let any_touch: id = msg![env; touches anyObject];
         let phase: u32 = msg![env; any_touch phase];
-        let window_point: crate::frameworks::core_graphics::CGPoint = msg![env; any_touch locationInView:this];
         
-        println!("🔥 DEBUG_WINDOW: Touch Phase: {}, Window Point: (x: {}, y: {})", phase, window_point.x, window_point.y);
-
+        // Let the view hierarchy properly resolve the rotated touch target
+        let window_point: crate::frameworks::core_graphics::CGPoint = msg![env; any_touch locationInView:this];
         let hit_view: id = msg![env; this hitTest:window_point withEvent:event];
-        println!("🔥 DEBUG_WINDOW: hitTest returned View: {:?}", hit_view);
 
-        // 🛡️ ASPHALT 8 BYPASS: Force all touches to the EAGLView if it exists!
-        let eagl_layer = crate::frameworks::core_animation::ca_eagl_layer::find_fullscreen_eagl_layer(env);
-        if eagl_layer != crate::objc::nil {
-            let eagl_view: id = msg![env; eagl_layer delegate]; // Layer's delegate is usually the View
-            if eagl_view != crate::objc::nil {
-                let eagl_class = msg![env; eagl_view class];
-                let is_eagl = env.objc.class_has_method_named(eagl_class, "swapBuffers") || 
-                              env.objc.class_has_method_named(eagl_class, "presentRenderbuffer:");
-                
-                if is_eagl {
-                    println!("🔥 DEBUG_WINDOW: FORCING TOUCH TO EAGLVIEW: {:?}", eagl_view);
-                    // Force the touch directly to the game view based on the phase
-                    match phase {
-                        0 => { let _: () = msg![env; eagl_view touchesBegan:touches withEvent:event]; },
-                        1 => { let _: () = msg![env; eagl_view touchesMoved:touches withEvent:event]; },
-                        3 => { let _: () = msg![env; eagl_view touchesEnded:touches withEvent:event]; },
-                        4 => { let _: () = msg![env; eagl_view touchesCancelled:touches withEvent:event]; },
-                        _ => {}
-                    }
-                    return;
-                }
+        if hit_view != crate::objc::nil {
+            // Standard touch routing based on natural hit testing
+            match phase {
+                0 => { let _: () = msg![env; hit_view touchesBegan:touches withEvent:event]; },
+                1 => { let _: () = msg![env; hit_view touchesMoved:touches withEvent:event]; },
+                3 => { let _: () = msg![env; hit_view touchesEnded:touches withEvent:event]; },
+                4 => { let _: () = msg![env; hit_view touchesCancelled:touches withEvent:event]; },
+                _ => {}
             }
         }
+    }
+}
 
         if hit_view != crate::objc::nil {
             // Standard touch routing fallback
