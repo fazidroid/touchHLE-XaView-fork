@@ -157,16 +157,17 @@ pub const CLASSES: ClassExports = objc_classes! {
         UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
         
         // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASSES
+        // N.O.V.A. 3 is a landscape game, so we force its weird orientations to LandscapeRight!
         0 => {
-            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to Portrait for orientation 0 (Unknown)");
-            DeviceOrientation::Portrait
+            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeRight for orientation 0 (Unknown)");
+            DeviceOrientation::LandscapeRight
         },
         2 => {
-            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to Portrait for orientation 2 (Upside Down)");
-            DeviceOrientation::Portrait
+            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeRight for orientation 2 (Upside Down)");
+            DeviceOrientation::LandscapeRight
         },
         
-        // Original code
+        // Original code: Protects strict emulation for everything else
         _ => unimplemented!("Orientation {} not handled yet", orientation),
     })});
 }
