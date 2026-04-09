@@ -23,6 +23,7 @@ const R_OK: i32 = 4; // read permission
 
 /// SycConf name type. This alias is for readability, POSIX just uses `int`.
 type SysConfName = i32;
+const _SC_CLK_TCK: SysConfName = 3;
 const _SC_PAGESIZE: SysConfName = 29;
 const _SC_NPROCESSORS_ONLN: SysConfName = 58;
 
@@ -202,6 +203,7 @@ fn getdtablesize(_env: &mut Environment) -> i32 {
 
 fn sysconf(_env: &mut Environment, name: i32) -> i32 {
     match name {
+        _SC_CLK_TCK => 100, // ImplSysconfClock
         _SC_PAGESIZE => PAGE_SIZE.try_into().unwrap(),
         _SC_NPROCESSORS_ONLN => 1,
         _ => unimplemented!("TODO: sysconf(name: {})", name),
