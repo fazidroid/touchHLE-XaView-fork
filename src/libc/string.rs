@@ -306,6 +306,30 @@ fn strlcpy(
 ) -> GuestUSize {
     GenericChar::<u8>::strlcpy(env, dst, src, size)
 }
+fn ___strncat_chk(
+    env: &mut Environment,
+    dest: MutPtr<u8>,
+    src: ConstPtr<u8>,
+    n: GuestUSize,
+    dest_len: GuestUSize,
+) -> MutPtr<u8> {
+    let current_dest_len = strlen(env, dest.cast_const());
+    let src_len = strlen(env, src);
+    let to_copy = n.min(src_len);
+
+    // Verify we aren't about to blow past the buffer size
+    if current_dest_len + to_copy >= dest_len {
+        panic!("🛡️ SAFETY TRIGGER: ___strncat_chk detected a buffer overflow attempt!");
+    }
+
+    let dest_slice = env.mem.bytes_at_mut(dest + current_dest_len, to_copy + 1);
+    let src_slice = env.mem.bytes_at(src, to_copy);
+
+    dest_slice[..to_copy].copy_from_slice(src_slice);
+    dest_slice[to_copy] = b'\0'; // Ensure it's null-terminated
+
+    dest
+}
 
 fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> ConstPtr<u8> {
     if s.is_null() || charset.is_null() {
