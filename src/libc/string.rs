@@ -322,11 +322,14 @@ fn ___strncat_chk(
         panic!("🛡️ SAFETY TRIGGER: ___strncat_chk detected a buffer overflow attempt!");
     }
 
+    // 🛠️ FIX: Convert to usize for Rust indexing
+    let to_copy_usize = to_copy as usize;
+
     let dest_slice = env.mem.bytes_at_mut(dest + current_dest_len, to_copy + 1);
     let src_slice = env.mem.bytes_at(src, to_copy);
 
-    dest_slice[..to_copy].copy_from_slice(src_slice);
-    dest_slice[to_copy] = b'\0'; // Ensure it's null-terminated
+    dest_slice[..to_copy_usize].copy_from_slice(src_slice);
+    dest_slice[to_copy_usize] = b'\0'; // Ensure it's null-terminated
 
     dest
 }
@@ -408,8 +411,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(__strcat_chk(_, _, _)),
     export_c_func!(strncpy(_, _, _)),
     export_c_func!(__strncpy_chk(_, _, _, _)),
-    export_c_func!(___strncat_chk(_, _, _, _, _)),
-    export_c_func!(_strspn(_, _, _)),
+    export_c_func!(___strncat_chk(_, _, _, _)),
+    export_c_func!(_strspn(_, _)),
     export_c_func!(strsep(_, _)),
     export_c_func!(strdup(_)),
     export_c_func!(strcmp(_, _)),
