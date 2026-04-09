@@ -157,17 +157,14 @@ pub const CLASSES: ClassExports = objc_classes! {
         UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
         
         // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASS
-        // This only catches the '0' (Unknown) orientation that crashes NOVA 3.
-        // It provides a safe fallback without breaking the strictness of the emulator.
         0 => {
             println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to Portrait for orientation 0");
             DeviceOrientation::Portrait
         },
         
-        // Original code: Any other unhandled orientation will still crash the emulator!
+        // Original code
         _ => unimplemented!("Orientation {} not handled yet", orientation),
     })});
- }
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation animated:(bool)_animated {
     msg![env; this setStatusBarOrientation:orientation]
