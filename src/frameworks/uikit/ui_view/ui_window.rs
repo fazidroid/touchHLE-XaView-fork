@@ -245,6 +245,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let other_layer: id = msg![env; other layer];
     msg![env; this_layer convertPoint:point fromLayer:other_layer]
 }
+
 - (CGPoint)convertPoint:(CGPoint)point
              toWindow:(id)other { // UIWindow*
     let this_layer: id = msg![env; this layer];
@@ -261,14 +262,9 @@ pub const CLASSES: ClassExports = objc_classes! {
         let any_touch: id = msg![env; touches anyObject];
         let phase: u32 = msg![env; any_touch phase];
         
+        // Let the view hierarchy properly resolve the rotated touch target
         let window_point: crate::frameworks::core_graphics::CGPoint = msg![env; any_touch locationInView:this];
         let hit_view: id = msg![env; this hitTest:window_point withEvent:event];
-
-        // 🔍 EXTRACT VARIABLES SAFELY FOR RUST MACROS
-        let wp_x = window_point.x;
-        let wp_y = window_point.y;
-        
-        println!("🔥 DEBUG_ROUTING: Phase {}, Window Pt (x: {}, y: {}) -> Hit View: {:?}", phase, wp_x, wp_y, hit_view);
 
         if hit_view != crate::objc::nil {
             // Standard touch routing based on natural hit testing
@@ -279,11 +275,8 @@ pub const CLASSES: ClassExports = objc_classes! {
                 4 => { let _: () = msg![env; hit_view touchesCancelled:touches withEvent:event]; },
                 _ => {}
             }
-        } else {
-            println!("⚠️ DEBUG_ROUTING: Touch dropped! Coordinates were out of bounds or ignored.");
         }
-     }
-  }
+    }
 }
 
 @end
