@@ -287,21 +287,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     // 🛡️ GT RACING BYPASS: Fake the Audio Session
     @implementation AVAudioSession: NSObject
     + (id)sharedInstance {
-        println!("🛡️ GAMELOFT BYPASS: Ignored AVAudioSession sharedInstance");
+        // Silenced for performance
         crate::objc::nil
     }
     @end
 
     @implementation GCController: NSObject
     + (id)controllers {
-        println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers");
+        // Silenced for performance: Polled 60x a second!
         crate::objc::nil
     }
     @end
 
     @implementation NSTimeZone: NSObject
     + (id)knownTimeZoneNames {
-        println!("🛡️ GAMELOFT BYPASS: Ignored NSTimeZone knownTimeZoneNames");
+        // Silenced for performance
         crate::objc::nil
     }
     @end
