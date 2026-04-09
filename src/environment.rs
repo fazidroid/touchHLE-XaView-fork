@@ -286,7 +286,15 @@ impl Environment {
                     // This appears to be an older way set the orientation.
                     // From testing, it seems to correspond to left.
                     "UIInterfaceOrientationLandscape" => window::DeviceOrientation::LandscapeLeft,
-                    other => unimplemented!("Unsupported startup orientation: {:?}", other),
+                    // MapUpsideDownToPortrait
+                    "UIInterfaceOrientationPortraitUpsideDown" => {
+                        echo!("WARNING: UIInterfaceOrientationPortraitUpsideDown requested, falling back to Portrait");
+                        window::DeviceOrientation::Portrait
+                    }
+                    other => {
+                        echo!("CRITICAL: Unknown orientation requested: {:?}", other);
+                        unimplemented!("Unsupported startup orientation: {:?}", other)
+                    }
                 };
                 log!("App needs non-portrait user interface orientation {:?}, applying device orientation {:?}.", non_portrait_orientation, options.initial_orientation);
             }
@@ -1600,7 +1608,8 @@ impl Environment {
                     // ReturnFromBadJump
                     if pc <= 0x2000 {
                         let lr = self.cpu.regs()[cpu::Cpu::LR];
-                        echo!("WARNING: Bypassing bad jump into header at {:#010x}. Returning to LR: {:#010x}", pc, lr);
+                        let r12 = self.cpu.regs()[12];
+                        echo!("WARNING: Bypassing bad jump to {:#010x}. LR: {:#010x}, R12: {:#x}", pc, lr, r12);
                         self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
                         return ThreadNextAction::Continue;
                     }
@@ -1668,32 +1677,59 @@ impl Environment {
                     self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
-                // BypassBackgroundHangs
+                // RestoreConditionalUnwinds
                 if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
-                    echo!("WARNING: Safely unwinding background hang at {:#010x}! Thread: {}", pc, self.current_thread);
                     let fp0 = self.cpu.regs()[7];
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
-                    self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    let current_lr = self.cpu.regs()[14];
+                    // CheckNetworkModule
+                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 {
+                        echo!("WARNING: Network deadlock safely unwound at {:#010x}! LR: {:#010x}", pc, target_lr);
+                        self.cpu.regs_mut()[7] = prev_fp;
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                        self.cpu.regs_mut()[0] = 0;
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    }
                 } else if (pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
-                    // DeepParserUnwind
-                    echo!("WARNING: Deep unwinding infinite parser loop at {:#010x}! Thread: {}", pc, self.current_thread);
                     let fp0 = self.cpu.regs()[7];
                     let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
                     let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
-                    self.cpu.regs_mut()[7] = prev_fp;
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
-                    self.cpu.regs_mut()[0] = 0;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    // FilterAudioThreads
+                    if (target_lr & 0xFFFF0000) == 0x005b0000 {
+                        echo!("WARNING: Deep unwinding infinite parser loop! LR: {:#010x}", target_lr);
+                        self.cpu.regs_mut()[7] = prev_fp;
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                        self.cpu.regs_mut()[0] = 0;
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    }
                 } else if pc == 0x00c32b3c {
-                    // SafeFallbackUnwind
-                    echo!("WARNING: Bypassing stack check at {:#010x}! Thread: {}", pc, self.current_thread);
-                    self.cpu.regs_mut()[cpu::Cpu::SP] += 0x400;
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
+                    // TargetedDoubleUnwind
+                    echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
+                    let fp0 = self.cpu.regs()[7];
+                    
+                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    
+                    if fp1 > fp0 && fp1.wrapping_sub(fp0) < 0x1000 {
+                        let saved_r4: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
+                        let saved_r5: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
+                        let saved_r6: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
+                        let saved_r7: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
+                        let saved_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
+
+                        self.cpu.regs_mut()[4] = saved_r4;
+                        self.cpu.regs_mut()[5] = saved_r5;
+                        self.cpu.regs_mut()[6] = saved_r6;
+                        self.cpu.regs_mut()[7] = saved_r7;
+                        self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                        self.cpu.regs_mut()[0] = 0;
+                        
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(saved_lr | 1));
+                    } else {
+                        echo!("FATAL: Stack chain corrupted beyond fp0!");
+                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
+                    }
                 }
 
                 // PrintDebugHeartbeat

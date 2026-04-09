@@ -275,11 +275,33 @@ impl GLES for GLES1Native<'_> {
             gles11::BlendFunc(sfactor, dfactor)
         }
     }
+    unsafe fn BlendFuncSeparateOES(
+        &mut self,
+        srcRGB: GLenum,
+        dstRGB: GLenum,
+        srcAlpha: GLenum,
+        dstAlpha: GLenum,
+    ) {
+        // BlendFuncSeparateNative
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha)
+        } else {
+            gles11::BlendFunc(srcRGB, dstRGB)
+        }
+    }
     unsafe fn BlendEquationOES(&mut self, mode: GLenum) {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::BlendEquation(mode)
         } else {
             gles11::BlendEquationOES(mode)
+        }
+    }
+    unsafe fn BlendEquationSeparateOES(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
+        // BlendEqSeparateNative
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::BlendEquationSeparate(modeRGB, modeAlpha)
+        } else {
+            gles11::BlendEquationOES(modeRGB)
         }
     }
     unsafe fn ColorMask(
@@ -393,6 +415,14 @@ impl GLES for GLES1Native<'_> {
             gles11::StencilFunc(func, ref_, mask)
         }
     }
+    unsafe fn StencilFuncSeparate(&mut self, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+        // StencilFuncSeparateNative
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::StencilFuncSeparate(face, func, ref_, mask)
+        } else {
+            gles11::StencilFunc(func, ref_, mask)
+        }
+    }
     unsafe fn StencilOp(&mut self, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::StencilOp(sfail, dpfail, dppass)
@@ -400,9 +430,25 @@ impl GLES for GLES1Native<'_> {
             gles11::StencilOp(sfail, dpfail, dppass)
         }
     }
+    unsafe fn StencilOpSeparate(&mut self, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+        // StencilOpSeparateNative
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::StencilOpSeparate(face, sfail, dpfail, dppass)
+        } else {
+            gles11::StencilOp(sfail, dpfail, dppass)
+        }
+    }
     unsafe fn StencilMask(&mut self, mask: GLuint) {
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::StencilMask(mask)
+        } else {
+            gles11::StencilMask(mask)
+        }
+    }
+    unsafe fn StencilMaskSeparate(&mut self, face: GLenum, mask: GLuint) {
+        // StencilMaskSeparateNative
+        if self.is_gles2 {
+            touchHLE_gl_bindings::gles20::StencilMaskSeparate(face, mask)
         } else {
             gles11::StencilMask(mask)
         }
@@ -1535,7 +1581,7 @@ impl GLES for GLES1Native<'_> {
         gles11::UnmapBufferOES(target)
     }
 
-    unsafe fn BlendFuncSeparate(
+        unsafe fn BlendFuncSeparateOES( // <--- ADD 'OES' HERE
         &mut self, 
         sfactorRGB: GLenum, 
         dfactorRGB: GLenum, 
@@ -1543,7 +1589,6 @@ impl GLES for GLES1Native<'_> {
         dfactorAlpha: GLenum
     ) {
         if self.is_gles2 {
-            // Call the native GLES 2.0 driver function
             touchHLE_gl_bindings::gles20::BlendFuncSeparate(
                 sfactorRGB, 
                 dfactorRGB, 
@@ -1551,18 +1596,15 @@ impl GLES for GLES1Native<'_> {
                 dfactorAlpha
             );
         } else {
-            // Fallback for GLES 1.1: Standard blending
             self.BlendFunc(sfactorRGB, dfactorRGB);
         }
     }
 
-    unsafe fn BlendEquationSeparate(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
+    unsafe fn BlendEquationSeparateOES(&mut self, modeRGB: GLenum, modeAlpha: GLenum) { // <--- ADD 'OES' HERE
         if self.is_gles2 {
-            // Call the native GLES 2.0 driver function
             touchHLE_gl_bindings::gles20::BlendEquationSeparate(modeRGB, modeAlpha);
         } else {
-            // Fallback for GLES 1.1: Standard equation
-            self.BlendEquationOES(modeRGB);
+            // Unimplemented in GLES 1.1 natively
         }
     }
 }

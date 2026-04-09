@@ -18,6 +18,9 @@ use std::str::FromStr;
 
 pub mod qsort;
 
+// GlobalHackWindow
+pub static HACK_MAIN_WINDOW: std::sync::Mutex<u32> = std::sync::Mutex::new(0);
+
 #[derive(Default)]
 pub struct State {
     rand: u32,
@@ -534,6 +537,13 @@ fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoid
     }
 }
 
+fn dispatch_async(env: &mut Environment, _queue: ConstVoidPtr, block: ConstVoidPtr) {
+    // ImplDispatchAsync
+    let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
+    let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
+    env.new_thread(func, block.cast_mut(), 1024 * 1024);
+}
+
 fn SecItemCopyMatching(
     _env: &mut Environment,
     _query: ConstVoidPtr,
@@ -541,6 +551,15 @@ fn SecItemCopyMatching(
 ) -> i32 {
     // FakeSecItemNotFound
     -25300
+}
+
+fn SecItemAdd(
+    _env: &mut Environment,
+    _attributes: ConstVoidPtr,
+    _result: MutPtr<MutVoidPtr>,
+) -> i32 {
+    // FakeSecItemAdd
+    0
 }
 
 fn objc_getClass(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
@@ -573,6 +592,36 @@ fn __udivsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
         0
     } else {
         a / b
+    }
+}
+
+fn __udivmodsi4(env: &mut Environment, a: u32, b: u32, rem: MutPtr<u32>) -> u32 {
+    // ImplUdivmodsi4
+    if b == 0 {
+        if !rem.is_null() {
+            env.mem.write(rem, 0);
+        }
+        0
+    } else {
+        if !rem.is_null() {
+            env.mem.write(rem, a % b);
+        }
+        a / b
+    }
+}
+
+fn __divmodsi4(env: &mut Environment, a: i32, b: i32, rem: MutPtr<i32>) -> i32 {
+    // ImplDivmodsi4
+    if b == 0 {
+        if !rem.is_null() {
+            env.mem.write(rem, 0);
+        }
+        0
+    } else {
+        if !rem.is_null() {
+            env.mem.write(rem, a.wrapping_rem(b));
+        }
+        a.wrapping_div(b)
     }
 }
 
@@ -676,17 +725,26 @@ fn __divsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
 }
 
 fn CFUUIDCreate(_env: &mut Environment, _alloc: ConstVoidPtr) -> MutVoidPtr {
-    // FakeUUIDCreate
+    // ImplUUIDCreate
+    log!("CFUUIDCreate: returning null to safely bypass CFRelease");
     crate::mem::Ptr::null()
 }
 
 fn CFUUIDCreateString(
-    _env: &mut Environment,
+    env: &mut Environment,
     _alloc: ConstVoidPtr,
     _uuid: ConstVoidPtr,
 ) -> MutVoidPtr {
-    // FakeUUIDString
-    crate::mem::Ptr::null()
+    // ImplUUIDString
+    log!("CFUUIDCreateString: returning fake toll-free bridged NSString");
+    let uuid_str = b"12345678-1234-1234-1234-1234567890AB";
+    let cstr_ptr = env.mem.alloc_and_write_cstr(uuid_str);
+    let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
+    let sel_alloc = env.objc.lookup_selector("alloc").unwrap();
+    let sel_init = env.objc.lookup_selector("initWithUTF8String:").unwrap();
+    let alloced: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (nsstring_class, sel_alloc));
+    let string: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (alloced, sel_init, cstr_ptr.cast_const()));
+    string.cast()
 }
 
 fn class_respondsToSelector(
@@ -792,7 +850,60 @@ fn abort(env: &mut Environment) {
     }
 }
 
+fn __stack_chk_fail(env: &mut Environment) {
+    // DebugStackFailPanic
+    let fp = env.cpu.regs()[7];
+    let sp = env.cpu.regs()[13];
+    let lr = env.cpu.regs()[14];
+    let mut dump = format!("\n[DEBUG] ___stack_chk_fail triggered!\n[DEBUG] LR: {:#010x}, FP: {:#010x}, SP: {:#010x}\n[DEBUG] Stack dump:\n", lr, fp, sp);
+    let mut curr = sp;
+    while curr <= fp + 32 {
+        let val: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(curr));
+        let b = val.to_le_bytes();
+        let c0 = if b[0] >= 32 && b[0] <= 126 { b[0] as char } else { '.' };
+        let c1 = if b[1] >= 32 && b[1] <= 126 { b[1] as char } else { '.' };
+        let c2 = if b[2] >= 32 && b[2] <= 126 { b[2] as char } else { '.' };
+        let c3 = if b[3] >= 32 && b[3] <= 126 { b[3] as char } else { '.' };
+        dump.push_str(&format!("[DEBUG] {:#010x}: {:08x} | {}{}{}{}\n", curr, val, c0, c1, c2, c3));
+        curr += 4;
+    }
+    panic!("{}", dump);
+}
+
+fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
+    // FakeHost
+    if let Ok(s) = env.mem.cstr_at_utf8(name) {
+        println!("WARNING: gethostbyname called for: {}", s);
+    }
+    crate::mem::Ptr::null()
+}
+
+fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) -> i32 {
+    // FakeSyscall
+    log!("Warning: syscall({}) called with args ({:#x}, {:#x}, {:#x}). Returning -1 (ENOENT) for anti-jailbreak checks.", number, arg1, arg2, arg3);
+    crate::libc::errno::set_errno(env, 2); // ENOENT
+    -1
+}
+
+fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32 {
+    // FakeDladdr
+    0
+}
+
+fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd: ConstVoidPtr, val: MutVoidPtr, offset: i32) {
+    // ImplSetPropertyNonatomic
+    if !self_ptr.is_null() {
+        let addr = (self_ptr.to_bits() as i32 + offset) as u32;
+        let addr_ptr = crate::mem::MutPtr::<MutVoidPtr>::from_bits(addr);
+        env.mem.write(addr_ptr, val);
+    }
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(dladdr(_, _)),
+    export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
+    export_c_func!(syscall(_, _, _, _)),
+    export_c_func!(gethostbyname(_)),
     export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(__cxa_guard_acquire(_)),
     export_c_func!(__cxa_guard_release(_)),
@@ -801,6 +912,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(_Unwind_SjLj_Resume(_)),
     export_c_func!(_Unwind_SjLj_Resume_or_Rethrow(_)),
     export_c_func!(abort()),
+    export_c_func!(__stack_chk_fail()),
     export_c_func!(CFUUIDCreate(_)),
     export_c_func!(CFUUIDCreateString(_, _)),
     export_c_func!(__modsi3(_, _)),
@@ -820,13 +932,17 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(__umoddi3(_, _)),
     export_c_func!(__udivsi3(_, _)),
     export_c_func!(__umodsi3(_, _)),
+    export_c_func!(__udivmodsi4(_, _, _)),
+    export_c_func!(__divmodsi4(_, _, _)),
     export_c_func!(OSMemoryBarrier()),
     export_c_func!(class_getInstanceSize(_)),
     export_c_func!(objc_getClass(_)),
     export_c_func!(SecItemCopyMatching(_, _)),
+    export_c_func!(SecItemAdd(_, _)),
     export_c_func!(_Block_copy(_)),
     export_c_func!(_Block_release(_)),
     export_c_func!(dispatch_once(_, _)),
+    export_c_func!(dispatch_async(_, _)),
     export_c_func!(malloc(_)),
     export_c_func!(malloc_size(_)),
     export_c_func!(calloc(_, _)),

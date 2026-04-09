@@ -17,6 +17,21 @@ use crate::mem::{ConstPtr, MutVoidPtr, SafeRead};
 use crate::Environment;
 use std::any::TypeId;
 
+// StoreRootViewControllers
+static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u32, u32>>> = std::sync::Mutex::new(None);
+
+/// The core implementation of `objc_msgSend`, the main function of Objective-C.
+///
+/// Note that while only two parameters (usually receiver and selector) are
+/// defined by the wrappers over this function, a call to an `objc_msgSend`
+/// variant may have additional arguments to be forwarded (or rather, left
+/// untouched) by `objc_msgSend` when it tail-calls the method implementation it
+/// looks up. This is invisible to the Rust type system; we're relying on
+/// [crate::abi::CallFromGuest] here.
+///
+/// Similarly, the return value of `objc_msgSend` is whatever value is returned
+/// by the method implementation. We are relying on CallFromGuest not
+/// overwriting it.
 #[allow(non_snake_case)]
 fn objc_msgSend_inner(
     env: &mut Environment,
@@ -30,6 +45,12 @@ fn objc_msgSend_inner(
         selector.as_str(&env.mem),
         receiver
     );
+    // TraceAudioCalls
+    let sel_name = selector.as_str(&env.mem);
+    if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
+        println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
+    }
+    let message_type_info = env.objc.message_type_info.take();
     let message_type_info = env.objc.message_type_info.take();
 
     let sel_str = selector.as_str(&env.mem);
@@ -104,6 +125,79 @@ fn objc_msgSend_inner(
                 ..
             } = class_host_object.as_any().downcast_ref().unwrap();
 
+            // BypassMethodSelector
+            if selector.as_str(&env.mem) == "methodForSelector:" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // BypassStopLoading
+            if selector.as_str(&env.mem) == "stopLoading" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // BypassInterfaceIdiom
+            if selector.as_str(&env.mem) == "userInterfaceIdiom" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // SafeRootViewControllerHook
+            if selector.as_str(&env.mem) == "setRootViewController:" {
+                let vc: id = crate::mem::Ptr::from_bits(env.cpu.regs()[2]);
+                echo!("SafeHook: setRootViewController: Window: {:?}, VC: {:?}", receiver, vc);
+                
+                if vc != nil {
+                    let mut store_lock = ROOT_VC_STORE.lock().unwrap();
+                    if store_lock.is_none() {
+                        *store_lock = Some(std::collections::HashMap::new());
+                    }
+                    store_lock.as_mut().unwrap().insert(receiver.to_bits(), vc.to_bits());
+                    drop(store_lock);
+                    
+                    // SaveCpuState
+                    let saved_regs = env.cpu.regs().to_vec();
+                    
+                    let view: id = crate::msg![env; vc view];
+                    if view != nil {
+                        let sel_add = env.objc.lookup_selector("addSubview:").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_add, view));
+                        
+                        let sel_key = env.objc.lookup_selector("makeKeyAndVisible").unwrap();
+                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_key));
+                        
+                        *crate::libc::stdlib::HACK_MAIN_WINDOW.lock().unwrap() = receiver.to_bits();
+                    }
+                    
+                    // RestoreCpuState (Crucial for AppPicker stability)
+                    env.cpu.regs_mut().copy_from_slice(&saved_regs);
+                }
+                
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // FakeRootViewGetter
+            if selector.as_str(&env.mem) == "rootViewController" {
+                let mut vc_bits = 0;
+                if let Some(store) = ROOT_VC_STORE.lock().unwrap().as_ref() {
+                    vc_bits = store.get(&receiver.to_bits()).copied().unwrap_or(0);
+                }
+                echo!("WARNING: Hooked rootViewController! Returning {:#x}", vc_bits);
+                env.cpu.regs_mut()[0] = vc_bits;
+                env.cpu.regs_mut()[1] = 0;
+                return;
+            }
+            // BypassTimeZone
+            if selector.as_str(&env.mem) == "defaultTimeZone" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // BypassWebViewJS
+            if selector.as_str(&env.mem) == "stringByEvaluatingJavaScriptFromString:" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
+            panic!(
+                "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
             // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
             // Instead of crashing the emulator when a method is missing, we safely print a warning and return 0 (nil).
             // This instantly bypasses EVERY missing ad network and tracking method Gameloft throws at us!
@@ -212,6 +306,38 @@ fn objc_msgSend_inner(
             is_metaclass,
         }) = host_object.as_any().downcast_ref()
         {
+            // BypassGKSession
+            if name == "GKSession" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // FakeAccessoryManager
+            if name == "EAAccessoryManager" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // BypassMailCompose
+            if name == "MFMailComposeViewController" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // BypassMessageCompose
+            if name == "MFMessageComposeViewController" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // FakeAdManager
+            if name == "ASIdentifierManager" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // BypassTextTokenizer
+            if name == "UITextInputStringTokenizer" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            panic!(
+                "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
             // ===== THE NUCLEAR OPTION: GLOBAL CLASS PANIC BYPASS =====
             log!(
                 "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",

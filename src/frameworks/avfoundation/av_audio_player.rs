@@ -85,6 +85,8 @@ pub const CLASSES: ClassExports = objc_classes! {
                       error:(MutPtr<id>)outError { // NSError**
     let path: id = msg![env; url path];
     let path_str = ns_string::to_rust_string(env, path);
+    // TraceAvAudioInit
+    println!("AUDIO_TRACE: AVAudioPlayer initWithContentsOfURL: {}", path_str);
     log_dbg!("[(AVAudioPlayer*){:?} initWithContentsOfURL:{:?} {} outError:{:?}]", this, url, path_str, outError);
 
     retain(env, url);
