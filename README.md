@@ -22,6 +22,8 @@ Audi RS3: 1.0.0, 1.0.1 (Missing buttons, screens, textures)
 
 =Retina and its scaling support
 
+=Asphalt Overdrive (IOS 6.0) 1.0.2 ver support  🕐
+
 =Asphalt 8 (IOS 5.0 Only) support: 🕐
 
 =Asphalt 7 (IOS 4.0-5.0) support: ✅
