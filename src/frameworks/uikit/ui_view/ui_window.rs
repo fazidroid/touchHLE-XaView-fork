@@ -246,12 +246,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this_layer convertPoint:point fromLayer:other_layer]
 }
 - (CGPoint)convertPoint:(CGPoint)point
-               toWindow:(id)other { // UIWindow*
+             toWindow:(id)other { // UIWindow*
     let this_layer: id = msg![env; this layer];
     // Resolves to nil if other is nil.
     let other_layer: id = msg![env; other layer];
     msg![env; this_layer convertPoint:point toLayer:other_layer]
 }
+
 - (())sendEvent:(id)event {
     let touches: id = msg![env; event allTouches];
     let count: u32 = msg![env; touches count];
@@ -266,19 +267,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
         if hit_view != crate::objc::nil {
             // Standard touch routing based on natural hit testing
-            match phase {
-                0 => { let _: () = msg![env; hit_view touchesBegan:touches withEvent:event]; },
-                1 => { let _: () = msg![env; hit_view touchesMoved:touches withEvent:event]; },
-                3 => { let _: () = msg![env; hit_view touchesEnded:touches withEvent:event]; },
-                4 => { let _: () = msg![env; hit_view touchesCancelled:touches withEvent:event]; },
-                _ => {}
-            }
-        }
-    }
-}
-
-        if hit_view != crate::objc::nil {
-            // Standard touch routing fallback
             match phase {
                 0 => { let _: () = msg![env; hit_view touchesBegan:touches withEvent:event]; },
                 1 => { let _: () = msg![env; hit_view touchesMoved:touches withEvent:event]; },
