@@ -292,10 +292,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
-@implementation GCController: NSObject
+@implementation NSTimeZone: NSObject
 
-+ (id)controllers {
-    println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers");
++ (id)knownTimeZoneNames {
+    println!("🛡️ GAMELOFT BYPASS: Ignored NSTimeZone knownTimeZoneNames");
     crate::objc::nil
 }
 
