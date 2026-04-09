@@ -331,6 +331,21 @@ fn ___strncat_chk(
     dest
 }
 
+fn _strspn(env: &mut Environment, s: ConstPtr<u8>, accept: ConstPtr<u8>) -> GuestUSize {
+    let s_slice = env.mem.cstr_at(s);
+    let accept_slice = env.mem.cstr_at(accept);
+    
+    let mut count = 0;
+    for &byte in s_slice {
+        if accept_slice.contains(&byte) {
+            count += 1;
+        } else {
+            break;
+        }
+    }
+    count as GuestUSize
+}
+
 fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> ConstPtr<u8> {
     if s.is_null() || charset.is_null() {
         return Ptr::null();
