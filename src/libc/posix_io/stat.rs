@@ -71,7 +71,10 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
             }
             s
         },
-        Err(_) => return 0,
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return 0;
+        }
     };
 
     // TODO: respect the mode
@@ -88,6 +91,12 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
                 mode,
                 err
             );
+            match err {
+                FsError::AlreadyExist => set_errno(env, EEXIST),
+                FsError::NonexistentParentDir => set_errno(env, ENOENT),
+                FsError::ReadonlyParentDir => set_errno(env, EACCES),
+                _ => (),
+            };
             // FakeSuccessOnFail
             0
         }
