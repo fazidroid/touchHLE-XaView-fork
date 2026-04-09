@@ -63,7 +63,14 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let path_str = env.mem.cstr_at_utf8(path).unwrap();
+    // BypassMkdirUnwrap
+    let path_str = match env.mem.cstr_at_utf8(path) {
+        Ok(s) => s,
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return -1;
+        }
+    };
     // TODO: respect the mode
     match env.fs.create_dir(GuestPath::new(&path_str)) {
         Ok(()) => {
