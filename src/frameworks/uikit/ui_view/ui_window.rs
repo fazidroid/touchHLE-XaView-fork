@@ -305,8 +305,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         crate::objc::nil
     }
     @end
-
-}; // <--- This cleanly closes the macro AFTER the @end tags!
+};
 
 /// Window life-cycle notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
