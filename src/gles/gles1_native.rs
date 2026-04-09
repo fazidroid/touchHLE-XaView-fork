@@ -1581,7 +1581,7 @@ impl GLES for GLES1Native<'_> {
         gles11::UnmapBufferOES(target)
     }
 
-    unsafe fn BlendFuncSeparate(
+        unsafe fn BlendFuncSeparateOES( // <--- ADD 'OES' HERE
         &mut self, 
         sfactorRGB: GLenum, 
         dfactorRGB: GLenum, 
@@ -1589,7 +1589,6 @@ impl GLES for GLES1Native<'_> {
         dfactorAlpha: GLenum
     ) {
         if self.is_gles2 {
-            // Call the native GLES 2.0 driver function
             touchHLE_gl_bindings::gles20::BlendFuncSeparate(
                 sfactorRGB, 
                 dfactorRGB, 
@@ -1597,18 +1596,15 @@ impl GLES for GLES1Native<'_> {
                 dfactorAlpha
             );
         } else {
-            // Fallback for GLES 1.1: Standard blending
             self.BlendFunc(sfactorRGB, dfactorRGB);
         }
     }
 
-    unsafe fn BlendEquationSeparate(&mut self, modeRGB: GLenum, modeAlpha: GLenum) {
+    unsafe fn BlendEquationSeparateOES(&mut self, modeRGB: GLenum, modeAlpha: GLenum) { // <--- ADD 'OES' HERE
         if self.is_gles2 {
-            // Call the native GLES 2.0 driver function
             touchHLE_gl_bindings::gles20::BlendEquationSeparate(modeRGB, modeAlpha);
         } else {
-            // Fallback for GLES 1.1: Standard equation
-            self.BlendEquationOES(modeRGB);
+            // Unimplemented in GLES 1.1 natively
         }
     }
 }
