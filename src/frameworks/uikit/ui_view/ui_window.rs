@@ -284,6 +284,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation AVAudioSessionDelegate: NSObject
     @end
 
+    // 🛡️ GT RACING BYPASS: Fake the Audio Session
+    @implementation AVAudioSession: NSObject
+    + (id)sharedInstance {
+        println!("🛡️ GAMELOFT BYPASS: Ignored AVAudioSession sharedInstance");
+        crate::objc::nil
+    }
+    @end
+
     @implementation GCController: NSObject
     + (id)controllers {
         println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers");
