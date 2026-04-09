@@ -987,7 +987,19 @@ fn times(env: &mut Environment, buf: MutVoidPtr) -> i32 {
     0
 }
 
+fn kqueue(_env: &mut Environment) -> i32 {
+    // FakeKqueue
+    999
+}
+
+fn kevent(_env: &mut Environment, _kq: i32, _changelist: ConstVoidPtr, _nchanges: i32, _eventlist: MutVoidPtr, _nevents: i32, _timeout: ConstVoidPtr) -> i32 {
+    // FakeKevent
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(kqueue()),
+    export_c_func!(kevent(_, _, _, _, _, _)),
     export_c_func!(CGColorGetComponents(_)),
     export_c_func!(CGContextAddLineToPoint(_, _, _)),
     export_c_func!(CGContextBeginPath(_)),
