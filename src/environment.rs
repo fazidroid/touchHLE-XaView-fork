@@ -1610,20 +1610,17 @@ impl Environment {
                         let lr = self.cpu.regs()[cpu::Cpu::LR];
                         let r12 = self.cpu.regs()[12];
                         echo!("WARNING: Bypassing bad jump to {:#010x}. LR: {:#010x}, R12: {:#x}", pc, lr, r12);
-                        let mut fp = self.cpu.regs()[7];
+                        // BypassDrmCrash
+                        let sp = self.cpu.regs()[cpu::Cpu::SP];
                         let mut safe_lr = lr;
-                        for _ in 0..30 {
-                            if fp == 0 { break; }
-                            let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp));
-                            let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp + 4));
-                            if target_lr > 0x2000 && target_lr < 0x10000000 {
-                                self.cpu.regs_mut()[7] = prev_fp;
-                                self.cpu.regs_mut()[cpu::Cpu::SP] = fp + 8;
+                        for offset in (0..0x800).step_by(4) {
+                            let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(sp + offset));
+                            if target_lr > 0x2000 && target_lr < 0x02000000 {
+                                self.cpu.regs_mut()[cpu::Cpu::SP] = sp + offset + 4;
                                 self.cpu.regs_mut()[0] = 0;
                                 safe_lr = target_lr;
                                 break;
                             }
-                            fp = prev_fp;
                         }
                         self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(safe_lr));
                         return ThreadNextAction::Continue;
