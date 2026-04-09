@@ -292,6 +292,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
+@implementation GCController: NSObject
+
++ (id)controllers {
+    println!("🛡️ GAMELOFT BYPASS: Ignored GCController controllers (Simulating no gamepads connected)");
+    crate::objc::nil
+}
+
+@end
+
 /// Window life-cycle notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
 /// Keyboard notifications
