@@ -299,6 +299,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 // For the time being, that will always be _touchHLE_NSString.
 @implementation NSString: NSObject
 
+// 🛡️ GAMELOFT BYPASS: Simulate offline mode so the game doesn't crash trying to download data
++ (id)stringWithContentsOfURL:(id)url encoding:(u32)enc error:(id)error {
+    println!("🛡️ GAMELOFT BYPASS: Ignored stringWithContentsOfURL (Simulating offline mode)");
+    crate::objc::nil 
+}
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::<StringHostObject>::default();
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
 + (id)allocWithZone:(NSZonePtr)zone {
     // NSString might be subclassed by something which needs allocWithZone:
     // to have the normal behaviour. Unimplemented: call superclass alloc then.
