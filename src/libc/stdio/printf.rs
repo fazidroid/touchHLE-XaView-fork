@@ -133,14 +133,26 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'l' => {
-                format_char_idx += 1;
-                if get_format_char(&env.mem, format_char_idx) == b'l' {
-                    format_char_idx += 1;
-                    Some("ll")
-                } else {
-                    Some("l")
+                    if get_format_char(&env.mem, format_char_idx + 1) == b'l' {
+                        // it's an 8-byte integer
+                        let specifier = get_format_char(&env.mem, format_char_idx + 2);
+                        format_char_idx += 2;
+                        
+                        let val: i64 = va_args.get(env);
+                        
+                        // 🛡️ GAMELOFT BYPASS: Safely handle %llu, %llx, and %llX instead of panicking!
+                        let string = match specifier {
+                            b'u' => format!("{}", val as u64),
+                            b'x' => format!("{:x}", val as u64),
+                            b'X' => format!("{:X}", val as u64),
+                            _ => format!("{}", val), // Standard 'd', 'i', or safe fallback
+                        };
+                        
+                        output.extend_from_slice(string.as_bytes());
+                    } else {
+                        todo!("unsupported format char: l{}", get_format_char(&env.mem, format_char_idx + 1) as char);
+                    }
                 }
-            }
             // q seems to be an equivalent of 'll'
             // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
             b'q' => {
