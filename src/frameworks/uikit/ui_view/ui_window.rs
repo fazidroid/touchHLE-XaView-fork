@@ -301,6 +301,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+};
+
 /// Window life-cycle notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
 /// Keyboard notifications
