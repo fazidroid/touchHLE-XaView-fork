@@ -906,14 +906,6 @@ fn __stack_chk_fail(env: &mut Environment) {
     panic!("{}", dump);
 }
 
-fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
-    // FakeHost
-    if let Ok(s) = env.mem.cstr_at_utf8(name) {
-        println!("WARNING: gethostbyname called for: {}", s);
-    }
-    crate::mem::Ptr::null()
-}
-
 fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) -> i32 {
     // FakeSyscall
     log!("Warning: syscall({}) called with args ({:#x}, {:#x}, {:#x}). Returning -1 (ENOENT) for anti-jailbreak checks.", number, arg1, arg2, arg3);
@@ -1076,7 +1068,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
     export_c_func!(setrlimit(_, _)),
     export_c_func!(syscall(_, _, _, _)),
-    export_c_func!(gethostbyname(_)),
     export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(__cxa_guard_acquire(_)),
     export_c_func!(__cxa_guard_release(_)),
