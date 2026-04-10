@@ -45,7 +45,7 @@ impl DeviceFamily {
     pub fn portrait_size(&self) -> (u32, u32) {
         match self {
             DeviceFamily::iPhone => (320, 480),
-            DeviceFamily::iPhone5 => (640, 1136), // 🏎️ 16:9 aspect ratio!
+            DeviceFamily::iPhone5 => (320, 536), // 🏎️ 16:9 aspect ratio!
             DeviceFamily::iPad => (768, 1024),
         }
     }
