@@ -23,7 +23,7 @@ homepage = { workspace = true }
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "touchHLE"
+name = "touchHLE_app" # FixPdbCollision
 path = "src/bin.rs"
 
 [features]
