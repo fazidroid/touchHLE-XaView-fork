@@ -70,7 +70,7 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
                 return 0;
             }
             s
-        },
+        }
         Err(_) => {
             set_errno(env, ENOENT);
             return 0;
