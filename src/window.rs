@@ -255,27 +255,59 @@ impl Window {
         env::consts::OS == "android"
     }
 
-            pub fn new(
+        pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
         options: &Options,
     ) -> Window {
-        // TEMPORARY OVERRIDE FOR TESTING (Since we can't easily pass args on Android yet)
+        // TEMPORARY OVERRIDE FOR TESTING 
         let mut options_clone = options.clone();
         options_clone.use_angle = true;
         options_clone.use_turnip = true;
         let options = &options_clone;
 
+        // 🏎️ CRITICAL FIX: We MUST set the environment variables BEFORE SDL initializes!
+        if env::consts::OS == "android" {
+            let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
+
+            if options.use_turnip {
+                std::env::set_var("VK_ICD_FILENAMES", format!("{}libvulkan_freedreno.so", lib_dir));
+                std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
+                std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
+            }
+
+            if options.use_angle {
+                // Force SDL's underlying C library to load our custom ANGLE files instead of system files
+                std::env::set_var("SDL_VIDEO_EGL_DRIVER", format!("{}libEGL_angle.so", lib_dir));
+                if options.gles_version == 2 {
+                    std::env::set_var("SDL_VIDEO_GL_DRIVER", format!("{}libGLESv2_angle.so", lib_dir));
+                } else {
+                    std::env::set_var("SDL_VIDEO_GL_DRIVER", format!("{}libGLESv1_CM_angle.so", lib_dir));
+                }
+            }
+        }
+
+        // NOW we can safely initialize SDL, and it will be forced to use the files we just specified
         let sdl_ctx = sdl2::init().unwrap();
         let video_ctx = sdl_ctx.video().unwrap();
 
-        // The "hidapi" feature of rust-sdl2 is enabled so that sdl2::sensor
-        // is available, but we don't want to enable SDL's HIDAPI controller
-        // drivers because they cause duplicated controllers on macOS
-        // (https://github.com/libsdl-org/SDL/issues/7479).
-        // Once that's fixed, remove this (https://github.com/touchHLE/touchHLE/issues/85).
-        sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");        
+        sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");
+
+        if env::consts::OS == "android" {
+            // Standard OpenGL context setup
+            let attr = video_ctx.gl_attr();
+            if options.gles_version == 2 {
+                attr.set_context_version(2, 0);
+            } else {
+                attr.set_context_version(1, 1);
+            }
+            attr.set_context_profile(sdl2::video::GLProfile::GLES);
+            sdl2::hint::set("SDL_ANDROID_BLOCK_ON_PAUSE", "0");
+        }
+
+        // Separate mouse and touch events
+        sdl2::hint::set("SDL_TOUCH_MOUSE_EVENTS", "0");        
 
         if env::consts::OS == "android" {
             // 🏎️ THE TURNIP HACK: Force Vulkan to use our custom Freedreno driver
