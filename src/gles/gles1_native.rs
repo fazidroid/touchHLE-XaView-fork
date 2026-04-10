@@ -415,7 +415,13 @@ impl GLES for GLES1Native<'_> {
             gles11::StencilFunc(func, ref_, mask)
         }
     }
-    unsafe fn StencilFuncSeparate(&mut self, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+    unsafe fn StencilFuncSeparate(
+        &mut self,
+        face: GLenum,
+        func: GLenum,
+        ref_: GLint,
+        mask: GLuint,
+    ) {
         // StencilFuncSeparateNative
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::StencilFuncSeparate(face, func, ref_, mask)
@@ -430,7 +436,13 @@ impl GLES for GLES1Native<'_> {
             gles11::StencilOp(sfail, dpfail, dppass)
         }
     }
-    unsafe fn StencilOpSeparate(&mut self, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+    unsafe fn StencilOpSeparate(
+        &mut self,
+        face: GLenum,
+        sfail: GLenum,
+        dpfail: GLenum,
+        dppass: GLenum,
+    ) {
         // StencilOpSeparateNative
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::StencilOpSeparate(face, sfail, dpfail, dppass)
