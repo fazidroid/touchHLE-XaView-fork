@@ -33,6 +33,7 @@ use std::time::{Duration, Instant};
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum DeviceFamily {
     iPhone,
+    iPhone5, // 🏎️ NEW: Widescreen iPhone support!
     iPad,
 }
 impl std::fmt::Display for DeviceFamily {
@@ -44,6 +45,7 @@ impl DeviceFamily {
     pub fn portrait_size(&self) -> (u32, u32) {
         match self {
             DeviceFamily::iPhone => (320, 480),
+            DeviceFamily::iPhone5 => (640, 1136), // 🏎️ 16:9 aspect ratio!
             DeviceFamily::iPad => (768, 1024),
         }
     }
@@ -54,6 +56,7 @@ impl TryFrom<u64> for DeviceFamily {
         match value {
             1 => Ok(DeviceFamily::iPhone),
             2 => Ok(DeviceFamily::iPad),
+            5 => Ok(DeviceFamily::iPhone5), 
             _ => Err(()),
         }
     }
@@ -63,6 +66,7 @@ impl TryFrom<&str> for DeviceFamily {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "iphone" => Ok(DeviceFamily::iPhone),
+            "iphone5" => Ok(DeviceFamily::iPhone5),
             "ipad" => Ok(DeviceFamily::iPad),
             _ => Err(()),
         }
