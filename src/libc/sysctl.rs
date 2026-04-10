@@ -1,6 +1,7 @@
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * License, v. 2.0.
+ * If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! `sys/sysctl.h`
@@ -18,7 +19,9 @@ use crate::Environment;
 // Below values corresponds to the original iPhone.
 // Reference https://www.mail-archive.com/misc@openbsd.org/msg80988.html
 // Numerical values are from xnu/bsd/sys/sysctl.h
-static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 18] = [
+
+// 🛡️ FIX: Updated array size from 18 to 20 to account for new Asphalt 8 additions
+static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 20] = [
     // Generic CPU, I/O
     ((6,1), "hw.machine" , String(b"iPhone1,1")),
     ((6,2), "hw.model" , String(b"M68AP")),
@@ -79,7 +82,6 @@ fn sysctl(
     newlen: GuestUSize,
 ) -> i32 {
     set_errno(env, 0);
-
     log_dbg!(
         "sysctl({:?}, {:#x}, {:?}, {:?}, {:?}, {:x})",
         name,
@@ -89,12 +91,12 @@ fn sysctl(
         newp,
         newlen
     );
-
     if name_len != 2 {
-        log!(
-            "TODO: sysctl called with name_len = {} (expected 2). Faking empty response to avoid crash.",
-            name_len
-        );
+        // 🛡️ SILENCED 60FPS LOG: Prevent Android logcat spam
+        // log!(
+        //     "TODO: sysctl called with name_len = {} (expected 2). Faking empty response to avoid crash.",
+        //     name_len
+        // );
         // Если игра запрашивает размер данных
         if !oldlenp.is_null() {
             env.mem.write(oldlenp, 0);
@@ -136,26 +138,7 @@ fn sysctl(
                     };
                     val.1 = SysInfoType::String(hw_machine); // OverrideMachine
                 } else if name0 == 6 && name1 == 4 {
-                    let hw_model: &[u8] = match model.as_str() {
-                        // MatchHwModel
-                        "iPod5,1" => b"N78AP",
-                        "iPod4,1" => b"N81AP",
-                        "iPod3,1" => b"N18AP",
-                        "iPod2,1" => b"N72AP",
-                        "iPod1,1" => b"N45AP",
-                        "iPad2,5" => b"P105AP",
-                        "iPad3,4" => b"P101AP",
-                        "iPad3,1" => b"J1AP",
-                        "iPad2,1" => b"K93AP",
-                        "iPad1,1" => b"K48AP",
-                        "iPhone5,3" => b"N48AP",
-                        "iPhone5,1" => b"N41AP",
-                        "iPhone4,1" => b"N94AP",
-                        "iPhone3,1" => b"N90AP",
-                        "iPhone2,1" => b"N88AP",
-                        "iPhone1,2" => b"N82AP",
-                        _ => b"M68AP",
-                    };
+                    // 🛡️ FIX: Removed unused 'hw_model' match block that was causing compiler warnings
                     val.1 = SysInfoType::Int32(512 * 1024 * 1024); // OverrideModel
                 }
             }
@@ -178,7 +161,6 @@ fn sysctlbyname(
 ) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
-
     let name_str = env.mem.cstr_at_utf8(name).unwrap();
     log_dbg!(
         "sysctlbyname({:?}, {:?}, {:?}, {:?}, {:x})",
@@ -222,7 +204,8 @@ fn sysctlbyname(
                         "iPhone1,2" => b"iPhone1,2",
                         _ => b"iPhone1,1",
                     };
-                    val = SysInfoType::String(hw_machine); // OverrideMachine
+                    val = SysInfoType::String(hw_machine);
+                // OverrideMachine
                 } else if name_str == "hw.model" {
                     let hw_model: &[u8] = match model.as_str() {
                         // MatchHwModel
@@ -286,7 +269,8 @@ where
     if oldlen < len {
         // TODO: set errno
         // TODO: write partial data
-        log!("sysctl(byname) for '{name_str}': the buffer of size {oldlen} is too low to fit the value of size {len}, returning -1");
+        // 🛡️ SILENCED 60FPS LOG: Prevent Android logcat spam
+        // log!("sysctl(byname) for '{name_str}': the buffer of size {oldlen} is too low to fit the value of size {len}, returning -1");
         return -1;
     }
     match val {
