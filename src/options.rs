@@ -63,6 +63,8 @@ pub struct Options {
     pub dumping_file: PathBuf,
     pub ignore_gl_errors: bool,
     pub gles_version: u32,
+    pub use_angle: bool,
+    pub use_turnip: bool,
 }
 
 impl Default for Options {
@@ -97,6 +99,8 @@ impl Default for Options {
             dumping_file: crate::paths::user_data_base_path().join("DUMP.txt"),
             ignore_gl_errors: false,
             gles_version: 2, // DefaultEsVer
+            use_angle: false,
+            use_turnip: false,
         }
     }
 }

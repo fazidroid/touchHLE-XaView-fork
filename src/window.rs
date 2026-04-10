@@ -255,7 +255,7 @@ impl Window {
         env::consts::OS == "android"
     }
 
-        pub fn new(
+            pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
@@ -268,14 +268,14 @@ impl Window {
         let options = &options_clone;
 
         let sdl_ctx = sdl2::init().unwrap();
-        // ... rest of the window.rs code ...
+        let video_ctx = sdl_ctx.video().unwrap();
 
         // The "hidapi" feature of rust-sdl2 is enabled so that sdl2::sensor
         // is available, but we don't want to enable SDL's HIDAPI controller
         // drivers because they cause duplicated controllers on macOS
         // (https://github.com/libsdl-org/SDL/issues/7479).
         // Once that's fixed, remove this (https://github.com/touchHLE/touchHLE/issues/85).
-        sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");
+        sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");        
 
         if env::consts::OS == "android" {
             // 🏎️ THE TURNIP HACK: Force Vulkan to use our custom Freedreno driver
