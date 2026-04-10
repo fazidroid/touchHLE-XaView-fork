@@ -266,7 +266,7 @@ impl Window {
         options_clone.use_angle = true;
         // options_clone.use_turnip = true; 
         
-        // 🏎️ ASPHALT 8 HACK: Force the emulator to spoof an iPhone 5!
+                // 🏎️ ASPHALT 8 HACK: Force the emulator to spoof an iPhone 5!
         options_clone.device_model = Some("iPhone5,1".to_string());
         
         let options = &options_clone;
@@ -278,6 +278,15 @@ impl Window {
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
             }
+            if options.use_turnip {
+                // Vulkan REQUIRES the absolute path to load custom ICD drivers!
+                let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
+                std::env::set_var("VK_ICD_FILENAMES", format!("{}libvulkan_freedreno.so", lib_dir));
+                
+                std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
+                std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
+            }
+            
 
             if options.use_angle {
                 // Bare filenames only! Android will find them in jniLibs.
