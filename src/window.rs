@@ -255,14 +255,20 @@ impl Window {
         env::consts::OS == "android"
     }
 
-    pub fn new(
+        pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
         options: &Options,
     ) -> Window {
+        // TEMPORARY OVERRIDE FOR TESTING (Since we can't easily pass args on Android yet)
+        let mut options_clone = options.clone();
+        options_clone.use_angle = true;
+        options_clone.use_turnip = true;
+        let options = &options_clone;
+
         let sdl_ctx = sdl2::init().unwrap();
-        let video_ctx = sdl_ctx.video().unwrap();
+        // ... rest of the window.rs code ...
 
         // The "hidapi" feature of rust-sdl2 is enabled so that sdl2::sensor
         // is available, but we don't want to enable SDL's HIDAPI controller
@@ -290,12 +296,14 @@ impl Window {
                 "vulkan_synchronous_submit,flush_after_ending_render_pass"
             );
 
-            // 🏎️ FORCE ANGLE TRANSLATION
-            // Tell SDL2 to load our bundled ANGLE libraries using the correct Rust method
+                        // 🏎️ FORCE ANGLE TRANSLATION
+            // Give Android the ABSOLUTE path to the extracted JNI libraries
+            let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
+            
             if options.gles_version == 2 {
-                let _ = video_ctx.gl_load_library("libGLESv2_angle.so");
+                let _ = video_ctx.gl_load_library(format!("{}libGLESv2_angle.so", lib_dir).as_str());
             } else {
-                let _ = video_ctx.gl_load_library("libGLESv1_CM_angle.so");
+                let _ = video_ctx.gl_load_library(format!("{}libGLESv1_CM_angle.so", lib_dir).as_str());
             }
 
             // Standard OpenGL context setup
