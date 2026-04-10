@@ -267,30 +267,29 @@ impl Window {
         options_clone.use_turnip = true;
         let options = &options_clone;
 
-        // 🏎️ CRITICAL FIX: We MUST set the environment variables BEFORE SDL initializes!
+                // 🏎️ CRITICAL FIX: Set environment variables BEFORE SDL initializes!
         if env::consts::OS == "android" {
-            let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
-
             if options.use_turnip {
-                std::env::set_var("VK_ICD_FILENAMES", format!("{}libvulkan_freedreno.so", lib_dir));
+                std::env::set_var("VK_ICD_FILENAMES", "libvulkan_freedreno.so");
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
             }
 
             if options.use_angle {
-                // Force SDL's underlying C library to load our custom ANGLE files instead of system files
-                std::env::set_var("SDL_VIDEO_EGL_DRIVER", format!("{}libEGL_angle.so", lib_dir));
+                // Bare filenames only! Android will find them in jniLibs.
+                std::env::set_var("SDL_VIDEO_EGL_DRIVER", "libEGL_angle.so"); 
+                
                 if options.gles_version == 2 {
-                    std::env::set_var("SDL_VIDEO_GL_DRIVER", format!("{}libGLESv2_angle.so", lib_dir));
+                    std::env::set_var("SDL_VIDEO_GL_DRIVER", "libGLESv2_angle.so");
                 } else {
-                    std::env::set_var("SDL_VIDEO_GL_DRIVER", format!("{}libGLESv1_CM_angle.so", lib_dir));
+                    std::env::set_var("SDL_VIDEO_GL_DRIVER", "libGLESv1_CM_angle.so");
                 }
             }
         }
 
-        // NOW we can safely initialize SDL, and it will be forced to use the files we just specified
+        // Initialize SDL2 AFTER the driver variables are set
         let sdl_ctx = sdl2::init().unwrap();
-        let video_ctx = sdl_ctx.video().unwrap();
+        let video_ctx = sdl_ctx.video().unwrap();        
 
         sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");
 
