@@ -373,10 +373,16 @@ impl Window {
         // here, and then the app can disable it if it wants to.
         video_ctx.enable_screen_saver();
 
-        let scale_hack = options.scale_hack;
+                let scale_hack = options.scale_hack;
         // TODO: some apps specify their orientation in Info.plist, we could use
         // that here.
-        let device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
+        let mut device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
+        
+        // 🏎️ DYNAMIC SCREEN HACK: If we are spoofing an iPhone 5, auto-upgrade to 16:9!
+        if options.device_model.as_deref().unwrap_or("").starts_with("iPhone5") {
+            device_family = DeviceFamily::iPhone5;
+        }
+        
         let device_orientation = options.initial_orientation;
         let fullscreen = options.fullscreen;
 
