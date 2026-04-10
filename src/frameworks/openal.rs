@@ -218,7 +218,10 @@ fn alcCreateContext(
     let guest_res = env.mem.alloc_and_write(GuestALCcontext { _filler: 0 });
 
     // TraceAlcCreateContext
-    println!("AUDIO_TRACE: alcCreateContext({:?}) => {:?}", device, guest_res);
+    println!(
+        "AUDIO_TRACE: alcCreateContext({:?}) => {:?}",
+        device, guest_res
+    );
 
     log_dbg!(
         "alcCreateContext({:?}, NULL) => {:?} (host: {:?})",
@@ -265,7 +268,10 @@ fn alcMakeContextCurrent(env: &mut Environment, context: MutPtr<GuestALCcontext>
         false
     };
     // TraceAlcMakeCurrent
-    println!("AUDIO_TRACE: alcMakeContextCurrent({:?}) => {}", context, res);
+    println!(
+        "AUDIO_TRACE: alcMakeContextCurrent({:?}) => {}",
+        context, res
+    );
     log_dbg!("alcMakeContextCurrent({:?}) => {}", context, res);
     res
 }
@@ -713,7 +719,10 @@ fn alBufferData(
     samplerate: ALsizei,
 ) {
     // TraceAlBufferData
-    println!("AUDIO_TRACE: alBufferData(buffer: {}, format: {:#x}, size: {}, samplerate: {})", buffer, format, size, samplerate);
+    println!(
+        "AUDIO_TRACE: alBufferData(buffer: {}, format: {:#x}, size: {}, samplerate: {})",
+        buffer, format, size, samplerate
+    );
     let size_usize: GuestUSize = size.try_into().unwrap();
     let data_ptr: *const ALvoid = if data.is_null() {
         std::ptr::null()
