@@ -137,10 +137,10 @@ fn sysctl(
                         _ => b"M68AP",
                     };
                     val.1 = SysInfoType::String(hw_machine); // OverrideMachine
-                } else if name0 == 6 && name1 == 4 {
-                    // 🛡️ FIX: Removed unused 'hw_model' match block that was causing compiler warnings
-                    val.1 = SysInfoType::Int32(512 * 1024 * 1024); // OverrideModel
-                }
+                                } else if name0 == 6 && name1 == 4 {
+                    // 🏎️ UPGRADE: 1GB of RAM for Asphalt 8 support!
+                    val.1 = SysInfoType::Int32(1024 * 1024 * 1024); // OverrideModel
+                }                
             }
             val
         },
