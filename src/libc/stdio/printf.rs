@@ -66,14 +66,14 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             false
         };
 
-        if get_format_char(&env.mem, format_char_idx) == b'#' {
-            // Alternative form handling
+        // BypassAltFormPanic
+        let alternative_form = if get_format_char(&env.mem, format_char_idx) == b'#' {
             format_char_idx += 1;
-            // TODO: other specifiers
-            assert!(get_format_char(&env.mem, format_char_idx) == b'.');
-            // TODO: other cases
-            assert!(get_format_char(&env.mem, format_char_idx + 2) == b'd');
-        }
+            log_dbg!("printf_inner: '#' flag parsed and partially supported");
+            true
+        } else {
+            false
+        };
 
         let pad_char = if get_format_char(&env.mem, format_char_idx) == b'0' {
             format_char_idx += 1;
@@ -265,11 +265,12 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     res.extend_from_slice("(null)".as_bytes());
                 }
             }
-            b'd' | b'i' | b'u' | b'D' | b'U' | b'O' => {
+            // FixMissingOctal
+            b'd' | b'i' | b'u' | b'D' | b'U' | b'O' | b'o' => {
                 assert!(!left_justified);
                 // Note: on 32-bit system int and long are i32,
                 // so single length_modifier is ignored (but not double one!)
-                let int: i64 = if specifier == b'u' || specifier == b'U' {
+                let int: i64 = if specifier == b'u' || specifier == b'U' || specifier == b'O' || specifier == b'o' {
                     if length_modifier == Some("ll") {
                         let uint: u64 = args.next(env);
                         uint.try_into().unwrap()
@@ -300,13 +301,17 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     }
                 };
 
-                let int_with_precision = if specifier == b'O' {
-                    // Форматируем как восьмеричное
-                    if precision.is_some_and(|value| value > 0) {
+                // SupportAltFormO
+                let int_with_precision = if specifier == b'O' || specifier == b'o' {
+                    let mut oct_str = if precision.is_some_and(|value| value > 0) {
                         format!("{:01$o}", int, precision.unwrap())
                     } else {
                         format!("{int:o}")
+                    };
+                    if alternative_form && int != 0 && !oct_str.starts_with('0') {
+                        oct_str.insert(0, '0');
                     }
+                    oct_str
                 } else if precision.is_some_and(|value| value > 0) {
                     format!("{:01$}", int, precision.unwrap())
                 } else {
@@ -353,6 +358,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'x' => {
+                // SupportAltFormX
                 assert!(!prepend_sign);
                 assert!(!left_justified);
                 // Note: on 32-bit system unsigned int and unsigned long
@@ -371,15 +377,25 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     let uint: u32 = args.next(env);
                     uint
                 };
+                
+                let mut prefix = "";
+                if alternative_form && uint != 0 {
+                    prefix = "0x";
+                }
+
                 if pad_width > 0 {
                     assert!(precision.is_none()); // TODO
                     let pad_width = pad_width as usize;
                     if pad_char == '0' && precision.is_none() {
-                        write!(&mut res, "{uint:0>pad_width$x}").unwrap();
+                        let pad_len = pad_width.saturating_sub(prefix.len());
+                        res.extend_from_slice(prefix.as_bytes());
+                        write!(&mut res, "{uint:0>pad_len$x}").unwrap();
                     } else {
-                        write!(&mut res, "{uint:>pad_width$x}").unwrap();
+                        let tmp = format!("{}{:x}", prefix, uint);
+                        write!(&mut res, "{tmp:>pad_width$}").unwrap();
                     }
                 } else {
+                    res.extend_from_slice(prefix.as_bytes());
                     let tmp = if precision.is_some_and(|value| value > 0) {
                         format!("{:01$x}", uint, precision.unwrap())
                     } else {
@@ -392,6 +408,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'X' => {
+                // SupportAltFormUpperX
                 assert!(!prepend_sign);
                 assert!(!left_justified);
                 assert!(precision.is_none());
@@ -411,15 +428,25 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     let uint: u32 = args.next(env);
                     uint
                 };
+                
+                let mut prefix = "";
+                if alternative_form && uint != 0 {
+                    prefix = "0X";
+                }
+
                 if pad_width > 0 {
                     let pad_width = pad_width as usize;
                     if pad_char == '0' && precision.is_none() {
-                        write!(&mut res, "{uint:0>pad_width$X}").unwrap();
+                        let pad_len = pad_width.saturating_sub(prefix.len());
+                        res.extend_from_slice(prefix.as_bytes());
+                        write!(&mut res, "{uint:0>pad_len$X}").unwrap();
                     } else {
                         assert!(pad_char == ' '); // TODO
-                        write!(&mut res, "{uint:>pad_width$X}").unwrap();
+                        let tmp = format!("{}{:X}", prefix, uint);
+                        write!(&mut res, "{tmp:>pad_width$}").unwrap();
                     }
                 } else {
+                    res.extend_from_slice(prefix.as_bytes());
                     res.extend_from_slice(format!("{uint:X}").as_bytes());
                 }
             }
