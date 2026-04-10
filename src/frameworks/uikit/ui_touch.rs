@@ -131,6 +131,25 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     // to be far off from the truth, since it should represent the
     // time when the event actually happened, not the time when the
     // event was dispatched. Maybe we'll need to fix this eventually.
+            // Assumes the windows in the list are ordered back-to-front.
+        // TODO: this may not be correct once we support windowLevel.
+        let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+        let Some((window, location_in_window)) = windows.into_iter().rev().find_map(|window| {
+            let location_in_window: CGPoint =
+                msg![env; window convertPoint:location fromWindow:nil];
+            if msg![env; window pointInside:location_in_window withEvent:event] {
+                Some((window, location_in_window))
+            } else {
+                None
+            }
+        }) else {
+            log!(
+                "Couldn't find a window for touch at {:?}, discarding",
+                location,
+            );
+            continue;
+        };
+        
     let timestamp: NSTimeInterval = {
         let process_info = msg_class![env; NSProcessInfo processInfo];
         msg![env; process_info systemUptime]
