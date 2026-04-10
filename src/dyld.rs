@@ -857,6 +857,33 @@ impl Dyld {
             return Some(&(impl_difftime as fn(&mut crate::Environment, i32, i32) -> f64));
         }
 
+        // ImplStrncatChk
+        if symbol == "___strncat_chk" {
+            fn impl_strncat_chk(env: &mut crate::Environment, dest: crate::mem::MutPtr<u8>, src: crate::mem::ConstPtr<u8>, n: u32, destlen: u32) -> crate::mem::MutPtr<u8> {
+                let src_str = env.mem.cstr_at_utf8(src).unwrap_or("<invalid utf8>");
+                log_dbg!("___strncat_chk(dest: {:?}, src: {:?} ('{}'), n: {}, destlen: {})", dest, src, src_str, n, destlen);
+                
+                let mut dest_len = 0;
+                while env.mem.read(dest + dest_len) != 0 {
+                    dest_len += 1;
+                }
+                
+                let mut i = 0;
+                while i < n {
+                    let c = env.mem.read(src + i);
+                    if c == 0 {
+                        break;
+                    }
+                    env.mem.write(dest + dest_len + i, c);
+                    i += 1;
+                }
+                env.mem.write(dest + dest_len + i, 0);
+                
+                dest
+            }
+            return Some(&(impl_strncat_chk as fn(&mut crate::Environment, crate::mem::MutPtr<u8>, crate::mem::ConstPtr<u8>, u32, u32) -> crate::mem::MutPtr<u8>));
+        }
+
         panic!("Call to unimplemented function {symbol}");
     }
 
