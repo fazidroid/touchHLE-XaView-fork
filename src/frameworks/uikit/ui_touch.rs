@@ -124,44 +124,17 @@ pub fn handle_event(env: &mut Environment, event: Event) {
 }
 
 fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
-    // UIKit creates and drains autorelease pools when handling events.
     let pool: id = msg_class![env; NSAutoreleasePool new];
 
-    // Note: if the emulator is heavily lagging, this timestamp is going
-    // to be far off from the truth, since it should represent the
-    // time when the event actually happened, not the time when the
-    // event was dispatched. Maybe we'll need to fix this eventually.
-            // Assumes the windows in the list are ordered back-to-front.
-        // TODO: this may not be correct once we support windowLevel.
-        let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
-        let Some((window, location_in_window)) = windows.into_iter().rev().find_map(|window| {
-            let location_in_window: CGPoint =
-                msg![env; window convertPoint:location fromWindow:nil];
-            if msg![env; window pointInside:location_in_window withEvent:event] {
-                Some((window, location_in_window))
-            } else {
-                None
-            }
-        }) else {
-            log!(
-                "Couldn't find a window for touch at {:?}, discarding",
-                location,
-            );
-            continue;
-        };
-        
     let timestamp: NSTimeInterval = {
         let process_info = msg_class![env; NSProcessInfo processInfo];
         msg![env; process_info systemUptime]
     };
 
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-
     for (finger_id, coords) in map {
         let current_touches = &mut env.framework_state.uikit.ui_touch.current_touches;
-
         if current_touches.contains_key(&finger_id) {
-            // this seems to happen only on the desktop with a single touch
             assert_eq!(current_touches.len(), 1);
             log!(
                 "Warning: New touch {:?} initiated but current touch did not end yet, treating as movement.",
@@ -171,15 +144,10 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         }
 
         log_dbg!("Finger {:?} touch down: {:?}", finger_id, coords);
-
         let location = CGPoint {
             x: coords.0,
             y: coords.1,
         };
-
-        // TODO: is this the correct state of the UITouch and UIEvent during
-        //       hit testing?
-
         let new_touch: id = msg_class![env; UITouch alloc];
         *env.objc.borrow_mut(new_touch) = UITouchHostObject {
             view: nil,
@@ -216,8 +184,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
     let event = ui_event::new_event(env, all_touches);
     autorelease(env, event);
-
-    // views with existing touches (see isMultipleTouchEnabled check below)
+    
     let views_with_existing_touches: HashSet<id> = env
         .framework_state
         .uikit
@@ -226,23 +193,22 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         .values()
         .map(|&touch| env.objc.borrow::<UITouchHostObject>(touch).view)
         .collect();
-
-    // view to set of touches for this view
+        
     let mut view_touches: HashMap<id, id> = HashMap::new();
-
     let touches_arr: id = msg![env; touches allObjects];
     let touches_count: NSUInteger = msg![env; touches_arr count];
+    
     for i in 0..touches_count {
         let touch: id = msg![env; touches_arr objectAtIndex:i];
         let &UITouchHostObject { location, .. } = env.objc.borrow(touch);
 
-        // Assumes the windows in the list are ordered back-to-front.
-        // TODO: this may not be correct once we support windowLevel.
         let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
         let Some((window, location_in_window)) = windows.into_iter().rev().find_map(|window| {
             let location_in_window: CGPoint =
                 msg![env; window convertPoint:location fromWindow:nil];
-            if msg![env; window pointInside:location_in_window withEvent:event] {
+            
+            // 🏎️ ASPHALT 8 HACK: Force accept all touches regardless of boundaries!
+            if true {
                 Some((window, location_in_window))
             } else {
                 None
@@ -278,11 +244,6 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
         let is_multi_touch_enabled: bool = msg![env; view isMultipleTouchEnabled];
         if !is_multi_touch_enabled {
-            // When a view has multi-touch disabled, it can only have one active
-            // touch at once. So, we can only report a new touch to the view if
-            // there are no other touches currently associated with it, and if
-            // there are multiple new touches for this view, we can only report
-            // one of them.
             let view_has_other_new_touches = view_touches.contains_key(&view);
             let view_has_existing_touches = views_with_existing_touches.contains(&view);
             if view_has_other_new_touches || view_has_existing_touches {
@@ -291,20 +252,10 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
                     touch,
                     view
                 );
-                // The touch will continue to be tracked until it ends, but the
-                // view will be nil, so messages sent to it will be ignored.
-                // TODO: Figure out if/how these should be delivered elsewhere
-                //       in the responder chain.
-                // FIXME: The fact the view is nil might be observed via
-                //        touchesForView:nil or allTouches on UIEvent.
-                //        This might cause problems. What does the real OS do?
-                //        Does this need to be prevented?
                 continue;
             }
         }
 
-        // Only create the set after the isMultipleTouchEnabled checks so we
-        // won't end up with an empty set.
         if let Entry::Vacant(e) = view_touches.entry(view) {
             let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
             e.insert(touches);
