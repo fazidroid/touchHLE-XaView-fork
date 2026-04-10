@@ -84,7 +84,7 @@ fn access(env: &mut Environment, path: ConstPtr<u8>, mode: i32) -> i32 {
                 return 0;
             }
             s
-        },
+        }
         Err(_) => return 0,
     };
     let guest_path = GuestPath::new(&binding);

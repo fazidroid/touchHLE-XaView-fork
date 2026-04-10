@@ -749,8 +749,10 @@ fn CFUUIDCreateString(
     let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
     let sel_alloc = env.objc.lookup_selector("alloc").unwrap();
     let sel_init = env.objc.lookup_selector("initWithUTF8String:").unwrap();
-    let alloced: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (nsstring_class, sel_alloc));
-    let string: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (alloced, sel_init, cstr_ptr.cast_const()));
+    let alloced: crate::objc::id =
+        crate::objc::msg_send_no_type_checking(env, (nsstring_class, sel_alloc));
+    let string: crate::objc::id =
+        crate::objc::msg_send_no_type_checking(env, (alloced, sel_init, cstr_ptr.cast_const()));
     string.cast()
 }
 
@@ -787,7 +789,9 @@ fn _Unwind_SjLj_RaiseException(env: &mut Environment, _ex: ConstVoidPtr) -> i32 
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -806,7 +810,9 @@ fn _Unwind_SjLj_Resume(env: &mut Environment, _ex: ConstVoidPtr) {
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -824,7 +830,9 @@ fn _Unwind_SjLj_Resume_or_Rethrow(env: &mut Environment, _ex: ConstVoidPtr) -> i
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -843,7 +851,9 @@ fn abort(env: &mut Environment) {
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -867,11 +877,30 @@ fn __stack_chk_fail(env: &mut Environment) {
     while curr <= fp + 32 {
         let val: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(curr));
         let b = val.to_le_bytes();
-        let c0 = if b[0] >= 32 && b[0] <= 126 { b[0] as char } else { '.' };
-        let c1 = if b[1] >= 32 && b[1] <= 126 { b[1] as char } else { '.' };
-        let c2 = if b[2] >= 32 && b[2] <= 126 { b[2] as char } else { '.' };
-        let c3 = if b[3] >= 32 && b[3] <= 126 { b[3] as char } else { '.' };
-        dump.push_str(&format!("[DEBUG] {:#010x}: {:08x} | {}{}{}{}\n", curr, val, c0, c1, c2, c3));
+        let c0 = if b[0] >= 32 && b[0] <= 126 {
+            b[0] as char
+        } else {
+            '.'
+        };
+        let c1 = if b[1] >= 32 && b[1] <= 126 {
+            b[1] as char
+        } else {
+            '.'
+        };
+        let c2 = if b[2] >= 32 && b[2] <= 126 {
+            b[2] as char
+        } else {
+            '.'
+        };
+        let c3 = if b[3] >= 32 && b[3] <= 126 {
+            b[3] as char
+        } else {
+            '.'
+        };
+        dump.push_str(&format!(
+            "[DEBUG] {:#010x}: {:08x} | {}{}{}{}\n",
+            curr, val, c0, c1, c2, c3
+        ));
         curr += 4;
     }
     panic!("{}", dump);
@@ -892,7 +921,13 @@ fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) 
     -1
 }
 
-fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd: ConstVoidPtr, val: MutVoidPtr, offset: i32) {
+fn objc_setProperty_nonatomic(
+    env: &mut Environment,
+    self_ptr: MutVoidPtr,
+    _cmd: ConstVoidPtr,
+    val: MutVoidPtr,
+    offset: i32,
+) {
     // ImplSetPropertyNonatomic
     if !self_ptr.is_null() {
         let addr = (self_ptr.to_bits() as i32 + offset) as u32;
@@ -903,7 +938,10 @@ fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd:
 
 fn setrlimit(_env: &mut Environment, resource: i32, _rlp: ConstVoidPtr) -> i32 {
     // FakeSetrlimit
-    log!("WARNING: setrlimit called with resource: {}. Faking success.", resource);
+    log!(
+        "WARNING: setrlimit called with resource: {}. Faking success.",
+        resource
+    );
     0
 }
 
@@ -918,7 +956,11 @@ fn CGColorGetComponents(env: &mut Environment, _color: ConstVoidPtr) -> MutVoidP
     ptr
 }
 
-fn CGContextSetFillColor(_env: &mut Environment, _context: ConstVoidPtr, _components: ConstVoidPtr) {
+fn CGContextSetFillColor(
+    _env: &mut Environment,
+    _context: ConstVoidPtr,
+    _components: ConstVoidPtr,
+) {
     // FakeSetFillColor
 }
 
@@ -946,11 +988,19 @@ fn CGContextStrokePath(_env: &mut Environment, _context: ConstVoidPtr) {
     // FakeStrokePath
 }
 
-fn CGContextSetFillColorWithColor(_env: &mut Environment, _context: ConstVoidPtr, _color: ConstVoidPtr) {
+fn CGContextSetFillColorWithColor(
+    _env: &mut Environment,
+    _context: ConstVoidPtr,
+    _color: ConstVoidPtr,
+) {
     // FakeSetFillColor
 }
 
-fn CGContextSetStrokeColorWithColor(_env: &mut Environment, _context: ConstVoidPtr, _color: ConstVoidPtr) {
+fn CGContextSetStrokeColorWithColor(
+    _env: &mut Environment,
+    _context: ConstVoidPtr,
+    _color: ConstVoidPtr,
+) {
     // FakeSetStrokeColor
 }
 
@@ -992,7 +1042,15 @@ fn kqueue(_env: &mut Environment) -> i32 {
     999
 }
 
-fn kevent(_env: &mut Environment, _kq: i32, _changelist: ConstVoidPtr, _nchanges: i32, _eventlist: MutVoidPtr, _nevents: i32, _timeout: ConstVoidPtr) -> i32 {
+fn kevent(
+    _env: &mut Environment,
+    _kq: i32,
+    _changelist: ConstVoidPtr,
+    _nchanges: i32,
+    _eventlist: MutVoidPtr,
+    _nevents: i32,
+    _timeout: ConstVoidPtr,
+) -> i32 {
     // FakeKevent
     0
 }
