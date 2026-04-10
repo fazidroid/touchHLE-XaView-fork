@@ -980,14 +980,6 @@ fn CGContextStrokePath(_env: &mut Environment, _context: ConstVoidPtr) {
     // FakeStrokePath
 }
 
-fn CGContextSetFillColorWithColor(
-    _env: &mut Environment,
-    _context: ConstVoidPtr,
-    _color: ConstVoidPtr,
-) {
-    // FakeSetFillColor
-}
-
 fn CGContextSetStrokeColorWithColor(
     _env: &mut Environment,
     _context: ConstVoidPtr,
@@ -998,14 +990,6 @@ fn CGContextSetStrokeColorWithColor(
 
 fn CGContextSetLineWidth(_env: &mut Environment, _context: ConstVoidPtr, _width: f32) {
     // FakeSetLineWidth
-}
-
-fn CGContextSaveGState(_env: &mut Environment, _context: ConstVoidPtr) {
-    // FakeSaveGState
-}
-
-fn CGContextRestoreGState(_env: &mut Environment, _context: ConstVoidPtr) {
-    // FakeRestoreGState
 }
 
 fn CGContextClip(_env: &mut Environment, _context: ConstVoidPtr) {
@@ -1057,10 +1041,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextClosePath(_)),
     export_c_func!(CGContextFillPath(_)),
     export_c_func!(CGContextMoveToPoint(_, _, _)),
-    export_c_func!(CGContextRestoreGState(_)),
-    export_c_func!(CGContextSaveGState(_)),
     export_c_func!(CGContextSetFillColor(_, _)),
-    export_c_func!(CGContextSetFillColorWithColor(_, _)),
     export_c_func!(CGContextSetLineWidth(_, _)),
     export_c_func!(CGContextSetStrokeColorWithColor(_, _)),
     export_c_func!(CGContextStrokePath(_)),
