@@ -460,7 +460,14 @@ fn glViewport(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height:
     let r_scale = get_smart_retina_scale(env, width, height);
     let scale_total = env.options.scale_hack.get() as f32 * r_scale;
     // DebugViewport
-    log!("DEBUG_GL: glViewport Guest(x={}, y={}, w={}, h={}) -> Scale={}", x, y, width, height, scale_total);
+    log!(
+        "DEBUG_GL: glViewport Guest(x={}, y={}, w={}, h={}) -> Scale={}",
+        x,
+        y,
+        width,
+        height,
+        scale_total
+    );
     let (x, y) = (
         (x as f32 * scale_total).round() as GLint,
         (y as f32 * scale_total).round() as GLint,
@@ -484,25 +491,43 @@ fn glStencilFunc(env: &mut Environment, func: GLenum, ref_: GLint, mask: GLuint)
         gles.StencilFunc(func, ref_, mask)
     });
 }
-fn glStencilFuncSeparate(env: &mut Environment, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+fn glStencilFuncSeparate(
+    env: &mut Environment,
+    face: GLenum,
+    func: GLenum,
+    ref_: GLint,
+    mask: GLuint,
+) {
     // StencilFuncSeparateImpl
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilFuncSeparate(face, func, ref_, mask) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.StencilFuncSeparate(face, func, ref_, mask)
+    })
 }
 fn glStencilOp(env: &mut Environment, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.StencilOp(sfail, dpfail, dppass)
     });
 }
-fn glStencilOpSeparate(env: &mut Environment, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+fn glStencilOpSeparate(
+    env: &mut Environment,
+    face: GLenum,
+    sfail: GLenum,
+    dpfail: GLenum,
+    dppass: GLenum,
+) {
     // StencilOpSeparateImpl
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilOpSeparate(face, sfail, dpfail, dppass) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.StencilOpSeparate(face, sfail, dpfail, dppass)
+    })
 }
 fn glStencilMask(env: &mut Environment, mask: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilMask(mask) });
 }
 fn glStencilMaskSeparate(env: &mut Environment, face: GLenum, mask: GLuint) {
     // StencilMaskSeparateImpl
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilMaskSeparate(face, mask) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.StencilMaskSeparate(face, mask)
+    })
 }
 fn glLogicOp(env: &mut Environment, opcode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.LogicOp(opcode) });
@@ -807,7 +832,12 @@ fn glVertexPointer(
 
 // Drawing
 fn glDrawArrays(env: &mut Environment, mode: GLenum, first: GLint, count: GLsizei) {
-    log!("DEBUG_GL: glDrawArrays(mode={:#x}, first={}, count={})", mode, first, count); // DrawArraysLog
+    log!(
+        "DEBUG_GL: glDrawArrays(mode={:#x}, first={}, count={})",
+        mode,
+        first,
+        count
+    ); // DrawArraysLog
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         let fog_state_backup = clamp_fog_state_values(gles);
         gles.DrawArrays(mode, first, count);
@@ -821,7 +851,13 @@ fn glDrawElements(
     type_: GLenum,
     indices: ConstVoidPtr,
 ) {
-    log!("DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x}, indices={:#x})", mode, count, type_, indices.to_bits()); // DrawElementsLog
+    log!(
+        "DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x}, indices={:#x})",
+        mode,
+        count,
+        type_,
+        indices.to_bits()
+    ); // DrawElementsLog
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let fog_state_backup = clamp_fog_state_values(gles);
         let indices = translate_pointer_or_offset_to_host(
@@ -849,7 +885,13 @@ fn glClearColor(
     alpha: GLclampf,
 ) {
     // DebugClearColor
-    log!("DEBUG_GL: glClearColor(R={}, G={}, B={}, A={})", red, green, blue, alpha);
+    log!(
+        "DEBUG_GL: glClearColor(R={}, G={}, B={}, A={})",
+        red,
+        green,
+        blue,
+        alpha
+    );
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.ClearColor(red, green, blue, alpha)
     });
@@ -1389,7 +1431,11 @@ fn glIsRenderbufferOES(env: &mut Environment, renderbuffer: GLuint) -> GLboolean
 }
 fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLuint) {
     // DebugBindFbo
-    log!("DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})", target, framebuffer);
+    log!(
+        "DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})",
+        target,
+        framebuffer
+    );
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindFramebufferOES(target, framebuffer)
     })
@@ -1608,17 +1654,20 @@ fn glGetBufferParameteriv(
     })
 }
 // TrackMappedBuffers
-static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLenum, u32, u32)>> = std::sync::Mutex::new(Vec::new());
+static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLenum, u32, u32)>> =
+    std::sync::Mutex::new(Vec::new());
 
 fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutPtr<GLvoid> {
     let size: GLint = _get_buffer_size(env, target);
     if size <= 0 {
         return Ptr::null();
     }
-    
+
     let mut allocated_ptr = 0;
     if let Ok(mut map) = MAPPED_BUFFERS.lock() {
-        if let Some(&mut (_, ref mut ptr, ref mut alloc_size)) = map.iter_mut().find(|(t, _, _)| *t == target) {
+        if let Some(&mut (_, ref mut ptr, ref mut alloc_size)) =
+            map.iter_mut().find(|(t, _, _)| *t == target)
+        {
             if *alloc_size >= size as u32 {
                 allocated_ptr = *ptr;
             } else {
@@ -1631,10 +1680,15 @@ fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutP
             map.push((target, allocated_ptr, size as u32));
         }
     }
-    
+
     let guest_ptr = Ptr::from_bits(allocated_ptr);
     // BetterDebugInfo
-    log_dbg!("glMapBufferOES(target: {}, access: {}) -> {:?}", target, access, guest_ptr);
+    log_dbg!(
+        "glMapBufferOES(target: {}, access: {}) -> {:?}",
+        target,
+        access,
+        guest_ptr
+    );
     guest_ptr
 }
 
@@ -1645,7 +1699,7 @@ fn glUnmapBufferOES(env: &mut Environment, target: GLenum) -> GLboolean {
             guest_ptr_bits = ptr;
         }
     }
-    
+
     if guest_ptr_bits != 0 {
         let size = _get_buffer_size(env, target);
         if size > 0 {
@@ -1709,7 +1763,11 @@ fn glShaderSource(
     string: ConstVoidPtr,
     length: ConstPtr<GLint>,
 ) {
-    log!("DEBUG_GL: glShaderSource(shader={}, count={})", shader, count); // ShaderSourceLog
+    log!(
+        "DEBUG_GL: glShaderSource(shader={}, count={})",
+        shader,
+        count
+    ); // ShaderSourceLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let mut shader_type = 0;
@@ -2153,7 +2211,12 @@ fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidP
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
         let res = gles.GetUniformLocation(program, host_name);
         let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // UniformLog
-        log!("DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {}", program, name_str, res); // UniformLog
+        log!(
+            "DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {}",
+            program,
+            name_str,
+            res
+        ); // UniformLog
         res
     })
 }
@@ -2162,7 +2225,12 @@ fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPt
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
         let res = gles.GetAttribLocation(program, host_name); // LogAttribLoc
         let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // LogAttribLoc
-        log!("DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}", program, name_str, res); // LogAttribLoc
+        log!(
+            "DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}",
+            program,
+            name_str,
+            res
+        ); // LogAttribLoc
         res // LogAttribLoc
     })
 }
@@ -2240,7 +2308,12 @@ fn glGetActiveAttrib(
         );
         if !name_ptr.is_null() {
             let name_str = std::ffi::CStr::from_ptr(name_ptr).to_string_lossy(); // LogActiveAttrib
-            log!("DEBUG_GL: glGetActiveAttrib(program={}, index={}) -> name='{}'", program, index, name_str); // LogActiveAttrib
+            log!(
+                "DEBUG_GL: glGetActiveAttrib(program={}, index={}) -> name='{}'",
+                program,
+                index,
+                name_str
+            ); // LogActiveAttrib
         }
     })
 }
