@@ -270,7 +270,11 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 assert!(!left_justified);
                 // Note: on 32-bit system int and long are i32,
                 // so single length_modifier is ignored (but not double one!)
-                let int: i64 = if specifier == b'u' || specifier == b'U' || specifier == b'O' || specifier == b'o' {
+                let int: i64 = if specifier == b'u'
+                    || specifier == b'U'
+                    || specifier == b'O'
+                    || specifier == b'o'
+                {
                     if length_modifier == Some("ll") {
                         let uint: u64 = args.next(env);
                         uint.try_into().unwrap()
@@ -377,7 +381,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     let uint: u32 = args.next(env);
                     uint
                 };
-                
+
                 let mut prefix = "";
                 if alternative_form && uint != 0 {
                     prefix = "0x";
@@ -428,7 +432,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     let uint: u32 = args.next(env);
                     uint
                 };
-                
+
                 let mut prefix = "";
                 if alternative_form && uint != 0 {
                     prefix = "0X";
