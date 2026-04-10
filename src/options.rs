@@ -257,15 +257,34 @@ impl Options {
             self.dumping_options = parse_dump_options(values)?;
         } else if let Some(path) = arg.strip_prefix("--dump-file=") {
             self.dumping_file = crate::paths::user_data_base_path().join(path);
-                } else if arg == "--ignore-gl-errors" {
-            self.ignore_gl_errors = true;
-        } else if let Some(val) = arg.strip_prefix("--gles-version=") {
+                        } else if let Some(val) = arg.strip_prefix("--gles-version=") {
             self.gles_version = val.parse().unwrap_or(2); // ParseEsVer
-        // 🏎️ ADD THE ARGUMENT PARSERS HERE:
+        // 🏎️ CUSTOM ANDROID GPU HACKS:
         } else if arg == "--use-angle" {
             self.use_angle = true;
         } else if arg == "--use-turnip" {
             self.use_turnip = true;
+        // 🏎️ DEVICE PRESET COMMANDS:
+        } else if arg == "--iphone" || arg == "--iphone2g" {
+            self.device_model = Some("iPhone1,1".to_string());
+        } else if arg == "--iphone3g" {
+            self.device_model = Some("iPhone1,2".to_string());
+        } else if arg == "--iphone3gs" {
+            self.device_model = Some("iPhone2,1".to_string());
+        } else if arg == "--iphone4" {
+            self.device_model = Some("iPhone3,1".to_string());
+        } else if arg == "--iphone4s" {
+            self.device_model = Some("iPhone4,1".to_string());
+        } else if arg == "--iphone5" {
+            self.device_model = Some("iPhone5,1".to_string());
+        } else if arg == "--iphone5c" {
+            self.device_model = Some("iPhone5,3".to_string());
+        } else if arg == "--ipad" || arg == "--ipad1" {
+            self.device_model = Some("iPad1,1".to_string());
+        } else if arg == "--ipad2" {
+            self.device_model = Some("iPad2,1".to_string());
+        } else if arg == "--ipod4" {
+            self.device_model = Some("iPod4,1".to_string());
         } else {
             return Ok(false);
         }
