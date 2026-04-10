@@ -254,34 +254,66 @@ impl Window {
     pub fn rotatable_fullscreen() -> bool {
         env::consts::OS == "android"
     }
-    pub fn new(
+
+            pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
         options: &Options,
     ) -> Window {
+        // TEMPORARY OVERRIDE FOR TESTING (Since we can't easily pass args on Android yet)
+        let mut options_clone = options.clone();
+        options_clone.use_angle = true;
+        options_clone.use_turnip = true;
+        let options = &options_clone;
+
         let sdl_ctx = sdl2::init().unwrap();
         let video_ctx = sdl_ctx.video().unwrap();
 
         // The "hidapi" feature of rust-sdl2 is enabled so that sdl2::sensor
         // is available, but we don't want to enable SDL's HIDAPI controller
         // drivers because they cause duplicated controllers on macOS
-        // (https://github.com/libsdl-org/SDL/issues/7479). Once that's fixed,
-        // remove this (https://github.com/touchHLE/touchHLE/issues/85).
-        sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");
+        // (https://github.com/libsdl-org/SDL/issues/7479).
+        // Once that's fixed, remove this (https://github.com/touchHLE/touchHLE/issues/85).
+        sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");        
 
         if env::consts::OS == "android" {
-            // It's important to set context version BEFORE window creation
-            // ref. https://wiki.libsdl.org/SDL2/SDL_GLattr
+            // 🏎️ THE TURNIP HACK: Force Vulkan to use our custom Freedreno driver
+            // We point VK_ICD_FILENAMES exactly to where Android extracts our jniLibs
+            std::env::set_var(
+                "VK_ICD_FILENAMES", 
+                "/data/data/org.touchhle.android.xaview/lib/libvulkan_freedreno.so"
+            );
+
+            // 🏎️ ADRENO VULKAN OPTIMIZATIONS
+            // Force Tile-Based rendering and prevent pipeline stalls
+            std::env::set_var(
+                "ANGLE_FEATURE_OVERRIDES_ENABLED", 
+                "enable_subpass_rendering,vulkan_async_command_buffers"
+            );
+            std::env::set_var(
+                "ANGLE_FEATURE_OVERRIDES_DISABLED", 
+                "vulkan_synchronous_submit,flush_after_ending_render_pass"
+            );
+
+                        // 🏎️ FORCE ANGLE TRANSLATION
+            // Give Android the ABSOLUTE path to the extracted JNI libraries
+            let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
+            
+            if options.gles_version == 2 {
+                let _ = video_ctx.gl_load_library(format!("{}libGLESv2_angle.so", lib_dir).as_str());
+            } else {
+                let _ = video_ctx.gl_load_library(format!("{}libGLESv1_CM_angle.so", lib_dir).as_str());
+            }
+
+            // Standard OpenGL context setup
             let attr = video_ctx.gl_attr();
             if options.gles_version == 2 {
-                attr.set_context_version(2, 0); // SetEsTwo
+                attr.set_context_version(2, 0);
             } else {
-                attr.set_context_version(1, 1); // SetEsOne
+                attr.set_context_version(1, 1);
             }
             attr.set_context_profile(sdl2::video::GLProfile::GLES);
-
-            // Disable blocking of event loop when app is paused.
             sdl2::hint::set("SDL_ANDROID_BLOCK_ON_PAUSE", "0");
         }
 
