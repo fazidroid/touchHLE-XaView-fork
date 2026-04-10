@@ -733,8 +733,8 @@ impl Dyld {
                 .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
             Some((stubs, pic_offset))
         }) else {
-                let r12 = cpu.regs()[12];
-                let r0 = cpu.regs()[0];
+            let r12 = cpu.regs()[12];
+            let r0 = cpu.regs()[0];
             // LogInlineSvc
             log!(
                 "WARNING: Unresolved inline SVC at {:#010x}! Syscall ID (R12): {}, R0: {:#x}",
