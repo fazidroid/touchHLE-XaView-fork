@@ -202,7 +202,10 @@ fn getsockopt(
 
     // RelaxGetsockopt
     if level != SOL_SOCKET || option_name != SO_ERROR {
-        println!("WARNING: Ignoring getsockopt for level {}, option {}", level, option_name);
+        println!(
+            "WARNING: Ignoring getsockopt for level {}, option {}",
+            level, option_name
+        );
         return 0;
     }
 
@@ -255,11 +258,17 @@ fn setsockopt(
 
     // RelaxSetsockopt
     if level != SOL_SOCKET {
-        println!("WARNING: Ignoring setsockopt for level {}, option {}", level, option_name);
+        println!(
+            "WARNING: Ignoring setsockopt for level {}, option {}",
+            level, option_name
+        );
         return 0;
     }
     if option_name != SO_REUSEADDR && option_name != SO_BROADCAST {
-        println!("WARNING: Ignoring setsockopt unsupported option {}", option_name);
+        println!(
+            "WARNING: Ignoring setsockopt unsupported option {}",
+            option_name
+        );
         return 0;
     }
 
