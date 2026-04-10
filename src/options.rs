@@ -259,6 +259,21 @@ impl Options {
             self.gles_version = val.parse().unwrap_or(2); // ParseEsVer
         } else {
             return Ok(false);
+        } else if arg == "--ignore-gl-errors" {
+            self.ignore_gl_errors = true;
+        } else if let Some(val) = arg.strip_prefix("--gles-version=") {
+            self.gles_version = val.parse().unwrap_or(2);
+        // 🏎️ ADD THE ARGUMENT PARSERS HERE:
+        } else if arg == "--use-angle" {
+            self.use_angle = true;
+        } else if arg == "--use-turnip" {
+            self.use_turnip = true;
+        } else {
+            return Ok(false);
+        };
+        Ok(true)
+    }
+    
         };
         Ok(true)
     }
