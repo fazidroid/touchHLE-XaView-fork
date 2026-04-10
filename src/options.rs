@@ -253,16 +253,10 @@ impl Options {
             self.dumping_options = parse_dump_options(values)?;
         } else if let Some(path) = arg.strip_prefix("--dump-file=") {
             self.dumping_file = crate::paths::user_data_base_path().join(path);
-        } else if arg == "--ignore-gl-errors" {
+                } else if arg == "--ignore-gl-errors" {
             self.ignore_gl_errors = true;
         } else if let Some(val) = arg.strip_prefix("--gles-version=") {
             self.gles_version = val.parse().unwrap_or(2); // ParseEsVer
-        } else {
-            return Ok(false);
-        } else if arg == "--ignore-gl-errors" {
-            self.ignore_gl_errors = true;
-        } else if let Some(val) = arg.strip_prefix("--gles-version=") {
-            self.gles_version = val.parse().unwrap_or(2);
         // 🏎️ ADD THE ARGUMENT PARSERS HERE:
         } else if arg == "--use-angle" {
             self.use_angle = true;
@@ -270,14 +264,12 @@ impl Options {
             self.use_turnip = true;
         } else {
             return Ok(false);
-        };
-        Ok(true)
-    }
-    
-        };
+        }
+        
         Ok(true)
     }
 }
+
 
 /// Try to get app-specific options from a file.
 ///
