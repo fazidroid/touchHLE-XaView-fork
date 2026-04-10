@@ -119,7 +119,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let class: Class = msg![env; this class];
     let class_name_str = env.objc.get_class_name(class).to_string();
     log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
-    
+
     // FixNibEaglLayer
     let mut view_class: Class = msg_class![env; UIView class];
     if class_name_str.contains("EAGL") || class_name_str.contains("GL") {
@@ -130,24 +130,24 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
     let view_alloc: id = msg![env; view_class alloc];
-    
+
     // FixLandscapeFrame
     let app_frame = crate::frameworks::core_graphics::CGRect {
         origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
         size: crate::frameworks::core_graphics::CGSize { width: 480.0, height: 320.0 },
     };
-    
+
     let view: id = msg![env; view_alloc initWithFrame:app_frame];
-    
+
     let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
-    
+
     // ForceTouchInteraction
     let sel_user = env.objc.lookup_selector("setUserInteractionEnabled:").unwrap();
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_user, 1u32));
     let sel_multi = env.objc.lookup_selector("setMultipleTouchEnabled:").unwrap();
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
-    
+
     () = msg![env; this setView:view];
 }
 
