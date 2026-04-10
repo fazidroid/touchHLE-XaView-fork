@@ -254,7 +254,7 @@ impl Window {
     pub fn rotatable_fullscreen() -> bool {
         env::consts::OS == "android"
     }
-    pub fn new(
+        pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
@@ -266,21 +266,30 @@ impl Window {
         // The "hidapi" feature of rust-sdl2 is enabled so that sdl2::sensor
         // is available, but we don't want to enable SDL's HIDAPI controller
         // drivers because they cause duplicated controllers on macOS
-        // (https://github.com/libsdl-org/SDL/issues/7479). Once that's fixed,
-        // remove this (https://github.com/touchHLE/touchHLE/issues/85).
+        // (https://github.com/libsdl-org/SDL/issues/7479).
+        // Once that's fixed, remove this (https://github.com/touchHLE/touchHLE/issues/85).
         sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");
-
+        
         if env::consts::OS == "android" {
+            // 🏎️ ADRENO HACK: ANGLE Vulkan Translation Layer
+            // Force SDL to bypass the buggy native Qualcomm OpenGL drivers
+            // and load our custom bundled ANGLE libraries instead.
+            sdl2::hint::set("SDL_OPENGL_ES_DRIVER", "1");
+            video_ctx.gl_set_attribute(sdl2::video::GLAttr::EGLDriver, "libEGL_angle.so");
+            video_ctx.gl_set_attribute(sdl2::video::GLAttr::GLESv1Driver, "libGLESv1_CM_angle.so");
+            video_ctx.gl_set_attribute(sdl2::video::GLAttr::GLESv2Driver, "libGLESv2_angle.so");
+
             // It's important to set context version BEFORE window creation
             // ref. https://wiki.libsdl.org/SDL2/SDL_GLattr
             let attr = video_ctx.gl_attr();
             if options.gles_version == 2 {
-                attr.set_context_version(2, 0); // SetEsTwo
+                attr.set_context_version(2, 0);
+                // SetEsTwo
             } else {
-                attr.set_context_version(1, 1); // SetEsOne
+                attr.set_context_version(1, 1);
+                // SetEsOne
             }
             attr.set_context_profile(sdl2::video::GLProfile::GLES);
-
             // Disable blocking of event loop when app is paused.
             sdl2::hint::set("SDL_ANDROID_BLOCK_ON_PAUSE", "0");
         }
