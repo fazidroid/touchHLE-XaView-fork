@@ -264,7 +264,11 @@ impl Window {
         // TEMPORARY OVERRIDE FOR TESTING 
         let mut options_clone = options.clone();
         options_clone.use_angle = true;
-        options_clone.use_turnip = true;
+        // options_clone.use_turnip = true; 
+        
+        // 🏎️ ASPHALT 8 HACK: Force the emulator to spoof an iPhone 5!
+        options_clone.device_model = Some("iPhone5,1".to_string());
+        
         let options = &options_clone;
 
                 // 🏎️ CRITICAL FIX: Set environment variables BEFORE SDL initializes!
