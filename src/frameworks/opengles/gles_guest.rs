@@ -2568,8 +2568,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetActiveUniform(_, _, _, _, _, _, _)),
     export_c_func!(glGetActiveAttrib(_, _, _, _, _, _, _)),
     export_c_func!(glGetVertexAttribiv(_, _, _)),
-    export_c_func!(glMapBufferOES(_, _)),
-    export_c_func!(glUnmapBufferOES(_)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {
