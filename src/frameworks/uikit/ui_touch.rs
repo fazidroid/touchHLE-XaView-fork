@@ -30,14 +30,9 @@ pub struct State {
 }
 
 pub(super) struct UITouchHostObject {
-    /// Strong reference to the `UIView`
     pub(super) view: id,
-    /// Strong reference to the `UIWindow`, used as a reference for co-ordinate
-    /// space conversion
     pub(super) window: id,
-    /// Relative to the screen
     location: CGPoint,
-    /// Relative to the screen
     previous_location: CGPoint,
     timestamp: NSTimeInterval,
     phase: UITouchPhase,
@@ -69,7 +64,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
-- (CGPoint)locationInView:(id)that_view { // UIView*
+- (CGPoint)locationInView:(id)that_view { 
     let &UITouchHostObject { location, window, .. } = env.objc.borrow(this);
     let location_in_window: CGPoint = msg![env; window convertPoint:location fromWindow:nil];
     if that_view == nil {
@@ -78,7 +73,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         msg![env; that_view convertPoint:location_in_window fromView:window]
     }
 }
-- (CGPoint)previousLocationInView:(id)that_view { // UIView*
+- (CGPoint)previousLocationInView:(id)that_view { 
     let &UITouchHostObject { previous_location, window, .. } = env.objc.borrow(this);
     let location_in_window: CGPoint = msg![env; window convertPoint:previous_location fromWindow:nil];
     if that_view == nil {
@@ -97,7 +92,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSUInteger)tapCount {
-    1 // TODO: support double-taps etc
+    1
 }
 
 - (UITouchPhase)phase {
@@ -108,9 +103,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
-/// [super::handle_events] will forward touch events to this function.
 pub fn handle_event(env: &mut Environment, event: Event) {
-    // before processing anything, we mark all current touches as stationary
     let current_touches = &env.framework_state.uikit.ui_touch.current_touches;
     for &touch in (*current_touches).values() {
         env.objc.borrow_mut::<UITouchHostObject>(touch).phase = UITouchPhaseStationary;
@@ -135,19 +128,12 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     for (finger_id, coords) in map {
         let current_touches = &mut env.framework_state.uikit.ui_touch.current_touches;
         if current_touches.contains_key(&finger_id) {
-            assert_eq!(current_touches.len(), 1);
-            log!(
-                "Warning: New touch {:?} initiated but current touch did not end yet, treating as movement.",
-                finger_id
-            );
+            log!("Warning: New touch {:?} initiated but current touch did not end yet, treating as movement.", finger_id);
             return handle_touches_move(env, HashMap::from([(finger_id, coords)]));
         }
 
         log_dbg!("Finger {:?} touch down: {:?}", finger_id, coords);
-        let location = CGPoint {
-            x: coords.0,
-            y: coords.1,
-        };
+        let location = CGPoint { x: coords.0, y: coords.1 };
         let new_touch: id = msg_class![env; UITouch alloc];
         *env.objc.borrow_mut(new_touch) = UITouchHostObject {
             view: nil,
@@ -160,30 +146,18 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         autorelease(env, new_touch);
 
         let _: () = msg![env; touches addObject:new_touch];
-
-        let _ = &env
-            .framework_state
-            .uikit
-            .ui_touch
-            .current_touches
-            .insert(finger_id, new_touch);
+        let _ = env.framework_state.uikit.ui_touch.current_touches.insert(finger_id, new_touch);
         retain(env, new_touch);
     }
 
     let all_touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-    for &touch in env
-        .framework_state
-        .uikit
-        .ui_touch
-        .current_touches
-        .clone()
-        .values()
-    {
+    for &touch in env.framework_state.uikit.ui_touch.current_touches.clone().values() {
         let _: () = msg![env; all_touches addObject:touch];
     }
 
     let event = ui_event::new_event(env, all_touches);
     autorelease(env, event);
+    
     let views_with_existing_touches: HashSet<id> = env
         .framework_state
         .uikit
@@ -192,37 +166,40 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         .values()
         .map(|&touch| env.objc.borrow::<UITouchHostObject>(touch).view)
         .collect();
+        
     let mut view_touches: HashMap<id, id> = HashMap::new();
     let touches_arr: id = msg![env; touches allObjects];
     let touches_count: NSUInteger = msg![env; touches_arr count];
+    
     for i in 0..touches_count {
         let touch: id = msg![env; touches_arr objectAtIndex:i];
         let &UITouchHostObject { location, .. } = env.objc.borrow(touch);
 
-        let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
-        let Some((window, location_in_window)) = windows.into_iter().rev().find_map(|window| {
-            let location_in_window: CGPoint =
-                msg![env; window convertPoint:location fromWindow:nil];
-            
-            // 🏎️ ASPHALT 8 HACK #1: Force accept all touches regardless of Window boundaries!
-            if true {
-                Some((window, location_in_window))
-            } else {
-                None
-            }
-        }) else {
-            log!(
-                "Couldn't find a window for touch at {:?}, discarding",
-                location,
-            );
-            continue;
-        };
-
-        let mut view: id = msg![env; window hitTest:location_in_window withEvent:event];
+        // 🏎️ ASPHALT 8 ULTIMATE TOUCH INJECTION HACK
+        let mut window: id = nil;
+        let mut location_in_window = location;
         
-        // 🏎️ ASPHALT 8 HACK #2: Bypass the View 'hitTest' rejection!
+        // 1. Forcefully grab the topmost window, ignoring all geometry checks!
+        let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+        if windows.len() > 0 {
+            window = *windows.last().unwrap();
+            location_in_window = msg![env; window convertPoint:location fromWindow:nil];
+        } else {
+            let app: id = msg_class![env; UIApplication sharedApplication];
+            window = msg![env; app keyWindow];
+            if window != nil {
+                location_in_window = msg![env; window convertPoint:location fromWindow:nil];
+            }
+        }
+
+        if window == nil {
+            log!("CRITICAL: Asphalt 8 has NO active windows! Touch at {:?} dropped.", location);
+            continue;
+        }
+
+        // 2. Forcefully grab the active game layer, bypassing 'hitTest' math!
+        let mut view: id = msg![env; window hitTest:location_in_window withEvent:event];
         if view == nil {
-            // If the math says the touch is out of bounds, forcefully grab the active game layer
             let subviews: id = msg![env; window subviews];
             let subviews_count: NSUInteger = msg![env; subviews count];
             if subviews_count > 0 {
@@ -230,18 +207,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             } else {
                 view = window;
             }
-            log_dbg!("Forcefully injected out-of-bounds touch into view {:?}", view);
-        } else {
-            log_dbg!(
-                "Found view {:?} with frame {:?} for touch at {:?} in window {:?}",
-                view,
-                {
-                    let f: CGRect = msg![env; view frame];
-                    f
-                },
-                location_in_window,
-                window,
-            );
+            log_dbg!("Injected out-of-bounds touch into view {:?}", view);
         }
 
         let is_multi_touch_enabled: bool = msg![env; view isMultipleTouchEnabled];
@@ -249,11 +215,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             let view_has_other_new_touches = view_touches.contains_key(&view);
             let view_has_existing_touches = views_with_existing_touches.contains(&view);
             if view_has_other_new_touches || view_has_existing_touches {
-                log!(
-                    "Ignoring new touch {:?} for view {:?}, !isMultipleTouchEnabled",
-                    touch,
-                    view
-                );
+                log!("Ignoring new touch {:?} for view {:?}, !isMultipleTouchEnabled", touch, view);
                 continue;
             }
         }
@@ -275,12 +237,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     }
 
     for (view, touches) in view_touches {
-        log_dbg!(
-            "Sending [{:?} touchesBegan:{:?} withEvent:{:?}]",
-            view,
-            touches,
-            event
-        );
+        log_dbg!("Sending [{:?} touchesBegan:{:?} withEvent:{:?}]", view, touches, event);
         let _: () = msg![env; view touchesBegan:touches withEvent:event];
     }
 
@@ -297,30 +254,16 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
     let mut view_touches: HashMap<id, id> = HashMap::new();
     for (finger_id, coords) in map {
-        let Some(&touch) = env
-            .framework_state
-            .uikit
-            .ui_touch
-            .current_touches
-            .get(&finger_id)
-        else {
-            log!(
-                 "Warning: Finger {:?} touch move event received but no current touch, ignoring.",
-                finger_id
-            );
+        let Some(&touch) = env.framework_state.uikit.ui_touch.current_touches.get(&finger_id) else {
+            log!("Warning: Finger {:?} touch move event received but no current touch, ignoring.", finger_id);
             continue;
         };
 
-        let location = CGPoint {
-            x: coords.0,
-            y: coords.1,
-        };
+        let location = CGPoint { x: coords.0, y: coords.1 };
         let view = env.objc.borrow::<UITouchHostObject>(touch).view;
         let host_object = env.objc.borrow_mut::<UITouchHostObject>(touch);
 
-        if host_object.location == location {
-            continue;
-        }
+        if host_object.location == location { continue; }
 
         log_dbg!("Finger {:?} touch move: {:?}", finger_id, coords);
 
@@ -340,26 +283,14 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     }
 
     let all_touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-    for &touch in env
-        .framework_state
-        .uikit
-        .ui_touch
-        .current_touches
-        .clone()
-        .values()
-    {
+    for &touch in env.framework_state.uikit.ui_touch.current_touches.clone().values() {
         let _: () = msg![env; all_touches addObject:touch];
     }
 
     let event = ui_event::new_event(env, all_touches);
     autorelease(env, event);
     for (view, touches) in view_touches {
-        log_dbg!(
-            "Sending [{:?} touchesMoved:{:?} withEvent:{:?}]",
-            view,
-            touches,
-            event
-        );
+        log_dbg!("Sending [{:?} touchesMoved:{:?} withEvent:{:?}]", view, touches, event);
         let _: () = msg![env; view touchesMoved:touches withEvent:event];
     }
 
@@ -375,39 +306,20 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
 
     let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
     let all_touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
-    for &touch in env
-        .framework_state
-        .uikit
-        .ui_touch
-        .current_touches
-        .clone()
-        .values()
-    {
+    for &touch in env.framework_state.uikit.ui_touch.current_touches.clone().values() {
         let _: () = msg![env; all_touches addObject:touch];
     }
 
     let mut view_touches: HashMap<id, id> = HashMap::new();
     for (finger_id, coords) in map {
-        let Some(&touch) = env
-            .framework_state
-            .uikit
-            .ui_touch
-            .current_touches
-            .get(&finger_id)
-        else {
-            log!(
-                 "Warning: Finger {:?} touch up event received but no current touch, ignoring.",
-                finger_id
-            );
+        let Some(&touch) = env.framework_state.uikit.ui_touch.current_touches.get(&finger_id) else {
+            log!("Warning: Finger {:?} touch up event received but no current touch, ignoring.", finger_id);
             continue;
         };
 
         log_dbg!("Finger {:?} touch up: {:?}", finger_id, coords);
 
-        let location = CGPoint {
-            x: coords.0,
-            y: coords.1,
-        };
+        let location = CGPoint { x: coords.0, y: coords.1 };
         let view = env.objc.borrow::<UITouchHostObject>(touch).view;
         let host_object = env.objc.borrow_mut::<UITouchHostObject>(touch);
         host_object.previous_location = host_object.location;
@@ -424,12 +336,7 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let touches: id = *view_touches.get(&view).unwrap();
         let _: () = msg![env; touches addObject:touch];
 
-        let _ = &env
-            .framework_state
-            .uikit
-            .ui_touch
-            .current_touches
-            .remove(&finger_id);
+        let _ = env.framework_state.uikit.ui_touch.current_touches.remove(&finger_id);
         release(env, touch); // only owner now should be the NSSet
     }
 
@@ -437,12 +344,7 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     autorelease(env, event);
 
     for (view, touches) in view_touches {
-        log_dbg!(
-            "Sending [{:?} touchesEnded:{:?} withEvent:{:?}]",
-            view,
-            touches,
-            event
-        );
+        log_dbg!("Sending [{:?} touchesEnded:{:?} withEvent:{:?}]", view, touches, event);
         let _: () = msg![env; view touchesEnded:touches withEvent:event];
     }
 
