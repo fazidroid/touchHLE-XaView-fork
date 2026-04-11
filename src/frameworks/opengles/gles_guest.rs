@@ -1239,6 +1239,8 @@ fn glTexSubImage2D(
         )
     })
 }
+
+// 🏎️ ASPHALT 8 VULKAN OPTIMIZATION: Decode PVRTC directly to RGBA!
 fn glCompressedTexImage2D(
     env: &mut Environment,
     target: GLenum,
@@ -1251,21 +1253,58 @@ fn glCompressedTexImage2D(
     data: ConstVoidPtr,
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
-        let data = mem
+        let host_data = mem
             .ptr_at(data.cast::<u8>(), image_size.try_into().unwrap())
-            .cast();
-        gles.CompressedTexImage2D(
-            target,
-            level,
-            internalformat,
-            width,
-            height,
-            border,
-            image_size,
-            data,
-        );
+            .cast::<GLvoid>();
+
+        let is_pvrtc = internalformat == gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG
+            || internalformat == gles11::COMPRESSED_RGBA_PVRTC_4BPPV1_IMG
+            || internalformat == gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG
+            || internalformat == gles11::COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
+
+        if is_pvrtc {
+            // Determine the exact format properties
+            let is_2bpp = internalformat == gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG 
+                       || internalformat == gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
+            
+            let compressed_slice = std::slice::from_raw_parts(host_data as *const u8, image_size as usize);
+            
+            // Unzip the Apple PVRTC texture directly on the CPU into raw RGBA
+            let decoded_rgba = crate::image::pvrtc::decompress(
+                width as u32, 
+                height as u32, 
+                compressed_slice, 
+                is_2bpp
+            );
+
+            // Bypass compressed paths completely and forcefully hand Vulkan the raw pixel data!
+            gles.TexImage2D(
+                target,
+                level,
+                gles11::RGBA as GLint,
+                width,
+                height,
+                border,
+                gles11::RGBA,
+                gles11::UNSIGNED_BYTE,
+                decoded_rgba.as_ptr() as *const GLvoid,
+            );
+        } else {
+            // If the texture is safely encoded in a format Vulkan naturally understands, leave it alone.
+            gles.CompressedTexImage2D(
+                target,
+                level,
+                internalformat,
+                width,
+                height,
+                border,
+                image_size,
+                host_data,
+            );
+        }
     })
 }
+
 fn glCopyTexImage2D(
     env: &mut Environment,
     target: GLenum,
