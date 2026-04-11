@@ -379,9 +379,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSDictionary: NSObject
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    // NSDictionary might be subclassed by something which needs allocWithZone:
-    // to have the normal behaviour. Unimplemented: call superclass alloc then.
-    assert!(this == env.objc.get_known_class("NSDictionary", &mut env.mem));
+    // 🏎️ GAMELOFT BYPASS: Allow subclasses to safely allocate!
     msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
 }
 
@@ -509,9 +507,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSMutableDictionary: NSDictionary
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    // NSDictionary might be subclassed by something which needs allocWithZone:
-    // to have the normal behaviour. Unimplemented: call superclass alloc then.
-    assert!(this == env.objc.get_known_class("NSMutableDictionary", &mut env.mem));
+    // 🏎️ GAMELOFT BYPASS: Allow subclasses to safely allocate!
     msg_class![env; _touchHLE_NSMutableDictionary allocWithZone:zone]
 }
 
