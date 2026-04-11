@@ -125,7 +125,8 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    let host_name = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
+    // 🏎️ RUST FIX: Append .to_string() to instantly drop the immutable borrow of env.mem!
+    let host_name = env.mem.cstr_at_utf8(name).unwrap_or("unknown").to_string();
     log!("🏎️ GAMELOFT BYPASS: Intercepted gethostbyname(\"{}\")! Redirecting to 127.0.0.1", host_name);
 
     // 1. Allocate a copy of the host name using raw bytes to satisfy the compiler
