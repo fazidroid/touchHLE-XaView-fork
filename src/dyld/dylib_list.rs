@@ -29,7 +29,8 @@ pub const DYLIB_LIST: &[&super::HostDylib] = &[
     &frameworks::opengles::DYLIB,
     &frameworks::store_kit::DYLIB,
     &frameworks::system_configuration::DYLIB,
-    &frameworks::uikit::DYLIB,
+    // 🏎️ ASPHALT 8 HACK: Turn on the Android Gyroscope!
+    &frameworks::core_motion::DYLIB,
 ];
 
 #[cfg(test)]
