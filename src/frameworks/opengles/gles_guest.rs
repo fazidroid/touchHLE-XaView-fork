@@ -1240,7 +1240,7 @@ fn glTexSubImage2D(
     })
 }
 
-// 🏎️ ASPHALT 8 VULKAN OPTIMIZATION: Decode PVRTC directly to RGBA!
+// 🏎️ ASPHALT 8 VULKAN OPTIMIZATION: Real PVRTC to RGBA Decoding!
 fn glCompressedTexImage2D(
     env: &mut Environment,
     target: GLenum,
@@ -1269,12 +1269,12 @@ fn glCompressedTexImage2D(
             
             let compressed_slice = std::slice::from_raw_parts(host_data as *const u8, image_size as usize);
             
-            // Unzip the Apple PVRTC texture directly on the CPU into raw RGBA
-            let decoded_rgba = crate::image::pvrtc::decompress(
-                width as u32, 
-                height as u32, 
+            // 🏎️ THE REAL DECODER: Use touchHLE's built-in C-wrapper to unzip the Apple texture!
+            let decoded_rgba = crate::image::decode_pvrtc(
                 compressed_slice, 
-                is_2bpp
+                is_2bpp,
+                width as u32, 
+                height as u32 
             );
 
             // Bypass compressed paths completely and forcefully hand Vulkan the raw pixel data!
