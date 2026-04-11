@@ -310,6 +310,12 @@ pub fn init_with_objects_and_keys(
 
 /// Helper function to share `initWithDictionary:` implementations
 fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) -> id {
+    // 🏎️ GAMELOFT BYPASS: Safely handle nil dictionaries (like empty save files)!
+    if other_dict == nil {
+        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
+        return this;
+    }
+
     let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
 
     let mut host_object = <DictionaryHostObject as Default>::default();
@@ -791,6 +797,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())addEntriesFromDictionary:(id)other { // NSDictionary *
+    // 🏎️ GAMELOFT BYPASS: Do nothing if the source dictionary is nil!
+    if other == nil {
+        return;
+    }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other));
     for (k, v) in host_obj.map.values().flatten() {
         () = msg![env; this setObject:(*v) forKey:(*k)];
