@@ -7,7 +7,6 @@
 
 use crate::dyld::HostDylib;
 use crate::objc::{id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr};
-use crate::Environment;
 
 pub const DYLIB: HostDylib = HostDylib {
     path: "/System/Library/Frameworks/CoreMotion.framework/CoreMotion",
@@ -17,7 +16,6 @@ pub const DYLIB: HostDylib = HostDylib {
     function_exports: &[],
 };
 
-// 🏎️ Dummy objects to hold our classes in memory
 struct CMMotionManagerHostObject;
 impl HostObject for CMMotionManagerHostObject {}
 
@@ -35,7 +33,6 @@ const CLASSES: ClassExports = objc_classes! {
 }
 - (id)init { this }
 
-// Disable advanced gyro/motion to prevent engine crashes, enable pure accelerometer
 - (bool)isGyroAvailable { false }
 - (bool)isDeviceMotionAvailable { false }
 - (bool)isAccelerometerAvailable { true }
@@ -55,7 +52,6 @@ const CLASSES: ClassExports = objc_classes! {
 - (id)gyroData { nil }
 
 - (id)accelerometerData {
-    // 🏎️ Create the data packet and hand it to Asphalt 8
     let data: id = msg_class![env; CMAccelerometerData alloc];
     msg![env; data init]
 }
@@ -69,13 +65,26 @@ const CLASSES: ClassExports = objc_classes! {
 }
 - (id)init { this }
 
-- ((f64, f64, f64))acceleration {
-    // 🏎️ Grab the physical Android hardware sensor data!
-    let options = env.options.clone();
-    let (x, y, z) = env.window.get_acceleration(&options);
+// 🏎️ THE ULTIMATE STRET HACK: Bypass the compiler and write directly to RAM!
+- (())acceleration {
+    // 1. Intercept the hidden memory pointer from the shifted 'this' register
+    let stret_ptr = this.to_bits();
     
-    // Pass it back to the game engine as a 3D tuple
-    (x as f64, y as f64, z as f64)
+    // 2. Grab the physical Android hardware sensor data safely
+    let options = env.options.clone();
+    let (x, y, z) = env.window.as_ref().unwrap().get_acceleration(&options);
+    
+    // 3. Create raw memory pointers to Asphalt 8's struct buffer
+    let ptr_x: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr);
+    let ptr_y: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 8);
+    let ptr_z: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 16);
+    
+    // 4. Forcefully write the 3 doubles (f64) directly into the guest's RAM
+    env.mem.write(ptr_x, x as f64);
+    env.mem.write(ptr_y, y as f64);
+    env.mem.write(ptr_z, z as f64);
+    
+    // 5. Return void to satisfy the compiler; the struct is perfectly constructed in memory!
 }
 
 @end
