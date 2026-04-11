@@ -6,7 +6,8 @@
 //! The Core Motion framework.
 
 use crate::dyld::HostDylib;
-use crate::objc::{id, nil, objc_classes, ClassExports};
+use crate::objc::{id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr};
+use crate::Environment;
 
 pub const DYLIB: HostDylib = HostDylib {
     path: "/System/Library/Frameworks/CoreMotion.framework/CoreMotion",
@@ -16,92 +17,65 @@ pub const DYLIB: HostDylib = HostDylib {
     function_exports: &[],
 };
 
+// 🏎️ Dummy objects to hold our classes in memory
+struct CMMotionManagerHostObject;
+impl HostObject for CMMotionManagerHostObject {}
+
+struct CMAccelerometerDataHostObject;
+impl HostObject for CMAccelerometerDataHostObject {}
+
 const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
 @implementation CMMotionManager: NSObject
 
-- (bool)isGyroAvailable {
-    // FakeGyroCheck
-    log!("TODO: [(CMMotionManager *){:?} isGyroAvailable] -> true", this);
-    true
++ (id)allocWithZone:(NSZonePtr)_zone {
+    env.objc.alloc_object(this, Box::new(CMMotionManagerHostObject), &mut env.mem)
 }
-- (bool)isDeviceMotionAvailable {
-    // FakeDeviceMotion
-    log!("TODO: [(CMMotionManager *){:?} isDeviceMotionAvailable] -> true", this);
-    true
-}
-- (bool)isAccelerometerAvailable {
-    // FakeAccelerometerCheck
-    log!("TODO: [(CMMotionManager *){:?} isAccelerometerAvailable] -> true", this);
-    true
-}
+- (id)init { this }
 
-- (())setAccelerometerUpdateInterval:(f64)interval {
-    // FakeAccelInterval
-    log!("TODO: [(CMMotionManager *){:?} setAccelerometerUpdateInterval:{}]", this, interval);
-}
+// Disable advanced gyro/motion to prevent engine crashes, enable pure accelerometer
+- (bool)isGyroAvailable { false }
+- (bool)isDeviceMotionAvailable { false }
+- (bool)isAccelerometerAvailable { true }
 
-- (())startAccelerometerUpdates {
-    // FakeAccelStart
-    log!("TODO: [(CMMotionManager *){:?} startAccelerometerUpdates]", this);
-}
+- (())setAccelerometerUpdateInterval:(f64)_interval {}
+- (())startAccelerometerUpdates {}
+- (())setGyroUpdateInterval:(f64)_interval {}
+- (())startGyroUpdates {}
+- (())setDeviceMotionUpdateInterval:(f64)_interval {}
+- (())startDeviceMotionUpdates {}
 
-- (())setGyroUpdateInterval:(f64)interval {
-    // FakeGyroInterval
-    log!("TODO: [(CMMotionManager *){:?} setGyroUpdateInterval:{}]", this, interval);
-}
+- (bool)isDeviceMotionActive { false }
+- (bool)isAccelerometerActive { true }
+- (bool)isGyroActive { false }
 
-- (())startGyroUpdates {
-    // FakeGyroStart
-    log!("TODO: [(CMMotionManager *){:?} startGyroUpdates]", this);
-}
-
-- (())setDeviceMotionUpdateInterval:(f64)interval {
-    // FakeMotionInterval
-    log!("TODO: [(CMMotionManager *){:?} setDeviceMotionUpdateInterval:{}]", this, interval);
-}
-
-- (())startDeviceMotionUpdates {
-    // FakeMotionStart
-    log!("TODO: [(CMMotionManager *){:?} startDeviceMotionUpdates]", this);
-}
-
-- (bool)isDeviceMotionActive {
-    // FakeMotionActive
-    log!("TODO: [(CMMotionManager *){:?} isDeviceMotionActive] -> true", this);
-    true
-}
-
-- (bool)isAccelerometerActive {
-    // FakeAccelActive
-    log!("TODO: [(CMMotionManager *){:?} isAccelerometerActive] -> true", this);
-    true
-}
-
-- (bool)isGyroActive {
-    // FakeGyroActive
-    log!("TODO: [(CMMotionManager *){:?} isGyroActive] -> true", this);
-    true
-}
-
-- (id)deviceMotion {
-    // FakeDeviceMotion
-    log!("TODO: [(CMMotionManager *){:?} deviceMotion] -> nil", this);
-    nil
-}
+- (id)deviceMotion { nil }
+- (id)gyroData { nil }
 
 - (id)accelerometerData {
-    // FakeAccelData
-    log!("TODO: [(CMMotionManager *){:?} accelerometerData] -> nil", this);
-    nil
+    // 🏎️ Create the data packet and hand it to Asphalt 8
+    let data: id = msg_class![env; CMAccelerometerData alloc];
+    msg![env; data init]
 }
 
-- (id)gyroData {
-    // FakeGyroData
-    log!("TODO: [(CMMotionManager *){:?} gyroData] -> nil", this);
-    nil
+@end
+
+@implementation CMAccelerometerData: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    env.objc.alloc_object(this, Box::new(CMAccelerometerDataHostObject), &mut env.mem)
+}
+- (id)init { this }
+
+- ((f64, f64, f64))acceleration {
+    // 🏎️ Grab the physical Android hardware sensor data!
+    let options = env.options.clone();
+    let (x, y, z) = env.window.get_acceleration(&options);
+    
+    // Pass it back to the game engine as a 3D tuple
+    (x as f64, y as f64, z as f64)
 }
 
 @end
