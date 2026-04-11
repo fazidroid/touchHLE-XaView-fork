@@ -33,6 +33,7 @@ use std::time::{Duration, Instant};
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum DeviceFamily {
     iPhone,
+    iPhone5, // 🏎️ NEW: Widescreen iPhone support!
     iPad,
 }
 impl std::fmt::Display for DeviceFamily {
@@ -44,6 +45,8 @@ impl DeviceFamily {
     pub fn portrait_size(&self) -> (u32, u32) {
         match self {
             DeviceFamily::iPhone => (320, 480),
+            // 🏎️ FIX: Real 16:9 aspect ratio for iPhone 5 is 320x568!
+            DeviceFamily::iPhone5 => (320, 568), 
             DeviceFamily::iPad => (768, 1024),
         }
     }
@@ -54,6 +57,7 @@ impl TryFrom<u64> for DeviceFamily {
         match value {
             1 => Ok(DeviceFamily::iPhone),
             2 => Ok(DeviceFamily::iPad),
+            5 => Ok(DeviceFamily::iPhone5), 
             _ => Err(()),
         }
     }
@@ -63,6 +67,7 @@ impl TryFrom<&str> for DeviceFamily {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "iphone" => Ok(DeviceFamily::iPhone),
+            "iphone5" => Ok(DeviceFamily::iPhone5),
             "ipad" => Ok(DeviceFamily::iPad),
             _ => Err(()),
         }
@@ -255,7 +260,7 @@ impl Window {
         env::consts::OS == "android"
     }
 
-        pub fn new(
+    pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
@@ -266,15 +271,24 @@ impl Window {
         options_clone.use_angle = true;
         // options_clone.use_turnip = true; 
         
-        // 🏎️ ASPHALT 8 HACK: Force the emulator to spoof an iPhone 5!
-        options_clone.device_model = Some("iPhone5,1".to_string());
+        // 🏎️ FIX: Removed the hardcoded iPhone 5 spoof!
+        // Now the emulator will properly respect the 3:2 aspect ratio of iPhone 2G/3G/4
+        // and only use 16:9 if you explicitly pass --iphone5c in the options file.
         
         let options = &options_clone;
 
-                // 🏎️ CRITICAL FIX: Set environment variables BEFORE SDL initializes!
+        // 🏎️ CRITICAL FIX: Set environment variables BEFORE SDL initializes!
         if env::consts::OS == "android" {
             if options.use_turnip {
                 std::env::set_var("VK_ICD_FILENAMES", "libvulkan_freedreno.so");
+                std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
+                std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
+            }
+            if options.use_turnip {
+                // Vulkan REQUIRES the absolute path to load custom ICD drivers!
+                let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
+                std::env::set_var("VK_ICD_FILENAMES", format!("{}libvulkan_freedreno.so", lib_dir));
+                
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
             }
@@ -331,7 +345,7 @@ impl Window {
                 "vulkan_synchronous_submit,flush_after_ending_render_pass"
             );
 
-                        // 🏎️ FORCE ANGLE TRANSLATION
+            // 🏎️ FORCE ANGLE TRANSLATION
             // Give Android the ABSOLUTE path to the extracted JNI libraries
             let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
             
@@ -363,7 +377,13 @@ impl Window {
         let scale_hack = options.scale_hack;
         // TODO: some apps specify their orientation in Info.plist, we could use
         // that here.
-        let device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
+        let mut device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
+        
+        // 🏎️ DYNAMIC SCREEN HACK: If we are spoofing an iPhone 5, auto-upgrade to 16:9!
+        if options.device_model.as_deref().unwrap_or("").starts_with("iPhone5") {
+            device_family = DeviceFamily::iPhone5;
+        }
+        
         let device_orientation = options.initial_orientation;
         let fullscreen = options.fullscreen;
 
@@ -787,17 +807,15 @@ impl Window {
                         continue;
                     }
                 }
-                E::AppWillEnterBackground { .. } => {
-                    log!("Received app-will-resign-active event.");
-                    assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppWillResignActive);
-                    // For some reason, if we don't pause event polling, we will
-                    // never finish handling the event.
-                    // TODO: Add a mechanism for re-enabling polling, if at some
-                    // point we support returning touchHLE to the foreground.
-                    self.enable_event_polling = false;
+                E::AppWillEnterBackground { .. } | E::AppDidEnterBackground { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored spurious background event to prevent black screen!");
+                    // We completely remove the `self.enable_event_polling = false;` 
+                    // and `self.high_priority_event` assignment so the emulator never sleeps!
                     continue;
                 }
+                E::AppWillEnterForeground { .. } | E::AppDidEnterForeground { .. } => {
+                    continue;
+                }                
                 E::AppTerminating { .. } => {
                     log!("Received app-will-terminate event.");
                     assert!(self.high_priority_event.is_none());
