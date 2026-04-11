@@ -34,6 +34,22 @@ pub struct hostent {
 }
 unsafe impl SafeRead for hostent {}
 
+// Helper structs to cleanly write C-style arrays into guest memory
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct AddrList {
+    ip: MutPtr<u8>,
+    null_ptr: MutPtr<u8>,
+}
+unsafe impl SafeRead for AddrList {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct AliasesList {
+    null_ptr: MutPtr<u8>,
+}
+unsafe impl SafeRead for AliasesList {}
+
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[allow(non_camel_case_types)]
@@ -112,22 +128,28 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     let host_name = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
     log!("🏎️ GAMELOFT BYPASS: Intercepted gethostbyname(\"{}\")! Redirecting to 127.0.0.1", host_name);
 
-    // 1. Allocate a copy of the host name to ensure we have a valid MutPtr
-    let h_name_ptr = env.mem.alloc_and_write_cstr(host_name).cast::<u8>();
+    // 1. Allocate a copy of the host name using raw bytes to satisfy the compiler
+    let h_name_ptr = env.mem.alloc_and_write_cstr(host_name.as_bytes()).cast::<u8>();
 
-    // 2. Allocate the 127.0.0.1 IP bytes (4 bytes for IPv4)
-    let ip_bytes: [u8; 4] = [127, 0, 0, 1];
-    let ip_ptr = env.mem.alloc_and_write(ip_bytes).cast::<u8>();
+    // 2. Allocate the 127.0.0.1 IP. We encode it as a Little-Endian u32 
+    // so it perfectly matches the memory layout of [127, 0, 0, 1] without needing array traits!
+    let ip_data = u32::from_le_bytes([127, 0, 0, 1]);
+    let ip_ptr = env.mem.alloc_and_write(ip_data).cast::<u8>();
 
-    // 3. Allocate h_addr_list array: [ip_ptr, NULL]
-    let addr_list: [MutPtr<u8>; 2] = [ip_ptr, Ptr::null()];
-    let addr_list_ptr = env.mem.alloc_and_write(addr_list).cast::<MutPtr<u8>>();
+    // 3. Construct and allocate the h_addr_list
+    let addr_list_data = AddrList {
+        ip: ip_ptr,
+        null_ptr: Ptr::null(),
+    };
+    let addr_list_ptr = env.mem.alloc_and_write(addr_list_data).cast::<MutPtr<u8>>();
 
-    // 4. Allocate h_aliases array: [NULL]
-    let aliases: [MutPtr<u8>; 1] = [Ptr::null()];
-    let aliases_ptr = env.mem.alloc_and_write(aliases).cast::<MutPtr<u8>>();
+    // 4. Construct and allocate the h_aliases array
+    let aliases_data = AliasesList {
+        null_ptr: Ptr::null(),
+    };
+    let aliases_ptr = env.mem.alloc_and_write(aliases_data).cast::<MutPtr<u8>>();
 
-    // 5. Construct the hostent struct
+    // 5. Construct the final hostent struct
     let hostent_data = hostent {
         h_name: h_name_ptr,
         h_aliases: aliases_ptr,
