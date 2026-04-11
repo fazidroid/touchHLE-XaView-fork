@@ -45,7 +45,8 @@ impl DeviceFamily {
     pub fn portrait_size(&self) -> (u32, u32) {
         match self {
             DeviceFamily::iPhone => (320, 480),
-            DeviceFamily::iPhone5 => (320, 536), // 🏎️ 16:9 aspect ratio!
+            // 🏎️ FIX: Real 16:9 aspect ratio for iPhone 5 is 320x568!
+            DeviceFamily::iPhone5 => (320, 568), 
             DeviceFamily::iPad => (768, 1024),
         }
     }
@@ -259,7 +260,7 @@ impl Window {
         env::consts::OS == "android"
     }
 
-        pub fn new(
+    pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
@@ -270,12 +271,13 @@ impl Window {
         options_clone.use_angle = true;
         // options_clone.use_turnip = true; 
         
-                // 🏎️ ASPHALT 8 HACK: Force the emulator to spoof an iPhone 5!
-        options_clone.device_model = Some("iPhone5,1".to_string());
+        // 🏎️ FIX: Removed the hardcoded iPhone 5 spoof!
+        // Now the emulator will properly respect the 3:2 aspect ratio of iPhone 2G/3G/4
+        // and only use 16:9 if you explicitly pass --iphone5c in the options file.
         
         let options = &options_clone;
 
-                // 🏎️ CRITICAL FIX: Set environment variables BEFORE SDL initializes!
+        // 🏎️ CRITICAL FIX: Set environment variables BEFORE SDL initializes!
         if env::consts::OS == "android" {
             if options.use_turnip {
                 std::env::set_var("VK_ICD_FILENAMES", "libvulkan_freedreno.so");
@@ -290,7 +292,6 @@ impl Window {
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
                 std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
             }
-            
 
             if options.use_angle {
                 // Bare filenames only! Android will find them in jniLibs.
@@ -344,7 +345,7 @@ impl Window {
                 "vulkan_synchronous_submit,flush_after_ending_render_pass"
             );
 
-                        // 🏎️ FORCE ANGLE TRANSLATION
+            // 🏎️ FORCE ANGLE TRANSLATION
             // Give Android the ABSOLUTE path to the extracted JNI libraries
             let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
             
@@ -373,7 +374,7 @@ impl Window {
         // here, and then the app can disable it if it wants to.
         video_ctx.enable_screen_saver();
 
-                let scale_hack = options.scale_hack;
+        let scale_hack = options.scale_hack;
         // TODO: some apps specify their orientation in Info.plist, we could use
         // that here.
         let mut device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
