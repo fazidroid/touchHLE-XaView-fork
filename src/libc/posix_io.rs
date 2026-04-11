@@ -296,13 +296,20 @@ fn fsync(env: &mut Environment, fd: FileDescriptor) -> i32 {
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(open(_, _, ...)),
-    export_c_func!(close(_)),
+    export_c_func!(open(_, _, _)),
     export_c_func!(read(_, _, _)),
+    export_c_func!(pread(_, _, _, _)),
     export_c_func!(write(_, _, _)),
+    export_c_func!(pwrite(_, _, _, _)),
     export_c_func!(lseek(_, _, _)),
-    export_c_func!(fcntl(_, _, ...)),
+    export_c_func!(close(_)),
+    export_c_func!(rename(_, _)),
+    export_c_func!(getcwd(_, _)),
+    export_c_func!(chdir(_)),
+    export_c_func!(fcntl(_, _, _)),
+    export_c_func!(flock(_, _)),
     export_c_func!(fsync(_)),
+    export_c_func!(ftruncate(_, _)),
 ];
 
 pub fn register_socket(env: &mut Environment) -> FileDescriptor {
