@@ -7,7 +7,6 @@
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::errno::set_errno;
-use crate::libc::sys::mount::statfs_inner;
 use crate::mem::{ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
 
@@ -38,38 +37,29 @@ pub struct statvfs {
 unsafe impl SafeRead for statvfs {}
 
 fn statvfs(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<statvfs>) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
-    let (result, statfs) = statfs_inner(env, path);
-    let statvfs = statvfs {
-        // From the manpage:
-        // "Corresponds to the f_iosize member of struct statfs."
-        f_bsize: statfs.f_iosize.try_into().unwrap(),
-        // From the manpage:
-        // "This corresponds to the f_bsize member of struct statfs."
-        f_frsize: statfs.f_bsize,
-        f_blocks: statfs.f_blocks.try_into().unwrap(),
-        f_bfree: statfs.f_bfree.try_into().unwrap(),
-        f_bavail: statfs.f_bavail.try_into().unwrap(),
-        f_files: statfs.f_files.try_into().unwrap(),
-        f_ffree: statfs.f_ffree.try_into().unwrap(),
-        f_favail: statfs.f_ffree.try_into().unwrap(), // TODO: Is this right?
-        // From the manpage: "Not meaningful in this implementation"
+    
+    // 🏎️ GAMELOFT BYPASS: Hardcode ~130GB of free space to bypass storage checks!
+    let statvfs_data = statvfs {
+        f_bsize: 4096,
+        f_frsize: 4096,
+        f_blocks: 0x01FFFFFF,
+        f_bfree: 0x01FFFFFF,
+        f_bavail: 0x01FFFFFF,
+        f_files: 0x01FFFFFF,
+        f_ffree: 0x01FFFFFF,
+        f_favail: 0x01FFFFFF,
         f_fsid: 0,
-        // In the manpage: "There are two flags defined for the f_flag member"
-        // ST_RDONLY and ST_NOSUID
-        f_flag: statfs.f_flags & ST_RDONLY & ST_NOSUID,
+        f_flag: 0,
         f_namemax: 255,
     };
-    env.mem.write(buf, statvfs);
+    env.mem.write(buf, statvfs_data);
+    
     log!(
-        "TODO: statvfs({:?} {:?}, {:?}) -> {}",
-        path,
-        env.mem.cstr_at_utf8(path),
-        buf,
-        result
+        "🏎️ GAMELOFT BYPASS: Faked massive free space for statvfs({:?})",
+        env.mem.cstr_at_utf8(path)
     );
-    result
+    0 // Success
 }
 
 pub const FUNCTIONS: FunctionExports = &[export_c_func!(statvfs(_, _))];
