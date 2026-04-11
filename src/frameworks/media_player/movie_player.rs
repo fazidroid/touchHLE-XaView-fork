@@ -108,6 +108,12 @@ pub const CLASSES: ClassExports = objc_classes! {
         (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now())
     );
 
+    // 🏎️ GAMELOFT BYPASS: Asphalt 6 gets stuck because it never actually calls play()!
+    // We must fire the "Video Finished" notification immediately upon initialization.
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now())
+    );
+
     this
 }
 
