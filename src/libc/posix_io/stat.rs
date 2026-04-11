@@ -99,19 +99,16 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
             stat.st_mode |= S_IFREG;
             stat.st_size = file.file.stream_len().unwrap().try_into().unwrap();
             
-            // 🏎️ GAMELOFT BYPASS: Give files real block sizes!
             stat.st_blksize = 4096;
             stat.st_blocks = (stat.st_size as u64 / 512) + 1;
         }
         GuestFile::Directory => {
             stat.st_mode |= S_IFDIR;
             
-            // 🏎️ GAMELOFT BYPASS: Give directories valid block sizes to bypass space checks!
             stat.st_blksize = 4096;
             stat.st_blocks = 8;
         }
         _ => {
-            // Fallback for sockets or unimplemented to prevent 0 byte reads
             stat.st_mode |= S_IFREG;
             stat.st_blksize = 4096;
             stat.st_blocks = 1;
@@ -119,7 +116,7 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
     }
 
     env.mem.write(buf, stat);
-    0 // success
+    0
 }
 
 fn fstat(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
@@ -137,9 +134,13 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
 
         let fd = open_direct(env, path, 0);
         if fd == -1 {
-            // 🏎️ GAMELOFT BYPASS: If a directory check fails, fake success!
             let path_str = env.mem.cstr_at_utf8(path).unwrap_or("");
-            if path_str.contains("Documents") || path_str.contains("Library") || path_str.ends_with('/') || !path_str.contains('.') {
+            let filename = path_str.split('/').last().unwrap_or("");
+            
+            // 🏎️ FIX: We broke the file system by using `.contains("Documents")`!
+            // It accidentally faked missing files like `r_ev.dat` as directories, causing infinite loops.
+            // Now, we ONLY fake success if the path legitimately looks like a directory (no file extension).
+            if !filename.contains('.') || path_str.ends_with('/') {
                 log!("🏎️ GAMELOFT BYPASS: Faking missing directory for stat: {}", path_str);
                 let mut fake_stat = stat::default();
                 fake_stat.st_mode = S_IFDIR | 0o777;
@@ -148,7 +149,7 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
                 env.mem.write(buf, fake_stat);
                 return 0;
             }
-            return -1; // Let normal files fail so the game knows to create them
+            return -1; // Let actual files fail properly so the game creates them!
         }
 
         let result = fstat_inner(env, fd, buf);
