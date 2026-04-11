@@ -816,11 +816,10 @@ impl Window {
                 E::AppWillEnterForeground { .. } | E::AppDidEnterForeground { .. } => {
                     continue;
                 }                
-                E::AppTerminating { .. } => {
-                    log!("Received app-will-terminate event.");
-                    assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppWillTerminate);
-                    self.enable_event_polling = false;
+                E::AppTerminating { .. } | E::Quit { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored app-will-terminate event to prevent black screen shutdown!");
+                    // We remove the high_priority_event and enable_event_polling = false
+                    // so the emulator never shuts down rendering unless you force-close the Android app!
                     continue;
                 }
                 E::FingerUp {
