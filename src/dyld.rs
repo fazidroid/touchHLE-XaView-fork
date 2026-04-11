@@ -32,6 +32,18 @@ use std::collections::HashMap;
 
 pub use dylib_list::DYLIB_LIST;
 
+pub const DYLIB_LIST: &[&HostDylib] = &[
+    &crate::frameworks::foundation::DYLIB,
+    &crate::frameworks::uikit::DYLIB,
+    // ... other frameworks ...
+    
+    // 🏎️ ASPHALT 8 HACK: Turn on the Android Gyroscope!
+    &crate::frameworks::core_motion::DYLIB,
+    
+    // ...
+];
+
+
 /// Struct used to expose a host implementation of a dynamic library (usually a
 /// framework) to the linker.
 ///
