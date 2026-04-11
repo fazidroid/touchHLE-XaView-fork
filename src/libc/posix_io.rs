@@ -231,27 +231,16 @@ pub fn read(
     buffer: MutVoidPtr,
     size: GuestUSize,
 ) -> GuestISize {
-    // TODO: handle errno properly
-    set_errno(env, 0);
+    crate::libc::errno::set_errno(env, 0);
 
     if buffer.is_null() {
-        // TODO: set errno to EFAULT
         return -1;
     }
 
-    // Isolate the borrows into a tight block so they drop immediately after the read.
-    // This makes the Rust Borrow Checker happy when we need to mutate `env` later!
     let (is_socket, read_result) = {
         let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
-            log!(
-                "Warning: read({:?}, {:?}, {:#x}) called with unknown fd, returning -1",
-                fd,
-                buffer,
-                size,
-            );
             return -1;
         };
-
         let is_socket = matches!(file.file, GuestFile::Socket);
         let buffer_slice = env.mem.bytes_at_mut(buffer.cast(), size);
         (is_socket, file.file.read(buffer_slice))
@@ -260,57 +249,27 @@ pub fn read(
     match read_result {
         Ok(bytes_read) => {
             if bytes_read == 0 && size != 0 {
-                // 🏎️ GAMELOFT BYPASS: Fake EAGAIN for dead sockets to break the infinite loop!
+                // 🏎️ GAMELOFT BYPASS: Forcefully kill empty sockets with a hard Reset to break infinite loops!
                 if is_socket {
-                    log!("🏎️ GAMELOFT BYPASS: read() returned 0 on socket {}. Faking EAGAIN to break loop.", fd);
-                    set_errno(env, EAGAIN);
+                    log!("🏎️ GAMELOFT BYPASS: Faking ECONNRESET on dead socket {} to kill connection loop.", fd);
+                    crate::libc::errno::set_errno(env, crate::libc::errno::ECONNRESET);
                     return -1;
                 }
                 
-                // For normal files, just need to set EOF
                 if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
                     file.reached_eof = true;
                 }
-            }
-            if bytes_read < size as usize {
-                log!(
-                    "Warning: read({:?}, {:?}, {:#x}) read only {:#x} bytes",
-                    fd,
-                    buffer,
-                    size,
-                    bytes_read,
-                );
-            } else {
-                log_dbg!(
-                    "read({:?}, {:?}, {:#x}) => {:#x}",
-                    fd,
-                    buffer,
-                    size,
-                    bytes_read,
-                );
             }
             bytes_read.try_into().unwrap()
         }
         Err(e) => {
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
-                    set_errno(env, EISDIR);
-                    // the returned value was validated on iOS
+                    crate::libc::errno::set_errno(env, crate::libc::errno::EISDIR);
                     0
                 }
-                _ => {
-                    // TODO: set errno
-                    -1
-                }
+                _ => -1
             };
-            log!(
-                "Warning: read({:?}, {:?}, {:#x}) encountered error {:?}, returning {}",
-                fd,
-                buffer,
-                size,
-                e,
-                res,
-            );
             res
         }
     }
