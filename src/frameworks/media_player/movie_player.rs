@@ -173,9 +173,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this);
     env.framework_state.media_player.movie_player.active_player = Some(this);
 
-    // Act as if playback immediately completed after 1 second
-    // (various apps wait for this, such as BIA and Hero of Sparta).
-    let notif = (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now().checked_add(Duration::from_millis(1000)).unwrap());
+    // 🏎️ GAMELOFT BYPASS: Act as if playback instantly completed!
+    // No more 1-second delay, forcing games like Asphalt 8 to skip black screens immediately.
+    let notif = (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now());
     for (name, obj, _) in &mut State::get(env).pending_notifications {
         // De-duplicate similar notifications. This can happen if app is calling
         // `play` twice on the same player object (case of NOVA2).
