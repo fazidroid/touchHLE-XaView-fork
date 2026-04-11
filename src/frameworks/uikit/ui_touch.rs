@@ -204,7 +204,7 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             let location_in_window: CGPoint =
                 msg![env; window convertPoint:location fromWindow:nil];
             
-            // 🏎️ ASPHALT 8 HACK: Force accept all touches regardless of boundaries!
+            // 🏎️ ASPHALT 8 HACK #1: Force accept all touches regardless of Window boundaries!
             if true {
                 Some((window, location_in_window))
             } else {
@@ -218,14 +218,19 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             continue;
         };
 
-        let view: id = msg![env; window hitTest:location_in_window withEvent:event];
+        let mut view: id = msg![env; window hitTest:location_in_window withEvent:event];
+        
+        // 🏎️ ASPHALT 8 HACK #2: Bypass the View 'hitTest' rejection!
         if view == nil {
-            log!(
-                "Couldn't find a view for touch at {:?} in window {:?}, discarding",
-                location_in_window,
-                window,
-            );
-            continue;
+            // If the math says the touch is out of bounds, forcefully grab the active game layer
+            let subviews: id = msg![env; window subviews];
+            let subviews_count: NSUInteger = msg![env; subviews count];
+            if subviews_count > 0 {
+                view = msg![env; subviews objectAtIndex:(subviews_count - 1)];
+            } else {
+                view = window;
+            }
+            log_dbg!("Forcefully injected out-of-bounds touch into view {:?}", view);
         } else {
             log_dbg!(
                 "Found view {:?} with frame {:?} for touch at {:?} in window {:?}",
