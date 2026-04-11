@@ -21,9 +21,18 @@ const EAI_FAIL: i32 = 4;
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// TODO: struct definition
+// 🏎️ GAMELOFT BYPASS: Define the actual memory layout of the C hostent struct
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
-struct hostent {}
+pub struct hostent {
+    h_name: MutPtr<u8>,
+    h_aliases: MutPtr<MutPtr<u8>>,
+    h_addrtype: i32,
+    h_length: i32,
+    h_addr_list: MutPtr<MutPtr<u8>>,
+}
+unsafe impl SafeRead for hostent {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -100,13 +109,35 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    log!(
-        "TODO: gethostbyname({:?} \"{}\") => NULL",
-        name,
-        env.mem.cstr_at_utf8(name).unwrap()
-    );
-    // TODO: set h_errno
-    Ptr::null()
+    let host_name = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
+    log!("🏎️ GAMELOFT BYPASS: Intercepted gethostbyname(\"{}\")! Redirecting to 127.0.0.1", host_name);
+
+    // 1. Allocate a copy of the host name to ensure we have a valid MutPtr
+    let h_name_ptr = env.mem.alloc_and_write_cstr(host_name).cast::<u8>();
+
+    // 2. Allocate the 127.0.0.1 IP bytes (4 bytes for IPv4)
+    let ip_bytes: [u8; 4] = [127, 0, 0, 1];
+    let ip_ptr = env.mem.alloc_and_write(ip_bytes).cast::<u8>();
+
+    // 3. Allocate h_addr_list array: [ip_ptr, NULL]
+    let addr_list: [MutPtr<u8>; 2] = [ip_ptr, Ptr::null()];
+    let addr_list_ptr = env.mem.alloc_and_write(addr_list).cast::<MutPtr<u8>>();
+
+    // 4. Allocate h_aliases array: [NULL]
+    let aliases: [MutPtr<u8>; 1] = [Ptr::null()];
+    let aliases_ptr = env.mem.alloc_and_write(aliases).cast::<MutPtr<u8>>();
+
+    // 5. Construct the hostent struct
+    let hostent_data = hostent {
+        h_name: h_name_ptr,
+        h_aliases: aliases_ptr,
+        h_addrtype: AF_INET, // AF_INET is typically 2
+        h_length: 4,         // IPv4 length is 4 bytes
+        h_addr_list: addr_list_ptr,
+    };
+
+    // 6. Write the struct to guest memory and return the pointer
+    env.mem.alloc_and_write(hostent_data)
 }
 
 pub const FUNCTIONS: FunctionExports = &[
