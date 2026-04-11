@@ -17,11 +17,13 @@ pub const IPPROTO_TCP: i32 = 6;
 pub const IPPROTO_UDP: i32 = 17;
 
 const EAI_FAIL: i32 = 4;
+// 🏎️ Added specifically for the Airplane Mode bypass
+const EAI_NONAME: i32 = 8; 
 
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// 🏎️ GAMELOFT BYPASS: Define the actual memory layout of the C hostent struct
+// Define the actual memory layout of the C hostent struct
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[allow(non_camel_case_types)]
@@ -66,101 +68,29 @@ pub struct addrinfo {
 unsafe impl SafeRead for addrinfo {}
 
 fn getaddrinfo(
-    env: &mut Environment,
-    node_name: MutPtr<u8>,
-    serv_name: MutPtr<u8>,
-    hints: ConstPtr<addrinfo>,
-    res: MutPtr<MutPtr<addrinfo>>,
+    _env: &mut Environment,
+    _node_name: MutPtr<u8>,
+    _serv_name: MutPtr<u8>,
+    _hints: ConstPtr<addrinfo>,
+    _res: MutPtr<MutPtr<addrinfo>>,
 ) -> i32 {
-    if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, getaddrinfo({:?}, {:?}, {:?}, {:?}) -> EAI_FAIL",
-            node_name,
-            serv_name,
-            hints,
-            res
-        );
-        return EAI_FAIL;
-    }
-
-    assert!(node_name.is_null()); // TODO
-
-    let hint = env.mem.read(hints);
-    let ai_flags = hint.ai_flags;
-    assert_eq!(ai_flags, AI_PASSIVE);
-    let ai_family = hint.ai_family;
-    assert_eq!(ai_family, AF_INET);
-    assert!(hint.ai_socktype == SOCK_STREAM || hint.ai_socktype == SOCK_DGRAM);
-    assert!(
-        hint.ai_protocol == IPPROTO_TCP || hint.ai_protocol == IPPROTO_UDP || hint.ai_protocol == 0
-    );
-    let ai_addrlen = hint.ai_addrlen;
-    assert_eq!(ai_addrlen, 0);
-    assert!(hint.ai_canonname.is_null());
-    assert!(hint.ai_addr.is_null());
-    assert!(hint.ai_next.is_null());
-
-    let mut addr_info = hint;
-    let port: u16 = env.mem.cstr_at_utf8(serv_name).unwrap().parse().unwrap();
-    log_dbg!("getaddrinfo: port {}", port);
-    let addr = sockaddr::from_ipv4_parts([0; 4], port);
-
-    let tmp_addr = env.mem.alloc_and_write(addr);
-    addr_info.ai_addr = tmp_addr;
-    addr_info.ai_addrlen = guest_size_of::<sockaddr>();
-
-    let tmp_addr_info = env.mem.alloc_and_write(addr_info);
-    env.mem.write(res, tmp_addr_info);
-
-    0 // Success
+    // 🏎️ GAMELOFT BYPASS: Instantly simulate "Airplane Mode" (No Internet)
+    // This forces Asphalt 8 and 6 to abort the CRM retry loop and jump straight to the main menu!
+    log!("🏎️ GAMELOFT BYPASS: getaddrinfo called. Simulating Airplane Mode (EAI_NONAME)!");
+    EAI_NONAME
 }
 
-fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
-    let addrinfo_val = env.mem.read(addrinfo);
-    assert!(addrinfo_val.ai_next.is_null()); // TODO
-    let ai_addrlen = addrinfo_val.ai_addrlen;
-    assert_eq!(ai_addrlen, guest_size_of::<sockaddr>());
-    env.mem.free(addrinfo_val.ai_addr.cast());
-    env.mem.free(addrinfo.cast());
+fn freeaddrinfo(_env: &mut Environment, _addrinfo: MutPtr<addrinfo>) {
+    // Since getaddrinfo never actually allocates anything now, this safely does nothing.
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    // 🏎️ RUST FIX: Append .to_string() to instantly drop the immutable borrow of env.mem!
     let host_name = env.mem.cstr_at_utf8(name).unwrap_or("unknown").to_string();
-    log!("🏎️ GAMELOFT BYPASS: Intercepted gethostbyname(\"{}\")! Redirecting to 127.0.0.1", host_name);
-
-    // 1. Allocate a copy of the host name using raw bytes to satisfy the compiler
-    let h_name_ptr = env.mem.alloc_and_write_cstr(host_name.as_bytes()).cast::<u8>();
-
-    // 2. Allocate the 127.0.0.1 IP. We encode it as a Little-Endian u32 
-    // so it perfectly matches the memory layout of [127, 0, 0, 1] without needing array traits!
-    let ip_data = u32::from_le_bytes([127, 0, 0, 1]);
-    let ip_ptr = env.mem.alloc_and_write(ip_data).cast::<u8>();
-
-    // 3. Construct and allocate the h_addr_list
-    let addr_list_data = AddrList {
-        ip: ip_ptr,
-        null_ptr: Ptr::null(),
-    };
-    let addr_list_ptr = env.mem.alloc_and_write(addr_list_data).cast::<MutPtr<u8>>();
-
-    // 4. Construct and allocate the h_aliases array
-    let aliases_data = AliasesList {
-        null_ptr: Ptr::null(),
-    };
-    let aliases_ptr = env.mem.alloc_and_write(aliases_data).cast::<MutPtr<u8>>();
-
-    // 5. Construct the final hostent struct
-    let hostent_data = hostent {
-        h_name: h_name_ptr,
-        h_aliases: aliases_ptr,
-        h_addrtype: AF_INET, // AF_INET is typically 2
-        h_length: 4,         // IPv4 length is 4 bytes
-        h_addr_list: addr_list_ptr,
-    };
-
-    // 6. Write the struct to guest memory and return the pointer
-    env.mem.alloc_and_write(hostent_data)
+    
+    // 🏎️ GAMELOFT BYPASS: Return NULL to strictly enforce Airplane Mode for old DNS lookups!
+    log!("🏎️ GAMELOFT BYPASS: Intercepted gethostbyname(\"{}\")! Enforcing Airplane Mode (NULL).", host_name);
+    
+    Ptr::null()
 }
 
 pub const FUNCTIONS: FunctionExports = &[

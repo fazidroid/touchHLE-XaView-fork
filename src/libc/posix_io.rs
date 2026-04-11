@@ -234,11 +234,13 @@ pub fn read(
     crate::libc::errno::set_errno(env, 0);
 
     if buffer.is_null() {
+        crate::libc::errno::set_errno(env, crate::libc::errno::EINVAL);
         return -1;
     }
 
     let (is_socket, read_result) = {
         let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+            crate::libc::errno::set_errno(env, crate::libc::errno::EBADF);
             return -1;
         };
         let is_socket = matches!(file.file, GuestFile::Socket);
@@ -263,14 +265,17 @@ pub fn read(
             bytes_read.try_into().unwrap()
         }
         Err(e) => {
-            let res = match e.kind() {
+            match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
                     crate::libc::errno::set_errno(env, crate::libc::errno::EISDIR);
                     0
                 }
-                _ => -1
-            };
-            res
+                _ => {
+                    // 🏎️ FIX: Properly set EIO so standard C/C++ libraries don't loop infinitely!
+                    crate::libc::errno::set_errno(env, crate::libc::errno::EIO);
+                    -1
+                }
+            }
         }
     }
 }
