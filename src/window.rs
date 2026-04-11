@@ -807,17 +807,15 @@ impl Window {
                         continue;
                     }
                 }
-                E::AppWillEnterBackground { .. } => {
-                    log!("Received app-will-resign-active event.");
-                    assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppWillResignActive);
-                    // For some reason, if we don't pause event polling, we will
-                    // never finish handling the event.
-                    // TODO: Add a mechanism for re-enabling polling, if at some
-                    // point we support returning touchHLE to the foreground.
-                    self.enable_event_polling = false;
+                E::AppWillEnterBackground { .. } | E::AppDidEnterBackground { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored spurious background event to prevent black screen!");
+                    // We completely remove the `self.enable_event_polling = false;` 
+                    // and `self.high_priority_event` assignment so the emulator never sleeps!
                     continue;
                 }
+                E::AppWillEnterForeground { .. } | E::AppDidEnterForeground { .. } => {
+                    continue;
+                }                
                 E::AppTerminating { .. } => {
                     log!("Received app-will-terminate event.");
                     assert!(self.high_priority_event.is_none());
