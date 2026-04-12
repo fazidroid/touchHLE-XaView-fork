@@ -137,9 +137,6 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
             let path_str = env.mem.cstr_at_utf8(path).unwrap_or("");
             let filename = path_str.split('/').last().unwrap_or("");
             
-            // 🏎️ FIX: We broke the file system by using `.contains("Documents")`!
-            // It accidentally faked missing files like `r_ev.dat` as directories, causing infinite loops.
-            // Now, we ONLY fake success if the path legitimately looks like a directory (no file extension).
             if !filename.contains('.') || path_str.ends_with('/') {
                 log!("🏎️ GAMELOFT BYPASS: Faking missing directory for stat: {}", path_str);
                 let mut fake_stat = stat::default();
@@ -149,7 +146,11 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
                 env.mem.write(buf, fake_stat);
                 return 0;
             }
-            return -1; // Let actual files fail properly so the game creates them!
+            
+            // 🏎️ FIX: We must explicitly tell the C++ engine the file does not exist (ENOENT)!
+            // If we leave errno at 0, the game assumes a fatal filesystem lock and loops forever.
+            set_errno(env, ENOENT);
+            return -1;
         }
 
         let result = fstat_inner(env, fd, buf);
