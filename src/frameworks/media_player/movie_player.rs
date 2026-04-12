@@ -86,13 +86,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentURL:(id)url {
-    log!("🏎️ GAMELOFT BYPASS: [MPMoviePlayerController initWithContentURL]");
     retain(env, url);
     
-    // 🏎️ CRITICAL FIX: Create a real dummy UIView!
-    // If we return `nil` for the view, touchHLE will panic when the game calls `addSubview:`.
     let view: id = msg_class![env; UIView alloc];
     let view: id = msg![env; view init];
+    
+    // 🏎️ CRITICAL: Make the dummy view 100% invisible so it doesn't block the 3D graphics!
+    let clear_color: id = msg_class![env; UIColor clearColor];
+    let _: () = msg![env; view setBackgroundColor:clear_color];
+    let _: () = msg![env; view setOpaque:false];
+    let _: () = msg![env; view setHidden:true];
     
     let mut host_obj = env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this);
     host_obj.content_url = url;
@@ -120,10 +123,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)backgroundColor {
-    msg_class![env; UIColor blackColor]
+    msg_class![env; UIColor clearColor]
 }
 
-// 🏎️ Muted all the setter macros to prevent console spam and potential panics
 - (())setBackgroundColor:(id)_color {}
 - (())setScalingMode:(MPMovieScalingMode)_mode {}
 - (())setUseApplicationAudioSession:(bool)_use_session {}
@@ -131,7 +133,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setFullscreen:(bool)_fullscreen {}
 
 - (id)view {
-    // 🏎️ Return our safe dummy view so addSubview: succeeds!
     env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).view
 }
 
@@ -144,7 +145,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated {}
 
 - (())play {
-    log!("🏎️ GAMELOFT BYPASS: [MPMoviePlayerController play] called!");
     if let Some(old) = env.framework_state.media_player.movie_player.active_player {
         let _: () = msg![env; old stop];
     }
@@ -152,7 +152,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this);
     env.framework_state.media_player.movie_player.active_player = Some(this);
 
-    // Instantly finish playback
     let notif = (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(100));
     for (name, obj, _) in &mut State::get(env).pending_notifications {
         if *name == MPMoviePlayerPlaybackDidFinishNotification && *obj == this {
@@ -183,8 +182,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentURL:(id)url {
-    log!("🏎️ GAMELOFT BYPASS: [(MPMoviePlayerViewController*) initWithContentURL]");
-    
     let player: id = msg_class![env; MPMoviePlayerController alloc];
     let player: id = msg![env; player initWithContentURL:url];
     
