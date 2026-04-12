@@ -500,23 +500,22 @@ fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
     set_errno(env, 0);
 
     if Ptr::is_null(path) {
-        // TODO: set errno
         log!("remove({:?}) => -1, attempted to remove null", path);
         return -1;
     }
 
-    match env
-        .fs
-        .remove(GuestPath::new(&env.mem.cstr_at_utf8(path).unwrap()))
-    {
+    let path_str = env.mem.cstr_at_utf8(path).unwrap();
+
+    match env.fs.remove(GuestPath::new(&path_str)) {
         Ok(()) => {
-            log_dbg!("remove({:?}) => 0", path);
+            log_dbg!("remove({:?}) => 0", path_str);
             0
         }
         Err(_) => {
-            // TODO: set errno
-            log!("Warning: remove({:?}) failed, returning -1", path);
-            -1
+            // 🏎️ GAMELOFT BYPASS: Fake success for failed file deletions!
+            // The CRM engine will infinitely loop and halt the main thread if it fails to delete an old profile data file.
+            log!("🏎️ GAMELOFT BYPASS: Faking success for failed remove of {:?} to prevent CRM deadlock!", path_str);
+            0
         }
     }
 }
