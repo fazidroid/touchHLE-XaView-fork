@@ -12,18 +12,13 @@ use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::Environment;
 
 const AI_PASSIVE: i32 = 0x1;
-
 pub const IPPROTO_TCP: i32 = 6;
 pub const IPPROTO_UDP: i32 = 17;
-
-const EAI_FAIL: i32 = 4;
-// 🏎️ Added specifically for the Airplane Mode bypass
 const EAI_NONAME: i32 = 8; 
 
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// Define the actual memory layout of the C hostent struct
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[allow(non_camel_case_types)]
@@ -35,22 +30,6 @@ pub struct hostent {
     h_addr_list: MutPtr<MutPtr<u8>>,
 }
 unsafe impl SafeRead for hostent {}
-
-// Helper structs to cleanly write C-style arrays into guest memory
-#[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
-struct AddrList {
-    ip: MutPtr<u8>,
-    null_ptr: MutPtr<u8>,
-}
-unsafe impl SafeRead for AddrList {}
-
-#[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
-struct AliasesList {
-    null_ptr: MutPtr<u8>,
-}
-unsafe impl SafeRead for AliasesList {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -74,22 +53,15 @@ fn getaddrinfo(
     _hints: ConstPtr<addrinfo>,
     _res: MutPtr<MutPtr<addrinfo>>,
 ) -> i32 {
-    // 🏎️ GAMELOFT BYPASS: Instantly simulate "Airplane Mode" (No Internet)
-    // This forces Asphalt 8 and 6 to abort the CRM retry loop and jump straight to the main menu!
-    log!("🏎️ GAMELOFT BYPASS: getaddrinfo called. Simulating Airplane Mode (EAI_NONAME)!");
+    log!("🏎️ ASPHALT 8 BYPASS: Simulating Airplane Mode (EAI_NONAME) to break CRM loop!");
     EAI_NONAME
 }
 
-fn freeaddrinfo(_env: &mut Environment, _addrinfo: MutPtr<addrinfo>) {
-    // Since getaddrinfo never actually allocates anything now, this safely does nothing.
-}
+fn freeaddrinfo(_env: &mut Environment, _addrinfo: MutPtr<addrinfo>) {}
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     let host_name = env.mem.cstr_at_utf8(name).unwrap_or("unknown").to_string();
-    
-    // 🏎️ GAMELOFT BYPASS: Return NULL to strictly enforce Airplane Mode for old DNS lookups!
-    log!("🏎️ GAMELOFT BYPASS: Intercepted gethostbyname(\"{}\")! Enforcing Airplane Mode (NULL).", host_name);
-    
+    log!("🏎️ ASPHALT 8 BYPASS: gethostbyname(\"{}\") -> NULL", host_name);
     Ptr::null()
 }
 

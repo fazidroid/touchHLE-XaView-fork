@@ -496,7 +496,6 @@ fn putchar(env: &mut Environment, c: u8) -> i32 {
 }
 
 fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
 
     if Ptr::is_null(path) {
@@ -512,9 +511,9 @@ fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
             0
         }
         Err(_) => {
-            // 🏎️ GAMELOFT BYPASS: Fake success for failed file deletions!
-            // The CRM engine will infinitely loop and halt the main thread if it fails to delete an old profile data file.
-            log!("🏎️ GAMELOFT BYPASS: Faking success for failed remove of {:?} to prevent CRM deadlock!", path_str);
+            // 🏎️ ASPHALT 8 BYPASS: Fake success for failed file deletions!
+            // The CRM engine will infinitely loop if it gets an error when deleting a non-existent profile.
+            log!("🏎️ ASPHALT 8 BYPASS: Faking success for failed remove of {:?} to prevent CRM deadlock!", path_str);
             0
         }
     }
