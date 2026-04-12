@@ -102,13 +102,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
-    // 🏎️ STAGE 1: Tell Asphalt 8 the video is fully loaded! 
-    // This breaks the deadlock and forces the game engine to call play()
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(100))
+        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(200))
     );
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(200))
+        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(300))
+    );
+
+    // 🏎️ THE ULTIMATE FAILSAFE: If the game refuses to call play(), we force the video to finish anyway!
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(1000))
     );
 
     this
@@ -145,6 +148,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     todo_objc_setter!(this, fullsreen);
 }
 
+// 🏎️ NEW: Trick Asphalt 8 into thinking the video is fully buffered and ready to play!
+- (NSInteger)loadState {
+    3 // MPMovieLoadStatePlayable | MPMovieLoadStatePlaythroughOK
+}
+
+- (bool)isPreparedToPlay {
+    true
+}
+
+- (())prepareToPlay {
+    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerController*){:?} prepareToPlay]", this);
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(100))
+    );
+}
+
 - (id)view {
     nil 
 }
@@ -166,7 +185,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this);
     env.framework_state.media_player.movie_player.active_player = Some(this);
 
-    // 🏎️ STAGE 2: The game called play! Instantly tell it the video is finished!
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerPlaybackStateDidChangeNotification, this, Instant::now() + Duration::from_millis(100))
     );
@@ -206,9 +224,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     
     env.objc.borrow_mut::<MPMoviePlayerViewControllerHostObject>(this).player = player;
     
-    // Fallback notification for the ViewController itself
+    // 🏎️ CRITICAL FIX: We MUST target `player`!
+    // Asphalt 8 attaches its listener to the MoviePlayer, NOT the ViewController!
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(500))
+        (MPMoviePlayerPlaybackDidFinishNotification, player, Instant::now() + Duration::from_millis(800))
     );
     
     this
