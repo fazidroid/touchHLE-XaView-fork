@@ -154,9 +154,13 @@ pub enum Event {
     /// OS has informed touchHLE it will soon become inactive.
     /// (iOS `applicationWillResignActive:`, Android `onPause()`)
     AppWillResignActive,
+    /// 🏎️ NEW: Added so the game can wake up from the background!
+    AppDidBecomeActive,
     /// OS has informed touchHLE it will soon terminate.
     /// (iOS `applicationWillTerminate:`, Android `onDestroy()`)
     AppWillTerminate,
+    /// 🏎️ NEW: Added to prevent crashes when Android sends a memory warning!
+    AppLowMemory,
     TouchesDown(HashMap<FingerId, Coords>),
     TouchesMove(HashMap<FingerId, Coords>),
     TouchesUp(HashMap<FingerId, Coords>),
