@@ -41,6 +41,12 @@ pub const MPMoviePlayerScalingModeDidChangeNotification: &str =
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
 
+// 🏎️ ASPHALT 8 BYPASS: Added the missing notifications!
+pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
+    "MPMoviePlayerLoadStateDidChangeNotification";
+pub const MPMoviePlayerPlaybackStateDidChangeNotification: &str =
+    "MPMoviePlayerPlaybackStateDidChangeNotification";
+
 pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMoviePlayerPlaybackDidFinishNotification",
@@ -58,6 +64,15 @@ pub const CONSTANTS: ConstantExports = &[
         "_MPMoviePlayerPlaybackDidFinishReasonUserInfoKey",
         HostConstant::NSString(MPMoviePlayerPlaybackDidFinishReasonUserInfoKey),
     ),
+    // 🏎️ Export the new constants so Asphalt 8 can bind its listeners!
+    (
+        "_MPMoviePlayerLoadStateDidChangeNotification",
+        HostConstant::NSString(MPMoviePlayerLoadStateDidChangeNotification),
+    ),
+    (
+        "_MPMoviePlayerPlaybackStateDidChangeNotification",
+        HostConstant::NSString(MPMoviePlayerPlaybackStateDidChangeNotification),
+    ),
 ];
 
 struct MPMoviePlayerControllerHostObject {
@@ -65,12 +80,10 @@ struct MPMoviePlayerControllerHostObject {
 }
 impl HostObject for MPMoviePlayerControllerHostObject {}
 
-// 🏎️ Added a HostObject to store the inner player so Asphalt 8's observers don't break
 struct MPMoviePlayerViewControllerHostObject {
     player: id,
 }
 impl HostObject for MPMoviePlayerViewControllerHostObject {}
-
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -96,12 +109,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
+    // 🏎️ ASPHALT 8 BYPASS: Fire the specific state-change notifications Asphalt 8 requires!
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(200))
+        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(100))
     );
-
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(500))
+        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(200))
+    );
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackStateDidChangeNotification, this, Instant::now() + Duration::from_millis(300))
+    );
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(400))
     );
 
     this
@@ -192,13 +211,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentURL:(id)url {
-    log!("🏎️ GAMELOFT BYPASS: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?}]", this, url);
+    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?}]", this, url);
     
-    // 🏎️ FIX: Create a real player so Asphalt 8 can successfully attach its auto-skip listeners to it!
     let player: id = msg_class![env; MPMoviePlayerController alloc];
     let player: id = msg![env; player initWithContentURL:url];
     
     env.objc.borrow_mut::<MPMoviePlayerViewControllerHostObject>(this).player = player;
+    
+    // Also dispatch to the view controller just in case
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(500))
+    );
+    
     this
 }
 
