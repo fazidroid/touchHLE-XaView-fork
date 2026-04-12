@@ -69,12 +69,10 @@ fn getaddrinfo(
 
     let mut addr_info = hint;
     
-    // Safely parse the port
     let port_str = env.mem.cstr_at_utf8(serv_name).unwrap_or("80");
     let port: u16 = port_str.parse().unwrap_or(80);
     
     // 🏎️ ASPHALT 8 BYPASS: Return 127.0.0.1 (Loopback)
-    // This prevents the "No Internet" popup and allows the network request to instantly finish empty!
     let addr = sockaddr::from_ipv4_parts([127, 0, 0, 1], port);
 
     let tmp_addr = env.mem.alloc_and_write(addr);
@@ -100,8 +98,23 @@ fn gethostbyname(_env: &mut Environment, _name: ConstPtr<u8>) -> MutPtr<hostent>
     Ptr::null()
 }
 
+// 🏎️ NEW: Missing Socket Functions Bypass
+fn getpeername(env: &mut Environment, _sockfd: i32, _addr: MutPtr<sockaddr>, _addrlen: MutPtr<socklen_t>) -> i32 {
+    log!("🏎️ ASPHALT 8 BYPASS: Stubbed getpeername to prevent crash!");
+    crate::libc::errno::set_errno(env, 57); // ENOTCONN (Socket is not connected)
+    -1 
+}
+
+fn getsockname(env: &mut Environment, _sockfd: i32, _addr: MutPtr<sockaddr>, _addrlen: MutPtr<socklen_t>) -> i32 {
+    log!("🏎️ ASPHALT 8 BYPASS: Stubbed getsockname to prevent crash!");
+    crate::libc::errno::set_errno(env, 57); // ENOTCONN
+    -1 
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(getaddrinfo(_, _, _, _)),
     export_c_func!(freeaddrinfo(_)),
     export_c_func!(gethostbyname(_)),
+    export_c_func!(getpeername(_, _, _)),
+    export_c_func!(getsockname(_, _, _)),
 ];
