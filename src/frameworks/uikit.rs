@@ -116,35 +116,15 @@ pub fn handle_events(env: &mut Environment) -> Option<Instant> {
                 ui_touch::handle_event(env, event)
             }
             Event::AppWillResignActive => {
-                // Getting this event means touchHLE is becoming inactive, e.g.
-                // due to switching apps. The obvious way to handle this would
-                // be to just send `applicationWillResignActive:` to the
-                // UIApplicationDelegate. However:
-                // - touchHLE's event loop can't handle an inactive app well
-                //   right now. For example, audio isn't paused.
-                // - touchHLE's event loop can't handle the subsequent
-                //   termination of an app right now: it doesn't manage to send
-                //   the `applicationWillTerminate:` message in time. This can
-                //   mean loss of data!
-                // Therefore, for the moment we will simulate the early iOS
-                // behavior where switching app usually resulted in termination.
-                // We can usually handle this in time, so there won't be data
-                // loss, nor problems with background resource usage or audio.
-                // TODO: Handle this better.
-                log!("Handling app-will-resign-active event: exiting.");
-                ui_application::exit(env);
+                // 🏎️ ASPHALT 8 BYPASS: We comment out the exit function!
+                // The game will no longer pause or shut down when Android loses focus.
+                log!("🏎️ ASPHALT 8 BYPASS: Ignored app-will-resign-active to prevent Android sleep!");
+                // ui_application::exit(env); 
             }
             Event::AppWillTerminate => {
-                log!("Handling app-will-terminate event.");
-                ui_application::exit(env);
-            }
-            // 🏎️ NEW: Ignore the new foreground wake-up event!
-            Event::AppDidBecomeActive => {
-                log!("Handling app-did-become-active event. Waking up iOS application layer!");
-            }
-            // 🏎️ NEW: Ignore the new memory warning event!
-            Event::AppLowMemory => {
-                log!("Handling app-low-memory event: ignored to prevent crashes.");
+                // 🏎️ ASPHALT 8 BYPASS: We comment out the exit function!
+                log!("🏎️ ASPHALT 8 BYPASS: Ignored app-will-terminate to prevent Android sleep!");
+                // ui_application::exit(env);
             }
             Event::EnterDebugger => {
                 if env.is_debugging_enabled() {
