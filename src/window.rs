@@ -638,7 +638,6 @@ impl Window {
             }
 
             self.event_queue.push_back(match event {
-                E::Quit { .. } => Event::Quit,
                 E::MouseButtonDown {
                     x,
                     y,
@@ -807,19 +806,29 @@ impl Window {
                         continue;
                     }
                 }
-                E::AppWillEnterBackground { .. } | E::AppDidEnterBackground { .. } => {
-                    log!("🏎️ ANDROID BYPASS: Ignored spurious background event to prevent black screen!");
-                    // We completely remove the `self.enable_event_polling = false;` 
-                    // and `self.high_priority_event` assignment so the emulator never sleeps!
+                E::AppTerminating { .. } | E::Quit { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored app-will-terminate event!");
                     continue;
                 }
-                E::AppWillEnterForeground { .. } | E::AppDidEnterForeground { .. } => {
+                E::AppLowMemory { .. } => {
+                    log!("Received app-low-memory event.");
+                    assert!(self.high_priority_event.is_none());
+                    self.high_priority_event = Some(Event::AppLowMemory);
                     continue;
-                }                
-                E::AppTerminating { .. } | E::Quit { .. } => {
-                    log!("🏎️ ANDROID BYPASS: Ignored app-will-terminate event to prevent black screen shutdown!");
-                    // We remove the high_priority_event and enable_event_polling = false
-                    // so the emulator never shuts down rendering unless you force-close the Android app!
+                }
+                E::AppWillEnterBackground { .. } | E::AppDidEnterBackground { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored background event to prevent sleep!");
+                    // We completely ignore this (and do NOT disable polling) so the game never pauses!
+                    continue;
+                }
+                E::AppWillEnterForeground { .. } => {
+                    continue;
+                }
+                E::AppDidEnterForeground { .. } => {
+                    log!("Received app-did-enter-foreground event. Waking up!");
+                    assert!(self.high_priority_event.is_none());
+                    // 🏎️ CRITICAL: We MUST allow this event through so Asphalt 8 wakes up and renders!
+                    self.high_priority_event = Some(Event::AppDidBecomeActive);
                     continue;
                 }
                 E::FingerUp {
