@@ -65,6 +65,11 @@ struct MPMoviePlayerControllerHostObject {
 }
 impl HostObject for MPMoviePlayerControllerHostObject {}
 
+struct MPMoviePlayerViewControllerHostObject {
+    player: id,
+}
+impl HostObject for MPMoviePlayerViewControllerHostObject {}
+
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
@@ -79,13 +84,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentURL:(id)url {
-    log!(
-        "TODO: [(MPMoviePlayerController*){:?} initWithContentURL:{:?} ({:?})]",
-        this,
-        url,
-        ns_url::to_rust_path(env, url),
-    );
-
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
@@ -108,9 +106,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)backgroundColor {
-    msg_class![env; UIColor blackColor] // guess
+    msg_class![env; UIColor blackColor]
 }
-- (())setBackgroundColor:(id)color { // guess
+- (())setBackgroundColor:(id)color {
     todo_objc_setter!(this, color);
 }
 
@@ -128,11 +126,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)view {
-    nil // TODO
+    nil
 }
 
 - (MPMoviePlaybackState)playbackState {
-    MPMoviePlaybackStateStopped // guess
+    MPMoviePlaybackStateStopped
 }
 
 - (())setMovieControlMode:(NSInteger)_mode {}
@@ -140,7 +138,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated {}
 
 - (())play {
-    log!("TODO: [(MPMoviePlayerController*){:?} play]", this);
+    log!("🏎️ ASPHALT 8 BYPASS: [MPMoviePlayerController play] called!");
     if let Some(old) = env.framework_state.media_player.movie_player.active_player {
         let _: () = msg![env; old stop];
     }
@@ -148,21 +146,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this);
     env.framework_state.media_player.movie_player.active_player = Some(this);
 
+    // Instantly finish playback
     let notif = (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(100));
     for (name, obj, _) in &mut State::get(env).pending_notifications {
         if *name == MPMoviePlayerPlaybackDidFinishNotification && *obj == this {
-            return; // already pending
+            return;
         }
     }
     State::get(env).pending_notifications.push_back(notif);
 }
 
-- (())pause {
-    log!("TODO: [(MPMoviePlayerController*){:?} pause]", this);
-}
+- (())pause {}
 
 - (())stop {
-    log!("TODO: [(MPMoviePlayerController*){:?} stop]", this);
     if env.framework_state.media_player.movie_player.active_player.is_some() {
         assert!(this == env.framework_state.media_player.movie_player.active_player.take().unwrap());
         release(env, this);
@@ -173,10 +169,39 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation MPMoviePlayerViewController: UIViewController
 
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::new(MPMoviePlayerViewControllerHostObject {
+        player: nil,
+    });
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
 - (id)initWithContentURL:(id)url {
-    log!("TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?}]", this, url);
-    release(env, this);
-    nil // 🏎️ CRITICAL: Returns nil so Asphalt 8 safely skips the movie player UI completely!
+    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerViewController*) initWithContentURL]");
+    
+    // We create the actual movie player object the game expects to find
+    let player: id = msg_class![env; MPMoviePlayerController alloc];
+    let player: id = msg![env; player initWithContentURL:url];
+    
+    env.objc.borrow_mut::<MPMoviePlayerViewControllerHostObject>(this).player = player;
+    
+    // 🏎️ CRITICAL: Fire the notification on the PLAYER, not the VIEW CONTROLLER!
+    // This is exactly what the Gameloft engine is waiting for to clear the black screen.
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackDidFinishNotification, player, Instant::now() + Duration::from_millis(500))
+    );
+    
+    this
+}
+
+- (())dealloc {
+    let player = env.objc.borrow::<MPMoviePlayerViewControllerHostObject>(this).player;
+    release(env, player);
+    env.objc.dealloc_object(this, &mut env.mem);
+}
+
+- (id)moviePlayer {
+    env.objc.borrow::<MPMoviePlayerViewControllerHostObject>(this).player
 }
 
 @end
