@@ -158,7 +158,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated {}
 
 - (())play {
-    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerController*){:?} play]");
+    // 🏎️ FIX: Added the missing `, this` argument for the log macro!
+    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerController*){:?} play]", this);
     if let Some(old) = env.framework_state.media_player.movie_player.active_player {
         let _: () = msg![env; old stop];
     }
