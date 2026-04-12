@@ -116,6 +116,16 @@ fn memset_pattern_inner(
         target += 1;
     }
 }
+fn strerror_r(env: &mut Environment, errnum: i32, buf: MutPtr<u8>, buflen: u32) -> i32 {
+    log!("🏎️ ASPHALT 8 BYPASS: Stubbed strerror_r for error code {}", errnum);
+    
+    // Safely return an empty string to prevent memory corruption
+    if !buf.is_null() && buflen > 0 {
+        env.mem.write(buf, 0u8); 
+    }
+    
+    0 // 0 means Success
+}
 fn memcpy(
     env: &mut Environment,
     dest: MutVoidPtr,
@@ -394,6 +404,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(memset_pattern4(_, _, _)),
     export_c_func!(memset_pattern8(_, _, _)),
     export_c_func!(memset_pattern16(_, _, _)),
+    export_c_func!(strerror_r(_, _, _)),
     export_c_func!(memcpy(_, _, _)),
     export_c_func!(__memcpy_chk(_, _, _, _)),
     export_c_func!(memmove(_, _, _)),
