@@ -15,7 +15,7 @@
 //! immediately fires the delegate callback with an empty `SKProductsResponse`,
 //! so the CRM task gets its answer and the boot screen advances.
 
-use crate::objc::{autorelease, id, msg, msg_class, nil, objc_classes, retain, ClassExports, HostObject};
+use crate::objc::{autorelease, id, msg, msg_class, msg_send_no_type_checking, nil, objc_classes, retain, ClassExports, HostObject};
 
 // ---------------------------------------------------------------------------
 // SKProductsRequest host object — stores the delegate set before -start
@@ -130,13 +130,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     let response: id = msg![env; response init];
     let response = autorelease(env, response);
 
-    // Call the mandatory delegate method:
-    // -productsRequest:didReceiveResponse:
-    let _: () = msg![env; delegate productsRequest:this didReceiveResponse:response];
+    // Call the mandatory delegate method: -productsRequest:didReceiveResponse:
+    // We use msg_send_no_type_checking to avoid GuestRet inference ambiguity
+    // on multi-argument selectors.
+    {
+        let sel = env.objc.lookup_selector("productsRequest:didReceiveResponse:")
+            .expect("Unknown selector");
+        let _: () = msg_send_no_type_checking(env, (delegate, sel, this, response));
+    }
 
-    // Call the optional SKRequestDelegate method -requestDidFinish: if
-    // the delegate implements it.
-    let _: () = msg![env; delegate requestDidFinish:this];
+    // Call the optional -requestDidFinish: if the delegate implements it.
+    if env.objc.object_has_method_named(&env.mem, delegate, "requestDidFinish:") {
+        let sel = env.objc.lookup_selector("requestDidFinish:")
+            .expect("Unknown selector");
+        let _: () = msg_send_no_type_checking(env, (delegate, sel, this));
+    }
 
     log_dbg!("SKProductsRequest: fired empty didReceiveResponse to delegate {:?}", delegate);
 }
