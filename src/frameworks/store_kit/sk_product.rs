@@ -15,20 +15,14 @@
 //! immediately fires the delegate callback with an empty `SKProductsResponse`,
 //! so the CRM task gets its answer and the boot screen advances.
 
-use crate::objc::{autorelease, id, msg, msg_class, msg_send_no_type_checking, nil, objc_classes, retain, ClassExports, HostObject};
+use crate::objc::{autorelease, id, msg, msg_class, msg_send_no_type_checking, nil,
+                  objc_classes, retain, ClassExports, HostObject};
 
-// ---------------------------------------------------------------------------
-// SKProductsRequest host object — stores the delegate set before -start
-// ---------------------------------------------------------------------------
 struct SKProductsRequestHostObject {
-    /// Strong reference to the delegate (SKProductsRequestDelegate).
     delegate: id,
 }
 impl HostObject for SKProductsRequestHostObject {}
 
-// ---------------------------------------------------------------------------
-// SKProductsResponse host object — wraps the (empty) result
-// ---------------------------------------------------------------------------
 struct SKProductsResponseHostObject;
 impl HostObject for SKProductsResponseHostObject {}
 
@@ -36,57 +30,26 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
-// ---------------------------------------------------------------------------
-// SKProduct — individual purchasable item. We never populate any.
-// ---------------------------------------------------------------------------
 @implementation SKProduct: NSObject
-
-- (id)productIdentifier {
-    nil
-}
-
-- (id)localizedTitle {
-    nil
-}
-
-- (id)localizedDescription {
-    nil
-}
-
-- (id)price {
-    nil
-}
-
-- (id)priceLocale {
-    nil
-}
-
+- (id)productIdentifier    { nil }
+- (id)localizedTitle       { nil }
+- (id)localizedDescription { nil }
+- (id)price                { nil }
+- (id)priceLocale          { nil }
 @end
 
-// ---------------------------------------------------------------------------
-// SKProductsResponse — handed to the delegate. Always empty.
-// ---------------------------------------------------------------------------
 @implementation SKProductsResponse: NSObject
-
 + (id)alloc {
-    let host_object = Box::new(SKProductsResponseHostObject);
-    env.objc.alloc_object(this, host_object, &mut env.mem)
+    env.objc.alloc_object(this, Box::new(SKProductsResponseHostObject), &mut env.mem)
 }
-
 - (id)products {
-    // Empty array — game iterates this to find purchasable items.
     msg_class![env; NSArray array]
 }
-
 - (id)invalidProductIdentifiers {
     msg_class![env; NSArray array]
 }
-
 @end
 
-// ---------------------------------------------------------------------------
-// SKProductsRequest — THE critical class.
-// ---------------------------------------------------------------------------
 @implementation SKProductsRequest: NSObject
 
 + (id)alloc {
@@ -94,19 +57,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
-- (id)initWithProductIdentifiers:(id)_ids { // NSSet *
-    // Previously returned nil — that was the root cause of the boot freeze.
-    // Return self so the caller gets a valid object.
+- (id)initWithProductIdentifiers:(id)_ids {
     this
 }
 
 - (())setDelegate:(id)delegate {
-    // Retain the delegate (strong ref for the lifetime of the request).
     retain(env, delegate);
     let host_obj = env.objc.borrow_mut::<SKProductsRequestHostObject>(this);
     let old = host_obj.delegate;
     host_obj.delegate = delegate;
-    // Release previous delegate if any.
     if old != nil {
         crate::objc::release(env, old);
     }
@@ -117,41 +76,37 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())start {
-    // Fire the delegate callback immediately with an empty response.
-    // This is what unblocks InitializeCRMTask so the boot screen advances.
     let delegate = env.objc.borrow::<SKProductsRequestHostObject>(this).delegate;
     if delegate == nil {
-        log!("SKProductsRequest: -start called with no delegate set, skipping callback");
+        log!("SKProductsRequest: -start called with no delegate, skipping");
         return;
     }
 
-    // Build an empty SKProductsResponse.
     let response: id = msg_class![env; SKProductsResponse alloc];
     let response: id = msg![env; response init];
     let response = autorelease(env, response);
 
-    // Call the mandatory delegate method: -productsRequest:didReceiveResponse:
-    // We use msg_send_no_type_checking to avoid GuestRet inference ambiguity
-    // on multi-argument selectors.
-    {
-        let sel = env.objc.lookup_selector("productsRequest:didReceiveResponse:")
-            .expect("Unknown selector");
+    // The guest binary registers all its selectors at startup via
+    // register_bin_selectors(), so these will be in the selector table
+    // by the time -start is called. We use if-let instead of .expect()
+    // so a missing selector degrades gracefully instead of panicking.
+    if let Some(sel) = env.objc.lookup_selector("productsRequest:didReceiveResponse:") {
         let _: () = msg_send_no_type_checking(env, (delegate, sel, this, response));
+        log_dbg!("SKProductsRequest: fired productsRequest:didReceiveResponse:");
+    } else {
+        // Selector was not found — this should not happen with Asphalt 8
+        // since it calls this method itself, so it will be in the binary.
+        log!("SKProductsRequest: WARNING — selector productsRequest:didReceiveResponse: not found!");
     }
 
-    // Call the optional -requestDidFinish: if the delegate implements it.
-    if env.objc.object_has_method_named(&env.mem, delegate, "requestDidFinish:") {
-        let sel = env.objc.lookup_selector("requestDidFinish:")
-            .expect("Unknown selector");
-        let _: () = msg_send_no_type_checking(env, (delegate, sel, this));
+    if let Some(sel) = env.objc.lookup_selector("requestDidFinish:") {
+        if env.objc.object_has_method_named(&env.mem, delegate, "requestDidFinish:") {
+            let _: () = msg_send_no_type_checking(env, (delegate, sel, this));
+        }
     }
-
-    log_dbg!("SKProductsRequest: fired empty didReceiveResponse to delegate {:?}", delegate);
 }
 
-- (())cancel {
-    // No-op — no async work is in flight.
-}
+- (())cancel {}
 
 @end
 
