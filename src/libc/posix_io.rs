@@ -22,7 +22,6 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 #[derive(Default)]
 pub struct State {
-    /// File descriptors _other than stdin, stdout, and stderr_
     files: Vec<Option<PosixFileHostObject>>,
 }
 impl State {
@@ -40,7 +39,6 @@ struct PosixFileHostObject {
     flags: i32,
 }
 
-// TODO: stdin/stdout/stderr handling somehow
 fn file_idx_to_fd(idx: usize) -> FileDescriptor {
     FileDescriptor::try_from(idx)
         .unwrap()
@@ -51,21 +49,17 @@ fn fd_to_file_idx(fd: FileDescriptor) -> usize {
     fd.checked_sub(NORMAL_FILENO_BASE).unwrap() as usize
 }
 
-/// File descriptor type. This alias is for readability, POSIX just uses `int`.
 pub type FileDescriptor = i32;
 pub const STDIN_FILENO: FileDescriptor = 0;
 pub const STDOUT_FILENO: FileDescriptor = 1;
 pub const STDERR_FILENO: FileDescriptor = 2;
 const NORMAL_FILENO_BASE: FileDescriptor = STDERR_FILENO + 1;
 
-/// Flags bitfield for `open`. This alias is for readability, POSIX just uses
-/// `int`.
 pub type OpenFlag = i32;
 pub const O_RDONLY: OpenFlag = 0x0;
 pub const O_WRONLY: OpenFlag = 0x1;
 pub const O_RDWR: OpenFlag = 0x2;
 pub const O_ACCMODE: OpenFlag = O_RDWR | O_WRONLY | O_RDONLY;
-
 pub const O_NONBLOCK: OpenFlag = 0x4;
 pub const O_APPEND: OpenFlag = 0x8;
 pub const O_SHLOCK: OpenFlag = 0x10;
@@ -74,11 +68,9 @@ pub const O_CREAT: OpenFlag = 0x200;
 pub const O_TRUNC: OpenFlag = 0x400;
 pub const O_EXCL: OpenFlag = 0x800;
 
-/// File control command flags.
 pub type FileControlCommand = i32;
 const F_GETFD: FileControlCommand = 1;
 const F_SETFD: FileControlCommand = 2;
-// 🏎️ ADDED MISSING FCNTL COMMANDS
 const F_GETFL: FileControlCommand = 3;
 const F_SETFL: FileControlCommand = 4;
 const F_GETLK: FileControlCommand = 7;
@@ -86,11 +78,9 @@ const F_SETLK: FileControlCommand = 8;
 const F_RDADVISE: FileControlCommand = 44;
 const F_NOCACHE: FileControlCommand = 48;
 
-/// File Descriptor flags.
 pub type FDFlag = i32;
 pub const FD_CLOEXEC: FDFlag = 1;
 
-/// Record Locking flags.
 pub type RecordLockingFlag = i16;
 pub const F_RDLCK: RecordLockingFlag = 1;
 pub const F_UNLCK: RecordLockingFlag = 2;
@@ -110,11 +100,8 @@ unsafe impl SafeRead for flock {}
 
 pub type FLockFlag = i32;
 pub const LOCK_SH: FLockFlag = 1;
-#[allow(dead_code)]
 pub const LOCK_EX: FLockFlag = 2;
-#[allow(dead_code)]
 pub const LOCK_NB: FLockFlag = 4;
-#[allow(dead_code)]
 pub const LOCK_UN: FLockFlag = 8;
 
 fn open(env: &mut Environment, path: ConstPtr<u8>, flags: i32, _args: DotDotDot) -> FileDescriptor {
@@ -123,23 +110,7 @@ fn open(env: &mut Environment, path: ConstPtr<u8>, flags: i32, _args: DotDotDot)
 }
 
 pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> FileDescriptor {
-    assert!(
-        flags
-            & !(O_ACCMODE
-                | O_NONBLOCK
-                | O_APPEND
-                | O_SHLOCK
-                | O_NOFOLLOW
-                | O_CREAT
-                | O_TRUNC
-                | O_EXCL)
-            == 0
-    );
-    assert!(flags & O_EXCL == 0);
-
-    if path.is_null() {
-        return -1;
-    }
+    if path.is_null() { return -1; }
 
     let mut needs_flush = false;
     let mut options = GuestOpenOptions::new();
@@ -160,47 +131,20 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
 
     let res = match env.fs.open_with_options(GuestPath::new(&path_string), options) {
         Ok(file) => {
-            let host_object = PosixFileHostObject {
-                file,
-                needs_flush,
-                reached_eof: false,
-                flags: 0,
-            };
-
-            let assigned_fd = find_or_create_fd(env, host_object);
-            // 🏎️ FILE TRACKER: Print every file being opened!
-            println!("🏎️ VFS TRACKER: Opened '{}' -> FD {}", path_string, assigned_fd);
-            assigned_fd
+            let host_object = PosixFileHostObject { file, needs_flush, reached_eof: false, flags: 0 };
+            find_or_create_fd(env, host_object)
         }
-        Err(()) => {
-            println!("🏎️ VFS TRACKER: FAILED to open '{}'", path_string);
-            -1
-        }
+        Err(()) => -1
     };
     
-    if res != -1 && (flags & O_SHLOCK) != 0 {
-        flock(env, res, LOCK_SH);
-    }
+    if res != -1 && (flags & O_SHLOCK) != 0 { flock(env, res, LOCK_SH); }
     res
 }
 
-pub fn read(
-    env: &mut Environment,
-    fd: FileDescriptor,
-    buffer: MutVoidPtr,
-    size: GuestUSize,
-) -> GuestISize {
+pub fn read(env: &mut Environment, fd: FileDescriptor, buffer: MutVoidPtr, size: GuestUSize) -> GuestISize {
     set_errno(env, 0);
     if buffer.is_null() { return -1; }
-
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else { return -1; };
-
-    // 🏎️ ASPHALT 8 BYPASS: Kill blocking socket reads!
-    if matches!(file.file, GuestFile::Socket) {
-        println!("🏎️ ASPHALT 8 BYPASS: Rejected Socket Read on FD {} to force Offline Mode!", fd);
-        set_errno(env, EIO); // Return generic I/O error to break the cURL loop
-        return -1;
-    }
 
     let buffer_slice = env.mem.bytes_at_mut(buffer.cast(), size);
     match file.file.read(buffer_slice) {
@@ -208,12 +152,10 @@ pub fn read(
             if bytes_read == 0 && size != 0 { file.reached_eof = true; }
             bytes_read.try_into().unwrap()
         }
-        Err(e) => {
-            let res = match e.kind() {
-                std::io::ErrorKind::IsADirectory => { set_errno(env, EISDIR); 0 }
-                _ => -1
-            };
-            res
+        Err(e) => match e.kind() {
+            std::io::ErrorKind::IsADirectory => { set_errno(env, EISDIR); 0 }
+            std::io::ErrorKind::WouldBlock => { set_errno(env, crate::libc::errno::EAGAIN); -1 }
+            _ => -1
         }
     }
 }
@@ -247,13 +189,6 @@ pub(super) fn fflush(env: &mut Environment, fd: FileDescriptor) -> i32 {
 pub fn write(env: &mut Environment, fd: FileDescriptor, buffer: ConstVoidPtr, size: GuestUSize) -> GuestISize {
     set_errno(env, 0);
     let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
-
-    // 🏎️ ASPHALT 8 BYPASS: Kill blocking socket writes!
-    if matches!(file.file, GuestFile::Socket) {
-        println!("🏎️ ASPHALT 8 BYPASS: Rejected Socket Write on FD {} to force Offline Mode!", fd);
-        set_errno(env, EIO);
-        return -1;
-    }
 
     let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
     match file.file.write(buffer_slice) {
@@ -437,16 +372,8 @@ fn fcntl(
             let lock = env.mem.read(lock_ptr);
             if let Err(error_code) = validate_lock(env, fd, &lock) { set_errno(env, error_code); return -1; }
         }
-        F_NOCACHE => {
-            let mut args = args.start();
-            let _arg: i32 = args.next(env);
-            // 🏎️ Silenced the log spam so we can see what the game is actually doing!
-        }
-        F_RDADVISE => { }
-        _ => {
-            println!("WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.", cmd, fd);
-            return 0;
-        }
+        F_NOCACHE | F_RDADVISE => { }
+        _ => { return 0; }
     }
     0
 }

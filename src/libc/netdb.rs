@@ -12,18 +12,23 @@ use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::Environment;
 
 const AI_PASSIVE: i32 = 0x1;
-
 pub const IPPROTO_TCP: i32 = 6;
 pub const IPPROTO_UDP: i32 = 17;
-
-const EAI_FAIL: i32 = 4;
 
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// TODO: struct definition
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
-struct hostent {}
+pub struct hostent {
+    h_name: MutPtr<u8>,
+    h_aliases: MutPtr<MutPtr<u8>>,
+    h_addrtype: i32,
+    h_length: i32,
+    h_addr_list: MutPtr<MutPtr<u8>>,
+}
+unsafe impl SafeRead for hostent {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -42,43 +47,35 @@ unsafe impl SafeRead for addrinfo {}
 
 fn getaddrinfo(
     env: &mut Environment,
-    node_name: MutPtr<u8>,
+    _node_name: MutPtr<u8>,
     serv_name: MutPtr<u8>,
     hints: ConstPtr<addrinfo>,
     res: MutPtr<MutPtr<addrinfo>>,
 ) -> i32 {
-    if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, getaddrinfo({:?}, {:?}, {:?}, {:?}) -> EAI_FAIL",
-            node_name,
-            serv_name,
-            hints,
-            res
-        );
-        return EAI_FAIL;
-    }
-
-    assert!(node_name.is_null()); // TODO
-
-    let hint = env.mem.read(hints);
-    let ai_flags = hint.ai_flags;
-    assert_eq!(ai_flags, AI_PASSIVE);
-    let ai_family = hint.ai_family;
-    assert_eq!(ai_family, AF_INET);
-    assert!(hint.ai_socktype == SOCK_STREAM || hint.ai_socktype == SOCK_DGRAM);
-    assert!(
-        hint.ai_protocol == IPPROTO_TCP || hint.ai_protocol == IPPROTO_UDP || hint.ai_protocol == 0
-    );
-    let ai_addrlen = hint.ai_addrlen;
-    assert_eq!(ai_addrlen, 0);
-    assert!(hint.ai_canonname.is_null());
-    assert!(hint.ai_addr.is_null());
-    assert!(hint.ai_next.is_null());
+    let hint = if hints.is_null() {
+        addrinfo {
+            ai_flags: 0,
+            ai_family: AF_INET,
+            ai_socktype: SOCK_STREAM,
+            ai_protocol: 0,
+            ai_addrlen: 0,
+            ai_canonname: Ptr::null(),
+            ai_addr: Ptr::null(),
+            ai_next: Ptr::null(),
+        }
+    } else {
+        env.mem.read(hints)
+    };
 
     let mut addr_info = hint;
-    let port: u16 = env.mem.cstr_at_utf8(serv_name).unwrap().parse().unwrap();
-    log_dbg!("getaddrinfo: port {}", port);
-    let addr = sockaddr::from_ipv4_parts([0; 4], port);
+    
+    // Safely parse the port
+    let port_str = env.mem.cstr_at_utf8(serv_name).unwrap_or("80");
+    let port: u16 = port_str.parse().unwrap_or(80);
+    
+    // 🏎️ ASPHALT 8 BYPASS: Return 127.0.0.1 (Loopback)
+    // This prevents the "No Internet" popup and allows the network request to instantly finish empty!
+    let addr = sockaddr::from_ipv4_parts([127, 0, 0, 1], port);
 
     let tmp_addr = env.mem.alloc_and_write(addr);
     addr_info.ai_addr = tmp_addr;
@@ -87,25 +84,19 @@ fn getaddrinfo(
     let tmp_addr_info = env.mem.alloc_and_write(addr_info);
     env.mem.write(res, tmp_addr_info);
 
-    0 // Success
+    0 // 0 = Success
 }
 
 fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
+    if addrinfo.is_null() { return; }
     let addrinfo_val = env.mem.read(addrinfo);
-    assert!(addrinfo_val.ai_next.is_null()); // TODO
-    let ai_addrlen = addrinfo_val.ai_addrlen;
-    assert_eq!(ai_addrlen, guest_size_of::<sockaddr>());
-    env.mem.free(addrinfo_val.ai_addr.cast());
+    if !addrinfo_val.ai_addr.is_null() {
+        env.mem.free(addrinfo_val.ai_addr.cast());
+    }
     env.mem.free(addrinfo.cast());
 }
 
-fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    log!(
-        "TODO: gethostbyname({:?} \"{}\") => NULL",
-        name,
-        env.mem.cstr_at_utf8(name).unwrap()
-    );
-    // TODO: set h_errno
+fn gethostbyname(_env: &mut Environment, _name: ConstPtr<u8>) -> MutPtr<hostent> {
     Ptr::null()
 }
 
