@@ -125,7 +125,12 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
     if (flags & O_TRUNC) != 0 { options.truncate(); }
 
     let path_string = match env.mem.cstr_at_utf8(path) {
-        Ok(path_str) => path_str.to_owned(),
+        Ok(path_str) => {
+            // 🏎️ ASPHALT 8 BYPASS: Force all requested files to lowercase to match the disk!
+            let mut lower_path = path_str.to_string();
+            lower_path.make_ascii_lowercase();
+            lower_path
+        },
         Err(_) => return -1,
     };
 
@@ -306,9 +311,12 @@ pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
 
 fn rename(env: &mut Environment, old: ConstPtr<u8>, new: ConstPtr<u8>) -> i32 {
     set_errno(env, 0);
-    let old = env.mem.cstr_at_utf8(old).unwrap();
-    let new = env.mem.cstr_at_utf8(new).unwrap();
-    match env.fs.rename(GuestPath::new(&old), GuestPath::new(&new)) { Ok(_) => 0, Err(_) => -1 }
+    let mut old_str = env.mem.cstr_at_utf8(old).unwrap().to_string();
+    let mut new_str = env.mem.cstr_at_utf8(new).unwrap().to_string();
+    old_str.make_ascii_lowercase();
+    new_str.make_ascii_lowercase();
+    
+    match env.fs.rename(GuestPath::new(&old_str), GuestPath::new(&new_str)) { Ok(_) => 0, Err(_) => -1 }
 }
 
 pub fn getcwd(env: &mut Environment, buf_ptr: MutPtr<u8>, buf_size: GuestUSize) -> MutPtr<u8> {
@@ -331,7 +339,10 @@ pub fn getcwd(env: &mut Environment, buf_ptr: MutPtr<u8>, buf_size: GuestUSize) 
 
 fn chdir(env: &mut Environment, path_ptr: ConstPtr<u8>) -> i32 {
     set_errno(env, 0);
-    let path = GuestPath::new(env.mem.cstr_at_utf8(path_ptr).unwrap());
+    let mut path_str = env.mem.cstr_at_utf8(path_ptr).unwrap().to_string();
+    path_str.make_ascii_lowercase();
+    
+    let path = GuestPath::new(&path_str);
     match env.fs.change_working_directory(path) { Ok(_) => 0, Err(()) => -1 }
 }
 
