@@ -80,41 +80,26 @@ fn objc_msgSend_inner(
         return;
     }
 
-    // ===== ULTIMATE GAMELOFT BOOT BYPASS =====
-    // 1. Force GameCenter and StoreKit singletons to return nil so the game skips them completely
-    if sel_str == "localPlayer" || sel_str == "defaultQueue" {
-        println!("🏎️ ASPHALT 8 BYPASS: Bypassing GameCenter/StoreKit singleton [{}]", sel_str);
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
+    // ===== GAMELOFT LOOP DETECTOR =====
+    // Logs selectors that commonly indicate a wait/retry loop.
+    if sel_str.contains("isReady") || sel_str.contains("Reachability") {
+        println!("GAMELOFT SUSPECT LOOP: [{:?} {}]", receiver, sel_str);
     }
 
-    // 2. Force the App Store verification to instantly succeed
-    if sel_str == "canMakePayments" {
-        println!("🏎️ ASPHALT 8 BYPASS: Faking [SKPaymentQueue canMakePayments] to YES");
-        env.cpu.regs_mut()[0] = 1; // 1 = YES
-        env.cpu.regs_mut()[1] = 0;
-        return;
-    }
-
-    // 3. Force network Reachability checks to return "Reachable" to bypass CRM download loops
+    // Force network Reachability checks to return "Reachable".
+    // Kept because Reachability is an unimplemented class with no host impl.
     if sel_str == "currentReachabilityStatus" {
         println!("🏎️ ASPHALT 8 BYPASS: Faking [Reachability currentReachabilityStatus] to ReachableViaWiFi!");
         env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
         env.cpu.regs_mut()[1] = 0;
         return;
     }
-    
-    // 4. Ensure the game engine knows it's active and not sleeping
+
+    // Ensure the game engine knows it's active and not sleeping.
     if sel_str == "applicationState" {
         env.cpu.regs_mut()[0] = 0; // UIApplicationStateActive
         env.cpu.regs_mut()[1] = 0;
         return;
-    }
-
-    // 5. 🚨 THE LOOP DETECTOR 🚨 
-    // If the game freezes, this will print out exactly what it is waiting for!
-    if sel_str.contains("isReady") || sel_str.contains("Status") || sel_str.contains("State") || sel_str.contains("Reachability") {
-        println!("GAMELOFT SUSPECT LOOP: [{:?} {}]", receiver, sel_str);
     }
 
     // ===== URL Tracker & Telemetry Bypasses =====
@@ -396,7 +381,8 @@ fn objc_msgSend_inner(
         }) = host_object.as_any().downcast_ref()
         {
             // BypassGKSession
-            if name == "GKSession" || name == "GKLocalPlayer" || name == "SKPaymentQueue" || name == "SKProductsRequest" || name == "Reachability" {
+            // SKPaymentQueue and SKProductsRequest now have real host implementations — do NOT bypass them here.
+            if name == "GKSession" || name == "GKLocalPlayer" || name == "Reachability" {
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
