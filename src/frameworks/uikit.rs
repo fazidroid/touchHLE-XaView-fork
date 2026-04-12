@@ -119,12 +119,18 @@ pub fn handle_events(env: &mut Environment) -> Option<Instant> {
                 // 🏎️ ASPHALT 8 BYPASS: We comment out the exit function!
                 // The game will no longer pause or shut down when Android loses focus.
                 log!("🏎️ ASPHALT 8 BYPASS: Ignored app-will-resign-active to prevent Android sleep!");
-                // ui_application::exit(env); 
+                // ui_application::exit(env);
             }
             Event::AppWillTerminate => {
                 // 🏎️ ASPHALT 8 BYPASS: We comment out the exit function!
                 log!("🏎️ ASPHALT 8 BYPASS: Ignored app-will-terminate to prevent Android sleep!");
                 // ui_application::exit(env);
+            }
+            Event::AppDidBecomeActive => {
+                log!("Handling app-did-become-active event. Waking up iOS application layer!");
+            }
+            Event::AppLowMemory => {
+                log!("Handling app-low-memory event: ignored to prevent crashes.");
             }
             Event::EnterDebugger => {
                 if env.is_debugging_enabled() {
