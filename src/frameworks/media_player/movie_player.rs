@@ -29,7 +29,6 @@ impl State {
 
 type MPMovieScalingMode = NSInteger;
 type MPMovieControlStyle = NSInteger;
-
 type MPMoviePlaybackState = NSInteger;
 const MPMoviePlaybackStateStopped: MPMoviePlaybackState = 0;
 
@@ -66,6 +65,13 @@ struct MPMoviePlayerControllerHostObject {
 }
 impl HostObject for MPMoviePlayerControllerHostObject {}
 
+// 🏎️ Added a HostObject to store the inner player so Asphalt 8's observers don't break
+struct MPMoviePlayerViewControllerHostObject {
+    player: id,
+}
+impl HostObject for MPMoviePlayerViewControllerHostObject {}
+
+
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
@@ -79,7 +85,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
-- (id)initWithContentURL:(id)url { // NSURL*
+- (id)initWithContentURL:(id)url { 
     log!(
         "TODO: [(MPMoviePlayerController*){:?} initWithContentURL:{:?} ({:?})]",
         this,
@@ -90,9 +96,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
-    // 🏎️ GAMELOFT BYPASS: Fix the Race Condition!
-    // We delay the finish notification by 500ms. If we fire it instantly,
-    // the game misses the event because it hasn't executed `addObserver` yet!
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(200))
     );
@@ -156,7 +159,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this);
     env.framework_state.media_player.movie_player.active_player = Some(this);
 
-    // 🏎️ GAMELOFT BYPASS: Fire completion on play with a tiny delay
     let notif = (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(100));
     for (name, obj, _) in &mut State::get(env).pending_notifications {
         if *name == MPMoviePlayerPlaybackDidFinishNotification && *obj == this {
@@ -182,21 +184,32 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation MPMoviePlayerViewController: UIViewController
 
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::new(MPMoviePlayerViewControllerHostObject {
+        player: nil,
+    });
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
 - (id)initWithContentURL:(id)url {
     log!("🏎️ GAMELOFT BYPASS: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?}]", this, url);
-    // 🏎️ FIX: DO NOT return nil here! The game needs a valid ViewController!
     
-    // Queue the fake finish event so the game moves on
-    State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(500))
-    );
+    // 🏎️ FIX: Create a real player so Asphalt 8 can successfully attach its auto-skip listeners to it!
+    let player: id = msg_class![env; MPMoviePlayerController alloc];
+    let player: id = msg![env; player initWithContentURL:url];
     
+    env.objc.borrow_mut::<MPMoviePlayerViewControllerHostObject>(this).player = player;
     this
 }
 
+- (())dealloc {
+    let player = env.objc.borrow::<MPMoviePlayerViewControllerHostObject>(this).player;
+    release(env, player);
+    env.objc.dealloc_object(this, &mut env.mem);
+}
+
 - (id)moviePlayer {
-    // Return nil so the game safely ignores calls to [vc.moviePlayer play] without crashing
-    nil
+    env.objc.borrow::<MPMoviePlayerViewControllerHostObject>(this).player
 }
 
 @end
