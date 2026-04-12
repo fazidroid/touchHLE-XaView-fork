@@ -97,18 +97,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentURL:(id)url { 
-    log!(
-        "TODO: [(MPMoviePlayerController*){:?} initWithContentURL:{:?} ({:?})]",
-        this,
-        url,
-        ns_url::to_rust_path(env, url),
-    );
+    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerController*){:?} initWithContentURL]", this);
 
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
+    // 🏎️ STAGE 1: Tell Asphalt 8 the video is fully loaded! 
+    // This breaks the deadlock and forces the game engine to call play()
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(100))
+        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(100))
+    );
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(200))
     );
 
     this
@@ -158,7 +158,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated {}
 
 - (())play {
-    // 🏎️ FIX: Added the missing `, this` argument for the log macro!
     log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerController*){:?} play]", this);
     if let Some(old) = env.framework_state.media_player.movie_player.active_player {
         let _: () = msg![env; old stop];
@@ -167,16 +166,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this);
     env.framework_state.media_player.movie_player.active_player = Some(this);
 
-    // 🏎️ CRITICAL: We moved these notifications here! 
-    // They will now fire exactly when Asphalt 8 is ready to listen for them!
+    // 🏎️ STAGE 2: The game called play! Instantly tell it the video is finished!
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(100))
+        (MPMoviePlayerPlaybackStateDidChangeNotification, this, Instant::now() + Duration::from_millis(100))
     );
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerPlaybackStateDidChangeNotification, this, Instant::now() + Duration::from_millis(200))
-    );
-    State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(300))
+        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(200))
     );
 }
 
@@ -204,13 +199,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentURL:(id)url {
-    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?}]", this, url);
+    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerViewController*){:?} initWithContentURL]", this);
     
     let player: id = msg_class![env; MPMoviePlayerController alloc];
     let player: id = msg![env; player initWithContentURL:url];
     
     env.objc.borrow_mut::<MPMoviePlayerViewControllerHostObject>(this).player = player;
     
+    // Fallback notification for the ViewController itself
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(500))
     );
