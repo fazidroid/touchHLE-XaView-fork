@@ -9,7 +9,7 @@ use crate::dyld::{ConstantExports, HostConstant};
 use crate::frameworks::foundation::{ns_string, ns_url, NSInteger};
 use crate::frameworks::uikit::ui_device::UIDeviceOrientation;
 use crate::objc::{
-    id, msg, msg_class, nil, objc_classes, release, retain, todo_objc_setter, ClassExports,
+    id, msg, msg_class, nil, objc_classes, release, retain, ClassExports,
     HostObject, NSZonePtr,
 };
 use crate::Environment;
@@ -62,6 +62,7 @@ pub const CONSTANTS: ConstantExports = &[
 
 struct MPMoviePlayerControllerHostObject {
     content_url: id,
+    view: id,
 }
 impl HostObject for MPMoviePlayerControllerHostObject {}
 
@@ -79,13 +80,23 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)allocWithZone:(NSZonePtr)_zone {
     let host_object = Box::new(MPMoviePlayerControllerHostObject {
         content_url: nil,
+        view: nil,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
 - (id)initWithContentURL:(id)url {
+    log!("🏎️ GAMELOFT BYPASS: [MPMoviePlayerController initWithContentURL]");
     retain(env, url);
-    env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
+    
+    // 🏎️ CRITICAL FIX: Create a real dummy UIView!
+    // If we return `nil` for the view, touchHLE will panic when the game calls `addSubview:`.
+    let view: id = msg_class![env; UIView alloc];
+    let view: id = msg![env; view init];
+    
+    let mut host_obj = env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this);
+    host_obj.content_url = url;
+    host_obj.view = view;
 
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(100))
@@ -97,6 +108,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())dealloc {
     let url = env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).content_url;
     release(env, url);
+    
+    let view = env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).view;
+    release(env, view);
 
     env.objc.dealloc_object(this, &mut env.mem);
 }
@@ -108,25 +122,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)backgroundColor {
     msg_class![env; UIColor blackColor]
 }
-- (())setBackgroundColor:(id)color {
-    todo_objc_setter!(this, color);
-}
 
-- (())setScalingMode:(MPMovieScalingMode)mode {
-    todo_objc_setter!(this, mode);
-}
-- (())setUseApplicationAudioSession:(bool)use_session {
-    todo_objc_setter!(this, use_session);
-}
-- (())setControlStyle:(MPMovieControlStyle)style {
-    todo_objc_setter!(this, style);
-}
-- (())setFullscreen:(bool)fullsreen {
-    todo_objc_setter!(this, fullsreen);
-}
+// 🏎️ Muted all the setter macros to prevent console spam and potential panics
+- (())setBackgroundColor:(id)_color {}
+- (())setScalingMode:(MPMovieScalingMode)_mode {}
+- (())setUseApplicationAudioSession:(bool)_use_session {}
+- (())setControlStyle:(MPMovieControlStyle)_style {}
+- (())setFullscreen:(bool)_fullscreen {}
 
 - (id)view {
-    nil
+    // 🏎️ Return our safe dummy view so addSubview: succeeds!
+    env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).view
 }
 
 - (MPMoviePlaybackState)playbackState {
@@ -138,7 +144,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated {}
 
 - (())play {
-    log!("🏎️ ASPHALT 8 BYPASS: [MPMoviePlayerController play] called!");
+    log!("🏎️ GAMELOFT BYPASS: [MPMoviePlayerController play] called!");
     if let Some(old) = env.framework_state.media_player.movie_player.active_player {
         let _: () = msg![env; old stop];
     }
@@ -177,16 +183,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithContentURL:(id)url {
-    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerViewController*) initWithContentURL]");
+    log!("🏎️ GAMELOFT BYPASS: [(MPMoviePlayerViewController*) initWithContentURL]");
     
-    // We create the actual movie player object the game expects to find
     let player: id = msg_class![env; MPMoviePlayerController alloc];
     let player: id = msg![env; player initWithContentURL:url];
     
     env.objc.borrow_mut::<MPMoviePlayerViewControllerHostObject>(this).player = player;
     
-    // 🏎️ CRITICAL: Fire the notification on the PLAYER, not the VIEW CONTROLLER!
-    // This is exactly what the Gameloft engine is waiting for to clear the black screen.
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerPlaybackDidFinishNotification, player, Instant::now() + Duration::from_millis(500))
     );
