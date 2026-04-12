@@ -41,7 +41,6 @@ pub const MPMoviePlayerScalingModeDidChangeNotification: &str =
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
 
-// 🏎️ ASPHALT 8 BYPASS: Added the missing notifications!
 pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
     "MPMoviePlayerLoadStateDidChangeNotification";
 pub const MPMoviePlayerPlaybackStateDidChangeNotification: &str =
@@ -64,7 +63,6 @@ pub const CONSTANTS: ConstantExports = &[
         "_MPMoviePlayerPlaybackDidFinishReasonUserInfoKey",
         HostConstant::NSString(MPMoviePlayerPlaybackDidFinishReasonUserInfoKey),
     ),
-    // 🏎️ Export the new constants so Asphalt 8 can bind its listeners!
     (
         "_MPMoviePlayerLoadStateDidChangeNotification",
         HostConstant::NSString(MPMoviePlayerLoadStateDidChangeNotification),
@@ -109,18 +107,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
-    // 🏎️ ASPHALT 8 BYPASS: Fire the specific state-change notifications Asphalt 8 requires!
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(100))
-    );
-    State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(200))
-    );
-    State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerPlaybackStateDidChangeNotification, this, Instant::now() + Duration::from_millis(300))
-    );
-    State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(400))
     );
 
     this
@@ -170,7 +158,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated {}
 
 - (())play {
-    log!("TODO: [(MPMoviePlayerController*){:?} play]", this);
+    log!("🏎️ ASPHALT 8 BYPASS: [(MPMoviePlayerController*){:?} play]");
     if let Some(old) = env.framework_state.media_player.movie_player.active_player {
         let _: () = msg![env; old stop];
     }
@@ -178,13 +166,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this);
     env.framework_state.media_player.movie_player.active_player = Some(this);
 
-    let notif = (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(100));
-    for (name, obj, _) in &mut State::get(env).pending_notifications {
-        if *name == MPMoviePlayerPlaybackDidFinishNotification && *obj == this {
-            return; 
-        }
-    }
-    State::get(env).pending_notifications.push_back(notif);
+    // 🏎️ CRITICAL: We moved these notifications here! 
+    // They will now fire exactly when Asphalt 8 is ready to listen for them!
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(100))
+    );
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackStateDidChangeNotification, this, Instant::now() + Duration::from_millis(200))
+    );
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(300))
+    );
 }
 
 - (())pause {
@@ -218,7 +210,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     
     env.objc.borrow_mut::<MPMoviePlayerViewControllerHostObject>(this).player = player;
     
-    // Also dispatch to the view controller just in case
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now() + Duration::from_millis(500))
     );
