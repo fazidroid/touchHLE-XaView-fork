@@ -496,25 +496,27 @@ fn putchar(env: &mut Environment, c: u8) -> i32 {
 }
 
 fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
+    // TODO: handle errno properly
     set_errno(env, 0);
 
     if Ptr::is_null(path) {
+        // TODO: set errno
         log!("remove({:?}) => -1, attempted to remove null", path);
         return -1;
     }
 
-    let path_str = env.mem.cstr_at_utf8(path).unwrap();
-
-    match env.fs.remove(GuestPath::new(&path_str)) {
+    match env
+        .fs
+        .remove(GuestPath::new(&env.mem.cstr_at_utf8(path).unwrap()))
+    {
         Ok(()) => {
-            log_dbg!("remove({:?}) => 0", path_str);
+            log_dbg!("remove({:?}) => 0", path);
             0
         }
         Err(_) => {
-            // 🏎️ ASPHALT 8 BYPASS: Fake success for failed file deletions!
-            // The CRM engine will infinitely loop if it gets an error when deleting a non-existent profile.
-            log!("🏎️ ASPHALT 8 BYPASS: Faking success for failed remove of {:?} to prevent CRM deadlock!", path_str);
-            0
+            // TODO: set errno
+            log!("Warning: remove({:?}) failed, returning -1", path);
+            -1
         }
     }
 }
