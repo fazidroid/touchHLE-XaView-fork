@@ -38,6 +38,8 @@ pub const MPMoviePlayerContentPreloadDidFinishNotification: &str =
     "MPMoviePlayerContentPreloadDidFinishNotification";
 pub const MPMoviePlayerScalingModeDidChangeNotification: &str =
     "MPMoviePlayerScalingModeDidChangeNotification";
+pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
+    "MPMoviePlayerLoadStateDidChangeNotification";
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
 
@@ -53,6 +55,10 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMoviePlayerScalingModeDidChangeNotification",
         HostConstant::NSString(MPMoviePlayerScalingModeDidChangeNotification),
+    ),
+    (
+        "_MPMoviePlayerLoadStateDidChangeNotification",
+        HostConstant::NSString(MPMoviePlayerLoadStateDidChangeNotification),
     ),
     (
         "_MPMoviePlayerPlaybackDidFinishReasonUserInfoKey",
@@ -91,7 +97,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let view: id = msg_class![env; UIView alloc];
     let view: id = msg![env; view init];
     
-    // 🏎️ CRITICAL: Make the dummy view 100% invisible so it doesn't block the 3D graphics!
+    // Make the dummy view 100% invisible so it doesn't block the 3D graphics
     let clear_color: id = msg_class![env; UIColor clearColor];
     let _: () = msg![env; view setBackgroundColor:clear_color];
     let _: () = msg![env; view setOpaque:false];
@@ -102,7 +108,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     host_obj.view = view;
 
     State::get(env).pending_notifications.push_back(
-        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(100))
+        (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now() + Duration::from_millis(50))
     );
 
     this
@@ -134,6 +140,23 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)view {
     env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).view
+}
+
+// 🏎️ THE STRONG HACKS: Break the Gameloft polling loop!
+- (NSInteger)loadState {
+    // Return MPMovieLoadStatePlayable (1) | MPMovieLoadStatePlaythroughOK (2)
+    3 
+}
+
+- (bool)isPreparedToPlay {
+    true
+}
+
+- (())prepareToPlay {
+    log!("🏎️ GAMELOFT BYPASS: [MPMoviePlayerController prepareToPlay] called!");
+    State::get(env).pending_notifications.push_back(
+        (MPMoviePlayerLoadStateDidChangeNotification, this, Instant::now() + Duration::from_millis(50))
+    );
 }
 
 - (MPMoviePlaybackState)playbackState {
