@@ -154,13 +154,9 @@ pub enum Event {
     /// OS has informed touchHLE it will soon become inactive.
     /// (iOS `applicationWillResignActive:`, Android `onPause()`)
     AppWillResignActive,
-    /// 🏎️ NEW: Added so the game can wake up from the background!
-    AppDidBecomeActive,
     /// OS has informed touchHLE it will soon terminate.
     /// (iOS `applicationWillTerminate:`, Android `onDestroy()`)
     AppWillTerminate,
-    /// 🏎️ NEW: Added to prevent crashes when Android sends a memory warning!
-    AppLowMemory,
     TouchesDown(HashMap<FingerId, Coords>),
     TouchesMove(HashMap<FingerId, Coords>),
     TouchesUp(HashMap<FingerId, Coords>),
@@ -642,6 +638,7 @@ impl Window {
             }
 
             self.event_queue.push_back(match event {
+                E::Quit { .. } => Event::Quit,
                 E::MouseButtonDown {
                     x,
                     y,
@@ -810,29 +807,22 @@ impl Window {
                         continue;
                     }
                 }
-                E::AppTerminating { .. } | E::Quit { .. } => {
-                    log!("🏎️ ANDROID BYPASS: Ignored app-will-terminate event!");
-                    continue;
-                }
-                E::AppLowMemory { .. } => {
-                    log!("Received app-low-memory event.");
+                E::AppWillEnterBackground { .. } => {
+                    log!("Received app-will-resign-active event.");
                     assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppLowMemory);
+                    self.high_priority_event = Some(Event::AppWillResignActive);
+                    // For some reason, if we don't pause event polling, we will
+                    // never finish handling the event.
+                    // TODO: Add a mechanism for re-enabling polling, if at some
+                    // point we support returning touchHLE to the foreground.
+                    self.enable_event_polling = false;
                     continue;
                 }
-                E::AppWillEnterBackground { .. } | E::AppDidEnterBackground { .. } => {
-                    log!("🏎️ ANDROID BYPASS: Ignored background event to prevent sleep!");
-                    // We completely ignore this (and do NOT disable polling) so the game never pauses!
-                    continue;
-                }
-                E::AppWillEnterForeground { .. } => {
-                    continue;
-                }
-                E::AppDidEnterForeground { .. } => {
-                    log!("Received app-did-enter-foreground event. Waking up!");
+                E::AppTerminating { .. } => {
+                    log!("Received app-will-terminate event.");
                     assert!(self.high_priority_event.is_none());
-                    // 🏎️ CRITICAL: We MUST allow this event through so Asphalt 8 wakes up and renders!
-                    self.high_priority_event = Some(Event::AppDidBecomeActive);
+                    self.high_priority_event = Some(Event::AppWillTerminate);
+                    self.enable_event_polling = false;
                     continue;
                 }
                 E::FingerUp {
