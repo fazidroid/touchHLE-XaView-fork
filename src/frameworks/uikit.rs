@@ -138,6 +138,12 @@ pub fn handle_events(env: &mut Environment) -> Option<Instant> {
                 log!("Handling app-will-terminate event.");
                 ui_application::exit(env);
             }
+            Event::AppDidBecomeActive => {
+                log!("Handling app-did-become-active event. Waking up iOS application layer!");
+            }
+            Event::AppLowMemory => {
+                log!("Handling app-low-memory event: ignored to prevent crashes.");
+            }
             Event::EnterDebugger => {
                 if env.is_debugging_enabled() {
                     log!("Handling EnterDebugger event: entering debugger.");
