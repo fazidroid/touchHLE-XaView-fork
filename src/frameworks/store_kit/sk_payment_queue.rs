@@ -10,7 +10,7 @@
 //! and calls `addTransactionObserver:` on it. A nil return caused a silent
 //! crash/hang. Now returns a real singleton instance.
 
-use crate::objc::{id, nil, objc_classes, retain, ClassExports, HostObject};
+use crate::objc::{id, nil, objc_classes, ClassExports, HostObject};
 
 /// Per-instance state for SKPaymentQueue.
 struct SKPaymentQueueHostObject {

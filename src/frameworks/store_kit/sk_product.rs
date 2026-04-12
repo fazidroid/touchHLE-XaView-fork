@@ -132,12 +132,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // Call the mandatory delegate method:
     // -productsRequest:didReceiveResponse:
-    msg![env; delegate productsRequest:this didReceiveResponse:response];
+    let _: () = msg![env; delegate productsRequest:this didReceiveResponse:response];
 
     // Call the optional SKRequestDelegate method -requestDidFinish: if
-    // the delegate implements it (Objective-C messaging to nil is safe here
-    // since msg! will just no-op if the selector is unimplemented).
-    msg![env; delegate requestDidFinish:this];
+    // the delegate implements it.
+    let _: () = msg![env; delegate requestDidFinish:this];
 
     log_dbg!("SKProductsRequest: fired empty didReceiveResponse to delegate {:?}", delegate);
 }
