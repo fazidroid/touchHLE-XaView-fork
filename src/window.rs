@@ -154,9 +154,13 @@ pub enum Event {
     /// OS has informed touchHLE it will soon become inactive.
     /// (iOS `applicationWillResignActive:`, Android `onPause()`)
     AppWillResignActive,
+    /// 🏎️ NEW: Added so the game can wake up from the background!
+    AppDidBecomeActive,
     /// OS has informed touchHLE it will soon terminate.
     /// (iOS `applicationWillTerminate:`, Android `onDestroy()`)
     AppWillTerminate,
+    /// 🏎️ NEW: Added to prevent crashes when Android sends a memory warning!
+    AppLowMemory,
     TouchesDown(HashMap<FingerId, Coords>),
     TouchesMove(HashMap<FingerId, Coords>),
     TouchesUp(HashMap<FingerId, Coords>),
@@ -271,26 +275,13 @@ impl Window {
         options_clone.use_angle = true;
         // options_clone.use_turnip = true; 
         
-        // 🏎️ FIX: Removed the hardcoded iPhone 5 spoof!
-        // Now the emulator will properly respect the 3:2 aspect ratio of iPhone 2G/3G/4
-        // and only use 16:9 if you explicitly pass --iphone5c in the options file.
-        
         let options = &options_clone;
 
-        // 🏎️ CRITICAL FIX: Set environment variables BEFORE SDL initializes!
         if env::consts::OS == "android" {
-            if options.use_turnip {
-                std::env::set_var("VK_ICD_FILENAMES", "libvulkan_freedreno.so");
-                std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
-                std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
-            }
             if options.use_turnip {
                 // Vulkan REQUIRES the absolute path to load custom ICD drivers!
                 let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
                 std::env::set_var("VK_ICD_FILENAMES", format!("{}libvulkan_freedreno.so", lib_dir));
-                
-                std::env::set_var("ANGLE_FEATURE_OVERRIDES_ENABLED", "enable_subpass_rendering,vulkan_async_command_buffers");
-                std::env::set_var("ANGLE_FEATURE_OVERRIDES_DISABLED", "vulkan_synchronous_submit,flush_after_ending_render_pass");
             }
 
             if options.use_angle {
@@ -327,26 +318,7 @@ impl Window {
         sdl2::hint::set("SDL_TOUCH_MOUSE_EVENTS", "0");        
 
         if env::consts::OS == "android" {
-            // 🏎️ THE TURNIP HACK: Force Vulkan to use our custom Freedreno driver
-            // We point VK_ICD_FILENAMES exactly to where Android extracts our jniLibs
-            std::env::set_var(
-                "VK_ICD_FILENAMES", 
-                "/data/data/org.touchhle.android.xaview/lib/libvulkan_freedreno.so"
-            );
-
-            // 🏎️ ADRENO VULKAN OPTIMIZATIONS
-            // Force Tile-Based rendering and prevent pipeline stalls
-            std::env::set_var(
-                "ANGLE_FEATURE_OVERRIDES_ENABLED", 
-                "enable_subpass_rendering,vulkan_async_command_buffers"
-            );
-            std::env::set_var(
-                "ANGLE_FEATURE_OVERRIDES_DISABLED", 
-                "vulkan_synchronous_submit,flush_after_ending_render_pass"
-            );
-
-            // 🏎️ FORCE ANGLE TRANSLATION
-            // Give Android the ABSOLUTE path to the extracted JNI libraries
+            // FORCE ANGLE TRANSLATION
             let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
             
             if options.gles_version == 2 {
@@ -638,7 +610,6 @@ impl Window {
             }
 
             self.event_queue.push_back(match event {
-                E::Quit { .. } => Event::Quit,
                 E::MouseButtonDown {
                     x,
                     y,
@@ -807,22 +778,27 @@ impl Window {
                         continue;
                     }
                 }
-                E::AppWillEnterBackground { .. } => {
-                    log!("Received app-will-resign-active event.");
-                    assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppWillResignActive);
-                    // For some reason, if we don't pause event polling, we will
-                    // never finish handling the event.
-                    // TODO: Add a mechanism for re-enabling polling, if at some
-                    // point we support returning touchHLE to the foreground.
-                    self.enable_event_polling = false;
+                E::AppTerminating { .. } | E::Quit { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored app-will-terminate event!");
                     continue;
                 }
-                E::AppTerminating { .. } => {
-                    log!("Received app-will-terminate event.");
+                E::AppLowMemory { .. } => {
+                    log!("Received app-low-memory event.");
                     assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppWillTerminate);
-                    self.enable_event_polling = false;
+                    self.high_priority_event = Some(Event::AppLowMemory);
+                    continue;
+                }
+                E::AppWillEnterBackground { .. } | E::AppDidEnterBackground { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored background event to prevent sleep!");
+                    continue;
+                }
+                E::AppWillEnterForeground { .. } => {
+                    continue;
+                }
+                E::AppDidEnterForeground { .. } => {
+                    log!("Received app-did-enter-foreground event. Waking up!");
+                    assert!(self.high_priority_event.is_none());
+                    self.high_priority_event = Some(Event::AppDidBecomeActive);
                     continue;
                 }
                 E::FingerUp {
