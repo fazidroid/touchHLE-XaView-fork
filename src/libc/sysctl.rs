@@ -319,8 +319,20 @@ fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
     crate::mem::Ptr::from_bits(isa)
 }
 
+// ==========================================================
+// 🏎️ EA BYPASS: class_getProperty Dummy Reflection
+// ==========================================================
+fn class_getProperty(_env: &mut Environment, _cls: ConstVoidPtr, _name: ConstVoidPtr) -> ConstVoidPtr {
+    // EA's engine is checking the properties of our dummy MTX class.
+    // Returning NULL safely tells it "this class has no properties," 
+    // satisfying the reflection check without causing memory access violations.
+    crate::mem::Ptr::null() 
+}
+
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
     export_c_func!(sysctlbyname(_, _, _, _, _)),
     export_c_func!(object_getClass(_)),
+    export_c_func!(class_getProperty(_, _, _)), // <--- ADD THIS LINE!
 ];
