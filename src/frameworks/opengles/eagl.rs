@@ -731,30 +731,50 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     };
     let old_clear_color: [GLfloat; 4] = get_floats(gles, gles11::COLOR_CLEAR_VALUE);
     let old_array_buffer: GLuint = get_int(gles, gles11::ARRAY_BUFFER_BINDING) as _;
-    let old_vertex_array_binding: GLuint = get_int(gles, gles11::VERTEX_ARRAY_BUFFER_BINDING) as _;
-    let old_vertex_array_size: GLint = get_int(gles, gles11::VERTEX_ARRAY_SIZE);
-    let old_vertex_array_type: GLenum = get_int(gles, gles11::VERTEX_ARRAY_TYPE) as _;
-    let old_vertex_array_stride: GLsizei = get_int(gles, gles11::VERTEX_ARRAY_STRIDE) as _;
-    let old_vertex_array_pointer = get_ptr(gles, gles11::VERTEX_ARRAY_POINTER);
-    let old_tex_coord_array_binding: GLuint =
-        get_int(gles, gles11::TEXTURE_COORD_ARRAY_BUFFER_BINDING) as _;
-    let old_tex_coord_array_size: GLint = get_int(gles, gles11::TEXTURE_COORD_ARRAY_SIZE);
-    let old_tex_coord_array_type: GLenum = get_int(gles, gles11::TEXTURE_COORD_ARRAY_TYPE) as _;
-    let old_tex_coord_array_stride: GLsizei =
-        get_int(gles, gles11::TEXTURE_COORD_ARRAY_STRIDE) as _;
-    let old_tex_coord_array_pointer = get_ptr(gles, gles11::TEXTURE_COORD_ARRAY_POINTER);
+    // GLES1-only state — only query/modify when not in GLES2 mode.
+    // These enums and functions do not exist in GLES2 and will cause
+    // GL_INVALID_ENUM or a panic if called on a GLES2 context.
+    let (
+        old_vertex_array_binding,
+        old_vertex_array_size,
+        old_vertex_array_type,
+        old_vertex_array_stride,
+        old_vertex_array_pointer,
+        old_tex_coord_array_binding,
+        old_tex_coord_array_size,
+        old_tex_coord_array_type,
+        old_tex_coord_array_stride,
+        old_tex_coord_array_pointer,
+        old_tex_env_mode,
+    ) = if !is_gles2 {
+        let va_binding    = get_int(gles, gles11::VERTEX_ARRAY_BUFFER_BINDING) as GLuint;
+        let va_size       = get_int(gles, gles11::VERTEX_ARRAY_SIZE);
+        let va_type       = get_int(gles, gles11::VERTEX_ARRAY_TYPE) as GLenum;
+        let va_stride     = get_int(gles, gles11::VERTEX_ARRAY_STRIDE) as GLsizei;
+        let va_ptr        = get_ptr(gles, gles11::VERTEX_ARRAY_POINTER);
+        let tca_binding   = get_int(gles, gles11::TEXTURE_COORD_ARRAY_BUFFER_BINDING) as GLuint;
+        let tca_size      = get_int(gles, gles11::TEXTURE_COORD_ARRAY_SIZE);
+        let tca_type      = get_int(gles, gles11::TEXTURE_COORD_ARRAY_TYPE) as GLenum;
+        let tca_stride    = get_int(gles, gles11::TEXTURE_COORD_ARRAY_STRIDE) as GLsizei;
+        let tca_ptr       = get_ptr(gles, gles11::TEXTURE_COORD_ARRAY_POINTER);
+        let tex_env       = get_tex_env_int(gles, gles11::TEXTURE_ENV, gles11::TEXTURE_ENV_MODE);
+        // Set REPLACE mode so our present quad renders the framebuffer 1:1.
+        let tex_env_mode_arr = [gles11::REPLACE; 1];
+        gles.TexEnviv(
+            gles11::TEXTURE_ENV,
+            gles11::TEXTURE_ENV_MODE,
+            tex_env_mode_arr.as_ptr().cast(),
+        );
+        (va_binding, va_size, va_type, va_stride, va_ptr,
+         tca_binding, tca_size, tca_type, tca_stride, tca_ptr, tex_env)
+    } else {
+        // GLES2: zero/null placeholders — never used in restoration block.
+        (0, 0, 0, 0, std::ptr::null(),
+         0, 0, 0, 0, std::ptr::null(), 0)
+    };
+
     let old_blend_sfactor: GLenum = get_int(gles, gles11::BLEND_SRC) as _;
     let old_blend_dfactor: GLenum = get_int(gles, gles11::BLEND_DST) as _;
-
-    let old_tex_env_mode = get_tex_env_int(gles, gles11::TEXTURE_ENV, gles11::TEXTURE_ENV_MODE);
-    // if the mode is REPLACE, we don't have to reset the other texture
-    // environment values
-    let tex_env_mode_arr = [gles11::REPLACE; 1];
-    gles.TexEnviv(
-        gles11::TEXTURE_ENV,
-        gles11::TEXTURE_ENV_MODE,
-        tex_env_mode_arr.as_ptr().cast(),
-    );
 
     // SmartRotationFix
     let rb_w = width as f32;
@@ -817,31 +837,34 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         old_clear_color[2],
         old_clear_color[3],
     );
-    // GL_ARRAY_BUFFER is implicitly used by the Pointer functions but is also
-    // an independent binding.
-    gles.BindBuffer(gles11::ARRAY_BUFFER, old_vertex_array_binding);
-    gles.VertexPointer(
-        old_vertex_array_size,
-        old_vertex_array_type,
-        old_vertex_array_stride,
-        old_vertex_array_pointer,
-    );
-    gles.BindBuffer(gles11::ARRAY_BUFFER, old_tex_coord_array_binding);
-    gles.TexCoordPointer(
-        old_tex_coord_array_size,
-        old_tex_coord_array_type,
-        old_tex_coord_array_stride,
-        old_tex_coord_array_pointer,
-    );
+    // Restore GLES1-only pointer/tex-env state only when not in GLES2 mode.
+    if !is_gles2 {
+        // GL_ARRAY_BUFFER is implicitly used by the Pointer functions but is
+        // also an independent binding.
+        gles.BindBuffer(gles11::ARRAY_BUFFER, old_vertex_array_binding);
+        gles.VertexPointer(
+            old_vertex_array_size,
+            old_vertex_array_type,
+            old_vertex_array_stride,
+            old_vertex_array_pointer,
+        );
+        gles.BindBuffer(gles11::ARRAY_BUFFER, old_tex_coord_array_binding);
+        gles.TexCoordPointer(
+            old_tex_coord_array_size,
+            old_tex_coord_array_type,
+            old_tex_coord_array_stride,
+            old_tex_coord_array_pointer,
+        );
+        let old_tex_env_mode_arr = [old_tex_env_mode; 1];
+        gles.TexEnviv(
+            gles11::TEXTURE_ENV,
+            gles11::TEXTURE_ENV_MODE,
+            old_tex_env_mode_arr.as_ptr().cast(),
+        );
+    }
+    // GL_ARRAY_BUFFER final restore and BlendFunc are safe in both GLES1 and GLES2.
     gles.BindBuffer(gles11::ARRAY_BUFFER, old_array_buffer);
     gles.BlendFunc(old_blend_sfactor, old_blend_dfactor);
-
-    let old_tex_env_mode_arr = [old_tex_env_mode; 1];
-    gles.TexEnviv(
-        gles11::TEXTURE_ENV,
-        gles11::TEXTURE_ENV_MODE,
-        old_tex_env_mode_arr.as_ptr().cast(),
-    );
 
     std::mem::drop(gles_boxed);
 
