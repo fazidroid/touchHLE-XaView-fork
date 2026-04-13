@@ -83,14 +83,8 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
             log_dbg!("mkdir({:?} {:?}, {:#x}) => 0", path, path_str, mode);
             0
         }
-        Err(err) => {
-            log!(
-                "Warning: mkdir({:?} {:?}, {:#x}) failed with {:?}, faking success",
-                path,
-                path_str,
-                mode,
-                err
-            );
+                Err(err) => {
+            log!("Warning: mkdir... failed with {:?}, faking success", err);
             match err {
                 FsError::AlreadyExist => set_errno(env, EEXIST),
                 FsError::NonexistentParentDir => set_errno(env, ENOENT),
@@ -98,7 +92,7 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
                 _ => (),
             };
             // FakeSuccessOnFail
-            0
+            0 // <--- IT RETURNS SUCCESS ANYWAY!
         }
     }
 }
