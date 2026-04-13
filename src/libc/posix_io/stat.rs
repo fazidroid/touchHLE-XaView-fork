@@ -186,9 +186,8 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
         }
 
         // ── Step 1: try to open as a regular file ────────────────────────────
-        // open_direct handles regular files correctly.  If it succeeds, reuse
-        // the fstat implementation and return immediately.
-        let fd = open_direct(env, path.cast_const(), 0);
+        // FIXED: Removed the invalid .cast_const() call here
+        let fd = open_direct(env, path, 0); 
         if fd != -1 {
             let result = fstat_inner(env, fd, buf);
             assert!(close(env, fd) == 0);
