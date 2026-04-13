@@ -114,8 +114,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (bool)runMode:(NSRunLoopMode)_mode beforeDate:(id)limit_date {
     let time_limit: NSTimeInterval = msg![env; limit_date timeIntervalSince1970];
+    // CoopYield: must call run_run_loop (which calls env.sleep) so that
+    // the cooperative scheduler gives other threads CPU time.
+    // If we returned immediately here, the game's loading spin-wait would
+    // starve all background threads and deadlock.
     run_run_loop(env, this, /* single_iteration: */ true, Some(time_limit));
-    false
+    true  // RunLoopDidRun: return true to indicate the loop ran, not false (timed out without running)
 }
 
 // TODO: other run methods
@@ -305,7 +309,9 @@ pub fn run_run_loop(
         // or until the next scheduled event, whichever is sooner. iPhone OS
         // apps can't do more than 60fps so this should be fine.
         let limit = Duration::from_millis(1000 / 60);
-        env.sleep(sleep_until.map_or(limit, |i| i.duration_since(Instant::now()).min(limit)));
+        // SafeSleepCalc: use saturating_duration_since to avoid a panic when
+        // sleep_until is already in the past (overdue timer or stale event due-time).
+        env.sleep(sleep_until.map_or(limit, |i| i.saturating_duration_since(Instant::now()).min(limit)));
 
         if single_iteration {
             break;
