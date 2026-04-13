@@ -334,5 +334,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
     export_c_func!(sysctlbyname(_, _, _, _, _)),
     export_c_func!(object_getClass(_)),
-    export_c_func!(class_getProperty(_, _, _)), // <--- ADD THIS LINE!
+    // FIXED: Removed the extra underscore!
+    export_c_func!(class_getProperty(_, _)), 
 ];
