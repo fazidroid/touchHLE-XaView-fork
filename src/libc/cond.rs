@@ -92,8 +92,6 @@ pub fn pthread_cond_wait(
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
     
-    // 🛡️ GENUINE WAIT: The thread yields so the CPU doesn't spinlock!
-    // This allows the main thread to actually process the graphics.
     env.yield_thread(ThreadBlock::Condition(cond_var));
     
     0 // success
@@ -150,21 +148,37 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
 }
 
 // ==========================================================
-// 🏎️ ASPHALT 8 BYPASS: Timed Wait Deadlock Defeater
+// 🏎️ ASPHALT 8 BYPASS: Timed Wait Anti-Starvation Hack
 // ==========================================================
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    _cond: MutPtr<pthread_cond_t>,
+    cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    // GAMELOFT ANTI-FREEZE HACK:
-    // By unlocking, relocking, and returning ETIMEDOUT (60) instantly, 
-    // we prevent Gameloft's loading screen from waiting on dropped signals!
-    let _ = pthread_mutex_unlock(env, mutex);
-    let _ = pthread_mutex_lock(env, mutex);
+    let _res = pthread_mutex_unlock(env, mutex);
     
-    60 // Return standard POSIX ETIMEDOUT code (60 on iOS)
+    let current_thread = env.current_thread;
+    let mutex_id = env.mem.read(mutex).mutex_id;
+    let cond_var = env.mem.read(cond);
+    
+    let host_object = State::get_mut(env)
+        .condition_variables
+        .get_mut(&cond_var)
+        .unwrap();
+        
+    host_object.curr_mutex = Some(mutex_id);
+    
+    // 🛡️ THE FIX: Push directly to `waking` instead of `waiting`
+    // This forces the background thread to safely yield the CPU so the main 
+    // game thread (Thread 0) can run, but guarantees the background thread 
+    // wakes up on the very next scheduler tick without sleeping forever!
+    host_object.waking.push_back(current_thread);
+    
+    env.yield_thread(ThreadBlock::Condition(cond_var));
+    
+    // Return standard POSIX ETIMEDOUT code (60 on iOS)
+    60
 }
 
 pub const FUNCTIONS: FunctionExports = &[
