@@ -328,6 +328,23 @@ fn class_getProperty(_env: &mut Environment, _cls: ConstVoidPtr, _name: ConstVoi
     // satisfying the reflection check without causing memory access violations.
     crate::mem::Ptr::null() 
 }
+// ==========================================================
+// 🏎️ GAMELOFT BYPASS: CCHmac Dummy Crypto
+// ==========================================================
+fn CCHmac(
+    _env: &mut Environment,
+    _algorithm: u32,
+    _key: ConstVoidPtr,
+    _keyLength: GuestUSize,
+    _data: ConstVoidPtr,
+    _dataLength: GuestUSize,
+    _macOut: MutVoidPtr,
+) {
+    println!("🎮 LOG: Bypassing Gameloft CCHmac crypto check!");
+    // The game is trying to cryptographically sign an ad-network request.
+    // By returning without doing any math, we safely neuter the analytics check!
+}
+
 
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -336,4 +353,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(object_getClass(_)),
     // FIXED: Removed the extra underscore!
     export_c_func!(class_getProperty(_, _)), 
+    export_c_func!(CCHmac(_, _, _, _, _, _)),
 ];
