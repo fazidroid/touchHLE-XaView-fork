@@ -7,8 +7,7 @@
 
 use super::mutex::pthread_mutex_t;
 use crate::dyld::FunctionExports;
-// FIXED IMPORT: Added pthread_mutex_lock so our bypass compiles!
-use crate::libc::pthread::mutex::{pthread_mutex_lock, pthread_mutex_unlock};
+use crate::libc::pthread::mutex::pthread_mutex_unlock;
 use crate::mem::{ConstPtr, MutPtr, SafeRead};
 use crate::{export_c_func, Environment};
 use std::collections::{HashMap, VecDeque};
@@ -67,18 +66,36 @@ pub fn pthread_cond_init(
     0 // success
 }
 
-// ==========================================================
-// 🏎️ ASPHALT 8 BYPASS: The Gameloft Deadlock Defeater
-// ==========================================================
 pub fn pthread_cond_wait(
     env: &mut Environment,
-    _cond: MutPtr<pthread_cond_t>,
+    cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
 ) -> i32 {
-    // Instantly unlock and lock to prevent Gameloft's threads from sleeping forever
-    let _ = pthread_mutex_unlock(env, mutex);
-    let _ = pthread_mutex_lock(env, mutex);
-    0 // Return 0 (Success) immediately to break the freeze
+    let res = pthread_mutex_unlock(env, mutex);
+    assert_eq!(res, 0);
+    log_dbg!(
+        "Thread {} is blocking on condition variable {:?}",
+        env.current_thread,
+        cond
+    );
+    let current_thread = env.current_thread;
+    let mutex_id = env.mem.read(mutex).mutex_id;
+    let cond_var = env.mem.read(cond);
+    let host_object = State::get_mut(env)
+        .condition_variables
+        .get_mut(&cond_var)
+        .unwrap();
+    assert!(
+        host_object.curr_mutex == Some(mutex_id)
+            || host_object.waking.is_empty() && host_object.waiting.is_empty()
+    );
+    host_object.curr_mutex = Some(mutex_id);
+    host_object.waiting.push_back(current_thread);
+    
+    // CRITICAL FIX: Restored the thread yield so the CPU doesn't spinlock!
+    env.yield_thread(ThreadBlock::Condition(cond_var));
+    
+    0 // success
 }
 
 pub fn pthread_cond_signal(env: &mut Environment, cond: MutPtr<pthread_cond_t>) -> i32 {
@@ -131,19 +148,13 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
     0 // success
 }
 
-// ==========================================================
-// 🏎️ ASPHALT 8 BYPASS: Timed Wait Deadlock Defeater
-// ==========================================================
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    _cond: MutPtr<pthread_cond_t>,
+    cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    // Bypasses the sleep timer and forces the engine to keep processing
-    let _ = pthread_mutex_unlock(env, mutex);
-    let _ = pthread_mutex_lock(env, mutex);
-    60 // Return standard POSIX ETIMEDOUT code (60 on iOS) to prevent indefinite waiting
+    pthread_cond_wait(env, cond, mutex)
 }
 
 pub const FUNCTIONS: FunctionExports = &[
