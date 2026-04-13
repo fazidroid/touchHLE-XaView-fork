@@ -138,6 +138,17 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
     0 // success
 }
 
+/// Write a synthetic directory entry into `buf`.
+/// Used when we know a path is a directory but `open_direct` cannot open it
+/// as a file descriptor (e.g. read-only IPA bundle directories like
+/// `shaders/`, `gui/`, `xml/`, `levels/` etc.).
+fn write_dir_stat(env: &mut Environment, buf: MutPtr<stat>) {
+    let mut s = stat::default();
+    s.st_mode = S_IFDIR;
+    s.st_nlink = 2; // POSIX: at least 2 for any directory
+    env.mem.write(buf, s);
+}
+
 fn fstat(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
@@ -152,23 +163,78 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    log!("Warning: stat() call, this function is mostly unimplemented");
-
     fn do_stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
         if path.is_null() {
             return -1; // TODO: Set errno
         }
 
-        // Open and reuse fstat implementation
+        // ── Step 1: try to open as a regular file ────────────────────────────
+        // open_direct handles regular files correctly.  If it succeeds, reuse
+        // the fstat implementation and return immediately.
         let fd = open_direct(env, path, 0);
-        if fd == -1 {
-            return -1; // TODO: Set errno
+        if fd != -1 {
+            let result = fstat_inner(env, fd, buf);
+            assert!(close(env, fd) == 0);
+            return result;
         }
 
-        let result = fstat_inner(env, fd, buf);
-        assert!(close(env, fd) == 0);
-        result
+        // ── Step 2: open_direct failed — probe whether it is a directory ─────
+        //
+        // open_direct can only open files, not directories.  Directories inside
+        // the IPA bundle (shaders/, gui/, xml/, levels/, pvs/, texter_fonts/,
+        // and "." itself) are legitimate paths the game's DirStreamFactory
+        // checks via stat().  When open_direct returns -1 for them, the game
+        // reports "Cannot find host/file/directory" and refuses to load assets.
+        //
+        // We probe by calling create_dir and reading the error:
+        //
+        //   AlreadyExist        → directory exists in a writable area  ✓
+        //   ReadonlyParentDir   → parent is the read-only IPA bundle mount;
+        //                         the item is a bundle directory that exists  ✓
+        //   NonexistentParentDir→ parent itself doesn't exist → genuine ENOENT
+        //   other errors        → treat as ENOENT
+
+        let path_str = match env.mem.cstr_at_utf8(path) {
+            Ok(s) => s.to_string(),
+            Err(_) => return -1,
+        };
+
+        if path_str.is_empty() {
+            return -1;
+        }
+
+        match env.fs.create_dir(GuestPath::new(&path_str)) {
+            Ok(()) => {
+                // Created it as a side-effect — treat as directory.
+                log_dbg!("stat: '{}' created as directory (probe side-effect)", path_str);
+                write_dir_stat(env, buf);
+                0
+            }
+            Err(FsError::AlreadyExist) => {
+                // Writable directory that already exists.
+                log_dbg!("stat: '{}' is an existing writable directory", path_str);
+                write_dir_stat(env, buf);
+                0
+            }
+            Err(FsError::ReadonlyParentDir) => {
+                // Parent is read-only — this is the IPA bundle mount.
+                // Directories like "shaders", "gui", "xml", "." live here.
+                log_dbg!("stat: '{}' is a read-only bundle directory", path_str);
+                write_dir_stat(env, buf);
+                0
+            }
+            Err(FsError::NonexistentParentDir) => {
+                // Parent doesn't exist at all — path is genuinely missing.
+                set_errno(env, ENOENT);
+                -1
+            }
+            Err(_) => {
+                set_errno(env, ENOENT);
+                -1
+            }
+        }
     }
+
     let result = do_stat(env, path, buf);
 
     log_dbg!(
