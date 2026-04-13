@@ -35,6 +35,17 @@ fn dlsym(env: &mut Environment, handle: MutVoidPtr, symbol: ConstPtr<u8>) -> Mut
     );
     // For some reason, the symbols passed to dlsym() don't have the leading _.
     let symbol = format!("_{}", env.mem.cstr_at_utf8(symbol).unwrap());
+
+    // ==========================================================
+    // 🏎️ ASPHALT 8 BYPASS: Gameloft DRM Integrity Check
+    // ==========================================================
+    if symbol == "_main" {
+        println!("🎮 LOG: Defeating Gameloft DRM main() check!");
+        // Give the DRM the actual memory pointer to Asphalt 8's entry point
+        // so it can scan the assembly and pass the anti-crack check!
+        return crate::mem::Ptr::from_bits(0x0000aef8); 
+    }
+
     // TODO: error handling. dlsym() should just return NULL in this case, but
     // currently it's probably more useful to have the emulator crash if there's
     // no symbol found, since it most likely indicates a missing host function.
