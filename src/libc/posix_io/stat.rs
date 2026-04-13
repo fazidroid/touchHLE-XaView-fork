@@ -59,13 +59,24 @@ pub struct stat {
 }
 unsafe impl SafeRead for stat {}
 
-fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
+/// Fill `buf` with a synthetic directory stat. Used when we know a path is a
+/// directory but cannot open it as a file descriptor (e.g. IPA bundle dirs).
+fn write_dir_stat(env: &mut Environment, buf: MutPtr<stat>) {
+    let mut s = stat::default();
+    s.st_mode   = S_IFDIR;
+    s.st_nlink  = 2;
+    s.st_blksize = 4096;
+    s.st_blocks  = 8;
+    env.mem.write(buf, s);
+}
+
+fn mkdir(env: &mut Environment, path: ConstPtr<u8>, _mode: mode_t) -> i32 {
     set_errno(env, 0);
 
     let path_str = match env.mem.cstr_at_utf8(path) {
         Ok(s) => {
             if s.contains("//") { return 0; }
-            if s.is_empty() { return 0; } // 🏎️ Fix for the empty string mkdir loop
+            if s.is_empty() { return 0; }
             s
         },
         Err(_) => {
@@ -78,9 +89,9 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
         Ok(()) => 0,
         Err(err) => {
             match err {
-                FsError::AlreadyExist => set_errno(env, EEXIST),
+                FsError::AlreadyExist       => set_errno(env, EEXIST),
                 FsError::NonexistentParentDir => set_errno(env, ENOENT),
-                FsError::ReadonlyParentDir => set_errno(env, EACCES),
+                FsError::ReadonlyParentDir  => set_errno(env, EACCES),
                 _ => (),
             };
             0 // Fake success on fail
@@ -94,36 +105,36 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
         return -1;
     };
 
-    let mut stat = stat::default();
+    let mut s = stat::default();
 
     match file.file {
         GuestFile::File(_) | GuestFile::IpaBundleFile(_) | GuestFile::ResourceFile(_) => {
-            stat.st_mode |= S_IFREG;
+            s.st_mode |= S_IFREG;
             if let Ok(len) = file.file.stream_len() {
-                stat.st_size = len.try_into().unwrap_or(0);
+                s.st_size = len.try_into().unwrap_or(0);
             }
-            // 🏎️ CRITICAL FIX: Provide real block sizes so Gameloft math doesn't divide-by-zero!
-            stat.st_blksize = 4096;
-            stat.st_blocks = (stat.st_size as u64 / 512) + 1;
+            s.st_blksize = 4096;
+            s.st_blocks  = (s.st_size as u64 / 512) + 1;
         }
         GuestFile::Directory => {
-            stat.st_mode |= S_IFDIR;
-            stat.st_blksize = 4096;
-            stat.st_blocks = 8;
+            s.st_mode   |= S_IFDIR;
+            s.st_nlink   = 2;
+            s.st_blksize = 4096;
+            s.st_blocks  = 8;
         }
         GuestFile::Socket => {
-            stat.st_mode |= S_IFSOCK;
-            stat.st_blksize = 4096;
-            stat.st_blocks = 1;
+            s.st_mode   |= S_IFSOCK;
+            s.st_blksize = 4096;
+            s.st_blocks  = 1;
         }
         _ => {
-            stat.st_mode |= S_IFREG;
-            stat.st_blksize = 4096;
-            stat.st_blocks = 1;
-        },
+            s.st_mode   |= S_IFREG;
+            s.st_blksize = 4096;
+            s.st_blocks  = 1;
+        }
     }
 
-    env.mem.write(buf, stat);
+    env.mem.write(buf, s);
     0
 }
 
@@ -135,25 +146,81 @@ fn fstat(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
 fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
     set_errno(env, 0);
 
-    fn do_stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
-        if path.is_null() {
-            set_errno(env, ENOENT);
-            return -1; 
-        }
+    if path.is_null() {
+        set_errno(env, ENOENT);
+        return -1;
+    }
 
-        let fd = open_direct(env, path, 0);
-        if fd == -1 {
-            // 🏎️ CRITICAL FIX: Explicitly set ENOENT so the engine knows the file is gone!
-            set_errno(env, ENOENT);
-            return -1; 
-        }
-
+    // ── Step 1: try to open as a regular file/directory fd ──────────────────
+    // open_direct handles regular files and any directory the VFS can open as
+    // a fd. If it succeeds we get correct st_mode from fstat_inner.
+    let fd = open_direct(env, path, 0);
+    if fd != -1 {
         let result = fstat_inner(env, fd, buf);
         assert!(close(env, fd) == 0);
-        result
+        return result;
     }
-    
-    do_stat(env, path, buf)
+
+    // ── Step 2: open_direct failed — probe whether it is a directory ─────────
+    // open_direct only opens files; directories inside the IPA bundle (shaders/,
+    // gui/, xml/, levels/, etc.) cannot be opened as fds but DO exist.
+    // We probe by attempting create_dir and interpreting the error:
+    //
+    //   AlreadyExist       → directory exists in a writable area
+    //   ReadonlyParentDir  → parent is the read-only IPA bundle mount; the path
+    //                        is inside the bundle. We treat it as a directory
+    //                        because the game only calls stat() on paths that
+    //                        are expected to exist.
+    //   NonexistentParentDir → parent doesn't exist at all → ENOENT
+    //   other errors         → genuine error → ENOENT
+
+    let path_str = match env.mem.cstr_at_utf8(path) {
+        Ok(s) => s.to_string(),
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return -1;
+        }
+    };
+
+    // Skip obviously empty or degenerate paths.
+    if path_str.is_empty() {
+        set_errno(env, ENOENT);
+        return -1;
+    }
+
+    match env.fs.create_dir(GuestPath::new(&path_str)) {
+        Ok(()) => {
+            // We just created it — shouldn't normally happen during stat, but
+            // treat it as a directory since that is what the caller expects.
+            log_dbg!("stat: created dir '{}' as side-effect of directory probe", path_str);
+            write_dir_stat(env, buf);
+            0
+        }
+        Err(FsError::AlreadyExist) => {
+            // Directory already exists in a writable area.
+            log_dbg!("stat: '{}' is an existing directory (AlreadyExist)", path_str);
+            write_dir_stat(env, buf);
+            0
+        }
+        Err(FsError::ReadonlyParentDir) => {
+            // The parent is read-only — this is the IPA bundle mount point.
+            // The path (e.g. "shaders", "gui") is a directory inside the bundle.
+            // Return a synthetic directory stat so the game's DirStreamFactory
+            // does not report "Cannot find host/file/directory".
+            log_dbg!("stat: '{}' is a read-only bundle directory (ReadonlyParentDir)", path_str);
+            write_dir_stat(env, buf);
+            0
+        }
+        Err(FsError::NonexistentParentDir) => {
+            // The parent itself doesn't exist — path is genuinely missing.
+            set_errno(env, ENOENT);
+            -1
+        }
+        Err(_) => {
+            set_errno(env, ENOENT);
+            -1
+        }
+    }
 }
 
 fn lstat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
