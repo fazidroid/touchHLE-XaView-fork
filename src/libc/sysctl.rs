@@ -344,6 +344,27 @@ fn CCHmac(
     // The game is trying to cryptographically sign an ad-network request.
     // By returning without doing any math, we safely neuter the analytics check!
 }
+// ==========================================================
+// 🏎️ EA BYPASS: __assert_rtn Crash Defeater
+// ==========================================================
+fn __assert_rtn(
+    env: &mut Environment,
+    _func: crate::mem::ConstPtr<u8>,
+    _file: crate::mem::ConstPtr<u8>,
+    line: i32,
+    expr: crate::mem::ConstPtr<u8>,
+) {
+    let expr_str = if expr.is_null() { 
+        String::from("(unknown)") 
+    } else { 
+        env.mem.cstr_at_utf8(expr).unwrap_or_default() 
+    };
+    
+    println!("🎮 LOG: EA Engine Assert Bypassed! Expression: {} (Line {})", expr_str, line);
+    // By intercepting this function and purposefully NOT aborting the emulator,
+    // we force the game's engine to ignore the missing telemetry and keep loading!
+}
+
 
 
 
@@ -354,4 +375,5 @@ pub const FUNCTIONS: FunctionExports = &[
     // FIXED: Removed the extra underscore!
     export_c_func!(class_getProperty(_, _)), 
     export_c_func!(CCHmac(_, _, _, _, _, _)),
+    export_c_func!(__assert_rtn(_, _, _, _)),
 ];
