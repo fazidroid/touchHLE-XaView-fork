@@ -12,7 +12,8 @@ use std::sync::LazyLock;
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::libc::errno::set_errno;
 use crate::libc::sysctl::SysInfoType::String;
-use crate::mem::{guest_size_of, ConstPtr, GuestUSize, MutPtr, MutVoidPtr, PAGE_SIZE};
+// 🛡️ FIXED IMPORT: Added ConstVoidPtr for object_getClass
+use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, PAGE_SIZE};
 use crate::Environment;
 
 // Clippy complains about the type.
@@ -26,7 +27,7 @@ static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 20] = [
     ((6,1), "hw.machine" , String(b"iPhone1,1")),
     ((6,2), "hw.model" , String(b"M68AP")),
     ((6,3), "hw.ncpu" , SysInfoType::Int32(1)),
-    ((6,4), "hw.physmem" , SysInfoType::Int32(512 * 1024 * 1024)), 
+    ((6,4), "hw.physmem" , SysInfoType::Int32(512 * 1024 * 1024)),
     ((0,0), "hw.cputype" , SysInfoType::Int32(12)),
     ((0,0), "hw.cputype" , SysInfoType::Int32(12)),
     ((0,0), "hw.cpusubtype" , SysInfoType::Int32(6)),
@@ -91,18 +92,27 @@ fn sysctl(
         newp,
         newlen
     );
-    if name_len != 2 {
-        // 🛡️ SILENCED 60FPS LOG: Prevent Android logcat spam
-        // log!(
-        //     "TODO: sysctl called with name_len = {} (expected 2). Faking empty response to avoid crash.",
-        //     name_len
-        // );
-        // Если игра запрашивает размер данных
-        if !oldlenp.is_null() {
-            env.mem.write(oldlenp, 0);
+
+    // ==========================================================
+    // 🏎️ EA BYPASS: Network Check / MAC Address Hack
+    // ==========================================================
+    if name_len >= 2 {
+        let name0 = env.mem.read(name);
+        let name1 = env.mem.read(name + 1);
+        // EA asks for NET_RT_IFLIST (mib[0]==4, mib[1]==17)
+        if name0 == 4 && name1 == 17 {
+            if !oldlenp.is_null() {
+                env.mem.write(oldlenp, 6); // Fake a 6-byte MAC address length
+            }
+            return 0; // SUCCESS
         }
-        // ОБЯЗАТЕЛЬНО возвращаем 0 (успех)
-        return 0;
+    }
+
+    if name_len != 2 {
+        // 🛡️ CRITICAL FIX: Return -1 (Error) instead of 0.
+        // If we return 0, EA's engine assumes it received valid data and reads (null).
+        // Returning -1 forces the engine to use safe fallbacks without panicking!
+        return -1;
     }
 
     let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));
@@ -140,7 +150,7 @@ fn sysctl(
                                 } else if name0 == 6 && name1 == 4 {
                     // 🏎️ UPGRADE: 1GB of RAM for Asphalt 8 support!
                     val.1 = SysInfoType::Int32(1024 * 1024 * 1024); // OverrideModel
-                }                
+                }
             }
             val
         },
@@ -290,7 +300,27 @@ where
     0 // success
 }
 
+// ==========================================================
+// 🏎️ EA BYPASS: object_getClass Dummy Memory Protection
+// ==========================================================
+fn object_getClass(env: &mut Environment, obj: ConstVoidPtr) -> ConstVoidPtr {
+    if obj.is_null() {
+        return crate::mem::Ptr::null();
+    }
+
+    // EA Bypass: If the game passes our dummy MTX pointer, 
+    // return a fake valid Class pointer to prevent the engine from panicking.
+    if obj.to_bits() == 0xDEADBEEF {
+        println!("🎮 LOG: Caught object_getClass reading dummy MTX pointer!");
+        return crate::mem::Ptr::from_bits(0x30000000); 
+    }
+
+    let isa = env.mem.read::<u32, false>(obj.cast());
+    crate::mem::Ptr::from_bits(isa)
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
     export_c_func!(sysctlbyname(_, _, _, _, _)),
+    export_c_func!(object_getClass(_)),
 ];
