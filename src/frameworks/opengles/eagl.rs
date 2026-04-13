@@ -792,6 +792,28 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         }
         log!("DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}", rb_w, rb_h);
     }
+        // ==========================================================
+    // 🏎️ ASPHALT 8 BYPASS: SmartRotationFix
+    // ==========================================================
+    let rb_w = width as f32;
+    let rb_h = height as f32;
+    let cols = rotation_matrix.columns();
+    let is_rotated = cols[0][0].abs() < 0.1 && cols[0][1].abs() > 0.9;
+    
+    if is_rotated && rb_w > rb_h {
+        unsafe {
+            let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
+            *m_ptr = [
+                [1.0, 0.0],
+                [0.0, 1.0],
+            ];
+        }
+        log!("DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}", rb_w, rb_h);
+    }
+
+    // Draw the quad
+    present_frame(gles, viewport, rotation_matrix, virtual_cursor_visible_at);
+    
 
     // Draw the quad
     present_frame(gles, viewport, rotation_matrix, virtual_cursor_visible_at);
