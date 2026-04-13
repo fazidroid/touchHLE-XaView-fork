@@ -65,8 +65,48 @@ fn dlclose(env: &mut Environment, handle: MutVoidPtr) -> i32 {
     0 // success
 }
 
+// ==========================================================
+// 🏎️ ASPHALT 8 BYPASS: dladdr() Gameloft DRM Defeater
+// ==========================================================
+#[repr(C, packed)]
+pub struct Dl_info {
+    pub dli_fname: crate::mem::ConstPtr<u8>,
+    pub dli_fbase: crate::mem::MutVoidPtr,
+    pub dli_sname: crate::mem::ConstPtr<u8>,
+    pub dli_saddr: crate::mem::MutVoidPtr,
+}
+unsafe impl crate::mem::SafeRead for Dl_info {}
+
+fn dladdr(env: &mut Environment, addr: crate::mem::ConstVoidPtr, info_ptr: crate::mem::MutPtr<Dl_info>) -> i32 {
+    if info_ptr.is_null() { return 0; }
+
+    println!("🎮 LOG: Gameloft dladdr() DRM Defeated! Address: {:#x}", addr.to_bits());
+
+    // 1. Get the current Stack Pointer (SP)
+    let sp = env.cpu.regs()[13];
+    
+    // 2. Safely point to the "Red Zone" (unused space below the stack)
+    let fake_str_ptr: crate::mem::ConstPtr<u8> = crate::mem::Ptr::from_bits(sp - 64);
+    
+    // 3. Write "main\0" directly into the guest's memory
+    env.mem.bytes_at_mut(fake_str_ptr.cast_mut(), 5).copy_from_slice(b"main\0");
+
+    // 4. Hand the fake memory pointer back to Gameloft's Anti-Piracy checker
+    let info = Dl_info {
+        dli_fname: fake_str_ptr, 
+        dli_fbase: crate::mem::Ptr::from_bits(0x4000), // Standard iOS binary base
+        dli_sname: fake_str_ptr, // <--- This satisfies the main() string check!
+        dli_saddr: addr.cast_mut(),
+    };
+
+    env.mem.write(info_ptr, info);
+    1 // Return 1 for Success
+}
+
+// Export the newly added dladdr function so the game can call it
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(dlopen(_, _)),
     export_c_func!(dlsym(_, _)),
     export_c_func!(dlclose(_)),
+    export_c_func!(dladdr(_, _)),
 ];
