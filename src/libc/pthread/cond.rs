@@ -92,7 +92,8 @@ pub fn pthread_cond_wait(
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
     
-    // CRITICAL FIX: Restored the thread yield so the CPU doesn't spinlock!
+    // CRITICAL FIX: The thread MUST yield here so the CPU doesn't spinlock!
+    // This allows the main thread to process the loading screen.
     env.yield_thread(ThreadBlock::Condition(cond_var));
     
     0 // success
@@ -154,6 +155,7 @@ pub fn pthread_cond_timedwait(
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
+    // Safe fallback: Delegate to the standard wait function so the thread yields properly
     pthread_cond_wait(env, cond, mutex)
 }
 
