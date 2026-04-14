@@ -126,14 +126,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     // TODO: file URL case
     
     // ==========================================================
-    // 🏎️ GAMELOFT BYPASS: Custom Ad-Network URI Crash Defeater
+    // 🏎️ GAMELOFT BYPASS: Ad-Network Infinite Loop Defeater
     // ==========================================================
-    // Gameloft attempts to load ad payloads with non-standard URIs.
-    // By removing the strict "http" assertion, we allow the emulator to 
-    // gracefully reject the download without panicking!
+    // Returning 'nil' causes Gameloft's FreeCash engine to infinitely 
+    // retry the download, preventing the save file from being created!
+    // By initializing an empty NSData object, we trick the engine into 
+    // thinking the ad server replied with 0 bytes, letting the game progress!
     if !path.starts_with("http") {
         println!("🎮 LOG: Bypassing non-HTTP URL check in initWithContentsOfURL!");
     }
+
+    log!("TODO: ignoring [(NSData*){:?} initWithContentsOfURL:{:?}]", this, path);
+    
+    // Return an empty data object instead of nil!
+    msg![env; this init]
+}
 
     log!("TODO: ignoring [(NSData*){:?} initWithContentsOfURL:{:?}]", this, path);
     // TODO: actually load data once we have proper network support
