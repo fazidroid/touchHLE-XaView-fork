@@ -114,20 +114,39 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithData:(id)data {
-    let bytes: ConstVoidPtr = msg![env; data bytes];
-    let length: NSUInteger = msg![env; data length];
-    msg![env; this initWithBytes:bytes length:length]
-}
-
 - (id)initWithContentsOfURL:(id)url { // NSURL *
     let path: id = msg![env; url absoluteString];
     let path = to_rust_string(env, path);
     // TODO: file URL case
-    assert!(path.starts_with("http"));
+    
+    // ==========================================================
+    //  GAMELOFT EXCLUSIVE BYPASS: Ad-Network Infinite Loop
+    // ==========================================================
+    // Dynamically grab the game's iOS Bundle ID at runtime!
+    let main_bundle: id = msg_class![env; NSBundle mainBundle];
+    let bundle_id: id = msg![env; main_bundle bundleIdentifier];
+    
+    let is_gameloft = if bundle_id != crate::objc::nil {
+        let bundle_id_str = to_rust_string(env, bundle_id);
+        bundle_id_str.contains("gameloft") || bundle_id_str.contains("GT Free+")
+    } else {
+        false
+    };
+
+    if !path.starts_with("http") {
+        println!(" LOG: Bypassing non-HTTP URL check in initWithContentsOfURL!");
+    }
+
     log!("TODO: ignoring [(NSData*){:?} initWithContentsOfURL:{:?}]", this, path);
-    // TODO: actually load data once we have proper network support
-    nil
+    
+    // ONLY apply the empty-data hack if the game is GT Racing (Gameloft)
+    if is_gameloft {
+        println!(" LOG: Gameloft game detected! Returning empty NSData to break ad-loop.");
+        msg![env; this init]
+    } else {
+        // Standard touchHLE behavior for Need for Speed and all other games
+        crate::objc::nil
+    }
 }
 
 - (id)initWithContentsOfFile:(id)path {

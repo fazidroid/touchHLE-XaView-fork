@@ -607,31 +607,38 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; layer containsPoint:point]
 }
 
-- (id)hitTest:(CGPoint)point
-    withEvent:(id)event { // UIEvent* (possibly nil)
+- (id)hitTest:(CGPoint)point withEvent:(id)event {
     let hidden: bool = msg![env; this isHidden];
-    let alpha: CGFloat = msg![env; this alpha];
-    if hidden || alpha < 0.01 {
-        return nil; // ForceTouchIgnoreAlpha
-    }
-    if !msg![env; this pointInside:point withEvent:event] {
+    let user_interaction_enabled: bool = msg![env; this isUserInteractionEnabled];
+    let alpha: crate::frameworks::core_graphics::CGFloat = msg![env; this alpha];
+
+    if hidden || !user_interaction_enabled || alpha < 0.01 {
         return nil;
     }
-    // TODO: avoid copy somehow?
-    let subviews = env.objc.borrow::<UIViewHostObject>(this).subviews.clone();
-    for subview in subviews.into_iter().rev() { // later views are on top
-        let hidden: bool = msg![env; subview isHidden];
-        let alpha: CGFloat = msg![env; subview alpha];
-        let interactible: bool = msg![env; subview isUserInteractionEnabled];
-        if hidden || alpha < 0.01 || !interactible {
-           continue;
-        }
-        let point: CGPoint = msg![env; subview convertPoint:point fromView:this];
-        let subview: id = msg![env; subview hitTest:point withEvent:event];
-        if subview != nil {
-            return subview;
+
+    let point_inside: bool = msg![env; this pointInside:point withEvent:event];
+    if !point_inside {
+        return nil;
+    }
+
+    let subviews: id = msg![env; this subviews];
+    if subviews != nil {
+        let count: u32 = msg![env; subviews count];
+        
+        // Traverse subviews in reverse order (top-most first)
+        for i in (0..count).rev() {
+            let subview: id = msg![env; subviews objectAtIndex:i];
+            
+            // 🎯 PROPER CONVERSION: Let UIKit handle the rotation/scaling transform math!
+            let sub_point: crate::frameworks::core_graphics::CGPoint = msg![env; this convertPoint:point toView:subview];
+            
+            let hit: id = msg![env; subview hitTest:sub_point withEvent:event];
+            if hit != nil {
+                return hit; // Return the exact view that was touched
+            }
         }
     }
+    
     this
 }
 
