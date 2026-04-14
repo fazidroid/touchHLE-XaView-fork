@@ -738,5 +738,3 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     gles.BindTexture(gles11::TEXTURE_2D, old_texture_2d);
     gles.BindFramebufferOES(gles11::FRAMEBUFFER_OES, old_framebuffer);
 }
-
-}
