@@ -16,7 +16,6 @@ use crate::objc::{
 use crate::window::{Coords, Event, FingerId};
 use crate::Environment;
 use std::collections::hash_map::{Entry, HashMap};
-use std::collections::HashSet;
 
 pub type UITouchPhase = NSInteger;
 pub const UITouchPhaseBegan: UITouchPhase = 0;
@@ -67,20 +66,47 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (CGPoint)locationInView:(id)that_view { 
     let &UITouchHostObject { location, window, .. } = env.objc.borrow(this);
     let location_in_window: CGPoint = msg![env; window convertPoint:location fromWindow:nil];
-    if that_view == nil {
+    let mut result: CGPoint = if that_view == nil {
         location_in_window
     } else {
         msg![env; that_view convertPoint:location_in_window fromView:window]
+    };
+    
+    if that_view != nil {
+        let bounds: CGRect = msg![env; that_view bounds];
+        let w = bounds.size.width;
+        let h = bounds.size.height;
+        if w > 0.0 && h > 0.0 {
+            if result.x < 0.0 { result.x = 0.0; }
+            if result.y < 0.0 { result.y = 0.0; }
+            if result.x >= w { result.x = w - 1.0; }
+            if result.y >= h { result.y = h - 1.0; }
+        }
     }
+    result
 }
-- (CGPoint)previousLocationInView:(id)that_view { 
+
+- (CGPoint)previousLocationInView:(id)that_view {
     let &UITouchHostObject { previous_location, window, .. } = env.objc.borrow(this);
     let location_in_window: CGPoint = msg![env; window convertPoint:previous_location fromWindow:nil];
-    if that_view == nil {
+    let mut result: CGPoint = if that_view == nil {
         location_in_window
     } else {
         msg![env; that_view convertPoint:location_in_window fromView:window]
+    };
+
+    if that_view != nil {
+        let bounds: CGRect = msg![env; that_view bounds];
+        let w = bounds.size.width;
+        let h = bounds.size.height;
+        if w > 0.0 && h > 0.0 {
+            if result.x < 0.0 { result.x = 0.0; }
+            if result.y < 0.0 { result.y = 0.0; }
+            if result.x >= w { result.x = w - 1.0; }
+            if result.y >= h { result.y = h - 1.0; }
+        }
     }
+    result
 }
 
 - (id)view {
@@ -92,7 +118,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSUInteger)tapCount {
-    1
+    1 
 }
 
 - (UITouchPhase)phase {
@@ -128,11 +154,9 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
     for (finger_id, coords) in map {
         let current_touches = &mut env.framework_state.uikit.ui_touch.current_touches;
         if current_touches.contains_key(&finger_id) {
-            log!("Warning: New touch {:?} initiated but current touch did not end yet, treating as movement.", finger_id);
             return handle_touches_move(env, HashMap::from([(finger_id, coords)]));
         }
 
-        log_dbg!("Finger {:?} touch down: {:?}", finger_id, coords);
         let location = CGPoint { x: coords.0, y: coords.1 };
         let new_touch: id = msg_class![env; UITouch alloc];
         *env.objc.borrow_mut(new_touch) = UITouchHostObject {
@@ -224,15 +248,15 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             let touches: id = msg_class![env; NSMutableSet allocWithZone:(MutVoidPtr::null())];
             e.insert(touches);
         }
-        let touches: id = *view_touches.get(&view).unwrap();
+        let touches: id = *view_touches.get(&target_view).unwrap();
         let _: () = msg![env; touches addObject:touch];
 
-        retain(env, view);
-        retain(env, window);
+        retain(env, target_view);
+        retain(env, target_window);
         {
             let new_touch = env.objc.borrow_mut::<UITouchHostObject>(touch);
-            new_touch.view = view;
-            new_touch.window = window;
+            new_touch.view = target_view;
+            new_touch.window = target_window;
         }
     }
 
@@ -264,8 +288,6 @@ fn handle_touches_move(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let host_object = env.objc.borrow_mut::<UITouchHostObject>(touch);
 
         if host_object.location == location { continue; }
-
-        log_dbg!("Finger {:?} touch move: {:?}", finger_id, coords);
 
         host_object.previous_location = host_object.location;
         host_object.location = location;
@@ -322,6 +344,7 @@ fn handle_touches_up(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let location = CGPoint { x: coords.0, y: coords.1 };
         let view = env.objc.borrow::<UITouchHostObject>(touch).view;
         let host_object = env.objc.borrow_mut::<UITouchHostObject>(touch);
+        
         host_object.previous_location = host_object.location;
         host_object.location = location;
         host_object.timestamp = timestamp;

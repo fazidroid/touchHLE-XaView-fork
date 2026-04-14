@@ -47,16 +47,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)initWithName:(id)tz_name { // NSString *
-    // 🏎️ GAMELOFT BYPASS: Safely handle nil timezones without panicking!
-    let final_tz_name = if tz_name == nil {
-        println!("GAMELOFT BYPASS: NSTimeZone initialized with nil name! Defaulting to GMT.");
-        ns_string::get_static_str(env, "GMT")
+    let tz = if tz_name == nil {
+        // fallback to UTC if nil
+        ns_string::get_static_str(env, "UTC")
     } else {
         tz_name
     };
 
-    retain(env, final_tz_name);
-    env.objc.borrow_mut::<NSTimeZoneHostObject>(this).time_zone = final_tz_name;
+    retain(env, tz);
+    env.objc.borrow_mut::<NSTimeZoneHostObject>(this).time_zone = tz;
     this
 }
 

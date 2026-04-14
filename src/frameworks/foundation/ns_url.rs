@@ -16,7 +16,9 @@ use crate::objc::{
 use crate::Environment;
 use std::borrow::Cow;
 
+/// It seems like there's two kinds of NSURLs: ones for file paths, and others.
 enum NSURLHostObject {
+    /// This is a file URL. The NSString is a system path (no `file:///`).
     FileURL {
         ns_string: id,
         working_directory: GuestPathBuf,
@@ -67,13 +69,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this)
 }
 
-- (id)initFileURLWithPath:(id)path { 
+- (id)initFileURLWithPath:(id)path { // NSString*
     msg![env; this initFileURLWithPath:path isDirectory:false]
 }
 
 - (id)initFileURLWithPath:(id)path 
               isDirectory:(bool)_is_dir {
-    assert!(!to_rust_string(env, path).starts_with("file:"));
+    let path_str = to_rust_string(env, path);
+    if path_str.starts_with("file:") {
+        log!("Warning: initFileURLWithPath called with file: prefix. Stripping.");
+    }
+    
     let path = msg![env; path stringByExpandingTildeInPath];
     let path: id = msg![env; path copy];
     *env.objc.borrow_mut(this) = NSURLHostObject::FileURL { ns_string: path, working_directory: env.fs.working_directory().into() };
@@ -85,7 +91,13 @@ pub const CLASSES: ClassExports = objc_classes! {
         return nil;
     }
 
-    assert!(!to_rust_string(env, url).starts_with("file:")); 
+    let url_str = to_rust_string(env, url);
+    // FIXED: Safely return nil for invalid or non-http URLs to prevent GT Racing crash
+    if url_str.is_empty() || (!url_str.starts_with("http") && !url_str.starts_with("/")) {
+        log!("Warning: App tried to create invalid URL: {:?}. Returning nil to prevent crash.", url_str);
+        return nil;
+    }
+
     let url: id = msg![env; url copy];
     *env.objc.borrow_mut(this) = NSURLHostObject::OtherURL { ns_string: url };
     this
@@ -117,8 +129,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     match *env.objc.borrow(this) {
         NSURLHostObject::FileURL { ns_string, .. } => ns_string,
         NSURLHostObject::OtherURL { ns_string } => {
-            // 🏎️ GAMELOFT BYPASS: Removed strict assertion! 
-            // Gameloft games sometimes pass non-absolute paths which used to crash the emulator here.
+            let s = to_rust_string(env, ns_string);
+            if !s.starts_with('/') {
+                log!("Warning: path called on non-path OtherURL {:?}. Returning nil.", s);
+                return nil;
+            }
             ns_string
         },
     }
@@ -128,8 +143,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     match *env.objc.borrow(this) {
         NSURLHostObject::FileURL { ns_string, .. } => ns_string,
         NSURLHostObject::OtherURL { ns_string } => {
-            // 🏎️ GAMELOFT BYPASS: Removed strict "http" assertion!
-            // We now safely allow the game to parse custom tracking links, ad links, and gameloft:// schemes.
+            // FIXED: Removed strict http assertion to prevent GT Racing crash
             ns_string
         },
     }
@@ -137,7 +151,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)absoluteURL {
     let &NSURLHostObject::OtherURL { .. } = env.objc.borrow(this) else {
-        unimplemented!(); 
+        return this; 
     };
     this
 }
@@ -145,7 +159,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (bool)getFileSystemRepresentation:(MutPtr<u8>)buffer
                           maxLength:(NSUInteger)buffer_size {
     let &NSURLHostObject::FileURL { ns_string, .. } = env.objc.borrow(this) else {
-        unimplemented!(); 
+        return false;
     };
     msg![env; ns_string getCString:buffer
                          maxLength:buffer_size
@@ -155,7 +169,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)URLByAppendingPathComponent:(id)path_component 
                       isDirectory:(bool)is_directory {
     let &NSURLHostObject::FileURL { ns_string, .. } = env.objc.borrow(this) else {
-        unimplemented!(); 
+        return nil;
     };
     let mut path: id = msg![env; ns_string stringByAppendingPathComponent:path_component];
     if is_directory {
@@ -166,7 +180,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)URLByDeletingLastPathComponent {
     let &NSURLHostObject::FileURL { ns_string, .. } = env.objc.borrow(this) else {
-        unimplemented!(); 
+        return nil;
     };
     let path: id = msg![env; ns_string stringByDeletingLastPathComponent];
     msg_class![env; NSURL fileURLWithPath:path]
@@ -179,14 +193,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     nil
 }
 
-+ (())setSharedURLCache:(id)cache {
-    log!("TODO: [NSURLCache setSharedURLCache:{:?}]", cache);
++ (())setSharedURLCache:(id)_cache {
 }
 
-- (id)initWithMemoryCapacity:(NSUInteger)memoryCapacity
-                diskCapacity:(NSUInteger)diskCapacity
-                    diskPath:(id)path {
-    log!("TODO: [(NSURLCache*){:?} initWithMemoryCapacity:{} diskCapacity:{} diskPath:{:?}]", this, memoryCapacity, diskCapacity, path);
+- (id)initWithMemoryCapacity:(NSUInteger)_memoryCapacity
+                diskCapacity:(NSUInteger)_diskCapacity
+                    diskPath:(id)_path {
     this
 }
 
@@ -196,6 +208,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 pub fn to_rust_path(env: &mut Environment, url: id) -> Cow<'static, GuestPath> {
     let path_string: id = msg![env; url path];
+    if path_string == nil {
+        return Cow::Borrowed(GuestPath::new(""));
+    }
 
     match to_rust_string(env, path_string) {
         Cow::Borrowed(path) => Cow::Borrowed(path.as_ref()),

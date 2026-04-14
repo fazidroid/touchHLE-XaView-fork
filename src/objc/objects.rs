@@ -112,6 +112,7 @@ macro_rules! impl_HostObject_with_superclass {
             ) -> Option<&'a (dyn $crate::objc::AnyHostObject + 'static)> {
                 Some(&self.superclass)
             }
+
             fn as_superclass_mut<'a>(
                 &'a mut self,
             ) -> Option<&'a mut (dyn $crate::objc::AnyHostObject + 'static)> {
@@ -167,7 +168,12 @@ impl super::ObjC {
 
         let ptr: MutPtr<objc_object> = mem.alloc(instance_size).cast();
         mem.write(ptr, guest_object);
-        assert!(!self.objects.contains_key(&ptr));
+
+        // Prevent crash on duplicate allocation (reuse-safe)
+        if self.objects.contains_key(&ptr) {
+            return ptr;
+        }
+
         self.objects.insert(
             ptr,
             HostObjectEntry {
@@ -274,6 +280,7 @@ impl super::ObjC {
 
         type Aho = dyn AnyHostObject + 'static;
         let mut host_object: &mut Aho = &mut *entry.host_object;
+
         loop {
             if let Some(res) = unsafe { &mut *(host_object as *mut Aho) }
                 .as_any_mut()
@@ -298,11 +305,11 @@ impl super::ObjC {
     /// some games (like "Cut the Rope") does call `retainCount`.
     pub fn get_refcount(&mut self, object: id) -> NonZeroU32 {
         let Some(entry) = self.objects.get_mut(&object) else {
-            println!("Warning: No entry found for object {object:?} during get_refcount. It may have already been deallocated.");
-            return NonZeroU32::new(1).unwrap();
+            log!("WARNING: No entry found for object {object:?} in get_refcount. Returning max.");
+            return NonZeroU32::new(u32::MAX).unwrap();
         };
         let Some(refcount) = entry.refcount.as_mut() else {
-            // 🏎️ FIX: Static objects effectively have an infinite retain count.
+            // Static-lifetime object
             return NonZeroU32::new(u32::MAX).unwrap();
         };
         *refcount
@@ -313,11 +320,11 @@ impl super::ObjC {
     /// may be overridden.
     pub fn increment_refcount(&mut self, object: id) {
         let Some(entry) = self.objects.get_mut(&object) else {
-            println!("Warning: No entry found for object {object:?} during retain. It may have already been deallocated.");
+            log!("WARNING: No entry found for object {object:?} in increment_refcount. Ignoring.");
             return;
         };
         let Some(refcount) = entry.refcount.as_mut() else {
-            // 🏎️ FIX: Silently ignore increment on static-lifetime objects.
+            // Safely ignore retain on static-lifetime object
             return;
         };
         *refcount = refcount.checked_add(1).unwrap();
@@ -332,11 +339,11 @@ impl super::ObjC {
     #[must_use]
     pub fn decrement_refcount(&mut self, object: id) -> bool {
         let Some(entry) = self.objects.get_mut(&object) else {
-            println!("Warning: No entry found for object {object:?} during release. It may have already been deallocated.");
+            log!("WARNING: No entry found for object {object:?} in decrement_refcount. Ignoring.");
             return false;
         };
         let Some(refcount) = entry.refcount.as_mut() else {
-            // 🏎️ FIX: Silently ignore decrement on static-lifetime objects instead of crashing!
+            // Safely ignore release on static-lifetime object
             return false;
         };
         if refcount.get() == 1 {
@@ -356,9 +363,8 @@ impl super::ObjC {
         // LoggedOnceFlag
         static LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-        if SHOW_ALL.load(std::sync::atomic::Ordering::Relaxed)
-            || !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed)
-        {
+        if SHOW_ALL.load(std::sync::atomic::Ordering::Relaxed) ||
+        !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed) {
             log!(
                 "MEMORY LEAK INTENTIONAL: Preventing deallocation of {:?} to avoid Use-After-Free crashes (muted further logs)",
                 object

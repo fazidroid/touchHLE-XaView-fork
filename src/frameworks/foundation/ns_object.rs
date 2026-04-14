@@ -14,10 +14,8 @@
 //!
 //! See also: [crate::objc], especially the `objects` module.
 
-use super::ns_dictionary::dict_from_keys_and_objects;
-use super::ns_run_loop::NSDefaultRunLoopMode;
 use super::ns_string::{from_rust_string, get_static_str, to_rust_string};
-use super::{NSTimeInterval, NSUInteger};
+use super::NSUInteger;
 use crate::frameworks::foundation::ns_thread::detach_new_thread_inner;
 use crate::mem::MutVoidPtr;
 use crate::objc::{
@@ -51,15 +49,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.class_is_subclass_of(this, class)
 }
 
-// See the instance method section for the normal versions of these.
 + (id)retain {
-    this // classes are not refcounted
+    this 
 }
 + (())release {
-    // classes are not refcounted
 }
 + (())autorelease {
-    // classes are not refcounted
 }
 
 + (bool)instancesRespondToSelector:(SEL)selector {
@@ -125,51 +120,31 @@ pub const CLASSES: ClassExports = objc_classes! {
     this.to_bits()
 }
 
-// To not confuse with isEqualTo:, which is
-// a category of NSWhoseSpecifier!
-// Reference https://nshipster.com/equality
 - (bool)isEqual:(id)other {
     this == other
 }
 
-// TODO: Instance description and debugDescription.
-// This is not hard to add, but before adding a fallback implementation of it,
-// we should make sure all the Foundation classes' overrides of it are there,
-// to prevent weird behavior.
-// TODO: localized description methods also? (not sure if NSObject has them)
-
-// Helper for NSCopying
 - (id)copy {
     msg![env; this copyWithZone:(MutVoidPtr::null())]
 }
 
-// Helper for NSMutableCopying
 - (id)mutableCopy {
     msg![env; this mutableCopyWithZone:(MutVoidPtr::null())]
 }
 
-// NSKeyValueCoding
-// https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/KeyValueCoding/SearchImplementation.html
 - (())setValue:(id)value
        forKey:(id)key { // NSString*
-    let key_string = to_rust_string(env, key); // TODO: avoid copy?
-    assert!(key_string.is_ascii()); // TODO: do we have to handle non-ASCII keys?
+    let key_string = to_rust_string(env, key);
+    assert!(key_string.is_ascii()); 
     let camel_case_key_string = format!("{}{}", key_string.as_bytes()[0].to_ascii_uppercase() as char, &key_string[1..]);
 
     let class = msg![env; this class];
-
-    // TODO: If value is nil, the target ivar/method argument type must be
-    // checked. If it's non-object type, invoke setNilValueForKey:
     assert!(value != nil);
-
-    // TODO: If value is a NSNumber or NSValue, it must be unwrapped
+    
     let value_class = msg![env; value class];
     let ns_value_class = env.objc.get_known_class("NSValue", &mut env.mem);
     assert!(!env.objc.class_is_subclass_of(value_class, ns_value_class));
 
-    // Look for the first accessor named set<Key>: or _set<Key>, in that order.
-    // If found, invoke it with the input value (or unwrapped value, as needed)
-    // and finish.
     if let Some(sel) = env.objc.lookup_selector(&format!("set{camel_case_key_string}:")) {
         if env.objc.class_has_method(class, sel) {
             () = msg_send(env, (this, sel, value));
@@ -184,14 +159,9 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
 
-    // If no simple accessor is found, and if the class method
-    // accessInstanceVariablesDirectly returns YES, look for an instance
-    // variable with a name like _<key>, _is<Key>, <key>, or is<Key>,
-    // in that order.
-    // If found, set the variable directly with the input value
-    // (or unwrapped value) and finish.
     let sel = env.objc.lookup_selector("accessInstanceVariablesDirectly").unwrap();
     let accessInstanceVariablesDirectly = msg_send(env, (class, sel));
+
     if accessInstanceVariablesDirectly {
         if let Some(ivar_ptr) = env.objc.object_lookup_ivar(&env.mem, this, &format!("_{key_string}"))
             .or_else(|| env.objc.object_lookup_ivar(&env.mem, this, &format!("_is{camel_case_key_string}")))
@@ -204,20 +174,16 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
     }
 
-    // Upon finding no accessor or instance variable,
-    // invoke setValue:forUndefinedKey:.
-    // This raises an exception by default, but a subclass of NSObject
-    // may provide key-specific behavior.
     let sel = env.objc.lookup_selector("setValue:forUndefinedKey:").unwrap();
     () = msg_send(env, (this, sel, value, key));
 }
 
 - (())setValue:(id)_value
 forUndefinedKey:(id)key { // NSString*
-    // TODO: Raise NSUnknownKeyException
     let class: Class = ObjC::read_isa(this, &env.mem);
-    let class_name_string = env.objc.get_class_name(class).to_owned(); // TODO: Avoid copying
+    let class_name_string = env.objc.get_class_name(class).to_owned(); 
     let key_string = to_rust_string(env, key);
+
     panic!("Object {:?} of class {:?} ({:?}) does not have a setter for {} ({:?})\
         \nAvailable selectors: {}\nAvailable ivars: {}",
         this, class_name_string, class, key_string, key,
@@ -249,29 +215,9 @@ forUndefinedKey:(id)key { // NSString*
 
 - (())performSelectorInBackground:(SEL)sel
                        withObject:(id)arg {
-    detach_new_thread_inner(env, sel, this, arg, /* tolerate_type_mismatch: */ true)
-}
-
-- (())performSelector:(SEL)sel withObject:(id)arg afterDelay:(NSTimeInterval)delay {
-    log_dbg!("performSelector:{} withObject:{:?} afterDelay:{}", sel.as_str(&env.mem), arg, delay);
-
-    let sel_key: id = get_static_str(env, "SEL");
-    let sel_str = from_rust_string(env, sel.as_str(&env.mem).to_string());
-    let arg_key: id = get_static_str(env, "arg");
-    let dict = dict_from_keys_and_objects(env, &[(sel_key, sel_str), (arg_key, arg)]);
-
-    // TODO: using timer is not the most efficient implementation, but does work
-    // Proper implementation requires a message queue in the run loop
-    let selector = env.objc.lookup_selector("_touchHLE_timerFireMethod:").unwrap();
-    let timer:id = msg_class![env; NSTimer timerWithTimeInterval:delay
-                                              target:this
-                                            selector:selector
-                                            userInfo:dict
-                                             repeats:false];
-
-    let run_loop: id = msg_class![env; NSRunLoop mainRunLoop];
-    let mode: id = get_static_str(env, NSDefaultRunLoopMode);
-    () = msg![env; run_loop addTimer:timer forMode:mode];
+    log_dbg!("Executing background selector in real background thread: {:?}", sel.as_str(&env.mem));
+    // FIXED: Passed arguments in correct order and added `true` for tolerate_type_mismatch
+    detach_new_thread_inner(env, sel, this, arg, true);
 }
 
 - (())performSelectorOnMainThread:(SEL)sel withObject:(id)arg waitUntilDone:(bool)wait {
@@ -285,6 +231,7 @@ forUndefinedKey:(id)key { // NSString*
         }
         return;
     }
+    
     if env.bundle.bundle_identifier().starts_with("com.gameloft.POP") && (sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie").unwrap()) && wait {
         log!("Applying game-specific hack for PoP: WW: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
         return;
@@ -306,14 +253,16 @@ forUndefinedKey:(id)key { // NSString*
             log!("Applying game-specific hack for Ferrari GT: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
             return;
         }
-        if sel == env.objc.lookup_selector("initTextInput:").unwrap() || sel == env.objc.lookup_selector("removeTextField:").unwrap() {
+        if sel == env.objc.lookup_selector("initTextInput:").unwrap() ||
+            sel == env.objc.lookup_selector("removeTextField:").unwrap() {
             log!("Applying game-specific hack for Ferrari GT: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
             () = msg_send(env, (this, sel, arg));
             return;
         }
     }
     if env.bundle.bundle_identifier().starts_with("com.gameloft.HOS2") && wait {
-        if sel == env.objc.lookup_selector("loadMovie:").unwrap() || sel == env.objc.lookup_selector("sendGameInfo").unwrap() || sel == env.objc.lookup_selector("setStatusBar:").unwrap() {
+        if sel == env.objc.lookup_selector("loadMovie:").unwrap() ||
+            sel == env.objc.lookup_selector("sendGameInfo").unwrap() || sel == env.objc.lookup_selector("setStatusBar:").unwrap() {
             log!("Applying game-specific hack for HOS2: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
             if sel.as_str(&env.mem).ends_with(':') {
                 () = msg_send(env, (this, sel, arg));
@@ -323,21 +272,25 @@ forUndefinedKey:(id)key { // NSString*
             }
             return;
         }
-        if sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie:").unwrap() {
+        if sel == env.objc.lookup_selector("startMovie:").unwrap() ||
+            sel == env.objc.lookup_selector("stopMovie:").unwrap() {
             log!("Applying game-specific hack for HOS2: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
             return;
         }
     }
-    // TODO: support waiting
-    // This would require tail calls for message send or a switch to async model
-    assert!(!wait);
+    
+    if wait {
+        log!("Ignoring performSelectorOnMainThread waitUntilDone:true (non-blocking)");
+    }
 
-    // The current implementation of performSelector:withObject:afterDelay
-    // already runs on the main thread.
-    msg![env; this performSelector:sel withObject:arg afterDelay:0.0]
+    if arg != nil {
+        let _res: id = msg![env; this performSelector:sel withObject:arg];
+    } else {
+        let _res: id = msg![env; this performSelector:sel];
+    }
 }
 
-// Private method, used by performSelector:withObject:afterDelay:
+// Private method, used by touchHLE's standard performSelector:withObject:afterDelay:
 - (())_touchHLE_timerFireMethod:(id)which { // NSTimer *
     let dict: id = msg![env; which userInfo];
 
@@ -359,7 +312,6 @@ forUndefinedKey:(id)key { // NSString*
     }
 }
 
-// UINibLoadingAdditions protocol
 - (())awakeFromNib {
     // no-op
 }

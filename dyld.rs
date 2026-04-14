@@ -594,19 +594,6 @@ impl Dyld {
                 continue;
             }
 
-            // ___stack_chk_guard must be a non-zero sentinel or any
-            // stack-protected function will silently corrupt or crash.
-            // On real iOS this is randomized per-boot; a fixed value is fine
-            // for emulation — we only need it non-zero so the canary check
-            // doesn't immediately trigger.
-            if symbol == "___stack_chk_guard" {
-                let canary: u32 = 0xDEAD_C0DE;
-                let canary_ptr = mem.alloc_and_write(canary);
-                mem.write(ptr_ptr, canary_ptr.cast().cast_const());
-                log_dbg!("Initialized ___stack_chk_guard sentinel at {:?}", canary_ptr);
-                continue;
-            }
-
             log!(
                 "Warning: unhandled non-lazy symbol {:?} at {:?} in \"{}\"",
                 symbol,
@@ -736,44 +723,25 @@ impl Dyld {
             (stub_function_ptr, la_symbol_ptr)
         }
 
-        let Some((stubs, pic_offset)) = bins.iter().find_map(|bin| {
-            let stubs = bin.get_section(SectionType::SymbolStubs)?;
-            if !(stubs.addr..(stubs.addr + stubs.size)).contains(&svc_pc) {
-                return None;
-            }
-            let pic_offset = bin
-                .get_section(SectionType::LazySymbolPointers)
-                .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
-            Some((stubs, pic_offset))
-        }) else {
-            let r12 = cpu.regs()[12];
-            let r0 = cpu.regs()[0];
-            // LogInlineSvc
-            log!(
-                "WARNING: Unresolved inline SVC at {:#010x}! Syscall ID (R12): {}, R0: {:#x}",
-                svc_pc,
-                r12,
-                r0
-            );
-            // SafeInlineSvc
-            fn safe_fallback(env: &mut crate::Environment) {
-                let r12 = env.cpu.regs()[12];
-                if r12 == 10 {
-                    let r1 = env.cpu.regs()[1];
-                    let r2 = env.cpu.regs()[2];
-                    let ptr = env.mem.alloc(r2).to_bits();
-                    env.mem.write(crate::mem::MutPtr::<u32>::from_bits(r1), ptr);
-                    env.cpu.regs_mut()[0] = 0;
-                    println!(
-                        "WARNING: Inline mach_vm_allocate size: {:#x} -> {:#x}",
-                        r2, ptr
-                    );
-                    return;
+        let Some((stubs, pic_offset)) = bins
+            .iter()
+            .find_map(|bin| {
+                let stubs = bin.get_section(SectionType::SymbolStubs)?;
+                if !(stubs.addr..(stubs.addr + stubs.size)).contains(&svc_pc) {
+                    return None;
                 }
-                env.cpu.regs_mut()[0] = 0;
-            }
-            return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
-        };
+                let pic_offset = bin
+                    .get_section(SectionType::LazySymbolPointers)
+                    .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
+                Some((stubs, pic_offset))
+            }) else {
+                log!("WARNING: Unresolved SVC at {:#010x}! Bypassing.", svc_pc);
+                // BypassInlineSVC
+                fn safe_fallback(env: &mut crate::Environment) {
+                    env.cpu.regs_mut()[0] = 0;
+                }
+                return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
+            };
 
         let info = stubs.dyld_indirect_symbol_info.as_ref().unwrap();
 
@@ -854,72 +822,6 @@ impl Dyld {
             }
         }
 
-        // FakeForkCall
-        if symbol == "_fork" {
-            fn fake_fork(env: &mut crate::Environment) {
-                env.cpu.regs_mut()[0] = 0xffffffff;
-            }
-            return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
-        }
-
-        // ImplDifftime
-        if symbol == "_difftime" {
-            fn impl_difftime(_env: &mut crate::Environment, time1: i32, time0: i32) -> f64 {
-                (time1 as f64) - (time0 as f64)
-            }
-            return Some(&(impl_difftime as fn(&mut crate::Environment, i32, i32) -> f64));
-        }
-
-        // ImplStrncatChk
-        if symbol == "___strncat_chk" {
-            fn impl_strncat_chk(
-                env: &mut crate::Environment,
-                dest: crate::mem::MutPtr<u8>,
-                src: crate::mem::ConstPtr<u8>,
-                n: u32,
-                destlen: u32,
-            ) -> crate::mem::MutPtr<u8> {
-                let src_str = env.mem.cstr_at_utf8(src).unwrap_or("<invalid utf8>");
-                log_dbg!(
-                    "___strncat_chk(dest: {:?}, src: {:?} ('{}'), n: {}, destlen: {})",
-                    dest,
-                    src,
-                    src_str,
-                    n,
-                    destlen
-                );
-
-                let mut dest_len = 0;
-                while env.mem.read(dest + dest_len) != 0 {
-                    dest_len += 1;
-                }
-
-                let mut i = 0;
-                while i < n {
-                    let c = env.mem.read(src + i);
-                    if c == 0 {
-                        break;
-                    }
-                    env.mem.write(dest + dest_len + i, c);
-                    i += 1;
-                }
-                env.mem.write(dest + dest_len + i, 0);
-
-                dest
-            }
-            return Some(
-                &(impl_strncat_chk
-                    as fn(
-                        &mut crate::Environment,
-                        crate::mem::MutPtr<u8>,
-                        crate::mem::ConstPtr<u8>,
-                        u32,
-                        u32,
-                    ) -> crate::mem::MutPtr<u8>),
-            );
-        }
-
-        panic!("Call to unimplemented function {symbol}");
         log!("WARNING: unimplemented function {symbol}, using stub");
 
         fn dummy(env: &mut crate::Environment) {
@@ -927,7 +829,7 @@ impl Dyld {
         }
 
         let f: HostFunction = &(dummy as fn(&mut crate::Environment) -> ());
-        Some(f)
+        return Some(f);
     }
 
     /// Creates a guest function that will call a host function with the name

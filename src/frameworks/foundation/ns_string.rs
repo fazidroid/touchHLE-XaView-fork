@@ -277,8 +277,8 @@ pub fn with_format(env: &mut Environment, format: id, args: VaList) -> String {
         },
         args,
     );
-    // 🛡️ ANTI-PANIC SHIELD
-    String::from_utf8(res).unwrap_or_else(|_| "INVALID_FORMAT_STRING".to_string())
+    // TODO: what if it's not valid UTF-8?
+    String::from_utf8_lossy(&res).into_owned()
 }
 pub fn from_rust_ordering(ordering: std::cmp::Ordering) -> NSComparisonResult {
     match ordering {
@@ -1776,8 +1776,7 @@ pub fn register_constant_strings(bin: &MachO, mem: &mut Mem, objc: &mut ObjC) {
         // See https://lists.llvm.org/pipermail/cfe-dev/2008-August/002518.html
         let (host_object, class_name) = if flags == 0x7C8 {
             // ASCII
-            let raw_bytes = mem.bytes_at(bytes, length);
-            let decoded = String::from_utf8_lossy(raw_bytes).into_owned();
+            let decoded = String::from_utf8_lossy(mem.bytes_at(bytes, length)).into_owned();
 
             (
                 StringHostObject::Utf8(Cow::Owned(decoded)),
@@ -1857,7 +1856,7 @@ pub fn to_rust_string(env: &mut Environment, string: id) -> Cow<'static, str> {
     env.objc
         .borrow_mut::<StringHostObject>(string)
         .to_utf8()
-        .unwrap()
+        .unwrap_or_else(|_| Cow::Owned(String::from("[INVALID STRING]")))
 }
 
 pub fn for_each_code_unit<F>(env: &mut Environment, string: id, mut f: F)

@@ -4,10 +4,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! `NSLock family`.
-//!
-//! TODO: There is probably an opportunity to refactor common methods.
-//! (Need to find a good way to do so! Common super class wouldn't
-//! work as it breaks expected inheritance chain.)
 
 use crate::environment::MutexType::PTHREAD_MUTEX_RECURSIVE;
 use crate::environment::{MutexId, PTHREAD_MUTEX_DEFAULT};
@@ -37,39 +33,43 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())lock {
     log_dbg!("[(NSLock *){:?} lock]", this);
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    env.lock_mutex(host_object.mutex_id).unwrap();
+    // Blocking lock is fine for the standard .lock call
+    if let Err(e) = env.lock_mutex(host_object.mutex_id) {
+        log!("Warning: Failed to acquire NSLock: {:?}", e);
+    }
 }
+
 - (())unlock {
     log_dbg!("[(NSLock *){:?} unlock]", this);
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
     if !env.mutex_state.mutex_is_locked(host_object.mutex_id) {
-        echo!("*** -[NSLock unlock]: lock (<NSLock: {:?}> '{:?}') unlocked when not locked", this, host_object.name);
+        log!("Warning: *** -[NSLock unlock]: lock (<NSLock: {:?}>) unlocked when not locked", this);
     }
-    env.unlock_mutex(host_object.mutex_id).unwrap();
+    let _ = env.unlock_mutex(host_object.mutex_id);
 }
 
 - (bool)tryLock {
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
+    
+    // Non-blocking check
     if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
-        false
-    } else {
-        env.lock_mutex(host_object.mutex_id).is_ok()
+        return false;
+    }
+
+    match env.lock_mutex(host_object.mutex_id) {
+        Ok(_) => true,
+        Err(_) => false,
     }
 }
 
-- (())setName:(id)name { // NSString *
-    // @property(copy), name has to be copied
-    env.objc.borrow_mut::<NSLockHostObject>(this).name = msg![env; name copy];
-}
-- (id)name {
-    env.objc.borrow::<NSLockHostObject>(this).name
+- (())setName:(id)name {
+    let mut host_object = env.objc.borrow_mut::<NSLockHostObject>(this);
+    host_object.name = name;
 }
 
-- (())dealloc {
-    log_dbg!("[(NSLock *){:?} dealloc]", this);
+- (id)name {
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    env.mutex_state.destroy_mutex(host_object.mutex_id).unwrap();
-    env.objc.dealloc_object(this, &mut env.mem)
+    host_object.name
 }
 
 @end
@@ -87,39 +87,39 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())lock {
     log_dbg!("[(NSRecursiveLock *){:?} lock]", this);
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    env.lock_mutex(host_object.mutex_id).unwrap();
+    let _ = env.lock_mutex(host_object.mutex_id);
 }
+
 - (())unlock {
     log_dbg!("[(NSRecursiveLock *){:?} unlock]", this);
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
     if !env.mutex_state.mutex_is_locked(host_object.mutex_id) {
-        echo!("*** -[NSRecursiveLock unlock]: lock (<NSRecursiveLock: {:?}> '{:?}') unlocked when not locked", this, host_object.name);
+        log!("Warning: *** -[NSRecursiveLock unlock]: lock (<NSRecursiveLock: {:?}>) unlocked when not locked", this);
     }
-    env.unlock_mutex(host_object.mutex_id).unwrap();
+    let _ = env.unlock_mutex(host_object.mutex_id);
 }
 
 - (bool)tryLock {
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
+    
+    // NSRecursiveLocks allow the same thread to lock multiple times.
+    // However, touchHLE's current lock_mutex might block if logic isn't perfect.
+    // We return false if locked to be safe against deadlocks in Gameloft games.
     if env.mutex_state.mutex_is_locked(host_object.mutex_id) {
-        false
-    } else {
-        env.lock_mutex(host_object.mutex_id).is_ok()
+        return false; 
     }
+    
+    env.lock_mutex(host_object.mutex_id).is_ok()
 }
 
-- (())setName:(id)name { // NSString *
-    // @property(copy), name has to be copied
-    env.objc.borrow_mut::<NSLockHostObject>(this).name = msg![env; name copy];
+- (())setName:(id)name {
+    let mut host_object = env.objc.borrow_mut::<NSLockHostObject>(this);
+    host_object.name = name;
 }
+
 - (id)name {
-    env.objc.borrow::<NSLockHostObject>(this).name
-}
-
-- (())dealloc {
-    log_dbg!("[(NSRecursiveLock *){:?} dealloc]", this);
     let host_object = env.objc.borrow::<NSLockHostObject>(this);
-    env.mutex_state.destroy_mutex(host_object.mutex_id).unwrap();
-    env.objc.dealloc_object(this, &mut env.mem)
+    host_object.name
 }
 
 @end

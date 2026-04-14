@@ -54,54 +54,9 @@ fn objc_msgSend_inner(
     } 
 
     let message_type_info = env.objc.message_type_info.take();
+    let message_type_info = env.objc.message_type_info.take();
+
     let sel_str = selector.as_str(&env.mem);
-
-    // ===== GAMELOFT UDID BYPASS =====
-    if sel_str == "uniqueIdentifier" {
-        println!("GAMELOFT BYPASS: Faking [UIDevice uniqueIdentifier] to fix udid=(null) loops!");
-        let fake_udid = crate::frameworks::foundation::ns_string::from_rust_string(
-            env, "1234567890abcdef1234567890abcdef12345678".to_string()
-        );
-        env.cpu.regs_mut()[0] = fake_udid.to_bits();
-        return;
-    }
-
-    //    NEW BYPASS: Faking Timezones to prevent NULL dereference crashes!
-    if sel_str == "knownTimeZoneNames" {
-        println!("GAMELOFT BYPASS: Faking [NSTimeZone knownTimeZoneNames] with GMT array!");
-        let array_class = env.objc.get_known_class("NSArray", &mut env.mem);
-        if array_class != nil {
-            let gmt = crate::frameworks::foundation::ns_string::from_rust_string(env, "GMT".to_string());
-            let arr: id = crate::msg![env; array_class arrayWithObject:gmt];
-            env.cpu.regs_mut()[0] = arr.to_bits();
-        } else {
-            env.cpu.regs_mut()[0] = 0;
-        }
-        env.cpu.regs_mut()[1] = 0;
-        return;
-    }
-
-    // ===== GAMELOFT LOOP DETECTOR =====
-    // Logs selectors that commonly indicate a wait/retry loop.
-    if sel_str.contains("isReady") || sel_str.contains("Reachability") {
-        println!("GAMELOFT SUSPECT LOOP: [{:?} {}]", receiver, sel_str);
-    }
-
-    // Force network Reachability checks to return "Reachable".
-    // Kept because Reachability is an unimplemented class with no host impl.
-    if sel_str == "currentReachabilityStatus" {
-        println!("🏎️ ASPHALT 8 BYPASS: Faking [Reachability currentReachabilityStatus] to ReachableViaWiFi!");
-        env.cpu.regs_mut()[0] = 1; // 1 = ReachableViaWiFi
-        env.cpu.regs_mut()[1] = 0;
-        return;
-    }
-
-    // Ensure the game engine knows it's active and not sleeping.
-    if sel_str == "applicationState" {
-        env.cpu.regs_mut()[0] = 0; // UIApplicationStateActive
-        env.cpu.regs_mut()[1] = 0;
-        return;
-    }
 
     // ===== URL Tracker & Telemetry Bypasses =====
     if sel_str == "HTTPMethod" || sel_str == "host" {
@@ -118,6 +73,7 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
+    // ============================================
 
     // SAFE: only crash-prone selectors
     if sel_str.is_empty() {
@@ -161,6 +117,7 @@ fn objc_msgSend_inner(
         return;
     }
 
+    // Traverse the chain of superclasses to find the method implementation.
     let mut class = orig_class;
     loop {
         if class == nil {
@@ -264,7 +221,12 @@ fn objc_msgSend_inner(
                 return;
             }
 
-            println!(
+            panic!(
+                "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
+            // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
+            // Instead of crashing the emulator when a method is missing, we safely print a warning and return 0 (nil).
+            // This instantly bypasses EVERY missing ad network and tracking method Gameloft throws at us!
+            log!(
                 "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
                 if is_metaclass { "Class" } else { "Object" },
                 receiver,
@@ -272,13 +234,13 @@ fn objc_msgSend_inner(
                 name,
                 orig_class,
                 if super2.is_some() { "'s superclass" } else { "" },
-                selector.as_str(&env.mem)
+                selector.as_str(&env.mem),
             );
             
             if sel_str == "self" {
-                env.cpu.regs_mut()[0] = receiver.to_bits(); 
+                env.cpu.regs_mut()[0] = receiver.to_bits(); // Return self
             } else {
-                env.cpu.regs_mut()[0..2].fill(0); 
+                env.cpu.regs_mut()[0..2].fill(0); // Return nil/0
             }
             return;
         }
@@ -370,6 +332,41 @@ fn objc_msgSend_inner(
             ..
         }) = host_object.as_any().downcast_ref()
         {
+            
+            // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
+            if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
+                log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
+                
+                if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
+                    let delegate: id = msg![env; receiver delegate];
+                    if delegate != nil {
+                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
+                            let zero: i32 = 0;
+                            let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
+                        }
+                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
+                            let zero: i32 = 0;
+                            let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
+                        }
+                    }
+                }
+                
+                if env.objc.object_has_method_named(&env.mem, receiver, "setHidden:") {
+                    let _: () = msg![env; receiver setHidden:true];
+                }
+                if env.objc.object_has_method_named(&env.mem, receiver, "setUserInteractionEnabled:") {
+                    let _: () = msg![env; receiver setUserInteractionEnabled:false];
+                }
+                if env.objc.object_has_method_named(&env.mem, receiver, "removeFromSuperview") {
+                    let _: () = msg![env; receiver removeFromSuperview];
+                }
+                
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+
+            // Skip method lookup on first iteration if this is the super-call
+            // variant of objc_msgSend (look up the superclass first)
             if super2.is_some() && class == orig_class {
                 class = superclass;
                 continue;
@@ -449,6 +446,9 @@ fn objc_msgSend_inner(
             }
             panic!(
                 "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
+            // ===== THE NUCLEAR OPTION: GLOBAL CLASS PANIC BYPASS =====
+            log!(
+                "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
                 name,
                 class,
                 if is_metaclass { "class" } else { "instance" },

@@ -4,12 +4,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! The Foundation framework.
-//!
-//! A concept that Foundation really likes is "class clusters": abstract classes
-//! with private concrete implementations. Apple has their own explanation of it
-//! in [Cocoa Core Competencies](https://developer.apple.com/library/archive/documentation/General/Conceptual/DevPedia-CocoaCore/ClassCluster.html).
-//! Being aware of this concept will make common types like `NSArray` and
-//! `NSString` easier to understand.
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::objc::id;
@@ -40,6 +34,7 @@ pub mod ns_notification_center;
 pub mod ns_null;
 pub mod ns_objc_runtime;
 pub mod ns_object;
+pub mod ns_operation; // FIXED: Added NSOperation module
 pub mod ns_process_info;
 pub mod ns_property_list_serialization;
 pub mod ns_run_loop;
@@ -82,6 +77,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         ns_notification_center::CLASSES,
         ns_null::CLASSES,
         ns_object::CLASSES,
+        ns_operation::CLASSES, // FIXED: Registered NSOperation classes
         ns_process_info::CLASSES,
         ns_property_list_serialization::CLASSES,
         ns_run_loop::CLASSES,
@@ -133,7 +129,6 @@ pub struct State {
 pub type NSInteger = i32;
 pub type NSUInteger = u32;
 
-// this should be equal to NSIntegerMax
 pub const NSNotFound: i32 = 0x7fffffff;
 
 #[derive(Debug)]
@@ -144,9 +139,9 @@ pub struct NSRange {
 }
 unsafe impl crate::mem::SafeRead for NSRange {}
 crate::abi::impl_GuestRet_for_large_struct!(NSRange);
+
 impl crate::abi::GuestArg for NSRange {
     const REG_COUNT: usize = 2;
-
     fn from_regs(regs: &[u32]) -> Self {
         NSRange {
             location: crate::abi::GuestArg::from_regs(&regs[0..1]),
@@ -171,20 +166,13 @@ pub const NSOrderedAscending: NSComparisonResult = -1;
 pub const NSOrderedSame: NSComparisonResult = 0;
 pub const NSOrderedDescending: NSComparisonResult = 1;
 
-/// Number of seconds.
 pub type NSTimeInterval = f64;
 
-/// UTF-16 code unit.
 #[allow(non_camel_case_types)]
 pub type unichar = u16;
 
-/// Utility to help with implementing the `hash` method, which various classes
-/// in Foundation have to do.
 fn hash_helper<T: std::hash::Hash>(hashable: &T) -> NSUInteger {
     use std::hash::Hasher;
-
-    // Rust documentation says DefaultHasher::new() should always return the
-    // same instance, so this should give consistent hashes.
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     hashable.hash(&mut hasher);
     let hash_u64: u64 = hasher.finish();

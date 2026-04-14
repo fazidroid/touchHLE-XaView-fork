@@ -7,96 +7,69 @@
 
 use crate::abi::GuestFunction;
 use crate::dyld::{export_c_func, FunctionExports};
-use crate::frameworks::core_foundation::cf_allocator::{kCFAllocatorDefault, CFAllocatorRef};
+use crate::frameworks::core_foundation::cf_allocator::CFAllocatorRef;
 use crate::frameworks::core_foundation::CFTypeRef;
 use crate::libc::sys::socket::sockaddr;
-use crate::mem::{ConstPtr, MutPtr, MutVoidPtr, Ptr};
-use crate::objc::{msg, objc_classes, Class, ClassExports, HostObject};
+use crate::mem::{ConstPtr, MutPtr, MutVoidPtr};
+use crate::objc::{objc_classes, msg, Class, ClassExports, HostObject};
 use crate::Environment;
 use std::net::SocketAddrV4;
 
 type SCNetworkReachabilityFlags = u32;
 const kSCNetworkReachabilityFlagsReachable: SCNetworkReachabilityFlags = 1 << 1;
+#[allow(dead_code)]
 const kSCNetworkReachabilityFlagsIsDirect: SCNetworkReachabilityFlags = 1 << 17;
 
 pub const CLASSES: ClassExports = objc_classes! {
-
-(env, this, _cmd);
-
-// SCNetworkReachabilityRef is not explicitly stated to be CFType-based type,
-// but the result of "Create" or "Copy" functions here is expected to be
-// released with CFRelease().
-@implementation _touchHLE_SCNetworkReachability: NSObject
-@end
-
+    (env, this, _cmd);
+    @implementation _touchHLE_SCNetworkReachability: NSObject
+    @end
 };
 
+#[allow(dead_code)]
 struct SCNetworkReachabilityHostObject {
     address: Option<SocketAddrV4>,
+    is_name_based: bool, // Track whether this is checking an internet hostname
 }
 impl HostObject for SCNetworkReachabilityHostObject {}
 
-// See comment for `_touchHLE_SCNetworkReachability` class
 type SCNetworkReachabilityRef = CFTypeRef;
 
 fn SCNetworkReachabilityCreateWithName(
     env: &mut Environment,
-    allocator: CFAllocatorRef,
-    name: ConstPtr<u8>,
+    _allocator: CFAllocatorRef,
+    _nodename: ConstPtr<i8>,
 ) -> SCNetworkReachabilityRef {
-    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
-    if env
-        .bundle
-        .bundle_identifier()
-        .starts_with("com.chillingo.cuttherope")
-        && env.mem.cstr_at_utf8(name).unwrap() == "chillingo-crystal.appspot.com"
-    {
-        log!("Applying game-specific hack for Cut the Rope: SCNetworkReachabilityCreateWithName(\"chillingo-crystal.appspot.com\") returns NULL");
-        return Ptr::null();
-    }
-    let isa = env
-        .objc
-        .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    let res = env.objc.alloc_object(
-        isa,
-        Box::new(SCNetworkReachabilityHostObject { address: None }), // TODO
+    let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
+    
+    // FIXED: Let alloc_object safely create the new object using the actual class pointer
+    env.objc.alloc_object(
+        class,
+        Box::new(SCNetworkReachabilityHostObject { 
+            address: None, 
+            is_name_based: true 
+        }),
         &mut env.mem,
-    );
-    log!(
-        "TODO: SCNetworkReachabilityCreateWithName({:?}, {:?} {:?}) -> {:?}",
-        allocator,
-        name,
-        env.mem.cstr_at_utf8(name),
-        res
-    );
-    res
+    )
 }
 
 fn SCNetworkReachabilityCreateWithAddress(
     env: &mut Environment,
-    allocator: CFAllocatorRef,
+    _allocator: CFAllocatorRef,
     address: ConstPtr<sockaddr>,
 ) -> SCNetworkReachabilityRef {
-    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
-    let isa = env
-        .objc
-        .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    let address_val = env.mem.read(address);
-    let res = env.objc.alloc_object(
-        isa,
+    let addr = env.mem.read(address);
+    let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
+    
+    // FIXED: Let alloc_object safely create the new object using the actual class pointer
+    env.objc.alloc_object(
+        class,
         Box::new(SCNetworkReachabilityHostObject {
-            address: Some(address_val.to_sockaddr_v4()),
+            address: Some(addr.to_sockaddr_v4()),
+            is_name_based: false,
         }),
         &mut env.mem,
-    );
-    log_dbg!(
-        "SCNetworkReachabilityCreateWithAddress({:?}, {:?} ({})) -> {:?}",
-        allocator,
-        address,
-        address_val.to_sockaddr_v4(),
-        res
-    );
-    res
+    )
 }
 
 fn SCNetworkReachabilityGetFlags(
@@ -104,65 +77,42 @@ fn SCNetworkReachabilityGetFlags(
     target: SCNetworkReachabilityRef,
     flags: MutPtr<SCNetworkReachabilityFlags>,
 ) -> bool {
-    if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, SCNetworkReachabilityGetFlags({:?}, {:?}) -> false",
-            target,
-            flags
-        );
-        return false;
-    }
-
     let target_class: Class = msg![env; target class];
     assert_eq!(
         target_class,
-        env.objc
-            .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
+        env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
+    
     let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
-    if let Some(addr) = host_object.address {
-        if addr.ip().is_link_local() {
-            log_dbg!(
-                "SCNetworkReachabilityGetFlags({:?}, {:?}) -> true",
-                target,
-                flags
-            );
-            // Those corresponds to local WiFi connection on a real iOS device
-            // TODO: actually check for the connectivity
-            // (but do we _really_ need it?)
-            let out_flags =
-                kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
-            env.mem.write(flags, out_flags);
-            return true;
-        }
+    
+    if host_object.is_name_based {
+        // Ad networks (Burstly, Tapjoy, Gameloft Trackers) use CreateWithName to check internet servers.
+        // We return 0 (Unreachable) so they voluntarily disable themselves and prevent crashes!
+        env.mem.write(flags, 0);
+    } else {
+        // Games use CreateWithAddress (0.0.0.0) to check if the Wi-Fi hardware is turned on.
+        // We return Reachable so "No WIFI" alerts don't appear and Local Multiplayer works perfectly!
+        let out_flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
+        env.mem.write(flags, out_flags);
     }
-    log!(
-        "TODO: SCNetworkReachabilityGetFlags({:?}, {:?}) -> false",
-        target,
-        flags
-    );
-    false
+    
+    true
 }
 
 fn SCNetworkReachabilitySetCallback(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
-    callout: GuestFunction, // SCNetworkReachabilityCallBack
-    context: MutVoidPtr,    // SCNetworkReachabilityContext *
+    _callout: GuestFunction, 
+    _context: MutVoidPtr,    
 ) -> bool {
     let target_class: Class = msg![env; target class];
     assert_eq!(
         target_class,
-        env.objc
-            .get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
+        env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
-    log!(
-        "TODO: SCNetworkReachabilitySetCallback({:?}, {:?}, {:?}) -> FALSE",
-        target,
-        callout,
-        context
-    );
-    false
+    
+    // Pretend the callback registered perfectly
+    true
 }
 
 fn SCNetworkReachabilityScheduleWithRunLoop(

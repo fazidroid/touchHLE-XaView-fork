@@ -71,13 +71,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     format = format.replace("z", "GMT");
     format = format.replace("a", if hour < 12 { "AM" } else { "PM" });
 
-    // 🛡️ PREVENT FUTURE CRASHES: Don't panic on unknown formats, just log and ignore!
-    for c in format.chars() {
-        if let pattern @ ('A'..='Z' | 'a'..='z') = c {
-            log_dbg!("Warning: date string contains unsubstituted format pattern: {}", pattern);
-            // We removed the 'unimplemented!' panic here so the game won't crash anymore!
+    // Ignore unsupported date format patterns instead of crashing
+    format = format.chars().map(|c: char| {
+        if c.is_ascii_alphabetic() {
+            ' '
+        } else {
+            c
         }
-    }
+    }).collect();
     log_dbg!("date_format after: {:?}", format);
 
     let res = ns_string::from_rust_string(env, format);
