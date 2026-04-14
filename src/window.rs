@@ -1216,8 +1216,18 @@ impl Window {
         (x, y, pressed)
     }
 
-    pub fn create_gl_context(&self, version: GLVersion) -> Result<GLContext, String> {
+        pub fn create_gl_context(&self, version: GLVersion) -> Result<GLContext, String> {
         let attr = self.video_ctx.gl_attr();
+
+        // ==========================================================
+        // 🏎️ GAMELOFT BYPASS: Force Global Context Sharing
+        // ==========================================================
+        // Android's ANGLE EGL driver frequently drops context sharing 
+        // requests if they are toggled dynamically. By forcefully locking 
+        // this to true, Gameloft's background thread can finally send its 
+        // 3D models to the main thread!
+        attr.set_share_with_current_context(true);
+
         match version {
             GLVersion::GLES11 => {
                 attr.set_context_version(1, 1);
