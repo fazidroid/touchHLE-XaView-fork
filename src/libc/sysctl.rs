@@ -99,23 +99,19 @@ fn sysctl(
     if name_len >= 2 {
         let name0 = env.mem.read(name);
         let name1 = env.mem.read(name + 1);
-        // EA asks for NET_RT_IFLIST (mib[0]==4, mib[1]==17)
         if name0 == 4 && name1 == 17 {
             if !oldlenp.is_null() {
-                env.mem.write(oldlenp, 6); // Fake a 6-byte MAC address length
+                env.mem.write(oldlenp, 6); // Fake a 6-byte MAC address
             }
             return 0; // SUCCESS
         }
     }
 
     if name_len != 2 {
-        // 🛡️ CRITICAL FIX: Return -1 (Error) instead of 0.
-        // If we return 0, EA's engine assumes it received valid data and reads (null).
-        // Returning -1 forces the engine to use safe fallbacks without panicking!
-        return -1;
+        return -1; // CRITICAL: This MUST return -1 (Error), not 0!
     }
 
-    let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));
+    let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));    
     sysctl_generic(
         env,
         |env| {
@@ -344,9 +340,9 @@ fn CCHmac(
     // The game is trying to cryptographically sign an ad-network request.
     // By returning without doing any math, we safely neuter the analytics check!
 }
-// ===========================
-// 🏎️ EA BYPASS: __assert_rtn Crash Defeater
-// ===================================
+// ==============================================
+// 🏎️ EA BYPASS: __assert_rtn Catch
+// ==============================================
 fn __assert_rtn(
     env: &mut Environment,
     _func: crate::mem::ConstPtr<u8>,
@@ -357,11 +353,10 @@ fn __assert_rtn(
     let expr_str = if expr.is_null() { 
         "(unknown)".to_string() 
     } else { 
-        // FIXED: Added .to_string() here so both branches match!
         env.mem.cstr_at_utf8(expr).unwrap_or_default().to_string() 
     };
     
-    println!("🎮 LOG: EA Engine Assert Bypassed! Expression: {} (Line {})", expr_str, line);
+    panic!("🎮 EA Engine Assert Triggered! Expression: {} (Line {})", expr_str, line);
 }
 
 pub const FUNCTIONS: FunctionExports = &[
