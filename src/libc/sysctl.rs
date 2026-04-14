@@ -344,9 +344,9 @@ fn CCHmac(
     // The game is trying to cryptographically sign an ad-network request.
     // By returning without doing any math, we safely neuter the analytics check!
 }
-// ==========================================================
+// ===========================
 // 🏎️ EA BYPASS: __assert_rtn Crash Defeater
-// ==========================================================
+// ===================================
 fn __assert_rtn(
     env: &mut Environment,
     _func: crate::mem::ConstPtr<u8>,
@@ -355,10 +355,10 @@ fn __assert_rtn(
     expr: crate::mem::ConstPtr<u8>,
 ) {
     let expr_str = if expr.is_null() { 
-        // FIXED: Using .to_string() to avoid the SysInfoType name collision!
         "(unknown)".to_string() 
     } else { 
-        env.mem.cstr_at_utf8(expr).unwrap_or_default() 
+        // FIXED: Added .to_string() here so both branches match!
+        env.mem.cstr_at_utf8(expr).unwrap_or_default().to_string() 
     };
     
     println!("🎮 LOG: EA Engine Assert Bypassed! Expression: {} (Line {})", expr_str, line);
