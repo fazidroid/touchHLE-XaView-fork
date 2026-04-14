@@ -125,13 +125,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let path = to_rust_string(env, path);
     // TODO: file URL case
     
-    // ==========================================================
-    // 🏎️ GAMELOFT BYPASS: Ad-Network Infinite Loop Defeater
-    // ==========================================================
-    // Returning 'nil' causes Gameloft's FreeCash engine to infinitely 
-    // retry the download, preventing the save file from being created!
-    // By initializing an empty NSData object, we trick the engine into 
-    // thinking the ad server replied with 0 bytes, letting the game progress!
+    // GAMELOFT BYPASS: Ad-Network Infinite Loop Defeater
     if !path.starts_with("http") {
         println!("🎮 LOG: Bypassing non-HTTP URL check in initWithContentsOfURL!");
     }
@@ -140,11 +134,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     
     // Return an empty data object instead of nil!
     msg![env; this init]
-}
-
-    log!("TODO: ignoring [(NSData*){:?} initWithContentsOfURL:{:?}]", this, path);
-    // TODO: actually load data once we have proper network support
-    nil
 }
 
 - (id)initWithContentsOfFile:(id)path {

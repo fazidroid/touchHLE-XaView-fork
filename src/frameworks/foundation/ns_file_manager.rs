@@ -349,12 +349,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)contentsAtPath:(id)path { // NSString *
     // TODO: return nil if path is directory
     
-    // ==========================================================
-    // 🏎️ EA BYPASS: Relative Path Crash Defeater
-    // ==========================================================
-    // EA's engine passes relative paths here (like SaveData/profile.dat).
-    // By removing the strict absolute path assertion, we allow the emulator 
-    // to dynamically resolve the path and load the save files!
+    // EA BYPASS: Remove the strict absolute path assertion!
     let is_absolute: bool = msg![env; path isAbsolutePath];
     if !is_absolute {
         println!("🎮 LOG: Bypassing relative path check for contentsAtPath!");
