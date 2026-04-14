@@ -55,6 +55,7 @@ pub mod ns_url_request;
 pub mod ns_user_defaults;
 pub mod ns_value;
 pub mod ns_xml_parser;
+pub mod mobile_core_services;
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/System/Library/Frameworks/Foundation.framework/Foundation",
