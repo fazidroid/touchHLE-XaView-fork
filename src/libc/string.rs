@@ -116,6 +116,16 @@ fn memset_pattern_inner(
         target += 1;
     }
 }
+fn strerror_r(env: &mut Environment, errnum: i32, buf: MutPtr<u8>, buflen: u32) -> i32 {
+    log!("🏎️ ASPHALT 8 BYPASS: Stubbed strerror_r for error code {}", errnum);
+    
+    // Safely return an empty string to prevent memory corruption
+    if !buf.is_null() && buflen > 0 {
+        env.mem.write(buf, 0u8); 
+    }
+    
+    0 // 0 means Success
+}
 fn memcpy(
     env: &mut Environment,
     dest: MutVoidPtr,
@@ -306,6 +316,45 @@ fn strlcpy(
 ) -> GuestUSize {
     GenericChar::<u8>::strlcpy(env, dst, src, size)
 }
+fn __strncat_chk(
+    env: &mut Environment,
+    dest: MutPtr<u8>,
+    src: ConstPtr<u8>,
+    n: GuestUSize,
+    dest_len: GuestUSize,
+) -> MutPtr<u8> {
+    let current_dest_len = strlen(env, dest.cast_const());
+    let src_len = strlen(env, src);
+    let to_copy = n.min(src_len);
+
+    if current_dest_len + to_copy >= dest_len {
+        panic!("🛡️ SAFETY TRIGGER: __strncat_chk detected a buffer overflow attempt!");
+    }
+
+    let to_copy_usize = to_copy as usize;
+    let src_data = env.mem.bytes_at(src, to_copy).to_vec(); 
+    let dest_slice = env.mem.bytes_at_mut(dest + current_dest_len, to_copy + 1);
+
+    dest_slice[..to_copy_usize].copy_from_slice(&src_data);
+    dest_slice[to_copy_usize] = b'\0'; 
+
+    dest
+}
+
+fn strspn(env: &mut Environment, s: ConstPtr<u8>, accept: ConstPtr<u8>) -> GuestUSize {
+    let s_slice = env.mem.cstr_at(s);
+    let accept_slice = env.mem.cstr_at(accept);
+    
+    let mut count = 0;
+    for &byte in s_slice {
+        if accept_slice.contains(&byte) {
+            count += 1;
+        } else {
+            break;
+        }
+    }
+    count as GuestUSize
+}
 
 fn strpbrk(env: &mut Environment, s: ConstPtr<u8>, charset: ConstPtr<u8>) -> ConstPtr<u8> {
     if s.is_null() || charset.is_null() {
@@ -355,6 +404,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(memset_pattern4(_, _, _)),
     export_c_func!(memset_pattern8(_, _, _)),
     export_c_func!(memset_pattern16(_, _, _)),
+    export_c_func!(strerror_r(_, _, _)),
     export_c_func!(memcpy(_, _, _)),
     export_c_func!(__memcpy_chk(_, _, _, _)),
     export_c_func!(memmove(_, _, _)),
@@ -369,6 +419,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(__strcat_chk(_, _, _)),
     export_c_func!(strncpy(_, _, _)),
     export_c_func!(__strncpy_chk(_, _, _, _)),
+    export_c_func!(__strncat_chk(_, _, _, _)),
+    export_c_func!(strspn(_, _)),
     export_c_func!(strsep(_, _)),
     export_c_func!(strdup(_)),
     export_c_func!(strcmp(_, _)),

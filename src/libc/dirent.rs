@@ -65,8 +65,17 @@ fn opendir(env: &mut Environment, filename: ConstPtr<u8>) -> MutPtr<DIR> {
     if is_dir {
         let dir = env.mem.alloc_and_write(DIR { idx: 0 });
         log_dbg!("opendir: new DIR ptr: {:?}", dir);
+        
         let iter = env.fs.enumerate_with_types(guest_path).unwrap();
-        let vec = iter.map(|(str, type_)| (str.to_string(), type_)).collect();
+        
+        // 🏎️ ASPHALT 8 BYPASS: THE LOWERCASE SPOOFER
+        // Gameloft's POSIX check aggressively rejects files containing uppercase letters.
+        // By forcing the enumeration list to be completely lowercase, the C++ engine 
+        // accepts the files, while touchHLE seamlessly maps them back to the real assets!
+        let vec: Vec<(String, FsNodeType)> = iter.map(|(str, type_)| {
+            (str.to_ascii_lowercase(), type_)
+        }).collect();
+
         assert!(!State::get_mut(env).open_dirs.contains_key(&dir));
         State::get_mut(env).open_dirs.insert(dir, vec);
         assert!(!State::get_mut(env).read_dirs.contains_key(&dir));

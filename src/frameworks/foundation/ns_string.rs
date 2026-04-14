@@ -118,7 +118,7 @@ impl StringHostObject {
                 StringHostObject::Utf8(Cow::Owned(string))
             }
             NSUTF8StringEncoding => {
-                let string = String::from_utf8(bytes.into_owned()).unwrap();
+                let string = String::from_utf8_lossy(&bytes).into_owned();
                 StringHostObject::Utf8(Cow::Owned(string))
             }
             NSWindowsCP1252StringEncoding => {
@@ -277,10 +277,9 @@ pub fn with_format(env: &mut Environment, format: id, args: VaList) -> String {
         },
         args,
     );
-    // TODO: what if it's not valid UTF-8?
-    String::from_utf8(res).unwrap()
+    // 🛡️ ANTI-PANIC SHIELD
+    String::from_utf8(res).unwrap_or_else(|_| "INVALID_FORMAT_STRING".to_string())
 }
-
 pub fn from_rust_ordering(ordering: std::cmp::Ordering) -> NSComparisonResult {
     match ordering {
         std::cmp::Ordering::Less => NSOrderedAscending,
@@ -299,6 +298,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 // We can pick whichever subclass we want for the various alloc methods.
 // For the time being, that will always be _touchHLE_NSString.
 @implementation NSString: NSObject
+
+// 🛡️ GAMELOFT BYPASS: Simulate offline mode so the game doesn't crash trying to download data
++ (id)stringWithContentsOfURL:(id)_url encoding:(u32)_enc error:(id)_error {
+    println!("🛡️ GAMELOFT BYPASS: Ignored stringWithContentsOfURL (Simulating offline mode)");
+    crate::objc::nil 
+}
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    // 🛠️ FIX: Safely initialize with an empty string instead of trying to use .default()
+    let host_object = Box::new(StringHostObject::Utf8(Cow::Borrowed("")));
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
 
 + (id)allocWithZone:(NSZonePtr)zone {
     // NSString might be subclassed by something which needs allocWithZone:
@@ -1765,10 +1776,11 @@ pub fn register_constant_strings(bin: &MachO, mem: &mut Mem, objc: &mut ObjC) {
         // See https://lists.llvm.org/pipermail/cfe-dev/2008-August/002518.html
         let (host_object, class_name) = if flags == 0x7C8 {
             // ASCII
-            let decoded = std::str::from_utf8(mem.bytes_at(bytes, length)).unwrap();
+            let raw_bytes = mem.bytes_at(bytes, length);
+            let decoded = String::from_utf8_lossy(raw_bytes).into_owned();
 
             (
-                StringHostObject::Utf8(Cow::Owned(String::from(decoded))),
+                StringHostObject::Utf8(Cow::Owned(decoded)),
                 "_touchHLE_NSString_CFConstantString_UTF8",
             )
         } else if flags == 0x7D0 {

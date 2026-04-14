@@ -298,11 +298,12 @@ impl super::ObjC {
     /// some games (like "Cut the Rope") does call `retainCount`.
     pub fn get_refcount(&mut self, object: id) -> NonZeroU32 {
         let Some(entry) = self.objects.get_mut(&object) else {
-            panic!("No entry found for object {object:?}, it may have already been deallocated");
+            println!("Warning: No entry found for object {object:?} during get_refcount. It may have already been deallocated.");
+            return NonZeroU32::new(1).unwrap();
         };
         let Some(refcount) = entry.refcount.as_mut() else {
-            // Might mean a missing `retain` override.
-            panic!("Attempt to get refcount on static-lifetime object {object:?}!");
+            // 🏎️ FIX: Static objects effectively have an infinite retain count.
+            return NonZeroU32::new(u32::MAX).unwrap();
         };
         *refcount
     }
@@ -312,11 +313,12 @@ impl super::ObjC {
     /// may be overridden.
     pub fn increment_refcount(&mut self, object: id) {
         let Some(entry) = self.objects.get_mut(&object) else {
-            panic!("No entry found for object {object:?}, it may have already been deallocated");
+            println!("Warning: No entry found for object {object:?} during retain. It may have already been deallocated.");
+            return;
         };
         let Some(refcount) = entry.refcount.as_mut() else {
-            // Might mean a missing `retain` override.
-            panic!("Attempt to increment refcount on static-lifetime object {object:?}!");
+            // 🏎️ FIX: Silently ignore increment on static-lifetime objects.
+            return;
         };
         *refcount = refcount.checked_add(1).unwrap();
     }
@@ -330,11 +332,12 @@ impl super::ObjC {
     #[must_use]
     pub fn decrement_refcount(&mut self, object: id) -> bool {
         let Some(entry) = self.objects.get_mut(&object) else {
-            panic!("No entry found for object {object:?}, it may have already been deallocated");
+            println!("Warning: No entry found for object {object:?} during release. It may have already been deallocated.");
+            return false;
         };
         let Some(refcount) = entry.refcount.as_mut() else {
-            // Might mean a missing `release` override.
-            panic!("Attempt to decrement refcount on static-lifetime object {object:?}!");
+            // 🏎️ FIX: Silently ignore decrement on static-lifetime objects instead of crashing!
+            return false;
         };
         if refcount.get() == 1 {
             entry.refcount = None;

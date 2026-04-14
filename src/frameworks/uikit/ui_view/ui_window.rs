@@ -245,20 +245,69 @@ pub const CLASSES: ClassExports = objc_classes! {
     let other_layer: id = msg![env; other layer];
     msg![env; this_layer convertPoint:point fromLayer:other_layer]
 }
+
 - (CGPoint)convertPoint:(CGPoint)point
-               toWindow:(id)other { // UIWindow*
+             toWindow:(id)other { // UIWindow*
     let this_layer: id = msg![env; this layer];
     // Resolves to nil if other is nil.
     let other_layer: id = msg![env; other layer];
     msg![env; this_layer convertPoint:point toLayer:other_layer]
 }
 
+- (())sendEvent:(id)event {
+    let touches: id = msg![env; event allTouches];
+    let count: u32 = msg![env; touches count];
+
+    if count > 0 {
+        let any_touch: id = msg![env; touches anyObject];
+        let phase: u32 = msg![env; any_touch phase];
+        
+        // Let the view hierarchy properly resolve the rotated touch target
+        let window_point: crate::frameworks::core_graphics::CGPoint = msg![env; any_touch locationInView:this];
+        let hit_view: id = msg![env; this hitTest:window_point withEvent:event];
+
+        if hit_view != crate::objc::nil {
+            // Standard touch routing based on natural hit testing
+            match phase {
+                0 => { let _: () = msg![env; hit_view touchesBegan:touches withEvent:event]; },
+                1 => { let _: () = msg![env; hit_view touchesMoved:touches withEvent:event]; },
+                3 => { let _: () = msg![env; hit_view touchesEnded:touches withEvent:event]; },
+                4 => { let _: () = msg![env; hit_view touchesCancelled:touches withEvent:event]; },
+                _ => {}
+            }
+        }
+    }
+}
+
 @end
 
-};
+@implementation AVAudioSessionDelegate: NSObject
+    @end
+
+    // 🛡️ GT RACING BYPASS: Fake the Audio Session
+    @implementation AVAudioSession: NSObject
+    + (id)sharedInstance {
+        // Silenced for performance
+        crate::objc::nil
+    }
+    @end
+
+    @implementation GCController: NSObject
+    + (id)controllers {
+        // Silenced for performance: Polled 60x a second!
+        crate::objc::nil
+    }
+    @end
+
+    @implementation NSTimeZone: NSObject
+    + (id)knownTimeZoneNames {
+        // Silenced for performance
+        crate::objc::nil
+    }
+    @end
+}; // <--- This now correctly closes the macro AFTER all implementation blocks.
 
 /// Window life-cycle notifications
-/// TODO: more notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
 /// Keyboard notifications
 /// TODO: more keyboard notifications

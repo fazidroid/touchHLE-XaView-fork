@@ -594,6 +594,19 @@ impl Dyld {
                 continue;
             }
 
+            // ___stack_chk_guard must be a non-zero sentinel or any
+            // stack-protected function will silently corrupt or crash.
+            // On real iOS this is randomized per-boot; a fixed value is fine
+            // for emulation — we only need it non-zero so the canary check
+            // doesn't immediately trigger.
+            if symbol == "___stack_chk_guard" {
+                let canary: u32 = 0xDEAD_C0DE;
+                let canary_ptr = mem.alloc_and_write(canary);
+                mem.write(ptr_ptr, canary_ptr.cast().cast_const());
+                log_dbg!("Initialized ___stack_chk_guard sentinel at {:?}", canary_ptr);
+                continue;
+            }
+
             log!(
                 "Warning: unhandled non-lazy symbol {:?} at {:?} in \"{}\"",
                 symbol,

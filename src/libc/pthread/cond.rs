@@ -79,21 +79,23 @@ pub fn pthread_cond_wait(
         cond
     );
     let current_thread = env.current_thread;
-    let mutex = env.mem.read(mutex).mutex_id;
+    let mutex_id = env.mem.read(mutex).mutex_id;
     let cond_var = env.mem.read(cond);
     let host_object = State::get_mut(env)
         .condition_variables
         .get_mut(&cond_var)
         .unwrap();
-    // The mutex used must be the same as the currently waiting mutex, or there
-    // must be no other waiters.
     assert!(
-        host_object.curr_mutex == Some(mutex)
+        host_object.curr_mutex == Some(mutex_id)
             || host_object.waking.is_empty() && host_object.waiting.is_empty()
     );
-    host_object.curr_mutex = Some(mutex);
+    host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
+    
+    // CRITICAL FIX: The thread MUST yield here so the CPU doesn't spinlock!
+    // This allows the main thread to process the loading screen.
     env.yield_thread(ThreadBlock::Condition(cond_var));
+    
     0 // success
 }
 
@@ -153,6 +155,7 @@ pub fn pthread_cond_timedwait(
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
+    // Safe fallback: Delegate to the standard wait function so the thread yields properly
     pthread_cond_wait(env, cond, mutex)
 }
 

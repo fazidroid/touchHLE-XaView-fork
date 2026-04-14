@@ -42,7 +42,7 @@ pub use objects::{
 pub use properties::todo_objc_setter;
 pub use selectors::{selector, SEL};
 
-use crate::mem::ConstVoidPtr;
+use crate::mem::{ConstVoidPtr, MutPtr, MutVoidPtr, Ptr};
 use crate::Environment;
 use classes::{ClassHostObject, FakeClass, UnimplementedClass};
 use messages::{
@@ -127,6 +127,23 @@ fn _Block_object_dispose(_env: &mut Environment, object: ConstVoidPtr, flags: i3
     );
 }
 
+// 🏎️ GAMELOFT BYPASS: Safe stub for class reflection
+fn class_copyPropertyList(
+    env: &mut Environment,
+    _cls: Class,
+    out_count: MutPtr<u32>,
+) -> MutVoidPtr {
+    println!("🏎️ GAMELOFT BYPASS: Intercepted class_copyPropertyList! Returning NULL.");
+    
+    // If the game passed a valid pointer to store the count, set it to 0
+    if !out_count.is_null() {
+        env.mem.write(out_count, 0);
+    }
+    
+    // Safely return a NULL pointer instead of crashing
+    Ptr::null()
+}
+
 const FUNCTIONS: FunctionExports = &[
     export_c_func!(objc_msgSend(_, _)),
     export_c_func!(objc_msgSend_stret(_, _, _)),
@@ -138,4 +155,5 @@ const FUNCTIONS: FunctionExports = &[
     export_c_func!(objc_sync_exit(_)),
     export_c_func!(sel_registerName(_)),
     export_c_func!(_Block_object_dispose(_, _)),
+    export_c_func!(class_copyPropertyList(_, _)),
 ];

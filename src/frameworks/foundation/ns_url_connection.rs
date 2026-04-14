@@ -13,6 +13,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSURLConnection: NSObject
 
++ (id)sendSynchronousRequest:(id)_request returningResponse:(u32)_response error:(u32)_error {
+    println!("🛡️ GAMELOFT BYPASS: Ignored NSURLConnection sendSynchronousRequest");
+    crate::objc::nil
+}
+
 + (id)connectionWithRequest:(id)request
                    delegate:(id)delegate {
     let new: id = msg![env; this alloc];
