@@ -111,6 +111,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (bool)isMultitaskingSupported {
     false
 }
+// EA games sometimes check for proximity sensor
+- (bool)proximityMonitoringEnabled {
+    false
+}
+- (())setProximityMonitoringEnabled:(bool)_enabled {
+    // no-op
+}
+- (bool)proximityState {
+    false
+}
+
+// Some games call this to detect if it's an iPod touch
+- (id)model {
+    ns_string::get_static_str(env, "iPhone")
+}
+// Add a specific method for "platform" if needed (though it's usually from sysctl)
+- (id)platform {
+    // EA custom method sometimes used
+    ns_string::get_static_str(env, "iPhone4,1")
+}
+- (id)systemVersion {
+    ns_string::get_static_str(env, "4.0")   // matches kern.osrelease 10.0.0d3
+}
 
 - (UIDeviceOrientation)orientation {
     match env.window().current_rotation() {
