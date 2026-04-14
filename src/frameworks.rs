@@ -38,6 +38,7 @@ pub mod opengles;
 pub mod store_kit;
 pub mod system_configuration;
 pub mod uikit;
+pub mod mobile_core_services;
 
 /// Container for state of various child modules
 #[derive(Default)]
