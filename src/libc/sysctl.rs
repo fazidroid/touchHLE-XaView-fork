@@ -73,25 +73,36 @@ enum SysInfoType {
     Int64(i64),
 }
 
-fn sysctl(
+// ==========================================================
+// 🏎️ EA BYPASS: "Strong Logger" for Asserts
+// ==========================================================
+fn __assert_rtn(
     env: &mut Environment,
-    name: MutPtr<i32>,
-    name_len: u32,
-    oldp: MutVoidPtr,
-    oldlenp: MutPtr<GuestUSize>,
-    newp: MutVoidPtr,
-    newlen: GuestUSize,
-) -> i32 {
-    set_errno(env, 0);
-    log_dbg!(
-        "sysctl({:?}, {:#x}, {:?}, {:?}, {:?}, {:x})",
-        name,
-        name_len,
-        oldp,
-        oldlenp,
-        newp,
-        newlen
-    );
+    func: crate::mem::ConstPtr<u8>,
+    file: crate::mem::ConstPtr<u8>,
+    line: i32,
+    expr: crate::mem::ConstPtr<u8>,
+) {
+    let expr_str = if expr.is_null() { 
+        "(unknown)".to_string() 
+    } else { 
+        env.mem.cstr_at_utf8(expr).unwrap_or_default().to_string() 
+    };
+    
+    let file_str = if file.is_null() { 
+        "(unknown)".to_string() 
+    } else { 
+        env.mem.cstr_at_utf8(file).unwrap_or_default().to_string() 
+    };
+    
+    let func_str = if func.is_null() { 
+        "(unknown)".to_string() 
+    } else { 
+        env.mem.cstr_at_utf8(func).unwrap_or_default().to_string() 
+    };
+    
+    panic!("🎮 EA ASSERT => Expr: [{}] | File: [{}] | Func: [{}] | Line: {}", expr_str, file_str, func_str, line);
+}
 
     // ==========================================================
     // 🏎️ EA BYPASS: Darwin Kernel Network Interface Mock
@@ -215,17 +226,11 @@ fn sysctlbyname(
     newp: MutVoidPtr,
     newlen: GuestUSize,
 ) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
     let name_str = env.mem.cstr_at_utf8(name).unwrap();
-    log_dbg!(
-        "sysctlbyname({:?}, {:?}, {:?}, {:?}, {:x})",
-        name_str,
-        oldp,
-        oldlenp,
-        newp,
-        newlen
-    );
+    
+    // 🔍 STRONG LOGGER: Force print the string queries!
+    println!("🎮 SYSCTL-BY-NAME QUERY: [{}]", name_str);
     sysctl_generic(
         env,
         |env| {
