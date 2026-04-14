@@ -355,18 +355,14 @@ fn __assert_rtn(
     expr: crate::mem::ConstPtr<u8>,
 ) {
     let expr_str = if expr.is_null() { 
-        String::from("(unknown)") 
+        // FIXED: Using .to_string() to avoid the SysInfoType name collision!
+        "(unknown)".to_string() 
     } else { 
         env.mem.cstr_at_utf8(expr).unwrap_or_default() 
     };
     
     println!("🎮 LOG: EA Engine Assert Bypassed! Expression: {} (Line {})", expr_str, line);
-    // By intercepting this function and purposefully NOT aborting the emulator,
-    // we force the game's engine to ignore the missing telemetry and keep loading!
 }
-
-
-
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sysctl(_, _, _, _, _, _)),
