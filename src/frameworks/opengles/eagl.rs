@@ -612,7 +612,15 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let old_texture_2d: GLuint = get_int(gles, gles11::TEXTURE_BINDING_2D) as _;
     let active_texture: GLint = get_int(gles, gles11::ACTIVE_TEXTURE);
     //DebugPRBState
-    log!("DEBUG_PRB: Start. RB={}, w={}, h={}. OLD_FB={}, OLD_TEX2D={}, ACTIVE_TEX={:#x}", renderbuffer, width, height, old_framebuffer, old_texture_2d, active_texture);
+    log!(
+        "DEBUG_PRB: Start. RB={}, w={}, h={}. OLD_FB={}, OLD_TEX2D={}, ACTIVE_TEX={:#x}",
+        renderbuffer,
+        width,
+        height,
+        old_framebuffer,
+        old_texture_2d,
+        active_texture
+    );
 
     // Create a framebuffer we can use to read from the renderbuffer
     let mut src_framebuffer = 0;
@@ -630,11 +638,51 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let mut px = [0u8; 20];
     let hw = width.saturating_sub(1);
     let hh = height.saturating_sub(1);
-    gles.ReadPixels(0, 0, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[0..4].as_mut_ptr() as *mut _);
-    gles.ReadPixels(hw, 0, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[4..8].as_mut_ptr() as *mut _);
-    gles.ReadPixels(0, hh, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[8..12].as_mut_ptr() as *mut _);
-    gles.ReadPixels(hw, hh, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[12..16].as_mut_ptr() as *mut _);
-    gles.ReadPixels(width / 2, height / 2, 1, 1, gles11::RGBA, gles11::UNSIGNED_BYTE, px[16..20].as_mut_ptr() as *mut _);
+    gles.ReadPixels(
+        0,
+        0,
+        1,
+        1,
+        gles11::RGBA,
+        gles11::UNSIGNED_BYTE,
+        px[0..4].as_mut_ptr() as *mut _,
+    );
+    gles.ReadPixels(
+        hw,
+        0,
+        1,
+        1,
+        gles11::RGBA,
+        gles11::UNSIGNED_BYTE,
+        px[4..8].as_mut_ptr() as *mut _,
+    );
+    gles.ReadPixels(
+        0,
+        hh,
+        1,
+        1,
+        gles11::RGBA,
+        gles11::UNSIGNED_BYTE,
+        px[8..12].as_mut_ptr() as *mut _,
+    );
+    gles.ReadPixels(
+        hw,
+        hh,
+        1,
+        1,
+        gles11::RGBA,
+        gles11::UNSIGNED_BYTE,
+        px[12..16].as_mut_ptr() as *mut _,
+    );
+    gles.ReadPixels(
+        width / 2,
+        height / 2,
+        1,
+        1,
+        gles11::RGBA,
+        gles11::UNSIGNED_BYTE,
+        px[16..20].as_mut_ptr() as *mut _,
+    );
     log!("DEBUG_PRB: FBO={:#x}. w={}, h={}. Pixels: BL[{},{},{},{}] BR[{},{},{},{}] TL[{},{},{},{}] TR[{},{},{},{}] C[{},{},{},{}]",
         fbo_status, width, height,
         px[0], px[1], px[2], px[3], px[4], px[5], px[6], px[7],
@@ -646,10 +694,10 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let mut texture: GLuint = 0;
     gles.GenTextures(1, &mut texture);
     gles.BindTexture(gles11::TEXTURE_2D, texture);
-    
+
     // Clear error
     while gles.GetError() != 0 {}
-    
+
     gles.CopyTexImage2D(
         gles11::TEXTURE_2D,
         0,
@@ -660,13 +708,16 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         height,
         0,
     );
-    
+
     //DebugCopyTex
     let err_after_copy = gles.GetError();
     if err_after_copy != 0 {
-        log!("DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}", err_after_copy);
+        log!(
+            "DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}",
+            err_after_copy
+        );
     }
-    
+
     // The texture will not have any mip levels so we must ensure the filter
     // does not use them, else rendering will fail.
     gles.TexParameteri(
@@ -761,16 +812,17 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let rb_h = height as f32;
     let cols = rotation_matrix.columns();
     let is_rotated = cols[0][0].abs() < 0.1 && cols[0][1].abs() > 0.9;
-    
+
     if is_rotated && rb_w > rb_h {
         unsafe {
             let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
-            *m_ptr = [
-                [1.0, 0.0],
-                [0.0, 1.0],
-            ];
+            *m_ptr = [[1.0, 0.0], [0.0, 1.0]];
         }
-        log!("DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}", rb_w, rb_h);
+        log!(
+            "DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}",
+            rb_w,
+            rb_h
+        );
     }
 
     // Draw the quad

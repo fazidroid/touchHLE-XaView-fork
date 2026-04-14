@@ -356,7 +356,9 @@ impl super::ObjC {
         // LoggedOnceFlag
         static LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-        if SHOW_ALL.load(std::sync::atomic::Ordering::Relaxed) || !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        if SHOW_ALL.load(std::sync::atomic::Ordering::Relaxed)
+            || !LOGGED.swap(true, std::sync::atomic::Ordering::Relaxed)
+        {
             log!(
                 "MEMORY LEAK INTENTIONAL: Preventing deallocation of {:?} to avoid Use-After-Free crashes (muted further logs)",
                 object

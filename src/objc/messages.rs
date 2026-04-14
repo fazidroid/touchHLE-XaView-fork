@@ -18,7 +18,8 @@ use crate::Environment;
 use std::any::TypeId;
 
 // StoreRootViewControllers
-static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u32, u32>>> = std::sync::Mutex::new(None);
+static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u32, u32>>> =
+    std::sync::Mutex::new(None);
 
 /// The core implementation of `objc_msgSend`, the main function of Objective-C.
 ///
@@ -146,6 +147,10 @@ fn objc_msgSend_inner(
 
     // BypassGarbagePointer
     if receiver.to_bits() >= 0xe0000000 {
+        log!(
+            "WARNING: objc_msgSend received garbage pointer {:#010x}. Bypassing.",
+            receiver.to_bits()
+        );
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
@@ -163,6 +168,10 @@ fn objc_msgSend_inner(
             let class_host_object = match env.objc.get_host_object(orig_class) {
                 Some(obj) => obj,
                 None => {
+                    log!(
+                        "WARNING: objc_msgSend superclass chain lookup failed for {:?}. Bypassing.",
+                        orig_class
+                    );
                     env.cpu.regs_mut()[0..2].fill(0);
                     return;
                 }
@@ -191,32 +200,42 @@ fn objc_msgSend_inner(
             // SafeRootViewControllerHook
             if selector.as_str(&env.mem) == "setRootViewController:" {
                 let vc: id = crate::mem::Ptr::from_bits(env.cpu.regs()[2]);
-                println!("SafeHook: setRootViewController: Window: {:?}, VC: {:?}", receiver, vc);
-                
+                echo!(
+                    "SafeHook: setRootViewController: Window: {:?}, VC: {:?}",
+                    receiver,
+                    vc
+                );
+
                 if vc != nil {
                     let mut store_lock = ROOT_VC_STORE.lock().unwrap();
                     if store_lock.is_none() {
                         *store_lock = Some(std::collections::HashMap::new());
                     }
-                    store_lock.as_mut().unwrap().insert(receiver.to_bits(), vc.to_bits());
+                    store_lock
+                        .as_mut()
+                        .unwrap()
+                        .insert(receiver.to_bits(), vc.to_bits());
                     drop(store_lock);
-                    
+
                     // SaveCpuState
                     let saved_regs = env.cpu.regs().to_vec();
                     let view: id = crate::msg![env; vc view];
                     if view != nil {
                         let sel_add = env.objc.lookup_selector("addSubview:").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_add, view));
-                        
+                        let _: () =
+                            crate::objc::msg_send_no_type_checking(env, (receiver, sel_add, view));
+
                         let sel_key = env.objc.lookup_selector("makeKeyAndVisible").unwrap();
-                        let _: () = crate::objc::msg_send_no_type_checking(env, (receiver, sel_key));
+                        let _: () =
+                            crate::objc::msg_send_no_type_checking(env, (receiver, sel_key));
+
                         *crate::libc::stdlib::HACK_MAIN_WINDOW.lock().unwrap() = receiver.to_bits();
                     }
-                    
+
                     // RestoreCpuState (Crucial for AppPicker stability)
                     env.cpu.regs_mut().copy_from_slice(&saved_regs);
                 }
-                
+
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
@@ -226,7 +245,10 @@ fn objc_msgSend_inner(
                 if let Some(store) = ROOT_VC_STORE.lock().unwrap().as_ref() {
                     vc_bits = store.get(&receiver.to_bits()).copied().unwrap_or(0);
                 }
-                println!("WARNING: Hooked rootViewController! Returning {:#x}", vc_bits);
+                echo!(
+                    "WARNING: Hooked rootViewController! Returning {:#x}",
+                    vc_bits
+                );
                 env.cpu.regs_mut()[0] = vc_bits;
                 env.cpu.regs_mut()[1] = 0;
                 return;
@@ -333,6 +355,10 @@ fn objc_msgSend_inner(
         let host_object = match env.objc.get_host_object(class) {
             Some(obj) => obj,
             None => {
+                log!(
+                    "WARNING: objc_msgSend failed to get host object for class {:?}. Bypassing.",
+                    class
+                );
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
@@ -411,9 +437,18 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
-
-            println!(
-                "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
+            // BypassBarButtonItem
+            if name == "UIBarButtonItem" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            // BypassGCController
+            if name == "GCController" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            panic!(
+                "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
                 name,
                 class,
                 if is_metaclass { "class" } else { "instance" },

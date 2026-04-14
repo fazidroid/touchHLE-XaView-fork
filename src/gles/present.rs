@@ -201,7 +201,7 @@ pub unsafe fn present_frame(
                 tex_coords.as_ptr() as *const _,
             );
         }
-        
+
         //DebugDrawArrays
         while gles.GetError() != 0 {}
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);

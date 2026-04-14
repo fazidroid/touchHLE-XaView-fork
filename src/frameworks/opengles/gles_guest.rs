@@ -486,25 +486,43 @@ fn glStencilFunc(env: &mut Environment, func: GLenum, ref_: GLint, mask: GLuint)
         gles.StencilFunc(func, ref_, mask)
     });
 }
-fn glStencilFuncSeparate(env: &mut Environment, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+fn glStencilFuncSeparate(
+    env: &mut Environment,
+    face: GLenum,
+    func: GLenum,
+    ref_: GLint,
+    mask: GLuint,
+) {
     // StencilFuncSeparateImpl
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilFuncSeparate(face, func, ref_, mask) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.StencilFuncSeparate(face, func, ref_, mask)
+    })
 }
 fn glStencilOp(env: &mut Environment, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.StencilOp(sfail, dpfail, dppass)
     });
 }
-fn glStencilOpSeparate(env: &mut Environment, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+fn glStencilOpSeparate(
+    env: &mut Environment,
+    face: GLenum,
+    sfail: GLenum,
+    dpfail: GLenum,
+    dppass: GLenum,
+) {
     // StencilOpSeparateImpl
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilOpSeparate(face, sfail, dpfail, dppass) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.StencilOpSeparate(face, sfail, dpfail, dppass)
+    })
 }
 fn glStencilMask(env: &mut Environment, mask: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilMask(mask) });
 }
 fn glStencilMaskSeparate(env: &mut Environment, face: GLenum, mask: GLuint) {
     // StencilMaskSeparateImpl
-    with_ctx_and_mem(env, |gles, _mem| unsafe { gles.StencilMaskSeparate(face, mask) })
+    with_ctx_and_mem(env, |gles, _mem| unsafe {
+        gles.StencilMaskSeparate(face, mask)
+    })
 }
 fn glLogicOp(env: &mut Environment, opcode: GLenum) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.LogicOp(opcode) });
@@ -1651,17 +1669,20 @@ fn glGetBufferParameteriv(
     })
 }
 // TrackMappedBuffers
-static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLenum, u32, u32)>> = std::sync::Mutex::new(Vec::new());
+static MAPPED_BUFFERS: std::sync::Mutex<Vec<(GLenum, u32, u32)>> =
+    std::sync::Mutex::new(Vec::new());
 
 fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutPtr<GLvoid> {
     let size: GLint = _get_buffer_size(env, target);
     if size <= 0 {
         return Ptr::null();
     }
-    
+
     let mut allocated_ptr = 0;
     if let Ok(mut map) = MAPPED_BUFFERS.lock() {
-        if let Some(&mut (_, ref mut ptr, ref mut alloc_size)) = map.iter_mut().find(|(t, _, _)| *t == target) {
+        if let Some(&mut (_, ref mut ptr, ref mut alloc_size)) =
+            map.iter_mut().find(|(t, _, _)| *t == target)
+        {
             if *alloc_size >= size as u32 {
                 allocated_ptr = *ptr;
             } else {
@@ -1674,10 +1695,15 @@ fn glMapBufferOES(env: &mut Environment, target: GLenum, access: GLenum) -> MutP
             map.push((target, allocated_ptr, size as u32));
         }
     }
-    
+
     let guest_ptr = Ptr::from_bits(allocated_ptr);
     // BetterDebugInfo
-    log_dbg!("glMapBufferOES(target: {}, access: {}) -> {:?}", target, access, guest_ptr);
+    log_dbg!(
+        "glMapBufferOES(target: {}, access: {}) -> {:?}",
+        target,
+        access,
+        guest_ptr
+    );
     guest_ptr
 }
 
@@ -1688,7 +1714,7 @@ fn glUnmapBufferOES(env: &mut Environment, target: GLenum) -> GLboolean {
             guest_ptr_bits = ptr;
         }
     }
-    
+
     if guest_ptr_bits != 0 {
         let size = _get_buffer_size(env, target);
         if size > 0 {
@@ -2551,8 +2577,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetActiveUniform(_, _, _, _, _, _, _)),
     export_c_func!(glGetActiveAttrib(_, _, _, _, _, _, _)),
     export_c_func!(glGetVertexAttribiv(_, _, _)),
-    export_c_func!(glMapBufferOES(_, _)),
-    export_c_func!(glUnmapBufferOES(_)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {

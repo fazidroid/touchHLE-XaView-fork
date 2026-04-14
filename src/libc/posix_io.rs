@@ -381,7 +381,46 @@ fn fcntl(
         F_SETLK => {
             let lock_ptr: MutPtr<flock> = args.start().next(env);
             let lock = env.mem.read(lock_ptr);
-            if let Err(error_code) = validate_lock(env, fd, &lock) { set_errno(env, error_code); return -1; }
+
+            if let Err(error_code) = validate_lock(env, fd, &lock) {
+                set_errno(env, error_code);
+                return -1;
+            }
+
+            // POSIX locks are process based which means that any threads within
+            // a process don't conflict with its own process's locks.
+            // For example, setting a lock that conflicts with another lock set
+            // by a thread in the same process results in the lock being either:
+            // upgraded, extended, split, etc., but it will not conflict.
+            // Practically, since touchHLE supports only one process, POSIX
+            // locks don't do anything, so they can temporarily be ignored.
+            // TODO: Actually set locks when multiproccess support is added and
+            // the file system supports it.
+            log!(
+                "TODO: fcntl({}, F_SETLK, {:?}) called. Locking unimplemented, ignoring lock.",
+                fd,
+                lock
+            );
+        }
+        F_NOCACHE => {
+            let mut args = args.start();
+            let arg: i32 = args.next(env);
+            assert_eq!(arg, 1);
+            log!(
+                "TODO: Ignoring enabling F_NOCACHE for file descriptor {}",
+                fd
+            );
+        }
+        F_RDADVISE => {
+            log_dbg!("TODO: Ignoring F_RDADVISE for file descriptor {}", fd);
+        }
+        _ => {
+            // BypassFcntl
+            println!(
+                "WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.",
+                cmd, fd
+            );
+            return 0;
         }
         F_NOCACHE | F_RDADVISE => { }
         _ => { return 0; }

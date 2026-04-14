@@ -190,7 +190,11 @@ impl Environment {
         };
 
         if locking_thread != current_thread {
-            return Err(EPERM);
+            if mutex.type_ != MutexType::PTHREAD_MUTEX_NORMAL {
+                return Err(EPERM);
+            }
+            // AllowCrossThreadUnlock
+            log_dbg!("Cross-thread unlock allowed for NORMAL mutex #{}", mutex_id);
         }
 
         if lock_count.get() == 1 {

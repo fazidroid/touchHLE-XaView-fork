@@ -9,7 +9,9 @@ use crate::dyld::ConstantExports;
 use crate::dyld::HostConstant;
 use crate::frameworks::foundation::{ns_string, NSInteger};
 // FixMsgClassImport
-use crate::objc::{id, msg, msg_class, objc_classes, todo_objc_setter, ClassExports, TrivialHostObject};
+use crate::objc::{
+    id, msg, msg_class, objc_classes, todo_objc_setter, ClassExports, TrivialHostObject,
+};
 use crate::window::DeviceOrientation;
 
 pub const UIDeviceOrientationDidChangeNotification: &str =

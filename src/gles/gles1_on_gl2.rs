@@ -1003,7 +1003,13 @@ impl GLES for GLES1OnGL2<'_> {
         .contains(&func));
         gl21::StencilFunc(func, ref_, mask);
     }
-    unsafe fn StencilFuncSeparate(&mut self, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+    unsafe fn StencilFuncSeparate(
+        &mut self,
+        face: GLenum,
+        func: GLenum,
+        ref_: GLint,
+        mask: GLuint,
+    ) {
         // StencilFuncSeparateCompat
         gl21::StencilFuncSeparate(face, func, ref_, mask);
     }
@@ -1021,7 +1027,13 @@ impl GLES for GLES1OnGL2<'_> {
         }
         gl21::StencilOp(sfail, dpfail, dppass);
     }
-    unsafe fn StencilOpSeparate(&mut self, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+    unsafe fn StencilOpSeparate(
+        &mut self,
+        face: GLenum,
+        sfail: GLenum,
+        dpfail: GLenum,
+        dppass: GLenum,
+    ) {
         // StencilOpSeparateCompat
         gl21::StencilOpSeparate(face, sfail, dpfail, dppass);
     }

@@ -504,18 +504,17 @@ impl Mem {
     pub fn memmove(&mut self, dest: MutVoidPtr, src: ConstVoidPtr, size: GuestUSize) {
         let src_u32 = src.to_bits();
         let dest_u32 = dest.to_bits();
-        
+
         // IgnoreGarbageSize
         if src_u32.checked_add(size).is_none() || dest_u32.checked_add(size).is_none() {
             return;
         }
-        
+
         let src = src_u32 as usize;
         let dest = dest_u32 as usize;
         let size = size as usize;
-        
-        self.bytes_mut()
-            .copy_within(src..src + size, dest)
+
+        self.bytes_mut().copy_within(src..src + size, dest)
     }
 
     /// Allocate `size` bytes.
