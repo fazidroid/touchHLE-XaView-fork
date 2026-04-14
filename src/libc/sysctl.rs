@@ -15,8 +15,8 @@ use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutV
 use crate::Environment;
 
 static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 20] = [
-    ((6,1),  "hw.machine",       String(b"iPhone1,1")),
-    ((6,2),  "hw.model",         String(b"M68AP")),
+    ((6,1),  "hw.machine",       String(b"iPhone4,1")),
+    ((6,2),  "hw.model",         String(b"N94AP")),
     ((6,3),  "hw.ncpu",          SysInfoType::Int32(1)),
     ((6,4),  "hw.physmem",       SysInfoType::Int32(512 * 1024 * 1024)),
     ((0,0),  "hw.cputype",       SysInfoType::Int32(12)),
@@ -340,26 +340,12 @@ fn __assert_rtn(
     line: i32,
     expr: ConstPtr<u8>,
 ) {
-    let expr_str = if expr.is_null() {
-        "(unknown)".to_string()
-    } else {
-        env.mem.cstr_at_utf8(expr).unwrap_or_default().to_string()
-    };
-    let file_str = if file.is_null() {
-        "(unknown)".to_string()
-    } else {
-        env.mem.cstr_at_utf8(file).unwrap_or_default().to_string()
-    };
-    let func_str = if func.is_null() {
-        "(unknown)".to_string()
-    } else {
-        env.mem.cstr_at_utf8(func).unwrap_or_default().to_string()
-    };
+    let expr_str = if expr.is_null() { "(unknown)".to_string() } else { env.mem.cstr_at_utf8(expr).unwrap_or_default().to_string() };
+    let file_str = if file.is_null() { "(unknown)".to_string() } else { env.mem.cstr_at_utf8(file).unwrap_or_default().to_string() };
+    let func_str = if func.is_null() { "(unknown)".to_string() } else { env.mem.cstr_at_utf8(func).unwrap_or_default().to_string() };
 
-    // Log but do NOT panic — let the game continue past non-fatal asserts.
-    log!(
-        "Warning: __assert_rtn: [{expr_str}] in {func_str} ({file_str}:{line}) — continuing"
-    );
+    // 🛡️ CRITICAL: This MUST panic to prevent Unexpected SVC memory corruption!
+    panic!("🎮 EA ASSERT => Expr: [{}] | File: [{}] | Func: [{}] | Line: {}", expr_str, file_str, func_str, line);
 }
 
 pub const FUNCTIONS: FunctionExports = &[
