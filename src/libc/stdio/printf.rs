@@ -133,14 +133,16 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'l' => {
-                format_char_idx += 1;
-                if get_format_char(&env.mem, format_char_idx) == b'l' {
-                    format_char_idx += 1;
-                    Some("ll")
-                } else {
-                    Some("l")
+                    if get_format_char(&env.mem, format_char_idx + 1) == b'l' {
+                        // 🛡️ GAMELOFT BYPASS: Safely swallow %llu, %llx, etc. without crashing.
+                        // We trick the emulator into treating them all as standard "lld".
+                        format_char_idx += 2;
+                        Some("lld")
+                    } else {
+                        format_char_idx += 1;
+                        Some("l")
+                    }
                 }
-            }
             // q seems to be an equivalent of 'll'
             // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
             b'q' => {

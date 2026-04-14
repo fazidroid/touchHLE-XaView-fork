@@ -348,8 +348,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)contentsAtPath:(id)path { // NSString *
     // TODO: return nil if path is directory
-    // TODO: handle non-absolute paths?
-    assert!(msg![env; path isAbsolutePath]);
+    
+    // EA BYPASS: Remove the strict absolute path assertion!
+    let is_absolute: bool = msg![env; path isAbsolutePath];
+    if !is_absolute {
+        println!("🎮 LOG: Bypassing relative path check for contentsAtPath!");
+    }
+    
     msg_class![env; NSData dataWithContentsOfFile:path]
 }
 

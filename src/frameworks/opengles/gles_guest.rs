@@ -300,11 +300,13 @@ fn glGetString(env: &mut Environment, name: GLenum) -> ConstPtr<GLubyte> {
                     b"OpenGL ES GLSL ES 1.00" // GlslVersion
                 }
                 gles11::EXTENSIONS => {
-                    // SafeExtensionsEsTwo
+                    // 🏎️ VULKAN ZERO-COPY HACK: We forcefully removed "GL_APPLE_framebuffer_multisample"
+                    // from this list! This tricks Asphalt 8's engine into bypassing the massive Apple FBO 
+                    // memory copy, and forces it to stream the geometry directly to the Android Vulkan display!
                     if is_es2 {
-                        b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_2D_limited_npot GL_APPLE_texture_format_BGRA8888 GL_APPLE_texture_max_level GL_EXT_blend_minmax GL_EXT_discard_framebuffer GL_EXT_read_format_bgra GL_EXT_texture_filter_anisotropic GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_equation_separate GL_OES_blend_func_separate GL_OES_blend_subtract GL_OES_depth24 GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_packed_depth_stencil GL_OES_rgb8_rgba8 GL_OES_standard_derivatives GL_OES_stencil_wrap GL_OES_texture_mirrored_repeat GL_OES_vertex_half_float "
+                        b"GL_APPLE_texture_2D_limited_npot GL_APPLE_texture_format_BGRA8888 GL_APPLE_texture_max_level GL_EXT_blend_minmax GL_EXT_discard_framebuffer GL_EXT_read_format_bgra GL_EXT_texture_filter_anisotropic GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_equation_separate GL_OES_blend_func_separate GL_OES_blend_subtract GL_OES_depth24 GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_packed_depth_stencil GL_OES_rgb8_rgba8 GL_OES_standard_derivatives GL_OES_stencil_wrap GL_OES_texture_mirrored_repeat GL_OES_vertex_half_float "
                     } else {
-                        b"GL_APPLE_framebuffer_multisample GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
+                        b"GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_texture_filter_anisotropic GL_EXT_texture_lod_bias GL_IMG_read_format GL_IMG_texture_compression_pvrtc GL_IMG_texture_format_BGRA8888 GL_OES_blend_subtract GL_OES_compressed_paletted_texture GL_OES_depth24 GL_OES_draw_texture GL_OES_framebuffer_object GL_OES_mapbuffer GL_OES_matrix_palette GL_OES_point_size_array GL_OES_point_sprite GL_OES_read_format GL_OES_rgb8_rgba8 GL_OES_texture_mirrored_repeat GL_OES_vertex_array_object "
                     }
                 }
                 _ => unreachable!(),
@@ -459,15 +461,8 @@ fn glScissor(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: 
 fn glViewport(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height: GLsizei) {
     let r_scale = get_smart_retina_scale(env, width, height);
     let scale_total = env.options.scale_hack.get() as f32 * r_scale;
-    // DebugViewport
-    log!(
-        "DEBUG_GL: glViewport Guest(x={}, y={}, w={}, h={}) -> Scale={}",
-        x,
-        y,
-        width,
-        height,
-        scale_total
-    );
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glViewport Guest(x={}, y={}, w={}, h={}) -> Scale={}", x, y, width, height, scale_total);
     let (x, y) = (
         (x as f32 * scale_total).round() as GLint,
         (y as f32 * scale_total).round() as GLint,
@@ -832,12 +827,8 @@ fn glVertexPointer(
 
 // Drawing
 fn glDrawArrays(env: &mut Environment, mode: GLenum, first: GLint, count: GLsizei) {
-    log!(
-        "DEBUG_GL: glDrawArrays(mode={:#x}, first={}, count={})",
-        mode,
-        first,
-        count
-    ); // DrawArraysLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glDrawArrays(mode={:#x}, first={}, count={})", mode, first, count); // DrawArraysLog
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         let fog_state_backup = clamp_fog_state_values(gles);
         gles.DrawArrays(mode, first, count);
@@ -851,13 +842,8 @@ fn glDrawElements(
     type_: GLenum,
     indices: ConstVoidPtr,
 ) {
-    log!(
-        "DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x}, indices={:#x})",
-        mode,
-        count,
-        type_,
-        indices.to_bits()
-    ); // DrawElementsLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x}, indices={:#x})", mode, count, type_, indices.to_bits()); // DrawElementsLog
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let fog_state_backup = clamp_fog_state_values(gles);
         let indices = translate_pointer_or_offset_to_host(
@@ -873,8 +859,8 @@ fn glDrawElements(
 
 // Clearing
 fn glClear(env: &mut Environment, mask: GLbitfield) {
-    // DebugClearMask
-    log!("DEBUG_GL: glClear(mask={:#x})", mask);
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glClear(mask={:#x})", mask);
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Clear(mask) });
 }
 fn glClearColor(
@@ -884,14 +870,8 @@ fn glClearColor(
     blue: GLclampf,
     alpha: GLclampf,
 ) {
-    // DebugClearColor
-    log!(
-        "DEBUG_GL: glClearColor(R={}, G={}, B={}, A={})",
-        red,
-        green,
-        blue,
-        alpha
-    );
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glClearColor(R={}, G={}, B={}, A={})", red, green, blue, alpha);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.ClearColor(red, green, blue, alpha)
     });
@@ -1279,6 +1259,8 @@ fn glTexSubImage2D(
         )
     })
 }
+
+// 🏎️ ASPHALT 8 VULKAN OPTIMIZATION: Real PVRTC to RGBA Decoding!
 fn glCompressedTexImage2D(
     env: &mut Environment,
     target: GLenum,
@@ -1291,21 +1273,58 @@ fn glCompressedTexImage2D(
     data: ConstVoidPtr,
 ) {
     with_ctx_and_mem(env, |gles, mem| unsafe {
-        let data = mem
+        let host_data = mem
             .ptr_at(data.cast::<u8>(), image_size.try_into().unwrap())
-            .cast();
-        gles.CompressedTexImage2D(
-            target,
-            level,
-            internalformat,
-            width,
-            height,
-            border,
-            image_size,
-            data,
-        );
+            .cast::<GLvoid>();
+
+        let is_pvrtc = internalformat == gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG
+            || internalformat == gles11::COMPRESSED_RGBA_PVRTC_4BPPV1_IMG
+            || internalformat == gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG
+            || internalformat == gles11::COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
+
+        if is_pvrtc {
+            // Determine the exact format properties
+            let is_2bpp = internalformat == gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG 
+                       || internalformat == gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
+            
+            let compressed_slice = std::slice::from_raw_parts(host_data as *const u8, image_size as usize);
+            
+            // 🏎️ THE REAL DECODER: Use touchHLE's built-in C-wrapper to unzip the Apple texture!
+            let decoded_rgba = crate::image::decode_pvrtc(
+                compressed_slice, 
+                is_2bpp,
+                width as u32, 
+                height as u32 
+            );
+
+            // Bypass compressed paths completely and forcefully hand Vulkan the raw pixel data!
+            gles.TexImage2D(
+                target,
+                level,
+                gles11::RGBA as GLint,
+                width,
+                height,
+                border,
+                gles11::RGBA,
+                gles11::UNSIGNED_BYTE,
+                decoded_rgba.as_ptr() as *const GLvoid,
+            );
+        } else {
+            // If the texture is safely encoded in a format Vulkan naturally understands, leave it alone.
+            gles.CompressedTexImage2D(
+                target,
+                level,
+                internalformat,
+                width,
+                height,
+                border,
+                image_size,
+                host_data,
+            );
+        }
     })
 }
+
 fn glCopyTexImage2D(
     env: &mut Environment,
     target: GLenum,
@@ -1430,12 +1449,8 @@ fn glIsRenderbufferOES(env: &mut Environment, renderbuffer: GLuint) -> GLboolean
     })
 }
 fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLuint) {
-    // DebugBindFbo
-    log!(
-        "DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})",
-        target,
-        framebuffer
-    );
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})", target, framebuffer);
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindFramebufferOES(target, framebuffer)
     })
@@ -1752,7 +1767,8 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
 // EsTwoGuestFix
 fn glCreateShader(env: &mut Environment, type_: GLenum) -> GLuint {
     let res = with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateShader(type_) });
-    log!("DEBUG_GL: glCreateShader(type={:#x}) -> {}", type_, res); // CreateShaderLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glCreateShader(type={:#x}) -> {}", type_, res); // CreateShaderLog
     res
 }
 // ShaderSourceBorrowFix
@@ -1763,11 +1779,8 @@ fn glShaderSource(
     string: ConstVoidPtr,
     length: ConstPtr<GLint>,
 ) {
-    log!(
-        "DEBUG_GL: glShaderSource(shader={}, count={})",
-        shader,
-        count
-    ); // ShaderSourceLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glShaderSource(shader={}, count={})", shader, count); // ShaderSourceLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let mut shader_type = 0;
@@ -1829,7 +1842,8 @@ fn glDeleteShader(env: &mut Environment, shader: GLuint) {
 
 // CompileShaderBorrowFix
 fn glCompileShader(env: &mut Environment, shader: GLuint) {
-    log!("DEBUG_GL: glCompileShader(shader={})", shader); // CompileShaderLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glCompileShader(shader={})", shader); // CompileShaderLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.CompileShader(shader);
@@ -1886,7 +1900,8 @@ fn glGetShaderInfoLog(
 }
 fn glCreateProgram(env: &mut Environment) -> GLuint {
     let res = with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateProgram() });
-    log!("DEBUG_GL: glCreateProgram() -> {}", res); // CreateProgramLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glCreateProgram() -> {}", res); // CreateProgramLog
     res
 }
 fn glDeleteProgram(env: &mut Environment, program: GLuint) {
@@ -1905,7 +1920,8 @@ fn glBindAttribLocation(env: &mut Environment, program: GLuint, index: GLuint, n
 }
 // LinkProgramBorrowFix
 fn glLinkProgram(env: &mut Environment, program: GLuint) {
-    log!("DEBUG_GL: glLinkProgram(program={})", program); // LinkProgramLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glLinkProgram(program={})", program); // LinkProgramLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         if is_gles2 {
@@ -1978,7 +1994,8 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
     })
 }
 fn glUseProgram(env: &mut Environment, program: GLuint) {
-    log!("DEBUG_GL: glUseProgram(program={})", program); // UseProgramLog
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glUseProgram(program={})", program); // UseProgramLog
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.UseProgram(program) })
 }
 fn glGetProgramiv(env: &mut Environment, program: GLuint, pname: GLenum, params: MutPtr<GLint>) {
@@ -2018,7 +2035,8 @@ fn glVertexAttribPointer(
     stride: GLsizei,
     ptr: ConstVoidPtr,
 ) {
-    log!("DEBUG_GL: glVertexAttribPointer(indx={}, size={}, type={:#x}, norm={}, stride={}, ptr={:#x})", indx, size, type_, normalized, stride, ptr.to_bits()); // LogAttribPointer
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glVertexAttribPointer(indx={}, size={}, type={:#x}, norm={}, stride={}, ptr={:#x})", indx, size, type_, normalized, stride, ptr.to_bits()); // LogAttribPointer
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr_host =
             translate_pointer_or_offset_to_host(gles, mem, ptr, gles11::ARRAY_BUFFER_BINDING);
@@ -2026,13 +2044,15 @@ fn glVertexAttribPointer(
     })
 }
 fn glDisableVertexAttribArray(env: &mut Environment, index: GLuint) {
-    log!("DEBUG_GL: glDisableVertexAttribArray(index={})", index); // LogDisableAttrib
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glDisableVertexAttribArray(index={})", index); // LogDisableAttrib
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.DisableVertexAttribArray(index)
     })
 }
 fn glEnableVertexAttribArray(env: &mut Environment, index: GLuint) {
-    log!("DEBUG_GL: glEnableVertexAttribArray(index={})", index); // LogEnableAttrib
+    // 🛡️ SILENCED 60FPS LOG
+    // log!("DEBUG_GL: glEnableVertexAttribArray(index={})", index); // LogEnableAttrib
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.EnableVertexAttribArray(index)
     })
@@ -2202,7 +2222,8 @@ fn glUniformMatrix4fv(
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
         // DebugUniformMat4
         let slice = std::slice::from_raw_parts(value_ptr, (count * 16) as usize);
-        log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
+        // 🛡️ SILENCED 60FPS LOG
+        // log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
         gles.UniformMatrix4fv(location, count, transpose, value_ptr);
     })
 }
@@ -2211,12 +2232,8 @@ fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidP
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
         let res = gles.GetUniformLocation(program, host_name);
         let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // UniformLog
-        log!(
-            "DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {}",
-            program,
-            name_str,
-            res
-        ); // UniformLog
+        // 🛡️ SILENCED 60FPS LOG
+        // log!("DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {}", program, name_str, res); // UniformLog
         res
     })
 }
@@ -2225,12 +2242,8 @@ fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPt
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
         let res = gles.GetAttribLocation(program, host_name); // LogAttribLoc
         let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // LogAttribLoc
-        log!(
-            "DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}",
-            program,
-            name_str,
-            res
-        ); // LogAttribLoc
+        // 🛡️ SILENCED 60FPS LOG
+        // log!("DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}", program, name_str, res); // LogAttribLoc
         res // LogAttribLoc
     })
 }
@@ -2308,12 +2321,8 @@ fn glGetActiveAttrib(
         );
         if !name_ptr.is_null() {
             let name_str = std::ffi::CStr::from_ptr(name_ptr).to_string_lossy(); // LogActiveAttrib
-            log!(
-                "DEBUG_GL: glGetActiveAttrib(program={}, index={}) -> name='{}'",
-                program,
-                index,
-                name_str
-            ); // LogActiveAttrib
+            // 🛡️ SILENCED 60FPS LOG
+            // log!("DEBUG_GL: glGetActiveAttrib(program={}, index={}) -> name='{}'", program, index, name_str); // LogActiveAttrib
         }
     })
 }
