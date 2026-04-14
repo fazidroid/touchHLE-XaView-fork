@@ -75,16 +75,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)model {
-    // TODO: Hardcoded to iPhone for now
     ns_string::get_static_str(env, "iPhone")
 }
 - (id)localizedModel {
-    // TODO: localization
     msg![env; this model]
 }
 
 - (id)name {
-    // TODO: Hardcoded to iPhone for now
     ns_string::get_static_str(env, "iPhone")
 }
 
@@ -92,19 +89,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     ns_string::get_static_str(env, "iPhone OS")
 }
 
-// NSString
+// ==========================================================
+// 🏎️ EA BYPASS: Upgrade from iOS 2.0 to iOS 5.1.1
+// ==========================================================
 - (id)systemVersion {
-    ns_string::get_static_str(env, "2.0")
+    ns_string::get_static_str(env, "5.1.1")
+}
+
+- (NSInteger)userInterfaceIdiom {
+    0 // UIUserInterfaceIdiomPhone
 }
 
 - (id)uniqueIdentifier {
-    // Aspen Simulator returns (null) here
-    // A device unique identifier must be 40 characters long
     ns_string::get_static_str(env, "touchHLEdevice..........................")
 }
 
 - (id)identifierForVendor {
-    // FakeVendorIdentifier
     msg_class![env; NSUUID UUID]
 }
 
@@ -120,27 +120,28 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 - (())setOrientation:(UIDeviceOrientation)orientation {
-    env.window_mut().rotate_device(match orientation {
-        UIDeviceOrientationPortrait => DeviceOrientation::Portrait,
-        UIDeviceOrientationLandscapeLeft => DeviceOrientation::LandscapeLeft,
+    let rotation = match orientation {
+        UIDeviceOrientationPortrait      => DeviceOrientation::Portrait,
+        UIDeviceOrientationLandscapeLeft  => DeviceOrientation::LandscapeLeft,
         UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
-        _ => unimplemented!("Orientation {} not handled yet", orientation),
-    });
+        _ => {
+            log!("Warning: setOrientation: unhandled orientation {}, ignoring", orientation);
+            return;
+        }
+    };
+    env.window_mut().rotate_device(rotation);
 }
 
 - (bool)isBatteryMonitoringEnabled {
     true
 }
-- (())setBatteryMonitoringEnabled:(bool)enabled {
-    todo_objc_setter!(this, enabled);
-    assert!(enabled);
+- (())setBatteryMonitoringEnabled:(bool)_enabled {
+    // No-op: battery monitoring not needed for emulation.
 }
 - (f32)batteryLevel {
-    // BypassSDLCrash
     1.0
 }
 - (UIDeviceBatteryState)batteryState {
-    // FakeBatteryFull
     UIDeviceBatteryStateFull
 }
 
@@ -149,18 +150,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation CTTelephonyNetworkInfo: NSObject
 
 + (id)allocWithZone:(crate::objc::NSZonePtr)_zone {
-    // FakeTelephonyAlloc
     let host_object = Box::new(TrivialHostObject);
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
 - (id)init {
-    // FakeTelephonyInit
     this
 }
 
 - (id)subscriberCellularProvider {
-    // FakeTelephonyProvider
     let carrier: id = msg_class![env; CTCarrier alloc];
     let carrier: id = msg![env; carrier init];
     crate::objc::autorelease(env, carrier)
@@ -171,38 +169,31 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation CTCarrier: NSObject
 
 + (id)allocWithZone:(crate::objc::NSZonePtr)_zone {
-    // FakeCarrierAlloc
     let host_object = Box::new(TrivialHostObject);
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
 - (id)init {
-    // FakeCarrierInit
     this
 }
 
 - (id)carrierName {
-    // FakeCarrierName
     ns_string::get_static_str(env, "touchHLE")
 }
 
 - (id)mobileCountryCode {
-    // FakeCarrierMCC
     ns_string::get_static_str(env, "310")
 }
 
 - (id)mobileNetworkCode {
-    // FakeCarrierMNC
     ns_string::get_static_str(env, "410")
 }
 
 - (id)isoCountryCode {
-    // FakeCarrierISO
     ns_string::get_static_str(env, "us")
 }
 
 - (bool)allowsVOIP {
-    // FakeCarrierVOIP
     true
 }
 
@@ -211,56 +202,43 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation UIPasteboard: NSObject
 
 + (id)allocWithZone:(crate::objc::NSZonePtr)_zone {
-    // FakePasteboardAlloc
     let host_object = Box::new(TrivialHostObject);
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
 + (id)pasteboardWithName:(id)_name create:(bool)_create {
-    // FakePasteboardWithName
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new init];
     crate::objc::autorelease(env, new)
 }
 
 + (id)generalPasteboard {
-    // FakeGeneralPasteboard
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new init];
     crate::objc::autorelease(env, new)
 }
 
 - (id)init {
-    // FakePasteboardInit
     this
 }
 
 - (id)string {
-    // FakePasteboardString
     ns_string::get_static_str(env, "")
 }
 
-- (())setString:(id)_string {
-    // FakePasteboardSetString
-}
+- (())setString:(id)_string {}
 
 - (id)dataForPasteboardType:(id)_pasteboardType {
-    // FakePasteboardData
     crate::objc::nil
 }
 
-- (())setData:(id)_data forPasteboardType:(id)_pasteboardType {
-    // FakePasteboardSetData
-}
+- (())setData:(id)_data forPasteboardType:(id)_pasteboardType {}
 
 - (id)valueForPasteboardType:(id)_pasteboardType {
-    // FakePasteboardValue
     crate::objc::nil
 }
 
-- (())setValue:(id)_value forPasteboardType:(id)_pasteboardType {
-    // FakePasteboardSetValue
-}
+- (())setValue:(id)_value forPasteboardType:(id)_pasteboardType {}
 
 @end
 
