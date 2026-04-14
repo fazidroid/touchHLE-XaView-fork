@@ -28,6 +28,7 @@ use crate::mach_o::{MachO, SectionType};
 use crate::mem::{ConstVoidPtr, GuestUSize, Mem, MutPtr, Ptr};
 use crate::objc::{nil, ClassExports, ObjC};
 use crate::Environment;
+use crate::dyld::HostDylib;
 use std::collections::HashMap;
 
 pub use dylib_list::DYLIB_LIST;
@@ -61,6 +62,14 @@ pub struct HostDylib {
     pub constant_exports: &'static [ConstantExports],
     pub function_exports: &'static [FunctionExports],
 }
+
+pub const DYLIB: HostDylib = HostDylib {
+    path: "/System/Library/Frameworks/MobileCoreServices.framework/MobileCoreServices",
+    aliases: &[],
+    class_exports: &[],
+    constant_exports: &[],
+    function_exports: &[FUNCTIONS],
+};
 
 pub type HostFunction = &'static dyn CallFromGuest;
 
