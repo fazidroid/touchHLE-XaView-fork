@@ -94,24 +94,74 @@ fn sysctl(
     );
 
     // ==========================================================
-    // 🏎️ EA BYPASS: Network Check / MAC Address Hack
+    // 🏎️ EA BYPASS: Darwin Kernel Network Interface Mock
     // ==========================================================
-    if name_len >= 2 {
+    // EA's engine triggers "Expression: 0" assert because it expects 
+    // a complex Darwin if_msghdr struct containing the MAC address. 
+    // We synthesize a fake "en0" Wi-Fi hardware interface here!
+    if name_len >= 6 {
         let name0 = env.mem.read(name);
         let name1 = env.mem.read(name + 1);
+        
+        // CTL_NET == 4, AF_ROUTE == 17
         if name0 == 4 && name1 == 17 {
-            if !oldlenp.is_null() {
-                env.mem.write(oldlenp, 6); // Fake a 6-byte MAC address
+            println!("🎮 LOG: Injecting fake Darwin if_msghdr for EA MAC check!");
+            let mut payload = vec![0u8; 152];
+            
+            // 1. Construct `if_msghdr`
+            payload[0] = 152; // ifm_msglen 
+            payload[2] = 14;  // ifm_version
+            payload[3] = 3;   // ifm_type (RTM_IFINFO)
+            payload[12] = 1;  // ifm_index (en0 = 1)
+            
+            // 2. Construct `sockaddr_dl` at offset 112
+            let sdl = 112;
+            payload[sdl] = 20;     // sdl_len
+            payload[sdl + 1] = 18; // sdl_family (AF_LINK)
+            payload[sdl + 2] = 1;  // sdl_index
+            payload[sdl + 3] = 6;  // sdl_type (IFT_ETHER)
+            payload[sdl + 4] = 3;  // sdl_nlen ('en0' length)
+            payload[sdl + 5] = 6;  // sdl_alen (MAC length)
+            
+            // 3. Inject Name ("en0")
+            payload[sdl + 8] = b'e';
+            payload[sdl + 9] = b'n';
+            payload[sdl + 10] = b'0';
+            
+            // 4. Inject Fake MAC Address (00:11:22:33:44:55)
+            payload[sdl + 11] = 0x00;
+            payload[sdl + 12] = 0x11;
+            payload[sdl + 13] = 0x22;
+            payload[sdl + 14] = 0x33;
+            payload[sdl + 15] = 0x44;
+            payload[sdl + 16] = 0x55;
+
+            if oldp.is_null() {
+                if !oldlenp.is_null() {
+                    env.mem.write(oldlenp, payload.len() as u32);
+                }
+                return 0; // Success
+            } else {
+                let oldlen = env.mem.read(oldlenp);
+                if oldlen < payload.len() as u32 {
+                    return -1; // Buffer too small
+                }
+                // Safely write the fake kernel response into the guest game memory
+                let slice = env.mem.bytes_at_mut(oldp.cast(), payload.len() as u32);
+                slice.copy_from_slice(&payload);
+                
+                env.mem.write(oldlenp, payload.len() as u32);
+                return 0; // Success
             }
-            return 0; // SUCCESS
         }
     }
 
     if name_len != 2 {
-        return -1; // CRITICAL: This MUST return -1 (Error), not 0!
+        return -1;
     }
 
-    let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));    
+    let (name0, name1) = (env.mem.read(name), env.mem.read(name + 1));
+    // ... [keep the rest of sysctl_generic exactly the same] ...
     sysctl_generic(
         env,
         |env| {
