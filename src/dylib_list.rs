@@ -29,13 +29,13 @@ pub const DYLIB_LIST: &[&super::HostDylib] = &[
     &frameworks::opengles::DYLIB,
     &frameworks::store_kit::DYLIB,
     &frameworks::system_configuration::DYLIB,
-    &mobile_core_services::DYLIB,
     
     // ⚠️ CRITICAL: The User Interface framework!
     &frameworks::uikit::DYLIB,
     
     // 🏎️ ASPHALT 8 HACK: Turn on the Android Gyroscope!
     &frameworks::core_motion::DYLIB,
+    &mobile_core_services::DYLIB,
 ];
 
 #[cfg(test)]
