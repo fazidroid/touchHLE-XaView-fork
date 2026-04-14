@@ -7,8 +7,7 @@
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::foundation::ns_string;
-use crate::mem::ConstVoidPtr;
-use crate::objc::{id, msg_class};
+use crate::objc::{id, msg, msg_class};
 use crate::Environment;
 
 fn UTTypeCreatePreferredIdentifierForTag(
