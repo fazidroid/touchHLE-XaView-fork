@@ -4,7 +4,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 //! MobileCoreServices.framework stubs.
-//! Provides UTType functions to satisfy EA engine checks.
 
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::foundation::ns_string;
@@ -12,7 +11,6 @@ use crate::mem::ConstVoidPtr;
 use crate::objc::{id, msg_class};
 use crate::Environment;
 
-/// UTTypeCreatePreferredIdentifierForTag
 fn UTTypeCreatePreferredIdentifierForTag(
     env: &mut Environment,
     _inTagClass: id,
@@ -27,25 +25,21 @@ fn UTTypeCreatePreferredIdentifierForTag(
     }
 }
 
-/// UTTypeCopyDeclaration
 fn UTTypeCopyDeclaration(env: &mut Environment, _inUTI: id) -> id {
     log_dbg!("UTTypeCopyDeclaration called");
     msg_class![env; NSMutableDictionary dictionary]
 }
 
-/// UTTypeConformsTo
 fn UTTypeConformsTo(_env: &mut Environment, _inUTI: id, _inConformsToUTI: id) -> bool {
     log_dbg!("UTTypeConformsTo called");
     true
 }
 
-/// UTTypeCopyDescription
 fn UTTypeCopyDescription(env: &mut Environment, _inUTI: id) -> id {
     log_dbg!("UTTypeCopyDescription called");
     ns_string::get_static_str(env, "Uniform Type Identifier")
 }
 
-/// UTTypeEqual
 fn UTTypeEqual(_env: &mut Environment, inUTI1: id, inUTI2: id) -> bool {
     if inUTI1.is_null() || inUTI2.is_null() {
         return false;
@@ -53,7 +47,6 @@ fn UTTypeEqual(_env: &mut Environment, inUTI1: id, inUTI2: id) -> bool {
     inUTI1 == inUTI2
 }
 
-/// UTTypeCreateAllIdentifiersForTag
 fn UTTypeCreateAllIdentifiersForTag(
     env: &mut Environment,
     inTagClass: id,
@@ -67,7 +60,6 @@ fn UTTypeCreateAllIdentifiersForTag(
     array
 }
 
-/// UTTypeCopyPreferredTagWithClass
 fn UTTypeCopyPreferredTagWithClass(
     env: &mut Environment,
     _inUTI: id,
