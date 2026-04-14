@@ -124,7 +124,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     let path: id = msg![env; url absoluteString];
     let path = to_rust_string(env, path);
     // TODO: file URL case
-    assert!(path.starts_with("http"));
+    
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Custom Ad-Network URI Crash Defeater
+    // ==========================================================
+    // Gameloft attempts to load ad payloads with non-standard URIs.
+    // By removing the strict "http" assertion, we allow the emulator to 
+    // gracefully reject the download without panicking!
+    if !path.starts_with("http") {
+        println!("🎮 LOG: Bypassing non-HTTP URL check in initWithContentsOfURL!");
+    }
+
     log!("TODO: ignoring [(NSData*){:?} initWithContentsOfURL:{:?}]", this, path);
     // TODO: actually load data once we have proper network support
     nil
