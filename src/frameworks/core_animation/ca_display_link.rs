@@ -48,8 +48,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         
         // Создаем свой внутренний селектор для перехвата тика таймера
-        let tick_sel = crate::objc::selector!(_timerTick:);
-        let tick_sel = env.objc.lookup_selector(tick_sel).unwrap();
+        let tick_sel = env.objc.lookup_selector("_timerTick:").unwrap();
         
         let ns_timer = msg_class![env; NSTimer timerWithTimeInterval:(1.0/60.0)
                          target:display_link
