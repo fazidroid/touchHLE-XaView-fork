@@ -221,8 +221,6 @@ fn objc_msgSend_inner(
                 return;
             }
 
-            panic!(
-                "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
             // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
             // Instead of crashing the emulator when a method is missing, we safely print a warning and return 0 (nil).
             // This instantly bypasses EVERY missing ad network and tracking method Gameloft throws at us!
@@ -444,8 +442,6 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
-            panic!(
-                "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
             // ===== THE NUCLEAR OPTION: GLOBAL CLASS PANIC BYPASS =====
             log!(
                 "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
