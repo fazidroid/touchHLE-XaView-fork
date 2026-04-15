@@ -16,6 +16,9 @@ use crate::objc::{
 #[derive(Default)]
 struct CADisplayLinkHostObject {
     ns_timer: id,
+    target: id,
+    selector: SEL,
+    frame_interval: NSInteger,
 }
 impl HostObject for CADisplayLinkHostObject {}
 
@@ -30,26 +33,61 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)displayLinkWithTarget:(id)target selector:(SEL)sel {
-    let ns_timer = msg_class![env; NSTimer timerWithTimeInterval:(1.0/60.0)
-                     target:target
-                   selector:sel
-                   userInfo:nil
-                    repeats:true];
-    retain(env, ns_timer);
-    let display_link: id = msg![env; this new];
-    let host_object = env.objc.borrow_mut::<CADisplayLinkHostObject>(display_link);
-    host_object.ns_timer = ns_timer;
-    log_dbg!("[CADisplayLink displayLinkWithTarget:{:?} selector:{}] => {:?}", target, sel.as_str(&env.mem), display_link);
-    autorelease(env, display_link)
-}
+        let display_link: id = msg![env; this new];
+        
+        // Retain the target as CADisplayLink holds a strong reference to it
+        retain(env, target);
+        
+        {
+            // Устанавливаем данные в хост-объект, изолируя borrow_mut,
+            // чтобы не мешать макросу msg_class! ниже
+            let host_object = env.objc.borrow_mut::<CADisplayLinkHostObject>(display_link);
+            host_object.target = target;
+            host_object.selector = sel;
+            host_object.frame_interval = 1;
+        }
+        
+        // Создаем свой внутренний селектор для перехвата тика таймера
+        let tick_sel = crate::objc::selector!(_timerTick:);
+        let tick_sel = env.objc.lookup_selector(tick_sel).unwrap();
+        
+        let ns_timer = msg_class![env; NSTimer timerWithTimeInterval:(1.0/60.0)
+                         target:display_link
+                       selector:tick_sel
+                       userInfo:nil
+                        repeats:true];
+        retain(env, ns_timer);
+        
+        env.objc.borrow_mut::<CADisplayLinkHostObject>(display_link).ns_timer = ns_timer;
+        
+        log_dbg!("[CADisplayLink displayLinkWithTarget:{:?} selector:{}] => {:?}", target, sel.as_str(&env.mem), display_link);
+        autorelease(env, display_link)
+    }
+
+    - (())_timerTick:(id)_timer {
+        let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
+        let target = host_object.target;
+        let sel = host_object.selector;
+        // Передаем this (сам CADisplayLink) вместо оригинального NSTimer
+        let _: () = crate::objc::msg_send(env, (target, sel, this));
+    }
+
+    - (f64)duration {
+        let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
+        (host_object.frame_interval as f64) / 60.0
+    }
 
 - (())setFrameInterval:(NSInteger)frameInterval {
-    log_dbg!("[(CADisplayLink*){:?} setFrameInterval:{}]", this, frameInterval);
-    assert!(frameInterval >= 1);
-    let interval = frameInterval as f64 / 60.0;
-    let ns_timer = env.objc.borrow::<CADisplayLinkHostObject>(this).ns_timer;
-    set_time_interval(env, ns_timer, interval);
-}
+        log_dbg!("[(CADisplayLink*){:?} setFrameInterval:{}]", this, frameInterval);
+        assert!(frameInterval >= 1);
+        let interval = frameInterval as f64 / 60.0;
+        let ns_timer = {
+            let host_object = env.objc.borrow_mut::<CADisplayLinkHostObject>(this);
+            host_object.frame_interval = frameInterval;
+            host_object.ns_timer
+        };
+        set_time_interval(env, ns_timer, interval);
+    }
 
 - (())addToRunLoop:(id)run_loop forMode:(NSRunLoopMode)mode {
     log_dbg!("[(CADisplayLink*){:?} addToRunLoop:{:?} forMode:{:?}]", this, run_loop, mode);
@@ -64,10 +102,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())dealloc {
-    let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
-    release(env, host_object.ns_timer);
-    env.objc.dealloc_object(this, &mut env.mem);
-}
+        let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
+        release(env, host_object.ns_timer);
+        release(env, host_object.target);
+        env.objc.dealloc_object(this, &mut env.mem);
+    }
 
 @end
 
