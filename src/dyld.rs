@@ -224,10 +224,7 @@ fn write_return_to_host_routine(mem: &mut Mem, svc: u32) -> GuestFunction {
     ptr
 }
 pub struct Dyld {
-    /// List of host functions that have been "linked" and had SVCs assigned.
-    ///
-    /// The `&'static str` part here is purely for debugging and could be
-    /// removed in release builds if it's ever necessary.
+    pub is_64_bit: bool, // 🏎️ ADD THIS FLAG
     linked_host_functions: Vec<(&'static str, HostFunction)>,
     return_to_host_routine: Option<GuestFunction>,
     thread_exit_routine: Option<GuestFunction>,
@@ -257,6 +254,7 @@ impl Dyld {
 
     pub fn new() -> Dyld {
         Dyld {
+            is_64_bit: false, // 🏎️ INITIALIZE IT TO FALSE
             linked_host_functions: Vec::new(),
             return_to_host_routine: None,
             thread_exit_routine: None,
@@ -264,7 +262,6 @@ impl Dyld {
             non_lazy_host_functions: HashMap::new(),
         }
     }
-
     pub fn return_to_host_routine(&self) -> GuestFunction {
         self.return_to_host_routine.unwrap()
     }
@@ -961,14 +958,14 @@ impl Dyld {
         if let Some(&cached_fn) = self.non_lazy_host_functions.get(symbol) {
             return Ok(cached_fn);
         }
-        let function_ptr = self.create_guest_function(mem, symbol, f);
+        let function_ptr = .create_guest_function(&mut env.mem, symb, hf);
         self.non_lazy_host_functions.insert(symbol, function_ptr);
         Ok(function_ptr)
     }
 
     pub fn create_guest_function(
         &mut self,
-        env: &mut Environment, // 🏎️ CHANGE: We need 'env' here now instead of just 'mem' to check the 64-bit flag
+        mem: &mut Mem, // 🏎️ REVERT: Back to 'mem: &mut Mem' to appease the Borrow Checker!
         symbol: &'static str,
         f: HostFunction,
     ) -> GuestFunction {
@@ -978,14 +975,13 @@ impl Dyld {
         self.linked_host_functions.push((symbol, f));
 
         // Create guest function to call this host function
-        let function_ptr = env.mem.alloc(8);
-        let ptr_slice = env.mem.bytes_at_mut(function_ptr, 8);
+        let function_ptr = mem.alloc(8);
+        let ptr_slice = mem.bytes_at_mut(function_ptr, 8);
 
         // ==========================================================
         // 🏎️ AARCH64 DYNAMIC STUB GENERATION
         // ==========================================================
-        // We assume you will add `is_64_bit: false` to your Options struct!
-        if env.options.is_64_bit {
+        if self.is_64_bit { // 🏎️ Check Dyld's internal flag!
             // AArch64 SVC instruction: 0xD4000001 | (imm16 << 5)
             let svc_inst: u32 = 0xd4000001 | ((svc & 0xffff) << 5);
             // AArch64 RET instruction: 0xD65F03C0
@@ -1002,15 +998,6 @@ impl Dyld {
             ptr_slice[4..8].copy_from_slice(&bx_lr_inst.to_le_bytes());
         }
 
-        // 🛡️ Ensure the JIT recompiles this memory
-        unsafe {
-            touchHLE_dynarmic_wrapper::touchHLE_DynarmicWrapper_invalidate_cache_range(
-                env.cpu.dynarmic_wrapper, // Assuming you have access to cpu here, or pass it
-                function_ptr.to_bits(),
-                8
-            )
-        }
-        
         GuestFunction::from_ptr(function_ptr)
     }
 }
