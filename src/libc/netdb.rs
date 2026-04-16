@@ -32,7 +32,6 @@ pub struct hostent {
     pub h_addr_list: MutPtr<MutPtr<u8>>,
 }
 unsafe impl SafeRead for hostent {}
-unsafe impl SafeWrite for hostent {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
