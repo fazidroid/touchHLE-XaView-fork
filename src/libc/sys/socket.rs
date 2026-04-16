@@ -149,12 +149,34 @@ fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> File
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    // OfflineSocketBypass
+        // OfflineSocketBypass
     if !env.options.network_access {
         println!("WARNING: Creating offline socket!");
     }
 
-    assert_eq!(domain, AF_INET);
+    // ==========================================================
+    // 🏎️ GT RACING EXCLUSIVE BYPASS: AF_UNIX Local Socket
+    // ==========================================================
+    let main_bundle: crate::objc::id = crate::objc::msg_class![env; NSBundle mainBundle];
+    let mut is_gt_racing = false;
+    
+    if main_bundle != crate::objc::nil {
+        let bundle_id: crate::objc::id = crate::objc::msg![env; main_bundle bundleIdentifier];
+        if bundle_id != crate::objc::nil {
+            let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
+            is_gt_racing = bundle_str == "com.gameloft.GTRacingFreemiumHD" ||
+                           bundle_str == "com.gameloft.GTRacingFreemium" ||
+                           bundle_str == "com.gameloft.GTRacingFreemiumUK";
+        }
+    }
+
+    if is_gt_racing && domain != AF_INET {
+        println!("🎮 GT RACING EXCLUSIVE: Bypassing strict AF_INET socket check for domain {}!", domain);
+    } else {
+        // Standard touchHLE behavior: Enforce AF_INET for Need for Speed and all other games
+        assert_eq!(domain, AF_INET);
+    }
+
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
     assert!(protocol == IPPROTO_TCP || protocol == IPPROTO_UDP || protocol == 0);
 
