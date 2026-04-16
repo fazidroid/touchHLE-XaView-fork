@@ -409,7 +409,7 @@ fn fcntl(env: &mut Environment, fd: FileDescriptor, cmd: FileControlCommand, arg
             );
             return 0;
         }
-        F_NOCACHE | F_RDADVISE => { }
+        F_NOCACHE | F_RDADVISE => 0,
         _ => { return 0; }
     }
 }
