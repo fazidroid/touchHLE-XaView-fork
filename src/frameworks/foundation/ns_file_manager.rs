@@ -421,10 +421,28 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // Reporting 1 Gb of free space should be enough
+    // ==========================================================
+    // 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: 32GB Free Space Spoof
+    // ==========================================================
+    let main_bundle: id = msg_class![env; NSBundle mainBundle];
+    let mut is_asphalt = false;
+    if main_bundle != nil {
+        let bundle_id: id = msg![env; main_bundle bundleIdentifier];
+        if bundle_id != nil {
+            let bundle_str = ns_string::to_rust_string(env, bundle_id);
+            is_asphalt = bundle_str.to_lowercase().contains("asphalt");
+        }
+    }
+
+    // Reporting 1 Gb of free space should be enough for normal games
     // TODO: unify with `statfs`
     // TODO: account for path
-    let size: u64 = 1024 * 1024 * 1024;
+    let size: u64 = if is_asphalt {
+        32 * 1024 * 1024 * 1024 // 32 GB for Asphalt 8
+    } else {
+        1024 * 1024 * 1024 // 1 GB default for other games
+    };
+    
     let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
 
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
