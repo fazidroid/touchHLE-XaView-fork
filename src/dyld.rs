@@ -990,14 +990,13 @@ impl Dyld {
             ptr_slice[0..4].copy_from_slice(&svc_inst.to_le_bytes());
             ptr_slice[4..8].copy_from_slice(&ret_inst.to_le_bytes());
         } else {
-            // Standard AArch32 (ARMv7) SVC and BX LR instructions
-            let svc_inst: u32 = 0xdf000000 | (svc & 0xffffff);
+            // 🏎️ FIX: ARMv7 Unconditional SVC is 0xEF000000, NOT 0xDF000000
+            let svc_inst: u32 = 0xef000000 | (svc & 0xffffff); 
             let bx_lr_inst: u32 = 0xe12fff1e;
             
             ptr_slice[0..4].copy_from_slice(&svc_inst.to_le_bytes());
             ptr_slice[4..8].copy_from_slice(&bx_lr_inst.to_le_bytes());
         }
-
         GuestFunction::from_addr_with_thumb_bit(function_ptr.to_bits())
     }
 }
