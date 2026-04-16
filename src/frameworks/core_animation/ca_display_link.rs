@@ -17,7 +17,7 @@ use crate::objc::{
 struct CADisplayLinkHostObject {
     ns_timer: id,
     target: id,
-    selector: SEL,
+    selector: Option<SEL>,
     frame_interval: NSInteger,
 }
 impl HostObject for CADisplayLinkHostObject {}
@@ -43,7 +43,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             // чтобы не мешать макросу msg_class! ниже
             let host_object = env.objc.borrow_mut::<CADisplayLinkHostObject>(display_link);
             host_object.target = target;
-            host_object.selector = sel;
+            host_object.selector = Some(sel);
             host_object.frame_interval = 1;
         }
         
@@ -64,9 +64,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (())_timerTick:(id)_timer {
-        let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
-        let target = host_object.target;
-        let sel = host_object.selector;
+        // Создаем отдельный scope { }, чтобы borrow освободился ДО вызова msg_send
+        let (target, sel) = {
+            let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
+            (host_object.target, host_object.selector.unwrap())
+        };
         // Передаем this (сам CADisplayLink) вместо оригинального NSTimer
         let _: () = crate::objc::msg_send(env, (target, sel, this));
     }
@@ -101,9 +103,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())dealloc {
-        let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
-        release(env, host_object.ns_timer);
-        release(env, host_object.target);
+        // Копируем указатели и сразу отпускаем borrow, чтобы release смог использовать env
+        let (ns_timer, target) = {
+            let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
+            (host_object.ns_timer, host_object.target)
+        };
+        release(env, ns_timer);
+        release(env, target);
         env.objc.dealloc_object(this, &mut env.mem);
     }
 
