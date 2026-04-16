@@ -1739,7 +1739,7 @@ unsafe fn restore_fog_state_values(gles: &mut dyn GLES, from_backup: Option<(f32
 // EsTwoGuestFix
 fn glCreateShader(env: &mut Environment, type_: GLenum) -> GLuint {
     let res = with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateShader(type_) });
-    log!("DEBUG_GL: glCreateShader(type={:#x}) -> {}", type_, res); // CreateShaderLog
+    //log!("DEBUG_GL: glCreateShader(type={:#x}) -> {}", type_, res); // CreateShaderLog
     res
 }
 // ShaderSourceBorrowFix
@@ -1750,11 +1750,11 @@ fn glShaderSource(
     string: ConstVoidPtr,
     length: ConstPtr<GLint>,
 ) {
-    log!(
-        "DEBUG_GL: glShaderSource(shader={}, count={})",
-        shader,
-        count
-    ); // ShaderSourceLog
+    //log!(
+    //    "DEBUG_GL: glShaderSource(shader={}, count={})",
+    //    shader,
+    //    count
+    //); // ShaderSourceLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let mut shader_type = 0;
@@ -1816,7 +1816,7 @@ fn glDeleteShader(env: &mut Environment, shader: GLuint) {
 
 // CompileShaderBorrowFix
 fn glCompileShader(env: &mut Environment, shader: GLuint) {
-    log!("DEBUG_GL: glCompileShader(shader={})", shader); // CompileShaderLog
+    //log!("DEBUG_GL: glCompileShader(shader={})", shader); // CompileShaderLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.CompileShader(shader);
@@ -1873,7 +1873,7 @@ fn glGetShaderInfoLog(
 }
 fn glCreateProgram(env: &mut Environment) -> GLuint {
     let res = with_ctx_and_mem_no_skip(env, |gles, _mem| unsafe { gles.CreateProgram() });
-    log!("DEBUG_GL: glCreateProgram() -> {}", res); // CreateProgramLog
+    //log!("DEBUG_GL: glCreateProgram() -> {}", res); // CreateProgramLog
     res
 }
 fn glDeleteProgram(env: &mut Environment, program: GLuint) {
@@ -1892,7 +1892,7 @@ fn glBindAttribLocation(env: &mut Environment, program: GLuint, index: GLuint, n
 }
 // LinkProgramBorrowFix
 fn glLinkProgram(env: &mut Environment, program: GLuint) {
-    log!("DEBUG_GL: glLinkProgram(program={})", program); // LinkProgramLog
+    //log!("DEBUG_GL: glLinkProgram(program={})", program); // LinkProgramLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         if is_gles2 {
@@ -1965,7 +1965,7 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
     })
 }
 fn glUseProgram(env: &mut Environment, program: GLuint) {
-    log!("DEBUG_GL: glUseProgram(program={})", program); // UseProgramLog
+    //log!("DEBUG_GL: glUseProgram(program={})", program); // UseProgramLog
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.UseProgram(program) })
 }
 fn glGetProgramiv(env: &mut Environment, program: GLuint, pname: GLenum, params: MutPtr<GLint>) {
@@ -2013,13 +2013,13 @@ fn glVertexAttribPointer(
     })
 }
 fn glDisableVertexAttribArray(env: &mut Environment, index: GLuint) {
-    log!("DEBUG_GL: glDisableVertexAttribArray(index={})", index); // LogDisableAttrib
+    //log!("DEBUG_GL: glDisableVertexAttribArray(index={})", index); // LogDisableAttrib
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.DisableVertexAttribArray(index)
     })
 }
 fn glEnableVertexAttribArray(env: &mut Environment, index: GLuint) {
-    log!("DEBUG_GL: glEnableVertexAttribArray(index={})", index); // LogEnableAttrib
+    //log!("DEBUG_GL: glEnableVertexAttribArray(index={})", index); // LogEnableAttrib
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.EnableVertexAttribArray(index)
     })
@@ -2198,12 +2198,12 @@ fn glGetUniformLocation(env: &mut Environment, program: GLuint, name: ConstVoidP
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
         let res = gles.GetUniformLocation(program, host_name);
         let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // UniformLog
-        log!(
-            "DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {}",
-            program,
-            name_str,
-            res
-        ); // UniformLog
+        //log!(
+        //    "DEBUG_GL: glGetUniformLocation(program={}, name='{}') -> {}",
+        //    program,
+        //    name_str,
+        //    res
+        //); // UniformLog
         res
     })
 }
@@ -2212,13 +2212,13 @@ fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPt
         let host_name = mem.unchecked_ptr_at(name.cast::<u8>(), 0).cast();
         let res = gles.GetAttribLocation(program, host_name); // LogAttribLoc
         let name_str = std::ffi::CStr::from_ptr(host_name).to_string_lossy(); // LogAttribLoc
-        log!(
-            "DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}",
-            program,
-            name_str,
-            res
-        ); // LogAttribLoc
-        res // LogAttribLoc
+        //log!(
+        //    "DEBUG_GL: glGetAttribLocation(program={}, name='{}') -> {}",
+        //    program,
+        //    name_str,
+        //    res
+        //); // LogAttribLoc
+        //res // LogAttribLoc
     })
 }
 // ActiveUniformFix
