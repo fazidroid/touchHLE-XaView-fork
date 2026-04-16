@@ -100,13 +100,61 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    log!(
-        "TODO: gethostbyname({:?} \"{}\") => NULL",
-        name,
-        env.mem.cstr_at_utf8(name).unwrap()
-    );
-    // TODO: set h_errno
-    Ptr::null()
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or_default();
+    
+    // ==========================================================
+    // 🏎️ GT RACING EXCLUSIVE BYPASS: Offline Telemetry Loop
+    // ==========================================================
+    let main_bundle: crate::objc::id = crate::objc::msg_class![env; NSBundle mainBundle];
+    let mut is_gt_racing = false;
+    
+    if main_bundle != crate::objc::nil {
+        let bundle_id: crate::objc::id = crate::objc::msg![env; main_bundle bundleIdentifier];
+        if bundle_id != crate::objc::nil {
+            let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
+            // Strictly check for the exact GT Racing bundle IDs
+            is_gt_racing = bundle_str == "com.gameloft.GTRacingFreemiumHD" ||
+                           bundle_str == "com.gameloft.GTRacingFreemium" ||
+                           bundle_str == "com.gameloft.GTRacingFreemiumUK";
+        }
+    }
+
+    if is_gt_racing {
+        println!("🎮 GT RACING EXCLUSIVE: Spoofing gethostbyname for [{}]", name_str);
+        
+        // Allocate memory for the hostent struct and IP data in the guest space
+        let block = env.mem.alloc(64).cast::<u8>();
+        let hostent_ptr = block.cast::<hostent>();
+        let addr_list_ptr = block.add(20).cast::<MutPtr<u8>>();
+        let aliases_ptr = block.add(28).cast::<MutPtr<u8>>();
+        let addr_data_ptr = block.add(32);
+        
+        // Write IP address: 127.0.0.1
+        env.mem.write(addr_data_ptr.add(0), 127u8);
+        env.mem.write(addr_data_ptr.add(1), 0u8);
+        env.mem.write(addr_data_ptr.add(2), 0u8);
+        env.mem.write(addr_data_ptr.add(3), 1u8);
+        
+        env.mem.write(addr_list_ptr.add(0), addr_data_ptr);
+        env.mem.write(addr_list_ptr.add(1), crate::mem::MutPtr::null());
+        env.mem.write(aliases_ptr.add(0), crate::mem::MutPtr::null());
+        
+        // Construct the hostent struct
+        let h = hostent {
+            h_name: name.cast_mut(),
+            h_aliases: aliases_ptr,
+            h_addrtype: 2, // AF_INET
+            h_length: 4,
+            h_addr_list: addr_list_ptr,
+        };
+        env.mem.write(hostent_ptr, h);
+        
+        return hostent_ptr;
+    }
+
+    // Standard touchHLE behavior for all other games
+    log!("TODO: gethostbyname({:?} {:?}) => NULL", name, name_str);
+    crate::mem::MutPtr::null()
 }
 
 pub const FUNCTIONS: FunctionExports = &[
