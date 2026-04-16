@@ -459,15 +459,17 @@ pub const CLASSES: ClassExports = objc_classes! {
         let dict: id = msg_class![env; NSMutableDictionary alloc];
         let dict: id = msg![env; dict initWithCapacity:count];
         
-        for i in 0..count {
-            let obj = env.mem.read(objects + i);
-            let key = env.mem.read(keys + i);
+                for i in 0..count {
+            // 🏎️ FIX: Multiply index by 4 because iOS pointers (id) are 4 bytes!
+            // Adding just 'i' adds raw bytes, reading misaligned garbage memory!
+            let obj = env.mem.read(objects + (i * 4));
+            let key = env.mem.read(keys + (i * 4));
             
             if obj != crate::objc::nil && key != crate::objc::nil {
                 let _: () = msg![env; dict setObject:obj forKey:key];
             }
         }
-        
+
         crate::objc::autorelease(env, dict)
     } else {
         // 3. Standard touchHLE fallback for Need for Speed and all other games
