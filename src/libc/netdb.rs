@@ -8,7 +8,7 @@
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_DGRAM, SOCK_STREAM};
-use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
+use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead, SafeWrite};
 use crate::Environment;
 
 const AI_PASSIVE: i32 = 0x1;
@@ -21,9 +21,18 @@ const EAI_FAIL: i32 = 4;
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// TODO: struct definition
+#[derive(Default)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
-struct hostent {}
+pub struct hostent {
+    pub h_name: MutPtr<u8>,
+    pub h_aliases: MutPtr<MutPtr<u8>>,
+    pub h_addrtype: i32,
+    pub h_length: i32,
+    pub h_addr_list: MutPtr<MutPtr<u8>>,
+}
+unsafe impl SafeRead for hostent {}
+unsafe impl SafeWrite for hostent {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -122,30 +131,31 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     if is_gt_racing {
         println!("🎮 GT RACING EXCLUSIVE: Spoofing gethostbyname for [{}]", name_str);
         
-        // Allocate memory for the hostent struct and IP data in the guest space
         let block = env.mem.alloc(64).cast::<u8>();
         let hostent_ptr = block.cast::<hostent>();
-        let addr_list_ptr = block.add(20).cast::<MutPtr<u8>>();
-        let aliases_ptr = block.add(28).cast::<MutPtr<u8>>();
-        let addr_data_ptr = block.add(32);
+        
+        // 🏎️ FIX: Use standard + operator instead of .add()
+        let addr_list_ptr = (block + 20).cast::<MutPtr<u8>>();
+        let aliases_ptr = (block + 28).cast::<MutPtr<u8>>();
+        let addr_data_ptr = block + 32;
         
         // Write IP address: 127.0.0.1
-        env.mem.write(addr_data_ptr.add(0), 127u8);
-        env.mem.write(addr_data_ptr.add(1), 0u8);
-        env.mem.write(addr_data_ptr.add(2), 0u8);
-        env.mem.write(addr_data_ptr.add(3), 1u8);
+        env.mem.write(addr_data_ptr + 0, 127u8);
+        env.mem.write(addr_data_ptr + 1, 0u8);
+        env.mem.write(addr_data_ptr + 2, 0u8);
+        env.mem.write(addr_data_ptr + 3, 1u8);
         
-        env.mem.write(addr_list_ptr.add(0), addr_data_ptr);
-        env.mem.write(addr_list_ptr.add(1), crate::mem::MutPtr::null());
-        env.mem.write(aliases_ptr.add(0), crate::mem::MutPtr::null());
+        env.mem.write(addr_list_ptr + 0, addr_data_ptr);
+        env.mem.write(addr_list_ptr + 1, crate::mem::MutPtr::null());
+        env.mem.write(aliases_ptr + 0, crate::mem::MutPtr::null());
         
         // Construct the hostent struct
         let h = hostent {
             h_name: name.cast_mut(),
-            h_aliases: aliases_ptr,
+            h_aliases: aliases_ptr.cast(),
             h_addrtype: 2, // AF_INET
             h_length: 4,
-            h_addr_list: addr_list_ptr,
+            h_addr_list: addr_list_ptr.cast(),
         };
         env.mem.write(hostent_ptr, h);
         
