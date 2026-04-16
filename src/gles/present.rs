@@ -54,13 +54,12 @@ pub unsafe fn present_frame(
     use gles11::types::*;
     //DebugPresentArgs
     let is_gles2 = gles.is_gles2();
-    log!(
-        "DEBUG_PRESENT: present_frame called! viewport: {:?}, is_gles2: {}",
-        viewport,
-        is_gles2
-    );
+    //log!("DEBUG_PRESENT: present_frame called! viewport: {:?}, is_gles2: {}",
+    //    viewport,
+    //    is_gles2
+    //);
     let m = rotation_matrix.columns();
-    log!("DEBUG_PRESENT: rotation_matrix: [{:?}, {:?}]", m[0], m[1]);
+    //log!("DEBUG_PRESENT: rotation_matrix: [{:?}, {:?}]", m[0], m[1]);
 
     let mut old_prog: GLint = 0;
     let mut old_array_buf: GLint = 0;
