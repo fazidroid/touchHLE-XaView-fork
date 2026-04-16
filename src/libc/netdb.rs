@@ -176,8 +176,8 @@ fn inet_ntoa(env: &mut Environment, in_addr: u32) -> MutPtr<u8> {
     let ip_str = format!("{}.{}.{}.{}", b1, b2, b3, b4);
     println!("🎮 GT RACING EXCLUSIVE: inet_ntoa converting IP to string: {}", ip_str);
     
-    // Allocate the string in guest memory and return the pointer
-    env.mem.alloc_and_write_cstr(&ip_str).cast_mut()
+        // Allocate the string in guest memory and return the pointer
+    env.mem.alloc_and_write_cstr(ip_str.as_bytes())
 }
 
 
