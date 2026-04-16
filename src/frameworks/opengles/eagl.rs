@@ -115,16 +115,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithAPI:(EAGLRenderingAPI)api sharegroup:(id)group {
         if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
-            log!(
-                "TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil", // UnsupportedApi
-                api,
-                group
-            );
+            //log!(
+            //    "TODO: App requested EAGL initWithAPI:{} sharegroup:{:?}, returning nil", // UnsupportedApi
+            //    api,
+            //    group
+            //);
             return nil;
         }
 
         if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
-            log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
+            //log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
             return nil; // RejectEsTwo
         }
 
@@ -149,7 +149,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
         let gles1_ctx = gles1_ins.make_current(window);
-        log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
+        //log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
     }
 
     let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
@@ -164,15 +164,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithAPI:(EAGLRenderingAPI)api {
         if api != kEAGLRenderingAPIOpenGLES1 && api != kEAGLRenderingAPIOpenGLES2 {
-            log!(
-                "TODO: App requested EAGL initWithAPI:{}, returning nil", // UnsupportedApi
-                api
-            );
+            //log!(
+                //"TODO: App requested EAGL initWithAPI:{}, returning nil", // UnsupportedApi
+                //api
+            //);
             return nil;
         }
 
         if env.options.gles_version == 1 && api == kEAGLRenderingAPIOpenGLES2 {
-            log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
+            //log!("Rejecting ES 2.0 context creation because ES 1.1 mode is active.");
             return nil; // RejectEsTwo
         }
 
@@ -182,7 +182,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
         let gles1_ctx = gles1_ins.make_current(window);
-        log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
+        //log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
     }
 
     let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
@@ -238,7 +238,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     // Intel HD Graphics 615 running macOS Monterey. I don't think RGBA8 is
     // guaranteed either, but it at least seems to work.
     if !msg![env; format isEqual:format_rgba8] && !msg![env; format isEqual:format_rgb565] {
-        log!("[renderbufferStorage:{:?} fromDrawable:{:?}] Warning: unhandled format {:?}, using RGBA8", target, drawable, format);
+        //log!("[renderbufferStorage:{:?} fromDrawable:{:?}] Warning: unhandled format {:?}, using RGBA8", target, drawable, format);
     }
     let internalformat = gles11::RGBA8_OES;
 
@@ -261,7 +261,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         let final_w = (width * scale * scale_hack).round() as u32;
         let final_h = (height * scale * scale_hack).round() as u32;
         //DebugRenderSize
-        log!("DEBUG_EAGL: renderbufferStorage:fromDrawable: {:?} Bounds: w={}, h={} | scale={}, scale_hack={} | Final FBO: {}x{}", drawable, width, height, scale, scale_hack, final_w, final_h);
+        //log!("DEBUG_EAGL: renderbufferStorage:fromDrawable: {:?} Bounds: w={}, h={} | scale={}, scale_hack={} | Final FBO: {}x{}", drawable, width, height, scale, scale_hack, final_w, final_h);
         (final_w, final_h)
     };
 
@@ -337,30 +337,30 @@ pub const CLASSES: ClassExports = objc_classes! {
     // We're presenting to the opaque CAEAGLLayer that covers the screen.
     // We can use the fast path where we skip composition and present directly.
     //DebugPresentPath
-    log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
+    //log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
     if drawable == fullscreen_layer {
-        log!(
-            "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
-            drawable,
-            renderbuffer,
-        );
+        //log!(
+        //    "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
+        //    drawable,
+        //    renderbuffer,
+        //);
         // re-borrow
         unsafe {
             present_renderbuffer(env);
         }
     } else {
         if fullscreen_layer != nil {
-            log!("DEBUG_EAGL: Layer {:?} is NOT fullscreen layer {:?}. Rendering to RAM (SLOW PATH) or skipped!", drawable, fullscreen_layer);
+            //log!("DEBUG_EAGL: Layer {:?} is NOT fullscreen layer {:?}. Rendering to RAM (SLOW PATH) or skipped!", drawable, fullscreen_layer);
             // If there's a single layer that covers the screen, and this isn't
             // it, there's no point in presenting the output because it won't be
             // seen. Using a noisy log because it's a weird scenario and might
             // indicate a bug.
-            log!(
-                "Layer {:?} is not the fullscreen layer {:?}, skipping presentation of renderbuffer {:?}!",
-                drawable,
-                fullscreen_layer,
-                renderbuffer,
-            );
+            //log!(
+            //    "Layer {:?} is not the fullscreen layer {:?}, skipping presentation of renderbuffer {:?}!",
+            //    drawable,
+            //    fullscreen_layer,
+            //    renderbuffer,
+            //);
             if let Some(sleep_for) = sleep_for {
                 env.sleep(sleep_for);
             }
@@ -612,15 +612,15 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     let old_texture_2d: GLuint = get_int(gles, gles11::TEXTURE_BINDING_2D) as _;
     let active_texture: GLint = get_int(gles, gles11::ACTIVE_TEXTURE);
     //DebugPRBState
-    log!(
-        "DEBUG_PRB: Start. RB={}, w={}, h={}. OLD_FB={}, OLD_TEX2D={}, ACTIVE_TEX={:#x}",
-        renderbuffer,
-        width,
-        height,
-        old_framebuffer,
-        old_texture_2d,
-        active_texture
-    );
+    //log!(
+    //    "DEBUG_PRB: Start. RB={}, w={}, h={}. OLD_FB={}, OLD_TEX2D={}, ACTIVE_TEX={:#x}",
+    //    renderbuffer,
+    //    width,
+    //    height,
+    //    old_framebuffer,
+    //    old_texture_2d,
+    //    active_texture
+    //);
 
     // Create a framebuffer we can use to read from the renderbuffer
     let mut src_framebuffer = 0;
@@ -683,12 +683,12 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         gles11::UNSIGNED_BYTE,
         px[16..20].as_mut_ptr() as *mut _,
     );
-    log!("DEBUG_PRB: FBO={:#x}. w={}, h={}. Pixels: BL[{},{},{},{}] BR[{},{},{},{}] TL[{},{},{},{}] TR[{},{},{},{}] C[{},{},{},{}]",
-        fbo_status, width, height,
-        px[0], px[1], px[2], px[3], px[4], px[5], px[6], px[7],
-        px[8], px[9], px[10], px[11], px[12], px[13], px[14], px[15],
-        px[16], px[17], px[18], px[19]
-    );
+    //log!("DEBUG_PRB: FBO={:#x}. w={}, h={}. Pixels: BL[{},{},{},{}] BR[{},{},{},{}] TL[{},{},{},{}] TR[{},{},{},{}] C[{},{},{},{}]",
+    //    fbo_status, width, height,
+    //    px[0], px[1], px[2], px[3], px[4], px[5], px[6], px[7],
+    //    px[8], px[9], px[10], px[11], px[12], px[13], px[14], px[15],
+    //    px[16], px[17], px[18], px[19]
+    //);
 
     // Create a texture with a copy of the pixels in the framebuffer
     let mut texture: GLuint = 0;
@@ -712,10 +712,10 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     //DebugCopyTex
     let err_after_copy = gles.GetError();
     if err_after_copy != 0 {
-        log!(
-            "DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}",
-            err_after_copy
-        );
+        //log!(
+        //    "DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}",
+        //    err_after_copy
+        //);
     }
 
     // The texture will not have any mip levels so we must ensure the filter
@@ -818,11 +818,11 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
             let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
             *m_ptr = [[1.0, 0.0], [0.0, 1.0]];
         }
-        log!(
-            "DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}",
-            rb_w,
-            rb_h
-        );
+        //log!(
+        //    "DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}",
+        //    rb_w,
+        //    rb_h
+        //);
     }
 
     // Draw the quad
