@@ -34,10 +34,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)displayLinkWithTarget:(id)target selector:(SEL)sel {
         let display_link: id = msg![env; this new];
-        
+
         // Retain the target as CADisplayLink holds a strong reference to it
         retain(env, target);
-        
+
         {
             // Устанавливаем данные в хост-объект, изолируя borrow_mut,
             // чтобы не мешать макросу msg_class! ниже
@@ -46,19 +46,19 @@ pub const CLASSES: ClassExports = objc_classes! {
             host_object.selector = Some(sel);
             host_object.frame_interval = 1;
         }
-        
+
         // Создаем свой внутренний селектор для перехвата тика таймера
         let tick_sel = env.objc.lookup_selector("_timerTick:").unwrap();
-        
+
         let ns_timer = msg_class![env; NSTimer timerWithTimeInterval:(1.0/60.0)
                          target:display_link
                        selector:tick_sel
                        userInfo:nil
                         repeats:true];
         retain(env, ns_timer);
-        
+
         env.objc.borrow_mut::<CADisplayLinkHostObject>(display_link).ns_timer = ns_timer;
-        
+
         log_dbg!("[CADisplayLink displayLinkWithTarget:{:?} selector:{}] => {:?}", target, sel.as_str(&env.mem), display_link);
         autorelease(env, display_link)
     }
