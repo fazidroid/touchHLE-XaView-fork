@@ -193,8 +193,8 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
     //);
     if fb_width == 0 || fb_height == 0 {
     //    log!("DEBUG_COMP: SKIP due to zero size");
-    //    return new_recomposite_next; // BypassZeroSize
-    //}
+        return new_recomposite_next; // BypassZeroSize
+    }
     let present_frame_args = (
         env.window().viewport(),
         env.window().rotation_matrix(),
