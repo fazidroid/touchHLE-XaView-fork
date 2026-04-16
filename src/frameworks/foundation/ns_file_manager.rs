@@ -28,6 +28,7 @@ const NSUserDomainMask: NSSearchPathDomainMask = 1;
 pub const NSFileModificationDate: &str = "NSFileModificationDate";
 pub const NSFileSize: &str = "NSFileSize";
 const NSFileSystemFreeSize: &str = "NSFileSystemFreeSize";
+const NSFileSystemSize: &str = "NSFileSystemSize";
 pub const NSFileType: &str = "NSFileType";
 pub const NSFileTypeDirectory: &str = "NSFileTypeDirectory";
 pub const NSFileTypeRegular: &str = "NSFileTypeRegular";
@@ -41,6 +42,10 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_NSFileSystemFreeSize",
         HostConstant::NSString(NSFileSystemFreeSize),
+    ),
+    (
+        "_NSFileSystemSize",
+        HostConstant::NSString(NSFileSystemSize),
     ),
     ("_NSFileType", HostConstant::NSString(NSFileType)),
     (
@@ -445,6 +450,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     
     let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
 
+    // 🏎️ FIX: Tell the game the Total Drive Size is 32GB
+    let fs_size_key = get_static_str(env, NSFileSystemSize);
+    () = msg![env; dict setObject:size_num forKey:fs_size_key];
+
+    // 🏎️ FIX: Tell the game the Free Space is also 32GB
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
     () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
 
