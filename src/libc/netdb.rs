@@ -108,7 +108,7 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    let name_str = env.mem.cstr_at_utf8(name).unwrap_or_default();
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or_default().to_string();
     
     // ==========================================================
     // 🏎️ GT RACING EXCLUSIVE BYPASS: Offline Telemetry Loop
