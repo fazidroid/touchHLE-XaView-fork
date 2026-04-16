@@ -460,14 +460,10 @@ fn glViewport(env: &mut Environment, x: GLint, y: GLint, width: GLsizei, height:
     let r_scale = get_smart_retina_scale(env, width, height);
     let scale_total = env.options.scale_hack.get() as f32 * r_scale;
     // DebugViewport
-    log!(
-        "DEBUG_GL: glViewport Guest(x={}, y={}, w={}, h={}) -> Scale={}",
-        x,
-        y,
-        width,
-        height,
-        scale_total
-    );
+    // log!(
+    //     "DEBUG_GL: glViewport Guest(x={}, y={}, w={}, h={}) -> Scale={}",
+    //     x, y, width, height, scale_total
+    // );
     let (x, y) = (
         (x as f32 * scale_total).round() as GLint,
         (y as f32 * scale_total).round() as GLint,
@@ -832,12 +828,10 @@ fn glVertexPointer(
 
 // Drawing
 fn glDrawArrays(env: &mut Environment, mode: GLenum, first: GLint, count: GLsizei) {
-    log!(
-        "DEBUG_GL: glDrawArrays(mode={:#x}, first={}, count={})",
-        mode,
-        first,
-        count
-    ); // DrawArraysLog
+    // log!(
+    //     "DEBUG_GL: glDrawArrays(mode={:#x}, first={}, count={})",
+    //     mode, first, count
+    // ); // DrawArraysLog
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         let fog_state_backup = clamp_fog_state_values(gles);
         gles.DrawArrays(mode, first, count);
@@ -851,13 +845,10 @@ fn glDrawElements(
     type_: GLenum,
     indices: ConstVoidPtr,
 ) {
-    log!(
-        "DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x}, indices={:#x})",
-        mode,
-        count,
-        type_,
-        indices.to_bits()
-    ); // DrawElementsLog
+    // log!(
+    //     "DEBUG_GL: glDrawElements(mode={:#x}, count={}, type={:#x}, indices={:#x})",
+    //     mode, count, type_, indices.to_bits()
+    // ); // DrawElementsLog
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let fog_state_backup = clamp_fog_state_values(gles);
         let indices = translate_pointer_or_offset_to_host(
@@ -874,7 +865,7 @@ fn glDrawElements(
 // Clearing
 fn glClear(env: &mut Environment, mask: GLbitfield) {
     // DebugClearMask
-    log!("DEBUG_GL: glClear(mask={:#x})", mask);
+    // log!("DEBUG_GL: glClear(mask={:#x})", mask);
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.Clear(mask) });
 }
 fn glClearColor(
@@ -885,13 +876,10 @@ fn glClearColor(
     alpha: GLclampf,
 ) {
     // DebugClearColor
-    log!(
-        "DEBUG_GL: glClearColor(R={}, G={}, B={}, A={})",
-        red,
-        green,
-        blue,
-        alpha
-    );
+    // log!(
+    //     "DEBUG_GL: glClearColor(R={}, G={}, B={}, A={})",
+    //     red, green, blue, alpha
+    // );
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.ClearColor(red, green, blue, alpha)
     });
@@ -1431,11 +1419,10 @@ fn glIsRenderbufferOES(env: &mut Environment, renderbuffer: GLuint) -> GLboolean
 }
 fn glBindFramebufferOES(env: &mut Environment, target: GLenum, framebuffer: GLuint) {
     // DebugBindFbo
-    log!(
-        "DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})",
-        target,
-        framebuffer
-    );
+    // log!(
+    //     "DEBUG_GL: glBindFramebufferOES(target={:#x}, framebuffer={})",
+    //     target, framebuffer
+    // );
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         gles.BindFramebufferOES(target, framebuffer)
     })
