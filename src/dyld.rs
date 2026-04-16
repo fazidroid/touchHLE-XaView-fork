@@ -968,7 +968,7 @@ impl Dyld {
 
     pub fn create_guest_function(
         &mut self,
-        mem: &mut Mem,
+        env: &mut Environment, // 🏎️ CHANGE: We need 'env' here now instead of just 'mem' to check the 64-bit flag
         symbol: &'static str,
         f: HostFunction,
     ) -> GuestFunction {
@@ -978,11 +978,39 @@ impl Dyld {
         self.linked_host_functions.push((symbol, f));
 
         // Create guest function to call this host function
-        let function_ptr = mem.alloc(8);
-        let function_ptr: MutPtr<u32> = function_ptr.cast();
-        mem.write(function_ptr + 0, encode_a32_svc(svc));
-        mem.write(function_ptr + 1, encode_a32_ret());
+        let function_ptr = env.mem.alloc(8);
+        let ptr_slice = env.mem.bytes_at_mut(function_ptr, 8);
 
-        GuestFunction::from_addr_with_thumb_bit(function_ptr.to_bits())
+        // ==========================================================
+        // 🏎️ AARCH64 DYNAMIC STUB GENERATION
+        // ==========================================================
+        // We assume you will add `is_64_bit: false` to your Options struct!
+        if env.options.is_64_bit {
+            // AArch64 SVC instruction: 0xD4000001 | (imm16 << 5)
+            let svc_inst: u32 = 0xd4000001 | ((svc & 0xffff) << 5);
+            // AArch64 RET instruction: 0xD65F03C0
+            let ret_inst: u32 = 0xd65f03c0; 
+            
+            ptr_slice[0..4].copy_from_slice(&svc_inst.to_le_bytes());
+            ptr_slice[4..8].copy_from_slice(&ret_inst.to_le_bytes());
+        } else {
+            // Standard AArch32 (ARMv7) SVC and BX LR instructions
+            let svc_inst: u32 = 0xdf000000 | (svc & 0xffffff);
+            let bx_lr_inst: u32 = 0xe12fff1e;
+            
+            ptr_slice[0..4].copy_from_slice(&svc_inst.to_le_bytes());
+            ptr_slice[4..8].copy_from_slice(&bx_lr_inst.to_le_bytes());
+        }
+
+        // 🛡️ Ensure the JIT recompiles this memory
+        unsafe {
+            touchHLE_dynarmic_wrapper::touchHLE_DynarmicWrapper_invalidate_cache_range(
+                env.cpu.dynarmic_wrapper, // Assuming you have access to cpu here, or pass it
+                function_ptr.to_bits(),
+                8
+            )
+        }
+        
+        GuestFunction::from_ptr(function_ptr)
     }
 }
