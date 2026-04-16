@@ -958,7 +958,7 @@ impl Dyld {
         if let Some(&cached_fn) = self.non_lazy_host_functions.get(symbol) {
             return Ok(cached_fn);
         }
-        let function_ptr = .create_guest_function(&mut env.mem, symb, hf);
+        let function_ptr = self.create_guest_function(mem, symbol, f);
         self.non_lazy_host_functions.insert(symbol, function_ptr);
         Ok(function_ptr)
     }
@@ -976,7 +976,7 @@ impl Dyld {
 
         // Create guest function to call this host function
         let function_ptr = mem.alloc(8);
-        let ptr_slice = mem.bytes_at_mut(function_ptr, 8);
+        let ptr_slice = mem.bytes_at_mut(function_ptr.cast::<u8>(), 8);
 
         // ==========================================================
         // 🏎️ AARCH64 DYNAMIC STUB GENERATION
@@ -998,6 +998,6 @@ impl Dyld {
             ptr_slice[4..8].copy_from_slice(&bx_lr_inst.to_le_bytes());
         }
 
-        GuestFunction::from_ptr(function_ptr)
+        GuestFunction::from_addr_with_thumb_bit(function_ptr.to_bits())
     }
 }
