@@ -41,23 +41,44 @@ fn statvfs(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<statvfs>) -> i
     // TODO: handle errno properly
     set_errno(env, 0);
     let (result, statfs) = statfs_inner(env, path);
+
+    // ==========================================================
+    // 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: 32GB Free Space Spoof
+    // ==========================================================
+    let main_bundle: crate::objc::id = crate::objc::msg_class![env; NSBundle mainBundle];
+    let mut is_asphalt = false;
+    if main_bundle != crate::objc::nil {
+        let bundle_id: crate::objc::id = crate::objc::msg![env; main_bundle bundleIdentifier];
+        if bundle_id != crate::objc::nil {
+            let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
+            is_asphalt = bundle_str.to_lowercase().contains("asphalt");
+        }
+    }
+
+    let (f_bsize, f_frsize, f_blocks, f_bfree, f_bavail) = if is_asphalt {
+        // 32GB fake drive for Asphalt 8
+        (4096, 4096, 8388608, 8388608, 8388608) 
+    } else {
+        // Standard touchHLE sandbox for all other games
+        (
+            statfs.f_iosize.try_into().unwrap(),
+            statfs.f_bsize,
+            statfs.f_blocks.try_into().unwrap(),
+            statfs.f_bfree.try_into().unwrap(),
+            statfs.f_bavail.try_into().unwrap(),
+        )
+    };
+
     let statvfs = statvfs {
-        // From the manpage:
-        // "Corresponds to the f_iosize member of struct statfs."
-        f_bsize: statfs.f_iosize.try_into().unwrap(),
-        // From the manpage:
-        // "This corresponds to the f_bsize member of struct statfs."
-        f_frsize: statfs.f_bsize,
-        f_blocks: statfs.f_blocks.try_into().unwrap(),
-        f_bfree: statfs.f_bfree.try_into().unwrap(),
-        f_bavail: statfs.f_bavail.try_into().unwrap(),
+        f_bsize,
+        f_frsize,
+        f_blocks,
+        f_bfree,
+        f_bavail,
         f_files: statfs.f_files.try_into().unwrap(),
         f_ffree: statfs.f_ffree.try_into().unwrap(),
         f_favail: statfs.f_ffree.try_into().unwrap(), // TODO: Is this right?
-        // From the manpage: "Not meaningful in this implementation"
         f_fsid: 0,
-        // In the manpage: "There are two flags defined for the f_flag member"
-        // ST_RDONLY and ST_NOSUID
         f_flag: statfs.f_flags & ST_RDONLY & ST_NOSUID,
         f_namemax: 255,
     };
