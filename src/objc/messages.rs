@@ -48,10 +48,10 @@ fn objc_msgSend_inner(
     );
 
     // TraceAudioCalls
-    //let sel_name = selector.as_str(&env.mem);
-    //if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
-    //    println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
-    //} 
+    let sel_name = selector.as_str(&env.mem);
+    if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
+        println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
+    } 
 
     let message_type_info = env.objc.message_type_info.take();
     let message_type_info = env.objc.message_type_info.take();
@@ -73,6 +73,19 @@ fn objc_msgSend_inner(
         env.cpu.regs_mut()[0] = receiver.to_bits();
         return;
     }
+    // ============================================
+
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Disable IAP to prevent CRM Deadlock
+    // ==========================================================
+    if sel_str == "canMakePayments" {
+        println!("🎮 LOG: Disabling SKPaymentQueue to skip IAP initialization!");
+        env.cpu.regs_mut()[0..2].fill(0); // Return false (0)
+        return;
+    }
+
+    // SAFE: only crash-prone selectors
+
     // ============================================
 
     // SAFE: only crash-prone selectors
