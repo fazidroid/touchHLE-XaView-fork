@@ -39,15 +39,17 @@ pub const CLASSES: ClassExports = objc_classes! {
         retain(env, target);
 
         {
-            // Устанавливаем данные в хост-объект, изолируя borrow_mut,
-            // чтобы не мешать макросу msg_class! ниже
+            // Устанавливаем данные в хост-объект,
+            // изолируя borrow_mut, чтобы не
+            // мешать макросу msg_class! ниже
             let host_object = env.objc.borrow_mut::<CADisplayLinkHostObject>(display_link);
             host_object.target = target;
             host_object.selector = Some(sel);
             host_object.frame_interval = 1;
         }
 
-        // Создаем свой внутренний селектор для перехвата тика таймера
+        // Создаем свой внутренний селектор
+        // для перехвата тика таймера
         let tick_sel = env.objc.lookup_selector("_timerTick:").unwrap();
 
         let ns_timer = msg_class![env; NSTimer timerWithTimeInterval:(1.0/60.0)
@@ -64,13 +66,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (())_timerTick:(id)_timer {
-        // Создаем отдельный scope { }, чтобы borrow освободился ДО
+        // Создаем отдельный scope { },
+        // чтобы borrow освободился ДО
         // вызова msg_send
         let (target, sel) = {
             let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
             (host_object.target, host_object.selector.unwrap())
         };
-        // Передаем this (сам CADisplayLink) вместо оригинального NSTimer
+        // Передаем this (сам CADisplayLink)
+        // вместо оригинального NSTimer
         let _: () = crate::objc::msg_send(env, (target, sel, this));
     }
 
@@ -104,7 +108,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())dealloc {
-        // Копируем указатели и сразу отпускаем borrow, чтобы release
+        // Копируем указатели и сразу 
+        // отпускаем borrow, чтобы release
         // смог использовать env
         let (ns_timer, target) = {
             let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
