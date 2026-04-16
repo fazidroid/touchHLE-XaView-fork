@@ -102,27 +102,7 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
         };
         assert!(pad_width >= 0); // TODO: Implement right-padding
 
-        let precision = if get_format_char(&env.mem, format_char_idx) == b'.' {
-            format_char_idx += 1;
-            let precision = if get_format_char(&env.mem, format_char_idx) == b'*' {
-                let precision = args.next::<i32>(env);
-                assert!(precision >= 0); // TODO: ignore negative
-                format_char_idx += 1;
-                precision as usize
-            } else {
-                let mut precision = 0;
-                while let c @ b'0'..=b'9' = get_format_char(&env.mem, format_char_idx) {
-                    precision = precision * 10 + (c - b'0') as usize;
-                    format_char_idx += 1;
-                }
-                precision
-            };
-            Some(precision)
-        } else {
-            None
-        };
-
-        let length_modifier = match get_format_char(&env.mem, format_char_idx) {
+        let mut length_modifier = match get_format_char(&env.mem, format_char_idx) {
             b'h' => {
                 format_char_idx += 1;
                 if get_format_char(&env.mem, format_char_idx) == b'h' {
@@ -133,25 +113,51 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'l' => {
-                    if get_format_char(&env.mem, format_char_idx + 1) == b'l' {
-                        // 🛡️ GAMELOFT BYPASS: Safely swallow %llu, %llx, etc. without crashing.
-                        // We trick the emulator into treating them all as standard "lld".
-                        format_char_idx += 2;
-                        Some("lld")
-                    } else {
-                        format_char_idx += 1;
-                        Some("l")
-                    }
+                format_char_idx += 1;
+                if get_format_char(&env.mem, format_char_idx) == b'l' {
+                    format_char_idx += 1;
+                    Some("ll") // 🏎️ Fix: touchHLE natively supports "ll", do not use "lld"!
+                } else {
+                    Some("l")
                 }
-            // q seems to be an equivalent of 'll'
-            // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
+            }
             b'q' => {
                 format_char_idx += 1;
                 Some("ll")
             }
-            b'j' | b'z' | b't' | b'L' => unimplemented!(),
+            b'j' | b'z' | b't' | b'L' => {
+                format_char_idx += 1;
+                Some("unsupported") // 🏎️ Fix: Catch 'z' and 't' without instantly panicking
+            }
             _ => None,
         };
+
+        // ==========================================================
+        // 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: Unsupported printf modifiers
+        // ==========================================================
+        if length_modifier == Some("unsupported") || length_modifier == Some("ll") {
+            let main_bundle: id = crate::objc::msg_class![env; NSBundle mainBundle];
+            let mut is_asphalt = false;
+            
+            if main_bundle != nil {
+                let bundle_id: id = msg![env; main_bundle bundleIdentifier];
+                if bundle_id != nil {
+                    let bundle_str = ns_string::to_rust_string(env, bundle_id);
+                    is_asphalt = bundle_str.to_lowercase().contains("asphalt");
+                }
+            }
+
+            if is_asphalt {
+                // If it is 'z', 't', etc., safely nullify it so Asphalt 8 can print!
+                if length_modifier == Some("unsupported") {
+                    length_modifier = None; 
+                }
+                // If it is "ll", we leave it alone because touchHLE natively handles 64-bit "ll" perfectly!
+            } else if length_modifier == Some("unsupported") {
+                // Standard touchHLE strict behavior for all other games
+                unimplemented!("Unsupported length modifier in printf!");
+            }
+        }
 
         let specifier = get_format_char(&env.mem, format_char_idx);
         format_char_idx += 1;
