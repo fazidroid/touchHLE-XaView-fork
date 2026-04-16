@@ -2005,7 +2005,7 @@ fn glVertexAttribPointer(
     stride: GLsizei,
     ptr: ConstVoidPtr,
 ) {
-    log!("DEBUG_GL: glVertexAttribPointer(indx={}, size={}, type={:#x}, norm={}, stride={}, ptr={:#x})", indx, size, type_, normalized, stride, ptr.to_bits()); // LogAttribPointer
+    //log!("DEBUG_GL: glVertexAttribPointer(indx={}, size={}, type={:#x}, norm={}, stride={}, ptr={:#x})", indx, size, type_, normalized, stride, ptr.to_bits()); // LogAttribPointer
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let ptr_host =
             translate_pointer_or_offset_to_host(gles, mem, ptr, gles11::ARRAY_BUFFER_BINDING);
@@ -2189,7 +2189,7 @@ fn glUniformMatrix4fv(
         let value_ptr = mem.ptr_at(value, (count * 16) as u32);
         // DebugUniformMat4
         let slice = std::slice::from_raw_parts(value_ptr, (count * 16) as usize);
-        log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
+        //log!("DEBUG_GL: glUniformMatrix4fv(loc={}, count={}, transpose={}, ptr={:#x}) -> 1st_mat: {:?}", location, count, transpose, value.to_bits(), &slice[0..std::cmp::min(16, slice.len())]);
         gles.UniformMatrix4fv(location, count, transpose, value_ptr);
     })
 }
@@ -2295,12 +2295,12 @@ fn glGetActiveAttrib(
         );
         if !name_ptr.is_null() {
             let name_str = std::ffi::CStr::from_ptr(name_ptr).to_string_lossy(); // LogActiveAttrib
-            log!(
-                "DEBUG_GL: glGetActiveAttrib(program={}, index={}) -> name='{}'",
-                program,
-                index,
-                name_str
-            ); // LogActiveAttrib
+            //log!(
+            //    "DEBUG_GL: glGetActiveAttrib(program={}, index={}) -> name='{}'",
+            //    program,
+            //    index,
+            //    name_str
+            //); // LogActiveAttrib
         }
     })
 }
