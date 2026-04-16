@@ -190,7 +190,7 @@ pub fn recomposite_if_necessary(env: &mut Environment, force: bool) -> Option<In
     //    screen_scale,
     //    fb_width,
     //    fb_height
-    );
+    //);
     if fb_width == 0 || fb_height == 0 {
     //    log!("DEBUG_COMP: SKIP due to zero size");
     //    return new_recomposite_next; // BypassZeroSize
