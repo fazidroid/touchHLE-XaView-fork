@@ -166,8 +166,24 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     crate::mem::MutPtr::null()
 }
 
+fn inet_ntoa(env: &mut Environment, in_addr: u32) -> MutPtr<u8> {
+    // Decode the 32-bit IPv4 address into 4 bytes
+    let b1 = (in_addr & 0xFF) as u8;
+    let b2 = ((in_addr >> 8) & 0xFF) as u8;
+    let b3 = ((in_addr >> 16) & 0xFF) as u8;
+    let b4 = ((in_addr >> 24) & 0xFF) as u8;
+    
+    let ip_str = format!("{}.{}.{}.{}", b1, b2, b3, b4);
+    println!("🎮 GT RACING EXCLUSIVE: inet_ntoa converting IP to string: {}", ip_str);
+    
+    // Allocate the string in guest memory and return the pointer
+    env.mem.alloc_and_write_cstr(&ip_str).cast_mut()
+}
+
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(getaddrinfo(_, _, _, _)),
     export_c_func!(freeaddrinfo(_)),
     export_c_func!(gethostbyname(_)),
+    export_c_func!(inet_ntoa(_)),
 ];
