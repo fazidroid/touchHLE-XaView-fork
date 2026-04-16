@@ -64,7 +64,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (())_timerTick:(id)_timer {
-        // Создаем отдельный scope { }, чтобы borrow освободился ДО вызова msg_send
+        // Создаем отдельный scope { }, чтобы borrow освободился ДО
+        // вызова msg_send
         let (target, sel) = {
             let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
             (host_object.target, host_object.selector.unwrap())
@@ -103,7 +104,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())dealloc {
-        // Копируем указатели и сразу отпускаем borrow, чтобы release смог использовать env
+        // Копируем указатели и сразу отпускаем borrow, чтобы release
+        // смог использовать env
         let (ns_timer, target) = {
             let host_object = env.objc.borrow::<CADisplayLinkHostObject>(this);
             (host_object.ns_timer, host_object.target)
