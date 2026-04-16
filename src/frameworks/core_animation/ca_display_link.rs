@@ -108,7 +108,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())dealloc {
-        // Копируем указатели и сразу 
+        // Копируем указатели и сразу
         // отпускаем borrow, чтобы release
         // смог использовать env
         let (ns_timer, target) = {
