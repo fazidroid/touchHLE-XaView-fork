@@ -2218,7 +2218,7 @@ fn glGetAttribLocation(env: &mut Environment, program: GLuint, name: ConstVoidPt
         //    name_str,
         //    res
         //); // LogAttribLoc
-        //res // LogAttribLoc
+        res // LogAttribLoc
     })
 }
 // ActiveUniformFix
