@@ -96,6 +96,18 @@ fn CFStringConvertNSStringEncodingToEncoding(
     }
 }
 
+fn CFStringCreateWithCStringNoCopy(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    c_string: ConstPtr<u8>,
+    encoding: CFStringEncoding,
+    contents_deallocator: CFAllocatorRef,
+) -> CFStringRef {
+    log_dbg!("CFStringCreateWithCStringNoCopy -> delegating to CFStringCreateWithCString");
+    // We ignore the "no copy" and deallocator hints; just copy the string.
+    CFStringCreateWithCString(env, allocator, c_string, encoding)
+}
+
 fn CFStringCreateCopy(
     env: &mut Environment,
     allocator: CFAllocatorRef,
@@ -345,6 +357,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringAppendFormat(_, _, _, _)),
     export_c_func!(CFStringConvertEncodingToNSStringEncoding(_)),
     export_c_func!(CFStringConvertNSStringEncodingToEncoding(_)),
+    export_c_func!(CFStringCreateWithCStringNoCopy(_, _, _, _)),
     export_c_func!(CFStringCreateCopy(_, _)),
     export_c_func!(CFStringCreateMutable(_, _)),
     export_c_func!(CFStringCreateMutableCopy(_, _, _)),
