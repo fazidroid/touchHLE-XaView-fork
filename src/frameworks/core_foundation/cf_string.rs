@@ -119,16 +119,20 @@ fn CFStringGetBytes(
     max_buf_len: CFIndex,
     used_buf_len: MutPtr<CFIndex>,
 ) -> CFIndex {
-    log_dbg!("CFStringGetBytes called with encoding {:#x}, max_buf_len {}", encoding, max_buf_len);
+    log_dbg!(
+        "CFStringGetBytes called with encoding {:#x}, max_buf_len {}",
+        encoding,
+        max_buf_len
+    );
     if the_string.is_null() {
         return 0;
     }
-    // Convert to Rust string
-    let rust_string = ns_string::to_rust_string(env, the_string);
+    // Convert to owned Rust string
+    let rust_string = ns_string::to_rust_string(env, the_string).to_string();
     // Extract the requested range
     let range_start = range.location as usize;
     let range_len = range.length as usize;
-    let sub_string = if range_start == 0 && range_len == rust_string.len() {
+    let sub_string = if range_start == 0 && range_len >= rust_string.len() {
         rust_string
     } else {
         rust_string
@@ -143,18 +147,18 @@ fn CFStringGetBytes(
         ns_string::NSASCIIStringEncoding => sub_string.as_bytes().to_vec(),
         ns_string::NSISOLatin1StringEncoding => sub_string
             .chars()
-            .filter_map(|c| if c as u32 <= 0xFF { Some(c as u8) } else { None })
+            .filter_map(|c| if (c as u32) <= 0xFF { Some(c as u8) } else { None })
             .collect(),
         ns_string::NSUTF16StringEncoding | ns_string::NSUTF16LittleEndianStringEncoding => {
             sub_string
                 .encode_utf16()
-                .flat_map(|u| u.to_le_bytes())
+                .flat_map(|u: u16| u.to_le_bytes())
                 .collect()
         }
         ns_string::NSUTF16BigEndianStringEncoding => {
             sub_string
                 .encode_utf16()
-                .flat_map(|u| u.to_be_bytes())
+                .flat_map(|u: u16| u.to_be_bytes())
                 .collect()
         }
         other => {
