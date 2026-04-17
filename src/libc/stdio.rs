@@ -472,6 +472,18 @@ fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
     }
 }
 
+fn rename(env: &mut Environment, old: ConstPtr<u8>, new: ConstPtr<u8>) -> i32 {
+    let old_str = env.mem.cstr_at_utf8(old).unwrap_or_default();
+    let new_str = env.mem.cstr_at_utf8(new).unwrap_or_default();
+    
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Unimplemented VFS Rename
+    // ==========================================================
+    println!("🎮 LOG: Safely bypassed rename from [{}] to [{}] to prevent fs.rs panic!", old_str, new_str);
+    
+    0 // Return 0 (success) so the game thinks the rename worked!
+}
+
 fn setbuf(env: &mut Environment, stream: MutPtr<FILE>, buf: ConstPtr<u8>) {
     set_errno(env, 0);
 
@@ -538,6 +550,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(puts(_)),
     export_c_func!(putchar(_)),
     export_c_func!(remove(_)),
+    export_c_func!(rename(_, _)),
     export_c_func!(setbuf(_, _)),
     // POSIX-specific functions
     export_c_func!(fileno(_)),
