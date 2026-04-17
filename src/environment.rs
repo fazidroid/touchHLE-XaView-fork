@@ -443,41 +443,21 @@ impl Environment {
             entry_point_addr
         );
 
-        if (entry_point_addr & !1) <= 0x2000 {
-            echo!(
-                "WARNING: Entry point seems corrupted (points to header). Scanning for __text..."
-            );
-            let mut lc_ptr = 0x101c;
-            let ncmds: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(0x1010));
-            let mut found_text = false;
-            for _ in 0..ncmds {
-                let cmd: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr));
-                let cmdsize: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr + 4));
-                if cmd == 1 {
-                    let nsects: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr + 48));
-                    let mut sect_ptr = lc_ptr + 56;
-                    for _ in 0..nsects {
-                        let sectname_0: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr));
-                        let sectname_1: u32 =
-                            mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 4));
-                        if sectname_0 == 0x65745f5f && sectname_1 == 0x00007478 {
-                            let sect_addr: u32 =
-                                mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 32));
-                            echo!(
-                                "Found __text section at {:#010x}. Overriding entry point!",
-                                sect_addr
-                            );
-                            entry_point_addr = sect_addr | 1;
-                            found_text = true;
-                            break;
-                        }
-                        sect_ptr += 68;
-                    }
-                }
-                if found_text {
-                    break;
-                }
-                lc_ptr += cmdsize;
+                // ==========================================================
+        // 🏎️ REAL RACING EXCLUSIVE BYPASS: Fix Cracked Entry Point
+        // ==========================================================
+        let is_real_racing = bundle.bundle_identifier() == "com.firemint.realracing";
+
+        if is_real_racing && (entry_point_addr & !1) <= 0x2000 {
+            // Check the symbols we already parsed in mach_o.rs!
+            if let Some(&real_start) = executable.exported_symbols.get("start")
+                .or_else(|| executable.exported_symbols.get("_start"))
+                .or_else(|| executable.exported_symbols.get("_main")) 
+            {
+                echo!("🎮 REAL RACING EXCLUSIVE: Detected corrupted entry point {:#010x}. Overriding with real start symbol at {:#010x}!", entry_point_addr, real_start);
+                entry_point_addr = real_start;
+            } else {
+                echo!("🎮 REAL RACING EXCLUSIVE: Corrupted entry point detected, but could not find 'start' symbol!");
             }
         }
 
