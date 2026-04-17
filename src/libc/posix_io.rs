@@ -11,6 +11,7 @@ pub mod statvfs;
 use crate::abi::DotDotDot;
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::fs::{GuestFile, GuestOpenOptions, GuestPath};
+use crate::fs::flock;
 use crate::libc::errno::{set_errno, EBADF, EINVAL, EISDIR, ESPIPE};
 use crate::libc::sys::socket::close_socket;
 use crate::libc::unistd::pid_t;
@@ -154,7 +155,7 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
     };
 
     if res != -1 && (flags & O_SHLOCK) != 0 {
-        flock(env, res, LOCK_SH);
+        crate::fs::flock(env, res, LOCK_SH);
     }
     res
 }
@@ -447,7 +448,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(getcwd(_, _)),
     export_c_func!(chdir(_)),
     export_c_func!(fcntl(_, _, _)),
-    export_c_func!(flock(_, _)),
     export_c_func!(fsync(_)),
     export_c_func!(ftruncate(_, _)),
 ];
