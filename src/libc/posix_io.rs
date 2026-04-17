@@ -179,13 +179,17 @@ pub fn read(
     }
 
     // ==========================================================
-    // 🏎️ GAMELOFT BYPASS: Yield on socket reads to prevent freeze!
+    // 🏎️ GAMELOFT BYPASS: Feed dummy zeroes to break the deadlock!
     // ==========================================================
     if is_socket(env, fd) {
-        // Sleep for 16ms to surrender the CPU back to the main thread!
-        env.sleep(std::time::Duration::from_millis(16));
-        set_errno(env, 35); // 35 is EAGAIN (Resource temporarily unavailable)
-        return -1;
+        println!("🎮 LOG: Safely fed {} fake bytes to socket to unblock thread!", size);
+        
+        // Fill the game's requested buffer with dummy zeroes
+        let buf_slice = env.mem.bytes_at_mut(buffer.cast(), size);
+        buf_slice.fill(0); 
+        
+        // Return the size to trick the game into thinking it successfully downloaded data
+        return size.try_into().unwrap(); 
     }
 
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
