@@ -192,6 +192,22 @@ fn fgetc(env: &mut Environment, file_ptr: MutPtr<FILE>) -> i32 {
     }
 }
 
+/// flockfile – acquire lock on a FILE stream (ignored)
+fn flockfile(env: &mut Environment, file: MutPtr<()>) {
+    log_dbg!("flockfile({:?}) ignored", file);
+}
+
+/// funlockfile – release lock on a FILE stream (ignored)
+fn funlockfile(env: &mut Environment, file: MutPtr<()>) {
+    log_dbg!("funlockfile({:?}) ignored", file);
+}
+
+/// ftrylockfile – try to acquire lock; always succeeds
+fn ftrylockfile(env: &mut Environment, file: MutPtr<()>) -> i32 {
+    log_dbg!("ftrylockfile({:?}) -> 0", file);
+    0 // success (lock acquired)
+}
+
 fn getc(env: &mut Environment, file_ptr: MutPtr<FILE>) -> i32 {
     fgetc(env, file_ptr)
 }
@@ -530,6 +546,9 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(fopen(_, _)),
     export_c_func!(fread(_, _, _, _)),
     export_c_func!(fgetc(_)),
+    export_c_func!(flockfile(_)),
+    export_c_func!(funlockfile(_)),
+    export_c_func!(ftrylockfile(_)),
     export_c_func!(getc(_)),
     export_c_func!(ungetc(_, _)),
     export_c_func!(fgets(_, _, _)),
