@@ -876,6 +876,17 @@ impl Dyld {
             return Some(&(fake_pthread_exit as fn(&mut crate::Environment, u32) -> ()));
         }
 
+        // ==========================================================
+        // 🏎️ EA BYPASS: Safely absorb IPSP ADK Logger
+        // ==========================================================
+        if symbol == "_ipsp_logger" { // Replace with the exact symbol from your log!
+            fn fake_ipsp_logger(env: &mut crate::Environment) {
+                println!("🎮 LOG: Safely absorbed IPSP ADK logger call!");
+                env.cpu.regs_mut()[0] = 0; // Return success
+            }
+            return Some(&(fake_ipsp_logger as fn(&mut crate::Environment) -> ()));
+        }
+        
         // ImplDifftime
         if symbol == "_difftime" {
             fn impl_difftime(_env: &mut crate::Environment, time1: i32, time0: i32) -> f64 {
