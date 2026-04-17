@@ -487,23 +487,24 @@ fn select(
         true
     };
 
-    // OfflineSelectBypass
+// OfflineSelectBypass
 if !env.options.network_access {
     let mut count = 0;
     if !read_fds.is_null() {
-        let mut set = env.mem.read(read_fds);
-        // Count bits, but keep them set (indicating ready)
-        count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
-        // Leave set unchanged – all requested fds are "ready"
+        let set = env.mem.read(read_fds);
+        // Copy bits to local array to avoid unaligned reference
+        let bits = set.fds_bits;
+        count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        // Write back unchanged – all requested fds are "ready"
         env.mem.write(read_fds, set);
     }
     if !write_fds.is_null() {
-        let mut set = env.mem.read(write_fds);
-        count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        let set = env.mem.read(write_fds);
+        let bits = set.fds_bits;
+        count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
         env.mem.write(write_fds, set);
     }
     if !error_fds.is_null() {
-        // No errors
         env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
     }
     log_dbg!("select (offline): returning {} ready fds", count);
