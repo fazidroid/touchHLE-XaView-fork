@@ -74,8 +74,9 @@ const F_GETFD: FileControlCommand = 1;
 const F_SETFD: FileControlCommand = 2;
 const F_GETFL: FileControlCommand = 3;
 const F_SETFL: FileControlCommand = 4;
-const F_GETLK: FileControlCommand = 7;
-const F_SETLK: FileControlCommand = 8;
+const F_SETLKW: FileControlCommand = 7;
+const F_GETLK: FileControlCommand = 8;
+const F_SETLK: FileControlCommand = 9;
 const F_RDADVISE: FileControlCommand = 44;
 const F_NOCACHE: FileControlCommand = 48;
 
@@ -177,6 +178,16 @@ pub fn read(
         return 0; 
     }
 
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Yield on socket reads to prevent freeze!
+    // ==========================================================
+    if is_socket(env, fd) {
+        // Sleep for 16ms to surrender the CPU back to the main thread!
+        env.sleep(std::time::Duration::from_millis(16));
+        set_errno(env, 35); // 35 is EAGAIN (Resource temporarily unavailable)
+        return -1;
+    }
+
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
         return -1;
@@ -246,6 +257,14 @@ pub fn write(
     size: GuestUSize,
 ) -> GuestISize {
     if fd == STDOUT_FILENO || fd == STDERR_FILENO {
+        return size.try_into().unwrap();
+    }
+
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Fake socket writes to prevent freeze!
+    // ==========================================================
+    if is_socket(env, fd) {
+        // Pretend we wrote all the data successfully immediately
         return size.try_into().unwrap();
     }
 
@@ -385,36 +404,53 @@ fn chdir(env: &mut Environment, path_ptr: ConstPtr<u8>) -> i32 {
 }
 
 fn fcntl(env: &mut Environment, fd: FileDescriptor, cmd: FileControlCommand, args: DotDotDot) -> i32 {
+    let is_asphalt8 = env.bundle.bundle_identifier() == "com.gameloft.asphalt8";
+
     if fd >= NORMAL_FILENO_BASE && env.libc_state.posix_io.files.get(fd_to_file_idx(fd)).is_none() {
         set_errno(env, EBADF);
         return -1;
     }
 
     match cmd {
-        F_GETFL => 0,
-        F_SETFL => 0,
+        F_GETFL => {
+            if is_asphalt8 {
+                log!("Asphalt8: fcntl(F_GETFL) -> 2 (O_RDWR)");
+                2
+            } else {
+                0
+            }
+        }
+        F_SETFL => {
+            log_dbg!("fcntl(F_SETFL) ignored");
+            0
+        }
         F_GETFD => {
-            if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) { file.flags } else { 0 }
+            if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
+                file.flags
+            } else {
+                0
+            }
         }
         F_SETFD => {
             let flags: i32 = args.start().next(env);
-            if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) { file.flags = flags; }
+            if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
+                file.flags = flags;
+            }
             0
+        }
+        F_SETLK | F_NOCACHE => {
+            if is_asphalt8 {
+                log!("Asphalt8: fcntl(cmd={}) -> 0 (bypass)", cmd);
+                0
+            } else {
+                log!("Warning: fcntl({}, {}) unhandled, returning 0", fd, cmd);
+                0
+            }
         }
         _ => {
             log!("Warning: fcntl({}, {}) unhandled, returning 0", fd, cmd);
             0
         }
-        _ => {
-            // BypassFcntl
-            println!(
-                "WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.",
-                cmd, fd
-            );
-            return 0;
-        }
-        F_NOCACHE | F_RDADVISE => 0,
-        _ => { return 0; }
     }
 }
 
