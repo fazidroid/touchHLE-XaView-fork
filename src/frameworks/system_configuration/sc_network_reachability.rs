@@ -73,21 +73,16 @@ fn SCNetworkReachabilityCreateWithAddress(
     )
 }
 
-fn SCNetworkReachabilityGetFlags(
-    env: &mut Environment,
-    target: SCNetworkReachabilityRef,
-    flags: MutPtr<SCNetworkReachabilityFlags>,
+// In system_configuration.rs
+pub fn SCNetworkReachabilityGetFlags(
+    _target: id,
+    flags: MutPtr<u32>,
 ) -> bool {
-    let target_class: Class = msg![env; target class];
-    assert_eq!(
-        target_class,
-        env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
-    );
-
-    // Always report reachable (WiFi + WWAN) to satisfy Asphalt 8.
-    let out_flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect | kSCNetworkReachabilityFlagsIsWWAN;
-    env.mem.write(flags, out_flags);
-    true
+    log_dbg!("SCNetworkReachabilityGetFlags stubbed: returning false (not reachable)");
+    if !flags.is_null() {
+        env.mem.write(flags, 0u32); // kSCNetworkFlagsReachable = 0
+    }
+    false // indicates failure, meaning no reachability info
 }
 
 fn SCNetworkReachabilitySetCallback(
