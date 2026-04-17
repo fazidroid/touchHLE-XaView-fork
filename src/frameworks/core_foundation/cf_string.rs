@@ -96,6 +96,21 @@ fn CFStringConvertNSStringEncodingToEncoding(
     }
 }
 
+fn CFStringCreateWithSubstring(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    string: CFStringRef,
+    range: CFRange,
+) -> CFStringRef {
+    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
+    let ns_range = NSRange {
+        location: range.location.try_into().unwrap(),
+        length: range.length.try_into().unwrap(),
+    };
+    log_dbg!("CFStringCreateWithSubstring(range: {:?})", ns_range);
+    msg![env; string substringWithRange:ns_range]
+}
+
 fn CFStringCreateWithCStringNoCopy(
     env: &mut Environment,
     allocator: CFAllocatorRef,
@@ -434,6 +449,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringAppendFormat(_, _, _, _)),
     export_c_func!(CFStringConvertEncodingToNSStringEncoding(_)),
     export_c_func!(CFStringConvertNSStringEncodingToEncoding(_)),
+    export_c_func!(CFStringCreateWithSubstring(_, _, _)),
     export_c_func!(CFStringCreateWithCStringNoCopy(_, _, _, _)),
     export_c_func!(CFStringGetBytes(_, _, _, _, _, _, _, _)),
     export_c_func!(CFStringCreateCopy(_, _)),
