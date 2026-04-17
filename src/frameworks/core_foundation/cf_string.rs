@@ -200,6 +200,23 @@ fn CFStringGetBytes(
     }
 }
 
+fn CFURLCreateStringByReplacingPercentEscapesUsingEncoding(
+    _env: &mut Environment,
+    _allocator: CFAllocatorRef,
+    original_string: CFStringRef,
+    _characters_to_leave_escaped: CFStringRef,
+    _encoding: CFStringEncoding,
+) -> CFStringRef {
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Fake URL String Decoding
+    // ==========================================================
+    println!("🎮 LOG: Safely stubbed CFURLCreateStringByReplacingPercentEscapesUsingEncoding in cf_string.rs!");
+    
+    // Instead of messing with CPU registers, we safely return the pointer directly!
+    original_string 
+}
+
+
 fn CFStringCreateCopy(
     env: &mut Environment,
     allocator: CFAllocatorRef,
@@ -452,6 +469,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringCreateWithSubstring(_, _, _)),
     export_c_func!(CFStringCreateWithCStringNoCopy(_, _, _, _)),
     export_c_func!(CFStringGetBytes(_, _, _, _, _, _, _, _)),
+   export_c_func!(CFURLCreateStringByReplacingPercentEscapesUsingEncoding(_, _, _, _, _)),
     export_c_func!(CFStringCreateCopy(_, _)),
     export_c_func!(CFStringCreateMutable(_, _)),
     export_c_func!(CFStringCreateMutableCopy(_, _, _)),
