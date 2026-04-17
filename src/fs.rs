@@ -465,6 +465,13 @@ impl Read for GuestFile {
                 std::io::ErrorKind::IsADirectory,
                 "Attempt to read from a directory as a guest file",
             )),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX reads on Sockets!
+            // ==========================================================
+            GuestFile::Socket => {
+                println!("🎮 LOG: Absorbed read() on GuestFile::Socket to prevent unimplemented panic!");
+                Ok(0) // Return 0 to simulate EOF or no data
+            }
             _ => unimplemented!(),
         }
     }
@@ -481,6 +488,13 @@ impl Write for GuestFile {
                 panic!("Attempt to write to a read-only file: {file:?}")
             }
             GuestFile::Directory => panic!("Attempt to write to a directory as a guest file"),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX writes on Sockets!
+            // ==========================================================
+            GuestFile::Socket => {
+                println!("🎮 LOG: Absorbed write() on GuestFile::Socket to prevent unimplemented panic!");
+                Ok(buf.len()) // Pretend we successfully wrote the payload
+            }
             _ => unimplemented!(),
         }
     }
@@ -495,6 +509,10 @@ impl Write for GuestFile {
                 panic!("Attempt to flush a read-only file: {file:?}")
             }
             GuestFile::Directory => panic!("Attempt to flush a directory as a guest file"),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX flushes on Sockets!
+            // ==========================================================
+            GuestFile::Socket => Ok(()),
             _ => unimplemented!(),
         }
     }
