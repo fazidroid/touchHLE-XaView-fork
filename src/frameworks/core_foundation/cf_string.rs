@@ -108,6 +108,79 @@ fn CFStringCreateWithCStringNoCopy(
     CFStringCreateWithCString(env, allocator, c_string, encoding)
 }
 
+fn CFStringGetBytes(
+    env: &mut Environment,
+    the_string: CFStringRef,
+    range: CFRange,
+    encoding: CFStringEncoding,
+    loss_byte: u8,
+    _is_external_representation: bool,
+    buffer: MutPtr<u8>,
+    max_buf_len: CFIndex,
+    used_buf_len: MutPtr<CFIndex>,
+) -> CFIndex {
+    log_dbg!("CFStringGetBytes called with encoding {:#x}, max_buf_len {}", encoding, max_buf_len);
+    if the_string.is_null() {
+        return 0;
+    }
+    // Convert to Rust string
+    let rust_string = ns_string::to_rust_string(env, the_string);
+    // Extract the requested range
+    let range_start = range.location as usize;
+    let range_len = range.length as usize;
+    let sub_string = if range_start == 0 && range_len == rust_string.len() {
+        rust_string
+    } else {
+        rust_string
+            .chars()
+            .skip(range_start)
+            .take(range_len)
+            .collect::<String>()
+    };
+    // Encode to bytes based on encoding
+    let bytes = match CFStringConvertEncodingToNSStringEncoding(env, encoding) {
+        ns_string::NSUTF8StringEncoding => sub_string.into_bytes(),
+        ns_string::NSASCIIStringEncoding => sub_string.as_bytes().to_vec(),
+        ns_string::NSISOLatin1StringEncoding => sub_string
+            .chars()
+            .filter_map(|c| if c as u32 <= 0xFF { Some(c as u8) } else { None })
+            .collect(),
+        ns_string::NSUTF16StringEncoding | ns_string::NSUTF16LittleEndianStringEncoding => {
+            sub_string
+                .encode_utf16()
+                .flat_map(|u| u.to_le_bytes())
+                .collect()
+        }
+        ns_string::NSUTF16BigEndianStringEncoding => {
+            sub_string
+                .encode_utf16()
+                .flat_map(|u| u.to_be_bytes())
+                .collect()
+        }
+        other => {
+            log!("Warning: CFStringGetBytes unhandled encoding {:#x}", other);
+            return 0;
+        }
+    };
+    let total_len = bytes.len() as CFIndex;
+    // Write to buffer if provided
+    if !buffer.is_null() {
+        let to_copy = std::cmp::min(total_len, max_buf_len) as usize;
+        env.mem
+            .bytes_at_mut(buffer, to_copy as u32)
+            .copy_from_slice(&bytes[..to_copy]);
+        if !used_buf_len.is_null() {
+            env.mem.write(used_buf_len, to_copy as CFIndex);
+        }
+        to_copy as CFIndex
+    } else {
+        if !used_buf_len.is_null() {
+            env.mem.write(used_buf_len, total_len);
+        }
+        total_len
+    }
+}
+
 fn CFStringCreateCopy(
     env: &mut Environment,
     allocator: CFAllocatorRef,
@@ -358,6 +431,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringConvertEncodingToNSStringEncoding(_)),
     export_c_func!(CFStringConvertNSStringEncodingToEncoding(_)),
     export_c_func!(CFStringCreateWithCStringNoCopy(_, _, _, _)),
+    export_c_func!(CFStringGetBytes(_, _, _, _, _, _, _, _)),
     export_c_func!(CFStringCreateCopy(_, _)),
     export_c_func!(CFStringCreateMutable(_, _)),
     export_c_func!(CFStringCreateMutableCopy(_, _, _)),
