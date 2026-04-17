@@ -57,43 +57,77 @@ fn getaddrinfo(
 ) -> i32 {
     if !env.options.network_access {
         log_dbg!(
-            "Network access is disabled, getaddrinfo({:?}, {:?}, {:?}, {:?}) -> EAI_FAIL",
+            "Network access disabled, getaddrinfo({:?}, {:?}, ...) -> EAI_FAIL",
             node_name,
-            serv_name,
-            hints,
-            res
+            serv_name
         );
         return EAI_FAIL;
     }
 
-    assert!(node_name.is_null()); // TODO
+    // Parse hints or use defaults
+    let (ai_flags, ai_family, ai_socktype, ai_protocol, ai_addrlen) = if hints.is_null() {
+        (0, AF_INET, SOCK_STREAM, 0, 0)
+    } else {
+        let hint = env.mem.read(hints);
+        (
+            hint.ai_flags,
+            hint.ai_family,
+            hint.ai_socktype,
+            hint.ai_protocol,
+            hint.ai_addrlen,
+        )
+    };
 
-    let hint = env.mem.read(hints);
-    let ai_flags = hint.ai_flags;
-    assert_eq!(ai_flags, AI_PASSIVE);
-    let ai_family = hint.ai_family;
-    assert_eq!(ai_family, AF_INET);
-    assert!(hint.ai_socktype == SOCK_STREAM || hint.ai_socktype == SOCK_DGRAM);
-    assert!(
-        hint.ai_protocol == IPPROTO_TCP || hint.ai_protocol == IPPROTO_UDP || hint.ai_protocol == 0
-    );
-    let ai_addrlen = hint.ai_addrlen;
-    assert_eq!(ai_addrlen, 0);
-    assert!(hint.ai_canonname.is_null());
-    assert!(hint.ai_addr.is_null());
-    assert!(hint.ai_next.is_null());
+    // Only support AF_INET for now
+    if ai_family != AF_INET && ai_family != 0 {
+        log_dbg!("getaddrinfo: unsupported ai_family {}", ai_family);
+        return EAI_FAIL;
+    }
 
-    let mut addr_info = hint;
-    let port: u16 = env.mem.cstr_at_utf8(serv_name).unwrap().parse().unwrap();
-    log_dbg!("getaddrinfo: port {}", port);
-    let addr = sockaddr::from_ipv4_parts([0; 4], port);
+    // Parse port number from serv_name (e.g., "80")
+    let port_str = env.mem.cstr_at_utf8(serv_name).unwrap_or_default();
+    let port: u16 = match port_str.parse() {
+        Ok(p) => p,
+        Err(_) => {
+            log_dbg!("getaddrinfo: invalid port '{}'", port_str);
+            return EAI_FAIL;
+        }
+    };
 
-    let tmp_addr = env.mem.alloc_and_write(addr);
-    addr_info.ai_addr = tmp_addr;
-    addr_info.ai_addrlen = guest_size_of::<sockaddr>();
+    // Determine the IP address to return
+    let ip_addr = if node_name.is_null() {
+        // Passive mode: bind to any address (0.0.0.0)
+        log_dbg!("getaddrinfo: passive mode (node_name null), binding to 0.0.0.0:{}", port);
+        [0, 0, 0, 0]
+    } else {
+        // Active mode: return localhost for any hostname (stub for Asphalt 8)
+        let hostname = env.mem.cstr_at_utf8(node_name).unwrap_or_default();
+        log_dbg!("getaddrinfo: active mode for '{}', returning 127.0.0.1:{}", hostname, port);
+        [127, 0, 0, 1]
+    };
 
-    let tmp_addr_info = env.mem.alloc_and_write(addr_info);
-    env.mem.write(res, tmp_addr_info);
+    // Build the sockaddr_in
+    let addr = sockaddr::from_ipv4_parts(ip_addr, port);
+    let addr_ptr = env.mem.alloc_and_write(addr);
+
+    // Build the addrinfo structure
+    let ai = addrinfo {
+        ai_flags,
+        ai_family: AF_INET,
+        ai_socktype,
+        ai_protocol,
+        ai_addrlen: guest_size_of::<sockaddr>(),
+        ai_canonname: if node_name.is_null() {
+            MutPtr::null()
+        } else {
+            // Optional: copy the hostname as canonical name
+            node_name
+        },
+        ai_addr: addr_ptr,
+        ai_next: MutPtr::null(),
+    };
+    let ai_ptr = env.mem.alloc_and_write(ai);
+    env.mem.write(res, ai_ptr);
 
     0 // Success
 }
