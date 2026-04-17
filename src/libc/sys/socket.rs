@@ -407,19 +407,11 @@ fn connect(
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
-    //assert_eq!(address_len, guest_size_of::<sockaddr>());
     if address_len != guest_size_of::<sockaddr>() {
-    log!(
-        "Warning: bind() addr_len {} != expected {}, using first 16 bytes",
-        address_len,
-        guest_size_of::<sockaddr>()
-       );
-     }
-     if address_len != guest_size_of::<sockaddr>() {
         log!(
-        "Warning: connect() addr_len {} != expected {}, using first 16 bytes",
-        address_len,
-        guest_size_of::<sockaddr>()
+            "Warning: connect() addr_len {} != expected {}, using first 16 bytes",
+            address_len,
+            guest_size_of::<sockaddr>()
         );
     }
     let sockaddr_val = env.mem.read(address);
@@ -446,7 +438,25 @@ fn connect(
         return 0;
     }
 
-    let host_stream = TcpStream::connect(socket_address).unwrap();
+    // Attempt real connection, but handle errors without panicking
+    let host_stream = match TcpStream::connect(socket_address) {
+        Ok(stream) => stream,
+        Err(e) => {
+            log!("connect: failed to connect to {:?}: {}", socket_address, e);
+            // Map the OS error to a guest errno
+            let errno = match e.raw_os_error() {
+                Some(code) => code,
+                None => match e.kind() {
+                    std::io::ErrorKind::ConnectionRefused => 61, // ECONNREFUSED
+                    std::io::ErrorKind::TimedOut => 60,          // ETIMEDOUT
+                    std::io::ErrorKind::AddrNotAvailable => 49,  // EADDRNOTAVAIL
+                    _ => 60,                                     // ETIMEDOUT as fallback
+                },
+            };
+            set_errno(env, errno);
+            return -1;
+        }
+    };
     // We set host socket as non-blocking in order to have
     // more control of how and when it's used
     host_stream.set_nonblocking(true).unwrap();
