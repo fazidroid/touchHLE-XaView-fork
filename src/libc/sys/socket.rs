@@ -317,25 +317,14 @@ fn bind(
     let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
 
-    //assert_eq!(address_len, guest_size_of::<sockaddr>());
-    // Read only as many bytes as the structure can hold, but log if size differs.
-     let expected_len = guest_size_of::<sockaddr>();
-          if address_len != expected_len {
-           log!(
-        "Warning: connect() addr_len {} != expected {}, clamping read size",
-           address_len,
-           expected_len
-           );
-         }
-// Read up to expected_len bytes from the address pointer.
-    let sockaddr_val = env.mem.read_struct_partial::<sockaddr>(address, address_len.min(expected_len) as usize);
-    log_dbg!(
-        "bind({}, {:?} ({:?}), {})",
-        socket,
-        address,
-        sockaddr_val,
-        address_len
+    if address_len != guest_size_of::<sockaddr>() {
+    log!(
+        "Warning: bind() addr_len {} != expected {}, using first 16 bytes",
+        address_len,
+        guest_size_of::<sockaddr>()
     );
+}
+let sockaddr_val = env.mem.read(address);
 
     let socket_address = sockaddr_val.to_sockaddr_v4();
     let type_str = match type_ {
@@ -417,6 +406,20 @@ fn connect(
     assert!(type_ == SOCK_STREAM);
 
     //assert_eq!(address_len, guest_size_of::<sockaddr>());
+    if address_len != guest_size_of::<sockaddr>() {
+    log!(
+        "Warning: bind() addr_len {} != expected {}, using first 16 bytes",
+        address_len,
+        guest_size_of::<sockaddr>()
+       );
+     }
+     if address_len != guest_size_of::<sockaddr>() {
+        log!(
+        "Warning: connect() addr_len {} != expected {}, using first 16 bytes",
+        address_len,
+        guest_size_of::<sockaddr>()
+        );
+    }
     let sockaddr_val = env.mem.read(address);
     log_dbg!(
         "connect({:?} ({:?}), {})",
@@ -789,8 +792,6 @@ fn accept(
         State::get_mut(env).sockets.insert(new_fd, host_object);
         assert!(!address.is_null());
         let peer_guest_addr = sockaddr::from_sockaddr_v4(&addr);
-        //assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
-env.mem.write(address_len, guest_size_of::<sockaddr>());
         //assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
         env.mem.write(address_len, guest_size_of::<sockaddr>());
         return new_fd;
