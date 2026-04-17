@@ -469,7 +469,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringCreateWithSubstring(_, _, _)),
     export_c_func!(CFStringCreateWithCStringNoCopy(_, _, _, _)),
     export_c_func!(CFStringGetBytes(_, _, _, _, _, _, _, _)),
-   export_c_func!(CFURLCreateStringByReplacingPercentEscapesUsingEncoding(_, _, _, _, _)),
+   export_c_func!(CFURLCreateStringByReplacingPercentEscapesUsingEncoding(_, _, _, _)),
     export_c_func!(CFStringCreateCopy(_, _)),
     export_c_func!(CFStringCreateMutable(_, _)),
     export_c_func!(CFStringCreateMutableCopy(_, _, _)),
