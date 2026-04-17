@@ -120,8 +120,7 @@ fn SCNetworkReachabilityScheduleWithRunLoop(
         let flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect | kSCNetworkReachabilityFlagsIsWWAN;
         let context = host_object.callback_context;
         log_dbg!("SCNetworkReachabilityScheduleWithRunLoop: firing callback with flags {:#x}", flags);
-        // Use GuestFunction::call_from_host
-        let _: u32 = callback.call_from_host(env, (target, flags, context));
+        let _: u32 = callback.call(env, (target, flags, context));
     }
     true
 }
