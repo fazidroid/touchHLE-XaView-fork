@@ -79,7 +79,7 @@ fn fcntl(env: &mut Environment, fd: i32, cmd: i32, arg: u32) -> i32 {
     }
 }
 
-fn flock(env: &mut Environment, fd: i32, operation: i32) -> i32 {
+pub fn flock(env: &mut Environment, fd: i32, operation: i32) -> i32 {
     log!("flock(fd={}, operation={:#x}) -> 0 (stubbed)", fd, operation);
     0 // success
 }
