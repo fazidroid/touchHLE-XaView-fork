@@ -135,7 +135,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             // ==========================================================
             // 🏎️ GAMELOFT BYPASS: Absorb unbalanced autorelease pool pops!
             // ==========================================================
-            let actual_refcount = env.objc.get_refcount(pool).map(|n| n.get()).unwrap_or(0);
+            let actual_refcount = env.objc.get_refcount(pool).get();
             if actual_refcount != 1 {
                 println!("🎮 LOG: Bypassed unbalanced pool pop! Refcount was {} instead of 1.", actual_refcount);
             } else {
