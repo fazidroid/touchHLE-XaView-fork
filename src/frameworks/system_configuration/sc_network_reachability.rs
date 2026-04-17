@@ -5,7 +5,7 @@
  */
 //! SCNetworkReachability
 
-use crate::abi::GuestFunction;
+use crate::abi::{GuestFunction, CallFromHost};
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::core_foundation::cf_allocator::CFAllocatorRef;
 use crate::frameworks::core_foundation::CFTypeRef;
@@ -119,8 +119,8 @@ fn SCNetworkReachabilityScheduleWithRunLoop(
     if let Some(callback) = host_object.callback {
         let flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect | kSCNetworkReachabilityFlagsIsWWAN;
         let context = host_object.callback_context;
-        log_dbg!("SCNetworkReachabilityScheduleWithRunLoop: firing callback with flags {:#x}", flags);
-        let _: u32 = callback.call(env, (target, flags, context));
+               log_dbg!("SCNetworkReachabilityScheduleWithRunLoop: firing callback with flags {:#x}", flags);
+        let _: u32 = callback.call_from_host(env, (target, flags, context));
     }
     true
 }
