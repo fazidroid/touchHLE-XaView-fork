@@ -851,12 +851,29 @@ impl Dyld {
             }
         }
 
-        // FakeForkCall
+                // FakeForkCall
         if symbol == "_fork" {
             fn fake_fork(env: &mut crate::Environment) {
                 env.cpu.regs_mut()[0] = 0xffffffff;
             }
             return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
+        }
+
+        // ==========================================================
+        // 🏎️ GAMELOFT BYPASS: Safely intercept _pthread_exit
+        // ==========================================================
+        if symbol == "_pthread_exit" {
+            fn fake_pthread_exit(env: &mut crate::Environment, ret_val: u32) {
+                println!("🎮 LOG: Safely intercepted pthread_exit({:#x}) to prevent panic!", ret_val);
+                
+                // 1. Ensure the thread's return value is placed in CPU register 0
+                env.cpu.regs_mut()[0] = ret_val; 
+                
+                // 2. Safely branch to touchHLE's built-in thread cleanup routine
+                let exit_routine = env.dyld.thread_exit_routine();
+                env.cpu.branch(exit_routine); 
+            }
+            return Some(&(fake_pthread_exit as fn(&mut crate::Environment, u32) -> ()));
         }
 
         // ImplDifftime
