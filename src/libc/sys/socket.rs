@@ -379,18 +379,20 @@ let sockaddr_val = env.mem.read(address);
 }
 
 fn listen(env: &mut Environment, socket: i32, backlog: i32) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
-
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
-    log!(
-        "Warning: listen(socket: {}, backlog: {}), ignoring",
-        socket,
-        backlog
-    );
-    0 // Success
+    let is_asphalt8 = env.bundle.bundle_identifier() == "com.gameloft.asphalt8";
+    if is_asphalt8 {
+        // Asphalt 8 expects listen to succeed and the socket to become readable later.
+        log!("Asphalt8: listen(socket: {}, backlog: {}) -> 0", socket, backlog);
+        // Mark socket as listening (you may add a field to SocketHostObject).
+        0
+    } else {
+        log!("Warning: listen(socket: {}, backlog: {}), ignoring", socket, backlog);
+        0
+    }
 }
 
 fn connect(
@@ -486,23 +488,27 @@ fn select(
     };
 
     // OfflineSelectBypass
-    if !env.options.network_access {
-        let mut count = 0;
-        if !read_fds.is_null() {
-            let set = env.mem.read(read_fds);
-            let bits = set.fds_bits;
-            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
-        }
-        if !write_fds.is_null() {
-            let set = env.mem.read(write_fds);
-            let bits = set.fds_bits;
-            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
-        }
-        if !error_fds.is_null() {
-            env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
-        }
-        return count;
+if !env.options.network_access {
+    let mut count = 0;
+    if !read_fds.is_null() {
+        let mut set = env.mem.read(read_fds);
+        // Count bits, but keep them set (indicating ready)
+        count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        // Leave set unchanged – all requested fds are "ready"
+        env.mem.write(read_fds, set);
     }
+    if !write_fds.is_null() {
+        let mut set = env.mem.read(write_fds);
+        count += set.fds_bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
+        env.mem.write(write_fds, set);
+    }
+    if !error_fds.is_null() {
+        // No errors
+        env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
+    }
+    log_dbg!("select (offline): returning {} ready fds", count);
+    return count;
+}
 
     let mut count = 0;
 
