@@ -129,6 +129,10 @@ enum ThreadNextAction {
     DebugCpuError(cpu::CpuError),
 }
 
+pub fn is_asphalt8(env: &Environment) -> bool {
+    env.bundle.bundle_identifier() == "com.gameloft.asphalt8"
+}
+
 /// If/what a thread is blocked by.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ThreadBlock {
@@ -443,21 +447,22 @@ impl Environment {
             entry_point_addr
         );
 
-                // ==========================================================
-        // 🏎️ REAL RACING EXCLUSIVE BYPASS: Fix Cracked Entry Point
+                        // ==========================================================
+        // 🏎️ CRACKED IPA BYPASS: EA & Firemint Exclusive
         // ==========================================================
-        let is_real_racing = bundle.bundle_identifier() == "com.firemint.realracing";
+        let bundle_id = bundle.bundle_identifier();
+        let is_ea_or_firemint = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
 
-        if is_real_racing && (entry_point_addr & !1) <= 0x2000 {
-            // Check the symbols we already parsed in mach_o.rs!
+        if is_ea_or_firemint {
+            // Bypass the cracked Mach-O header and jump directly to the compiler's true start symbol!
             if let Some(&real_start) = executable.exported_symbols.get("start")
                 .or_else(|| executable.exported_symbols.get("_start"))
                 .or_else(|| executable.exported_symbols.get("_main")) 
             {
-                echo!("🎮 REAL RACING EXCLUSIVE: Detected corrupted entry point {:#010x}. Overriding with real start symbol at {:#010x}!", entry_point_addr, real_start);
+                echo!("🎮 EA/FIREMINT BYPASS: Overriding cracked entry point {:#010x} with real start symbol at {:#010x}!", entry_point_addr, real_start);
                 entry_point_addr = real_start;
             } else {
-                echo!("🎮 REAL RACING EXCLUSIVE: Corrupted entry point detected, but could not find 'start' symbol!");
+                echo!("🎮 EA/FIREMINT BYPASS: Could not find 'start' symbol to override!");
             }
         }
 
