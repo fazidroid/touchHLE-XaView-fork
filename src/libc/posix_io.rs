@@ -418,6 +418,15 @@ fn fcntl(env: &mut Environment, fd: FileDescriptor, cmd: FileControlCommand, arg
     }
 }
 
+fn getuid(_env: &mut Environment) -> u32 {
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Safely stub unimplemented getuid()
+    // ==========================================================
+    println!("🎮 LOG: Safely stubbed getuid() returning 501 (mobile user)!");
+    501 // 501 is the standard iOS user ID
+}
+
+
 fn fsync(_env: &mut Environment, fd: i32) -> i32 {
     // ==========================================================
     // 🏎️ GAMELOFT BYPASS: Safely intercept POSIX fsync
@@ -448,6 +457,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(getcwd(_, _)),
     export_c_func!(chdir(_)),
     export_c_func!(fcntl(_, _, _)),
+    export_c_func!(getuid()),
     export_c_func!(fsync(_)),
     export_c_func!(ftruncate(_, _)),
 ];
