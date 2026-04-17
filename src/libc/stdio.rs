@@ -113,6 +113,11 @@ fn fopen(env: &mut Environment, filename: ConstPtr<u8>, mode: ConstPtr<u8>) -> M
     }
 }
 
+fn __srget(env: &mut Environment, stream: MutVoidPtr) -> i32 {
+    log_dbg!("__srget({:?}) -> EOF", stream);
+    EOF
+}
+
 fn fread(
     env: &mut Environment,
     mut buffer: MutVoidPtr,
@@ -544,6 +549,7 @@ pub const CONSTANTS: ConstantExports = &[
 pub const FUNCTIONS: FunctionExports = &[
     // Standard C functions
     export_c_func!(fopen(_, _)),
+    export_c_func!(__srget(_)),
     export_c_func!(fread(_, _, _, _)),
     export_c_func!(fgetc(_)),
     export_c_func!(flockfile(_)),
