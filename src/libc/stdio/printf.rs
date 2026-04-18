@@ -841,7 +841,7 @@ fn sscanf_common_generic<
     T,
     U,
     F1: Fn(&mut Environment, MutPtr<U>, GuestUSize) -> Result<T, ()>,
-    F2: Fn(&mut Environment, MutPtr<U>, u8), // TODO: make last param generic too?
+    F2: Fn(&mut Environment, MutPtr<U>, u8),
 >(
     env: &mut Environment,
     getc_fn: F1,
@@ -868,14 +868,10 @@ where
         if c != b'%' {
             let mut cc: u8 = getc_fn(env, subject, src_char_idx).unwrap().into(); // TODO: EOF
             if isspace(env, format + format_char_idx - 1) {
-                // "any single whitespace character in the format string
-                // consumes all available consecutive whitespace characters
-                // from the input"
                 while isspace_inner(cc) {
                     src_char_idx += 1;
                     cc = getc_fn(env, subject, src_char_idx).unwrap().into(); // TODO: EOF
                 }
-                // backtrack one
                 ungetc_fn(env, subject, cc);
                 continue;
             }
@@ -911,13 +907,10 @@ where
                     Some("l")
                 }
             }
-            // q seems to be an equivalent of 'll'
-            // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
             b'q' => {
                 format_char_idx += 1;
                 Some("ll")
             }
-
             _ => None,
         };
 
@@ -925,7 +918,6 @@ where
         format_char_idx += 1;
 
         if ![b'[', b'c', b'n'].contains(&specifier) {
-            // skip whitespaces
             let x = getc_fn(env, subject, src_char_idx);
             if x.is_err() {
                 break 'outer;
@@ -939,47 +931,37 @@ where
                 }
                 cc = x.unwrap().into();
             }
-            // backtrack one
             ungetc_fn(env, subject, cc);
         }
 
         match specifier {
             b'd' | b'i' => {
-                let base: u32 = if specifier == b'd' {
-                    10
-                } else {
-                    // automatic base detection in strtol
-                    0
-                };
-
+                let base: u32 = if specifier == b'd' { 10 } else { 0 };
                 match length_modifier {
-                    Some(lm) => {
-                        match lm {
-                            "h" => {
-                                // signed short*
-                                let res = str_to_int_inner_generic(
-                                    env,
-                                    &getc_fn,
-                                    &ungetc_fn,
-                                    subject,
-                                    src_char_idx,
-                                    base,
-                                    if max_width > 0 { max_width } else { u32::MAX },
-                                    |s, base| i16::from_str_radix(s, base).unwrap_or(i16::MAX),
-                                    |num| num.checked_mul(-1).unwrap_or(i16::MIN),
-                                );
-                                match res {
-                                    Ok((val, len)) => {
-                                        src_char_idx += len;
-                                        let c_int_ptr: ConstPtr<i16> = args.next(env);
-                                        env.mem.write(c_int_ptr.cast_mut(), val);
-                                    }
-                                    Err(_) => break,
+                    Some(lm) => match lm {
+                        "h" => {
+                            let res = str_to_int_inner_generic(
+                                env,
+                                &getc_fn,
+                                &ungetc_fn,
+                                subject,
+                                src_char_idx,
+                                base,
+                                if max_width > 0 { max_width } else { u32::MAX },
+                                |s, base| i16::from_str_radix(s, base).unwrap_or(i16::MAX),
+                                |num| num.checked_mul(-1).unwrap_or(i16::MIN),
+                            );
+                            match res {
+                                Ok((val, len)) => {
+                                    src_char_idx += len;
+                                    let c_int_ptr: ConstPtr<i16> = args.next(env);
+                                    env.mem.write(c_int_ptr.cast_mut(), val);
                                 }
+                                Err(_) => break,
                             }
-                            _ => unimplemented!(),
                         }
-                    }
+                        _ => unimplemented!(),
+                    },
                     _ => {
                         let res = str_to_int_inner_generic(
                             env,
@@ -1004,7 +986,6 @@ where
                 }
             }
             b'f' => {
-                // Bypass max_width assert
                 let res = atof_inner_generic(env, &getc_fn, &ungetc_fn, subject, src_char_idx);
                 let val = match res {
                     Ok((val, len)) => {
@@ -1022,9 +1003,7 @@ where
                         let c_int_ptr: ConstPtr<f64> = args.next(env);
                         env.mem.write(c_int_ptr.cast_mut(), val);
                     }
-                    Some(modifier) => {
-                        unimplemented!("Length formater '{}' for f", modifier)
-                    }
+                    Some(modifier) => unimplemented!("Length formater '{}' for f", modifier),
                 }
             }
             b'x' | b'X' | b'u' => {
@@ -1056,7 +1035,6 @@ where
             }
             b'[' => {
                 assert!(length_modifier.is_none());
-                // [set] case
                 assert_ne!(env.mem.read(format + format_char_idx), b']');
                 let mut c: u8;
                 let inverted = if env.mem.read(format + format_char_idx) == b'^' {
@@ -1066,7 +1044,6 @@ where
                 } else {
                     false
                 };
-                // Build set
                 let mut set: HashSet<u8> = HashSet::new();
                 c = env.mem.read(format + format_char_idx);
                 format_char_idx += 1;
@@ -1088,18 +1065,16 @@ where
                 let mut matched = false;
                 let mut chars_read = 0;
                 let limit = if max_width > 0 { max_width } else { u32::MAX };
-                // Consume `src` while chars are not in the set
-                let mut cc = getc_fn(env, subject, src_char_idx).unwrap().into(); // TODO: EOF
+                let mut cc = getc_fn(env, subject, src_char_idx).unwrap().into();
                 src_char_idx += 1;
                 while set.contains(&cc) ^ inverted && cc != b'\0' && chars_read < limit {
                     matched = true;
                     env.mem.write(dst_ptr, cc);
                     dst_ptr += 1;
                     chars_read += 1;
-                    cc = getc_fn(env, subject, src_char_idx).unwrap().into(); // TODO: EOF
+                    cc = getc_fn(env, subject, src_char_idx).unwrap().into();
                     src_char_idx += 1;
                 }
-                // we need to backtrack one position
                 ungetc_fn(env, subject, cc);
                 src_char_idx -= 1;
                 if matched {
@@ -1107,7 +1082,6 @@ where
                 } else {
                     matched_args -= 1;
                 }
-            }
             }
             b's' => {
                 assert!(length_modifier.is_none());
@@ -1142,10 +1116,8 @@ where
                     "sscanf_common_generic read %s '{:?}'",
                     env.mem.cstr_at_utf8(orig_dst_ptr)
                 );
-            },
+            }
             b'n' => {
-                // %n – store number of input characters read so far
-                // Does not consume input, does not count towards assignment count.
                 match length_modifier {
                     Some("hh") => {
                         let ptr: MutPtr<i8> = args.next(env);
@@ -1165,13 +1137,12 @@ where
                     }
                     _ => unimplemented!("Unsupported length modifier for %%n in scanf"),
                 }
-                // %n does not count as a matched assignment
                 matched_args -= 1;
-            },
-            // TODO: more specifiers
+            }
             _ => unimplemented!("Format character '{}'", specifier as char),
         }
-          matched_args += 1;
+
+        matched_args += 1;
     }
 
     matched_args
