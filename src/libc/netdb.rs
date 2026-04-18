@@ -171,13 +171,13 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
         env.mem.write(ip_data + 2, 0);
         env.mem.write(ip_data + 3, 1);
 
-        // 2. Allocate the h_addr_list (Array of pointers, terminated by NULL)
-        let addr_list = env.mem.alloc(2).cast::<crate::mem::MutPtr<u8>>();
+        // 2. Allocate the h_addr_list (Array of 2 pointers = 8 bytes total!)
+        let addr_list = env.mem.alloc(8).cast::<crate::mem::MutPtr<u8>>();
         env.mem.write(addr_list + 0, ip_data);
         env.mem.write(addr_list + 1, crate::mem::MutPtr::null());
 
-        // 3. Allocate the h_aliases (Array of pointers, terminated by NULL)
-        let aliases = env.mem.alloc(1).cast::<crate::mem::MutPtr<u8>>();
+        // 3. Allocate the h_aliases (Array of 1 pointer = 4 bytes total!)
+        let aliases = env.mem.alloc(4).cast::<crate::mem::MutPtr<u8>>();
         env.mem.write(aliases + 0, crate::mem::MutPtr::null());
 
         // 4. Construct the hostent struct and write it safely!
