@@ -133,6 +133,18 @@ pub const FUNCTIONS: FunctionExports = &[
                 MutPtr<ConstPtr<u8>>,
             ) -> i32),
     ),
+        (
+        "_sqlite3_bind_text",
+        &(sqlite3_bind_text
+            as fn(
+                &mut Environment,
+                u32,
+                i32,
+                ConstPtr<u8>,
+                i32,
+                u32,
+            ) -> i32),
+    ),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
