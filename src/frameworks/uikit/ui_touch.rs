@@ -175,28 +175,49 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let touch: id = msg![env; touches_arr objectAtIndex:i];
         let &UITouchHostObject { location, .. } = env.objc.borrow(touch);
 
-        // 🏎️ ASPHALT 8 ULTIMATE TOUCH INJECTION HACK
+        // ==========================================================
+        // 🏎️ DYNAMIC TOUCH INJECTION: Game-Specific Window Priority!
+        // ==========================================================
         let mut window: id = nil;
         let mut location_in_window = location;
         
-        // 1. Forcefully grab the topmost window, ignoring all geometry checks!
-        let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
-        if windows.len() > 0 {
-            window = *windows.last().unwrap();
-            location_in_window = msg![env; window convertPoint:location fromWindow:nil];
-        } else {
+        let bundle_id = env.bundle.bundle_identifier();
+
+        // Target ALL versions of GT Racing (Freemium, FreemiumHD, FreemiumUK, etc.)
+        if bundle_id.starts_with("com.gameloft.GTRacing") {
+            // Priority 1 (GT Racing): Always target the active Key Window to bypass invisible AdMob windows!
             let app: id = msg_class![env; UIApplication sharedApplication];
-            window = msg![env; app keyWindow];
-            if window != nil {
+            let key_window: id = msg![env; app keyWindow];
+
+            if key_window != nil {
+                window = key_window;
                 location_in_window = msg![env; window convertPoint:location fromWindow:nil];
+            } else {
+                let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+                if windows.len() > 0 {
+                    window = *windows.last().unwrap();
+                    location_in_window = msg![env; window convertPoint:location fromWindow:nil];
+                }
+            }
+        } else {
+            // Priority 2 (Asphalt 8 & Others): Forcefully grab the topmost window, ignoring geometry checks!
+            let windows = env.framework_state.uikit.ui_view.ui_window.windows.clone();
+            if windows.len() > 0 {
+                window = *windows.last().unwrap();
+                location_in_window = msg![env; window convertPoint:location fromWindow:nil];
+            } else {
+                let app: id = msg_class![env; UIApplication sharedApplication];
+                window = msg![env; app keyWindow];
+                if window != nil {
+                    location_in_window = msg![env; window convertPoint:location fromWindow:nil];
+                }
             }
         }
 
         if window == nil {
-            log!("CRITICAL: Asphalt 8 has NO active windows! Touch at {:?} dropped.", location);
+            log!("CRITICAL: App has NO active windows! Touch at {:?} dropped.", location);
             continue;
         }
-
         // 2. Forcefully grab the active game layer, bypassing 'hitTest' math!
         let mut view: id = msg![env; window hitTest:location_in_window withEvent:event];
         if view == nil {
