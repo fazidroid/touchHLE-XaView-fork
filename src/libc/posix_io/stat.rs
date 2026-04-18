@@ -104,25 +104,34 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
         return -1;
     };
 
-    // FIXME: This implementation is highly incomplete. fstat() returns a huge
-    // struct with many kinds of data in it. This code is assuming the caller
-    // only wants a small part of it.
-
     let mut stat = stat::default();
 
     match file.file {
         GuestFile::File(_) | GuestFile::IpaBundleFile(_) | GuestFile::ResourceFile(_) => {
             stat.st_mode |= S_IFREG;
 
-            // TODO: use `std::fs::metadata()` instead
-
             // Obtain file size
-            stat.st_size = file.file.stream_len().unwrap().try_into().unwrap();
+            let real_size = file.file.stream_len().unwrap_or(0).try_into().unwrap();
+            stat.st_size = real_size;
+
+            // ==========================================================
+            // 🏎️ EA & GAMELOFT BYPASS: Populate missing block sizes!
+            // ==========================================================
+            // C++ stream buffers check st_blksize to allocate disk writes.
+            // If it is 0, the extraction/save process aborts completely!
+            stat.st_blksize = 4096;
+            stat.st_blocks = if real_size > 0 {
+                (real_size + 511) / 512
+            } else {
+                8 // Fake a minimum allocation block for newly created files
+            };
         }
         GuestFile::Directory => {
             stat.st_mode |= S_IFDIR;
-
-            // TODO: st_size
+            
+            // Give directories a valid block size too!
+            stat.st_blksize = 4096;
+            stat.st_blocks = 8;
         }
         _ => unimplemented!(),
     }
