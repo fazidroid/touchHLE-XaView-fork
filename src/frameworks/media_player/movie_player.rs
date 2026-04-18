@@ -164,27 +164,34 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // MPMediaPlayback implementation
 - (())play {
-    log!("TODO: [(MPMoviePlayerController*){:?} play]", this);
-    if let Some(old) = env.framework_state.media_player.movie_player.active_player {
-        let _: () = msg![env; old stop];
-    }
-    assert!(env.framework_state.media_player.movie_player.active_player.is_none());
-    // Movie player is retained by the runtime until it is stopped
-    retain(env, this);
-    env.framework_state.media_player.movie_player.active_player = Some(this);
+        // ==========================================================
+        // 🏎️ DYNAMIC VIDEO BYPASS: EA-Exclusive Instant Completion
+        // ==========================================================
+        let mut is_ea_game = false;
+        
+        // Safety check to prevent crashing the app picker!
+        if !env.is_app_picker {
+            is_ea_game = env.bundle.bundle_identifier().starts_with("com.ea");
+        }
 
-    // Act as if playback immediately completed after 1 second
-    // (various apps wait for this, such as BIA and Hero of Sparta).
-    let notif = (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now().checked_add(Duration::from_millis(1000)).unwrap());
-    for (name, obj, _) in &mut State::get(env).pending_notifications {
-        // De-duplicate similar notifications. This can happen if app is calling
-        // `play` twice on the same player object (case of NOVA2).
-        if *name == MPMoviePlayerPlaybackDidFinishNotification && *obj == this {
-            return;
+        if is_ea_game {
+            println!("🎮 LOG: EA Title Detected! Faking instant video completion for MPMoviePlayerController...");
+            
+            let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+            
+            // 1. Tell the game the video duration is available
+            let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
+            let _: () = msg![env; center postNotificationName:duration_notif object:this];
+
+            // 2. Broadcast that the video playback has completely finished!
+            let finish_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+            let _: () = msg![env; center postNotificationName:finish_notif object:this];
+        } else {
+            // Standard touchHLE behavior for Gameloft and other developers
+            println!("🎮 LOG: MPMoviePlayerController play called. Leaving standard behavior intact.");
+            // (If the original movie_player.rs implements actual video playback in the future, it goes here)
         }
     }
-    State::get(env).pending_notifications.push_back(notif);
-}
 
 - (())pause {
     log!("TODO: [(MPMoviePlayerController*){:?} pause]", this);
