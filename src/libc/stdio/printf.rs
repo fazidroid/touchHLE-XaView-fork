@@ -1108,6 +1108,7 @@ where
                     matched_args -= 1;
                 }
             }
+            }
             b's' => {
                 assert!(length_modifier.is_none());
                 let orig_dst_ptr: MutPtr<u8> = args.next(env);
@@ -1141,7 +1142,7 @@ where
                     "sscanf_common_generic read %s '{:?}'",
                     env.mem.cstr_at_utf8(orig_dst_ptr)
                 );
-            }
+            },
             b'n' => {
                 // %n – store number of input characters read so far
                 // Does not consume input, does not count towards assignment count.
@@ -1169,10 +1170,10 @@ where
             },
             // TODO: more specifiers
             _ => unimplemented!("Format character '{}'", specifier as char),
+        }
+          matched_args += 1;
     }
-  }),
-    }
-    
+
     matched_args
 }
 
