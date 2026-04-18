@@ -39,6 +39,24 @@ fn CFStringAppend(
 ) {
     msg![env; the_string appendString:appended_string]
 }
+// ==========================================================
+// 🏎️ EA BYPASS: Dynamic String Building for NFS Most Wanted
+// ==========================================================
+fn CFStringAppendCharacters(
+    env: &mut Environment,
+    the_string: CFMutableStringRef,
+    chars: ConstPtr<unichar>,
+    num_chars: CFIndex,
+) {
+    // 1. Convert the CFIndex length to an iOS-compatible NSUInteger
+    let length: NSUInteger = num_chars.try_into().unwrap();
+    
+    // 2. Safely create a new NSString out of the raw unicode characters
+    let to_append: id = msg_class![env; NSString stringWithCharacters:chars length:length];
+    
+    // 3. Append the new string to the target buffer!
+    msg![env; the_string appendString:to_append]
+}
 
 fn CFStringAppendCString(
     env: &mut Environment,
@@ -462,6 +480,7 @@ fn CFStringGetPascalString(
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringAppend(_, _)),
+    export_c_func!(CFStringAppendCharacters(_, _, _)),
     export_c_func!(CFStringAppendCString(_, _, _)),
     export_c_func!(CFStringAppendFormat(_, _, _, _)),
     export_c_func!(CFStringConvertEncodingToNSStringEncoding(_)),
