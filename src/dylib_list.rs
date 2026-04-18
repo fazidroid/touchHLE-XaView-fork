@@ -14,6 +14,7 @@ use crate::frameworks::mobile_core_services;
 /// searches through.
 pub const DYLIB_LIST: &[&super::HostDylib] = &[
     &libc::DYLIB,
+    &libc::sqlite::DYLIB,
     &objc::DYLIB,
     &crate::environment::app_picker::DYLIB, // Not a real library; special internal classes.
     &frameworks::audio_toolbox::DYLIB,
