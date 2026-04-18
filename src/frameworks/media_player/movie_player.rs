@@ -54,6 +54,10 @@ const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
 /// `NSNotificationName` values and other constants.
 pub const CONSTANTS: ConstantExports = &[
     (
+        "_MPMovieDurationAvailableNotification",
+        HostConstant::NSString(MPMovieDurationAvailableNotification),
+    ),
+    (
         "_MPMoviePlayerPlaybackDidFinishNotification",
         HostConstant::NSString(MPMoviePlayerPlaybackDidFinishNotification),
     ),
