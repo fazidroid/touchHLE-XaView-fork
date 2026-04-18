@@ -43,6 +43,7 @@ pub mod sysctl;
 pub mod time;
 pub mod unistd;
 pub mod wchar;
+pub mod sqlite;
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/usr/lib/libSystem.B.dylib",
