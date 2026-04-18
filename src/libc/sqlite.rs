@@ -95,6 +95,11 @@ fn sqlite3_step(_env: &mut Environment, _stmt: u32) -> i32 {
     SQLITE_DONE
 }
 
+fn sqlite3_finalize(_env: &mut Environment, _stmt: u32) -> i32 {
+    log!("sqlite3_finalize: returning SQLITE_OK");
+    SQLITE_OK
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
     export_c_func!(sqlite3_close(_)),
@@ -102,6 +107,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_errmsg(_)),
     export_c_func!(sqlite3_prepare_v2(_, _, _, _, _)),
     export_c_func!(sqlite3_step(_)),
+    export_c_func!(sqlite3_finalize(_)),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
