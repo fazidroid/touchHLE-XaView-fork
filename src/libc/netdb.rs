@@ -164,35 +164,32 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     if is_gt_racing {
         println!("🎮 GT RACING EXCLUSIVE: Spoofing gethostbyname for [{}]", name_str);
         
-        let block = env.mem.alloc(64).cast::<u8>();
-        let hostent_ptr = block.cast::<hostent>();
-        
-        // 🏎️ FIX: Use standard + operator instead of .add()
-        let addr_list_ptr = (block + 20).cast::<MutPtr<u8>>();
-        let aliases_ptr = (block + 28).cast::<MutPtr<u8>>();
-        let addr_data_ptr = block + 32;
-        
-        // Write IP address: 127.0.0.1
-        env.mem.write(addr_data_ptr + 0, 127u8);
-        env.mem.write(addr_data_ptr + 1, 0u8);
-        env.mem.write(addr_data_ptr + 2, 0u8);
-        env.mem.write(addr_data_ptr + 3, 1u8);
-        
-        env.mem.write(addr_list_ptr + 0, addr_data_ptr);
-        env.mem.write(addr_list_ptr + 1, crate::mem::MutPtr::null());
-        env.mem.write(aliases_ptr + 0, crate::mem::MutPtr::null());
-        
-        // Construct the hostent struct
+        // 1. Allocate the IP data (127.0.0.1) safely in its own 4-byte block
+        let ip_data = env.mem.alloc(4).cast::<u8>();
+        env.mem.write(ip_data + 0, 127);
+        env.mem.write(ip_data + 1, 0);
+        env.mem.write(ip_data + 2, 0);
+        env.mem.write(ip_data + 3, 1);
+
+        // 2. Allocate the h_addr_list (Array of pointers, terminated by NULL)
+        let addr_list = env.mem.alloc(2).cast::<crate::mem::MutPtr<u8>>();
+        env.mem.write(addr_list + 0, ip_data);
+        env.mem.write(addr_list + 1, crate::mem::MutPtr::null());
+
+        // 3. Allocate the h_aliases (Array of pointers, terminated by NULL)
+        let aliases = env.mem.alloc(1).cast::<crate::mem::MutPtr<u8>>();
+        env.mem.write(aliases + 0, crate::mem::MutPtr::null());
+
+        // 4. Construct the hostent struct and write it safely!
         let h = hostent {
             h_name: name.cast_mut(),
-            h_aliases: aliases_ptr.cast(),
+            h_aliases: aliases,
             h_addrtype: 2, // AF_INET
             h_length: 4,
-            h_addr_list: addr_list_ptr.cast(),
+            h_addr_list: addr_list,
         };
-        env.mem.write(hostent_ptr, h);
         
-        return hostent_ptr;
+        return env.mem.alloc_and_write(h);
     }
 
     // Standard touchHLE behavior for all other games
