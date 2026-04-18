@@ -1142,10 +1142,7 @@ where
                     env.mem.cstr_at_utf8(orig_dst_ptr)
                 );
             }
-            // TODO: more specifiers
-            _ => unimplemented!("Format character '{}'", specifier as char),
-        }
-        b'n' => {
+            b'n' => {
                 // %n – store number of input characters read so far
                 // Does not consume input, does not count towards assignment count.
                 match length_modifier {
@@ -1172,7 +1169,9 @@ where
             },
             // TODO: more specifiers
             _ => unimplemented!("Format character '{}'", specifier as char),
-        }
+    }
+  }),
+    }
     
     matched_args
 }
