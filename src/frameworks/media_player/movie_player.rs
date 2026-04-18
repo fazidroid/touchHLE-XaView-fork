@@ -40,6 +40,9 @@ const MPMoviePlaybackStateStopped: MPMoviePlaybackState = 0;
 
 // Values might not be correct, but as these are linked symbol constants, it
 // shouldn't matter.
+pub const MPMovieDurationAvailableNotification: &str =
+    "MPMovieDurationAvailableNotification";
+
 pub const MPMoviePlayerPlaybackDidFinishNotification: &str =
     "MPMoviePlayerPlaybackDidFinishNotification";
 /// Apparently an undocumented, private API. Spore Origins uses it.
