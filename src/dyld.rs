@@ -858,6 +858,35 @@ impl Dyld {
             }
             return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
         }
+        // ==========================================================
+        // 🏎️ REAL RACING 2 BYPASS: Stub _NSGetExecutablePath
+        // ==========================================================
+        if symbol == "__NSGetExecutablePath" {
+            fn fake_NSGetExecutablePath(
+                env: &mut crate::Environment,
+                buf: crate::mem::MutPtr<u8>,
+                bufsize: crate::mem::MutPtr<u32>,
+            ) -> i32 {
+                log!("_NSGetExecutablePath called (RR2 bypass)");
+                let path = b"/path/to/app.app/app\0";
+                let required_size = path.len() as u32;
+
+                let current_size = env.mem.read(bufsize);
+                if current_size < required_size {
+                    env.mem.write(bufsize, required_size);
+                    return -1;
+                }
+
+                for (i, &b) in path.iter().enumerate() {
+                    env.mem.write(buf + i as u32, b);
+                }
+                0
+            }
+            return Some(
+                &(fake_NSGetExecutablePath
+                    as fn(&mut crate::Environment, crate::mem::MutPtr<u8>, crate::mem::MutPtr<u32>) -> i32),
+            );
+        }
 
         // ==========================================================
         // 🏎️ GAMELOFT BYPASS: Safely intercept _pthread_exit
