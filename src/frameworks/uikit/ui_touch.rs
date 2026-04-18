@@ -175,16 +175,19 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
         let touch: id = msg![env; touches_arr objectAtIndex:i];
         let &UITouchHostObject { location, .. } = env.objc.borrow(touch);
 
-        // ==========================================================
+           // ==========================================================
         // 🏎️ DYNAMIC TOUCH INJECTION: Game-Specific Window Priority!
         // ==========================================================
         let mut window: id = nil;
         let mut location_in_window = location;
         
-        let bundle_id = env.bundle.bundle_identifier();
+        let mut is_gt_racing = false;
+        // 🏎️ FIX: Ensure we don't crash the app picker's fake bundle!
+        if !env.is_app_picker {
+            is_gt_racing = env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing");
+        }
 
-        // Target ALL versions of GT Racing (Freemium, FreemiumHD, FreemiumUK, etc.)
-        if bundle_id.starts_with("com.gameloft.GTRacing") {
+        if is_gt_racing {
             // Priority 1 (GT Racing): Always target the active Key Window to bypass invisible AdMob windows!
             let app: id = msg_class![env; UIApplication sharedApplication];
             let key_window: id = msg![env; app keyWindow];
