@@ -12,6 +12,7 @@ use crate::Environment;
 // SQLite result codes
 const SQLITE_OK: i32 = 0;
 const SQLITE_ERROR: i32 = 1;
+const SQLITE_DONE: i32 = 101;
 
 // We represent sqlite3* as an opaque u32 guest pointer.
 // The guest will treat it as a pointer to an sqlite3 struct.
@@ -89,12 +90,18 @@ fn sqlite3_prepare_v2(
     SQLITE_OK
 }
 
+fn sqlite3_step(_env: &mut Environment, _stmt: u32) -> i32 {
+    log!("sqlite3_step: returning SQLITE_DONE");
+    SQLITE_DONE
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
     export_c_func!(sqlite3_close(_)),
     export_c_func!(sqlite3_exec(_, _, _, _, _)),
     export_c_func!(sqlite3_errmsg(_)),
     export_c_func!(sqlite3_prepare_v2(_, _, _, _, _)),
+    export_c_func!(sqlite3_step(_)),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
