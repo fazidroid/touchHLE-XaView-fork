@@ -44,7 +44,7 @@ fn sqlite3_close(env: &mut Environment, db: u32) -> i32 {
     if db != 0 {
         // Free the dummy allocation (optional, we could leak it)
         let ptr: MutPtr<u8> = Ptr::from_bits(db);
-        env.mem.free(ptr);
+        env.mem.free(ptr.cast());
     }
     SQLITE_OK
 }
