@@ -443,7 +443,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     // TODO: unify with `statfs`
     // TODO: account for path
     let size: u64 = if is_asphalt {
-        32 * 1024 * 1024 * 1024 // 32 GB for Asphalt 8
+        // 🏎️ FIX: Safest max 32-bit signed integer (2.14 GB) to prevent overflow!
+        2147483647 
     } else {
         1024 * 1024 * 1024 // 1 GB default for other games
     };
