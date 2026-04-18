@@ -227,25 +227,24 @@ fn arc4random(env: &mut Environment) -> u32 {
 }
 
 fn getenv(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<u8> {
-    let name_cstr = env.mem.cstr_at(name);
-    let Some(&value) = env.env_vars.get(name_cstr) else {
-        log!(
-            "Warning: getenv() for {:?} ({:?}) unhandled",
-            name,
-            std::str::from_utf8(name_cstr)
-        );
-        return Ptr::null();
-    };
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or_default();
+    
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Safely absorb libcurl proxy checks!
+    // ==========================================================
+    let is_proxy_check = name_str.to_lowercase().contains("proxy");
+    if is_proxy_check {
+        println!("🎮 LOG: Safely stubbed getenv({:?}) to return empty string!", name_str);
+        // Returning a valid empty string safely bypasses the libcurl NULL pointer crash!
+        return env.mem.alloc_and_write_cstr(b""); 
+    }
 
-    log_dbg!(
-        "getenv({:?} ({:?})) => {:?} ({:?})",
-        name,
-        name_cstr,
-        value,
-        env.mem.cstr_at_utf8(value),
-    );
-    // Caller should not modify the result
-    value
+    if let Some(&ptr) = env.env_vars.get(env.mem.cstr_at(name)) {
+        ptr
+    } else {
+        log!("Warning: getenv() for {:?} (Ok({:?})) unhandled", name, name_str);
+        crate::mem::MutPtr::null()
+    }
 }
 fn setenv(env: &mut Environment, name: ConstPtr<u8>, value: ConstPtr<u8>, overwrite: i32) -> i32 {
     // TODO: handle errno properly
