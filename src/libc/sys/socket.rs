@@ -1140,6 +1140,35 @@ fn if_nametoindex(_env: &mut Environment, _ifname: ConstPtr<u8>) -> u32 {
     1
 }
 
+fn getsockname(
+    env: &mut Environment,
+    socket: i32,
+    address: MutPtr<sockaddr>,
+    address_len: MutPtr<socklen_t>,
+) -> i32 {
+    log_dbg!("getsockname({}, {:?}, {:?})", socket, address, address_len);
+    set_errno(env, 0);
+
+    if !State::get(env).sockets.contains_key(&socket) {
+        set_errno(env, EBADF);
+        return -1;
+    }
+
+    // Offline mode: return a dummy local address
+    if !env.options.network_access {
+        let dummy_addr = sockaddr::from_ipv4_parts([0, 0, 0, 0], 0);
+        env.mem.write(address, dummy_addr);
+        env.mem.write(address_len, guest_size_of::<sockaddr>());
+        return 0;
+    }
+
+    // For now, we don't track bound addresses properly, so just return a dummy.
+    let dummy_addr = sockaddr::from_ipv4_parts([0, 0, 0, 0], 0);
+    env.mem.write(address, dummy_addr);
+    env.mem.write(address_len, guest_size_of::<sockaddr>());
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(socket(_, _, _)),
     export_c_func!(ioctl(_, _, _)),
@@ -1155,7 +1184,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(send(_, _, _, _)),
     export_c_func!(sendto(_, _, _, _, _, _)),
     export_c_func!(shutdown(_, _)),
-    export_c_func!(if_nametoindex(_)), // Зарегистрировали нашу функцию
+    export_c_func!(if_nametoindex(_)),
+    export_c_func!(getsockname(_, _, _)),
 ];
 
 /// A helper to close a socket, not a part of API
