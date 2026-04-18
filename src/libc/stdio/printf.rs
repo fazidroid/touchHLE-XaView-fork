@@ -1172,7 +1172,7 @@ where
             },
             // TODO: more specifiers
             _ => unimplemented!("Format character '{}'", specifier as char),
-    }
+        }
     
     matched_args
 }
