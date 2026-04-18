@@ -21,6 +21,12 @@ const WHITESPACE_CHARACTERS: [char; 18] = [
 const NEWLINE_CHARACTERS: [char; 7] = [
     '\u{000A}', '\u{000B}', '\u{000C}', '\u{000D}', '\u{0085}', '\u{2028}', '\u{2029}',
 ];
+// ==========================================================
+// 🏎️ EA BYPASS: Decimal Digits for Text Parsing
+// ==========================================================
+const DECIMAL_DIGIT_CHARACTERS: [char; 10] = [
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+];
 
 /// Belongs to _touchHLE_NSCharacterSet
 struct CharacterSetHostObject {
@@ -80,6 +86,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     let set1 = HashSet::from(NEWLINE_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
     let set2 = HashSet::from(WHITESPACE_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
     let set = set1.union(&set2).copied().collect();
+
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
+
+    autorelease(env, new)
+}
+// ==========================================================
+// 🏎️ EA BYPASS: Expose Decimal Digits to the Engine
+// ==========================================================
++ (id)decimalDigitCharacterSet {
+    let set = HashSet::from(DECIMAL_DIGIT_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
 
     let new: id = msg![env; this alloc];
     env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
