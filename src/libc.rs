@@ -93,6 +93,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         stdio::FUNCTIONS,
         stdio::printf::FUNCTIONS,
         stdlib::FUNCTIONS,
+        sqlite::FUNCTIONS,
         stdlib::qsort::FUNCTIONS,
         string::FUNCTIONS,
         sys::mman::FUNCTIONS,
