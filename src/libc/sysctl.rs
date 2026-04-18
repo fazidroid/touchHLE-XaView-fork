@@ -14,7 +14,7 @@ use crate::libc::sysctl::SysInfoType::String;
 use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, PAGE_SIZE};
 use crate::Environment;
 
-static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 27] = [
+static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 28] = [
     ((6,1),  "hw.machine",       String(b"iPhone4,1")),
     ((6,2),  "hw.model",         String(b"N94AP")),
     ((6,12), "hw.machine_arch",  String(b"arm64")),
