@@ -210,13 +210,16 @@ fn handle_touches_down(env: &mut Environment, map: HashMap<FingerId, Coords>) {
             log_dbg!("Injected out-of-bounds touch into view {:?}", view);
         }
 
-        let is_multi_touch_enabled: bool = msg![env; view isMultipleTouchEnabled];
+                let is_multi_touch_enabled: bool = msg![env; view isMultipleTouchEnabled];
         if !is_multi_touch_enabled {
             let view_has_other_new_touches = view_touches.contains_key(&view);
             let view_has_existing_touches = views_with_existing_touches.contains(&view);
             if view_has_other_new_touches || view_has_existing_touches {
-                log!("Ignoring new touch {:?} for view {:?}, !isMultipleTouchEnabled", touch, view);
-                continue;
+                // ==========================================================
+                // 🏎️ ANDROID TOUCH BYPASS: Ignore strict multi-touch rules
+                // ==========================================================
+                println!("🎮 LOG: Bypassed strict !isMultipleTouchEnabled check for view {:?} to ensure menu clicks work!", view);
+                // continue; // <-- Commented out so the touch is NEVER dropped!
             }
         }
 
