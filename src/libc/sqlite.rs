@@ -120,7 +120,19 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_prepare_v2(_, _, _, _, _)),
     export_c_func!(sqlite3_step(_)),
     export_c_func!(sqlite3_finalize(_)),
-    export_c_func!(sqlite3_prepare(_, _, _, _, _, _)),
+    // Manual entry for sqlite3_prepare
+    (
+        "_sqlite3_prepare",
+        &(sqlite3_prepare
+            as fn(
+                &mut Environment,
+                u32,
+                ConstPtr<u8>,
+                i32,
+                MutPtr<u32>,
+                MutPtr<ConstPtr<u8>>,
+            ) -> i32),
+    ),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
