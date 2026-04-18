@@ -136,33 +136,6 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     Some("h")
                 }
             }
-            b'n' => {
-                // %n – store number of characters written so far
-                assert!(!prepend_sign);
-                assert!(!left_justified);
-                assert!(precision.is_none());
-                // Length modifier determines the integer type pointed to
-                match length_modifier {
-                    Some("hh") => {
-                        let ptr: MutPtr<i8> = args.next(env);
-                        env.mem.write(ptr, res.len() as i8);
-                    }
-                    Some("h") => {
-                        let ptr: MutPtr<i16> = args.next(env);
-                        env.mem.write(ptr, res.len() as i16);
-                    }
-                    None | Some("l") => {
-                        // int / long are 32-bit on 32-bit iOS
-                        let ptr: MutPtr<i32> = args.next(env);
-                        env.mem.write(ptr, res.len() as i32);
-                    }
-                    Some("ll") => {
-                        let ptr: MutPtr<i64> = args.next(env);
-                        env.mem.write(ptr, res.len() as i64);
-                    }
-                    _ => unimplemented!("Unsupported length modifier for %%n"),
-                }
-            }
             
             b'l' => {
                 format_char_idx += 1;
@@ -528,6 +501,32 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     write!(&mut res, "{tmp:>pad_width$}").unwrap();
                 } else {
                     res.extend_from_slice(tmp.as_bytes());
+                }
+            }
+            b'n' => {
+                // %n – store number of characters written so far
+                assert!(!prepend_sign);
+                assert!(!left_justified);
+                assert!(precision.is_none());
+                match length_modifier {
+                    Some("hh") => {
+                        let ptr: MutPtr<i8> = args.next(env);
+                        env.mem.write(ptr, res.len() as i8);
+                    }
+                    Some("h") => {
+                        let ptr: MutPtr<i16> = args.next(env);
+                        env.mem.write(ptr, res.len() as i16);
+                    }
+                    None | Some("l") => {
+                        // int / long are 32-bit on 32-bit iOS
+                        let ptr: MutPtr<i32> = args.next(env);
+                        env.mem.write(ptr, res.len() as i32);
+                    }
+                    Some("ll") => {
+                        let ptr: MutPtr<i64> = args.next(env);
+                        env.mem.write(ptr, res.len() as i64);
+                    }
+                    _ => unimplemented!("Unsupported length modifier for %%n"),
                 }
             }
             // Float specifiers
