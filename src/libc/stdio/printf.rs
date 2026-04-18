@@ -1001,6 +1001,31 @@ where
                     Some("l")
                 }
             }
+            b'n' => {
+                // %n – store number of input characters read so far
+                // Does not consume input, does not count towards assignment count.
+                match length_modifier {
+                    Some("hh") => {
+                        let ptr: MutPtr<i8> = args.next(env);
+                        env.mem.write(ptr, src_char_idx as i8);
+                    }
+                    Some("h") => {
+                        let ptr: MutPtr<i16> = args.next(env);
+                        env.mem.write(ptr, src_char_idx as i16);
+                    }
+                    None | Some("l") => {
+                        let ptr: MutPtr<i32> = args.next(env);
+                        env.mem.write(ptr, src_char_idx as i32);
+                    }
+                    Some("ll") => {
+                        let ptr: MutPtr<i64> = args.next(env);
+                        env.mem.write(ptr, src_char_idx as i64);
+                    }
+                    _ => unimplemented!("Unsupported length modifier for %%n in scanf"),
+                }
+                // %n does not count as a matched assignment
+                matched_args -= 1;
+            }
             // q seems to be an equivalent of 'll'
             // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
             b'q' => {
