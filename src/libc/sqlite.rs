@@ -111,6 +111,17 @@ fn sqlite3_prepare(
     // Delegate to the v2 implementation
     sqlite3_prepare_v2(env, db, z_sql, n_byte, pp_stmt, pz_tail)
 }
+fn sqlite3_bind_text(
+    _env: &mut Environment,
+    _stmt: u32,
+    _index: i32,
+    _value: ConstPtr<u8>,
+    _len: i32,
+    _destructor: u32, // function pointer or SQLITE_STATIC/SQLITE_TRANSIENT
+) -> i32 {
+    log!("sqlite3_bind_text: returning SQLITE_OK");
+    SQLITE_OK
+}
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
