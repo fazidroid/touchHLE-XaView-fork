@@ -67,11 +67,34 @@ fn sqlite3_errmsg(_env: &mut Environment, _db: u32) -> ConstPtr<u8> {
     Ptr::from_bits(0xdeadbeef)
 }
 
+fn sqlite3_prepare_v2(
+    env: &mut Environment,
+    _db: u32,                       // sqlite3*
+    _z_sql: ConstPtr<u8>,           // SQL text
+    _n_byte: i32,                   // Max bytes to read from zSql, or -1 for up to null terminator
+    pp_stmt: MutPtr<u32>,           // OUT: sqlite3_stmt**
+    _pz_tail: MutPtr<ConstPtr<u8>>, // OUT: pointer to unused portion of zSql (optional)
+) -> i32 {
+    let sql = if _z_sql.is_null() {
+        "<null>".to_string()
+    } else {
+        env.mem.cstr_at_utf8(_z_sql).unwrap_or("<invalid utf8>").to_string()
+    };
+    log!("sqlite3_prepare_v2: {}", sql);
+
+    // Allocate a dummy statement handle (just a non‑null guest pointer)
+    let dummy_stmt = env.mem.alloc(1);
+    env.mem.write(pp_stmt, dummy_stmt.to_bits());
+
+    SQLITE_OK
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
     export_c_func!(sqlite3_close(_)),
     export_c_func!(sqlite3_exec(_, _, _, _, _)),
     export_c_func!(sqlite3_errmsg(_)),
+    export_c_func!(sqlite3_prepare_v2(_, _, _, _, _)),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
