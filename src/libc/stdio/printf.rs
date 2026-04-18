@@ -66,14 +66,14 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
             false
         };
 
-        // BypassAltFormPanic
-        let alternative_form = if get_format_char(&env.mem, format_char_idx) == b'#' {
+        if get_format_char(&env.mem, format_char_idx) == b'#' {
+            // Alternative form handling
             format_char_idx += 1;
-            log_dbg!("printf_inner: '#' flag parsed and partially supported");
-            true
-        } else {
-            false
-        };
+            // TODO: other specifiers
+            assert!(get_format_char(&env.mem, format_char_idx) == b'.');
+            // TODO: other cases
+            assert!(get_format_char(&env.mem, format_char_idx + 2) == b'd');
+        }
 
         let pad_char = if get_format_char(&env.mem, format_char_idx) == b'0' {
             format_char_idx += 1;
@@ -102,9 +102,6 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
         };
         assert!(pad_width >= 0); // TODO: Implement right-padding
 
-        // ==========================================================
-        // 🛠️ MISSING PRECISION BLOCK RESTORED HERE
-        // ==========================================================
         let precision = if get_format_char(&env.mem, format_char_idx) == b'.' {
             format_char_idx += 1;
             let precision = if get_format_char(&env.mem, format_char_idx) == b'*' {
@@ -124,9 +121,8 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
         } else {
             None
         };
-        // ==========================================================
 
-        let mut length_modifier = match get_format_char(&env.mem, format_char_idx) {
+        let length_modifier = match get_format_char(&env.mem, format_char_idx) {
             b'h' => {
                 format_char_idx += 1;
                 if get_format_char(&env.mem, format_char_idx) == b'h' {
@@ -136,53 +132,24 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     Some("h")
                 }
             }
-            
             b'l' => {
                 format_char_idx += 1;
                 if get_format_char(&env.mem, format_char_idx) == b'l' {
                     format_char_idx += 1;
-                    Some("ll") // 🏎️ Fix: touchHLE natively supports "ll", do not use "lld"!
+                    Some("ll")
                 } else {
                     Some("l")
                 }
             }
+            // q seems to be an equivalent of 'll'
+            // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
             b'q' => {
                 format_char_idx += 1;
                 Some("ll")
             }
-            b'j' | b'z' | b't' | b'L' => {
-                format_char_idx += 1;
-                Some("unsupported") // 🏎️ Fix: Catch 'z' and 't' without instantly panicking
-            }
+            b'j' | b'z' | b't' | b'L' => unimplemented!(),
             _ => None,
         };
-
-        // ==========================================================
-        // 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: Unsupported printf modifiers
-        // ==========================================================
-        if length_modifier == Some("unsupported") || length_modifier == Some("ll") {
-            let main_bundle: id = crate::objc::msg_class![env; NSBundle mainBundle];
-            let mut is_asphalt = false;
-            
-            if main_bundle != nil {
-                let bundle_id: id = msg![env; main_bundle bundleIdentifier];
-                if bundle_id != nil {
-                    let bundle_str = ns_string::to_rust_string(env, bundle_id);
-                    is_asphalt = bundle_str.to_lowercase().contains("asphalt");
-                }
-            }
-
-            if is_asphalt {
-                // If it is 'z', 't', etc., safely nullify it so Asphalt 8 can print!
-                if length_modifier == Some("unsupported") {
-                    length_modifier = None; 
-                }
-                // If it is "ll", we leave it alone because touchHLE natively handles 64-bit "ll" perfectly!
-            } else if length_modifier == Some("unsupported") {
-                // Standard touchHLE strict behavior for all other games
-                unimplemented!("Unsupported length modifier in printf!");
-            }
-        }
 
         let specifier = get_format_char(&env.mem, format_char_idx);
         format_char_idx += 1;
@@ -298,16 +265,11 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     res.extend_from_slice("(null)".as_bytes());
                 }
             }
-            // FixMissingOctal
-            b'd' | b'i' | b'u' | b'D' | b'U' | b'O' | b'o' => {
+            b'd' | b'i' | b'u' | b'D' | b'U' | b'O' => {
                 assert!(!left_justified);
                 // Note: on 32-bit system int and long are i32,
                 // so single length_modifier is ignored (but not double one!)
-                let int: i64 = if specifier == b'u'
-                    || specifier == b'U'
-                    || specifier == b'O'
-                    || specifier == b'o'
-                {
+                let int: i64 = if specifier == b'u' || specifier == b'U' {
                     if length_modifier == Some("ll") {
                         let uint: u64 = args.next(env);
                         uint.try_into().unwrap()
@@ -338,17 +300,13 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     }
                 };
 
-                // SupportAltFormO
-                let int_with_precision = if specifier == b'O' || specifier == b'o' {
-                    let mut oct_str = if precision.is_some_and(|value| value > 0) {
+                let int_with_precision = if specifier == b'O' {
+                    // Форматируем как восьмеричное
+                    if precision.is_some_and(|value| value > 0) {
                         format!("{:01$o}", int, precision.unwrap())
                     } else {
                         format!("{int:o}")
-                    };
-                    if alternative_form && int != 0 && !oct_str.starts_with('0') {
-                        oct_str.insert(0, '0');
                     }
-                    oct_str
                 } else if precision.is_some_and(|value| value > 0) {
                     format!("{:01$}", int, precision.unwrap())
                 } else {
@@ -395,7 +353,6 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'x' => {
-                // SupportAltFormX
                 assert!(!prepend_sign);
                 assert!(!left_justified);
                 // Note: on 32-bit system unsigned int and unsigned long
@@ -414,25 +371,15 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     let uint: u32 = args.next(env);
                     uint
                 };
-
-                let mut prefix = "";
-                if alternative_form && uint != 0 {
-                    prefix = "0x";
-                }
-
                 if pad_width > 0 {
                     assert!(precision.is_none()); // TODO
                     let pad_width = pad_width as usize;
                     if pad_char == '0' && precision.is_none() {
-                        let pad_len = pad_width.saturating_sub(prefix.len());
-                        res.extend_from_slice(prefix.as_bytes());
-                        write!(&mut res, "{uint:0>pad_len$x}").unwrap();
+                        write!(&mut res, "{uint:0>pad_width$x}").unwrap();
                     } else {
-                        let tmp = format!("{}{:x}", prefix, uint);
-                        write!(&mut res, "{tmp:>pad_width$}").unwrap();
+                        write!(&mut res, "{uint:>pad_width$x}").unwrap();
                     }
                 } else {
-                    res.extend_from_slice(prefix.as_bytes());
                     let tmp = if precision.is_some_and(|value| value > 0) {
                         format!("{:01$x}", uint, precision.unwrap())
                     } else {
@@ -445,7 +392,6 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                 }
             }
             b'X' => {
-                // SupportAltFormUpperX
                 assert!(!prepend_sign);
                 assert!(!left_justified);
                 assert!(precision.is_none());
@@ -465,25 +411,15 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     let uint: u32 = args.next(env);
                     uint
                 };
-
-                let mut prefix = "";
-                if alternative_form && uint != 0 {
-                    prefix = "0X";
-                }
-
                 if pad_width > 0 {
                     let pad_width = pad_width as usize;
                     if pad_char == '0' && precision.is_none() {
-                        let pad_len = pad_width.saturating_sub(prefix.len());
-                        res.extend_from_slice(prefix.as_bytes());
-                        write!(&mut res, "{uint:0>pad_len$X}").unwrap();
+                        write!(&mut res, "{uint:0>pad_width$X}").unwrap();
                     } else {
                         assert!(pad_char == ' '); // TODO
-                        let tmp = format!("{}{:X}", prefix, uint);
-                        write!(&mut res, "{tmp:>pad_width$}").unwrap();
+                        write!(&mut res, "{uint:>pad_width$X}").unwrap();
                     }
                 } else {
-                    res.extend_from_slice(prefix.as_bytes());
                     res.extend_from_slice(format!("{uint:X}").as_bytes());
                 }
             }
@@ -501,32 +437,6 @@ pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
                     write!(&mut res, "{tmp:>pad_width$}").unwrap();
                 } else {
                     res.extend_from_slice(tmp.as_bytes());
-                }
-            }
-            b'n' => {
-                // %n – store number of characters written so far
-                assert!(!prepend_sign);
-                assert!(!left_justified);
-                assert!(precision.is_none());
-                match length_modifier {
-                    Some("hh") => {
-                        let ptr: MutPtr<i8> = args.next(env);
-                        env.mem.write(ptr, res.len() as i8);
-                    }
-                    Some("h") => {
-                        let ptr: MutPtr<i16> = args.next(env);
-                        env.mem.write(ptr, res.len() as i16);
-                    }
-                    None | Some("l") => {
-                        // int / long are 32-bit on 32-bit iOS
-                        let ptr: MutPtr<i32> = args.next(env);
-                        env.mem.write(ptr, res.len() as i32);
-                    }
-                    Some("ll") => {
-                        let ptr: MutPtr<i64> = args.next(env);
-                        env.mem.write(ptr, res.len() as i64);
-                    }
-                    _ => unimplemented!("Unsupported length modifier for %%n"),
                 }
             }
             // Float specifiers
@@ -1001,31 +911,6 @@ where
                     Some("l")
                 }
             }
-            b'n' => {
-                // %n – store number of input characters read so far
-                // Does not consume input, does not count towards assignment count.
-                match length_modifier {
-                    Some("hh") => {
-                        let ptr: MutPtr<i8> = args.next(env);
-                        env.mem.write(ptr, src_char_idx as i8);
-                    }
-                    Some("h") => {
-                        let ptr: MutPtr<i16> = args.next(env);
-                        env.mem.write(ptr, src_char_idx as i16);
-                    }
-                    None | Some("l") => {
-                        let ptr: MutPtr<i32> = args.next(env);
-                        env.mem.write(ptr, src_char_idx as i32);
-                    }
-                    Some("ll") => {
-                        let ptr: MutPtr<i64> = args.next(env);
-                        env.mem.write(ptr, src_char_idx as i64);
-                    }
-                    _ => unimplemented!("Unsupported length modifier for %%n in scanf"),
-                }
-                // %n does not count as a matched assignment
-                matched_args -= 1;
-            }
             // q seems to be an equivalent of 'll'
             // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/Strings/Articles/formatSpecifiers.html#//apple_ref/doc/uid/TP40004265-SW1
             b'q' => {
@@ -1262,6 +1147,32 @@ where
         }
 
         matched_args += 1;
+    }
+    b'n' => {
+    // %n – store number of input characters read so far
+    // Does not consume input, does not count towards assignment count.
+    match length_modifier {
+        Some("hh") => {
+            let ptr: MutPtr<i8> = args.next(env);
+            env.mem.write(ptr, src_char_idx as i8);
+        }
+        Some("h") => {
+            let ptr: MutPtr<i16> = args.next(env);
+            env.mem.write(ptr, src_char_idx as i16);
+        }
+        None | Some("l") => {
+            // int / long are 32-bit on 32-bit iOS
+            let ptr: MutPtr<i32> = args.next(env);
+            env.mem.write(ptr, src_char_idx as i32);
+        }
+        Some("ll") => {
+            let ptr: MutPtr<i64> = args.next(env);
+            env.mem.write(ptr, src_char_idx as i64);
+        }
+        _ => unimplemented!("Unsupported length modifier for %%n in scanf"),
+    }
+    // %n does not count as a matched assignment
+    matched_args -= 1;
     }
 
     matched_args
