@@ -25,6 +25,7 @@ static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 27] = [
     ((6,18), "hw.cachelinesize", SysInfoType::Int32(0)),
     ((6,19), "hw.availcpu",     SysInfoType::Int32(1)),
     ((6,20), "hw.cpufrequency_max", SysInfoType::Int64(0)),
+    ((6,21), "hw.cpusubtype",   SysInfoType::Int32(0)),
     ((6,13), "hw.vectorunit",    SysInfoType::Int32(0)),
     ((0,0),  "hw.cputype",       SysInfoType::Int32(12)),
     ((0,0),  "hw.cputype",       SysInfoType::Int32(12)),
