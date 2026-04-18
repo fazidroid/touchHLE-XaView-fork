@@ -45,8 +45,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())setFrameInterval:(NSInteger)frameInterval {
     log_dbg!("[(CADisplayLink*){:?} setFrameInterval:{}]", this, frameInterval);
-    assert!(frameInterval >= 1);
-    let interval = frameInterval as f64 / 60.0;
+    
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Safely clamp invalid frame intervals!
+    // ==========================================================
+    let safe_interval = if frameInterval < 1 {
+        println!("🎮 LOG: Bypassed CADisplayLink panic! Clamped invalid frameInterval {} to 1.", frameInterval);
+        1
+    } else {
+        frameInterval
+    };
+
+    let interval = safe_interval as f64 / 60.0;
     let ns_timer = env.objc.borrow::<CADisplayLinkHostObject>(this).ns_timer;
     set_time_interval(env, ns_timer, interval);
 }
