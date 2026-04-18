@@ -858,6 +858,33 @@ impl Dyld {
             }
             return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
         }
+                // ==========================================================
+        // 🏎️ REAL RACING 2 BYPASS: Stub _getsockname
+        // ==========================================================
+        if symbol == "_getsockname" {
+            fn fake_getsockname(
+                env: &mut crate::Environment,
+                _socket: i32,
+                addr: crate::mem::MutPtr<crate::libc::sys::socket::sockaddr>,
+                addrlen: crate::mem::MutPtr<crate::libc::netdb::socklen_t>,
+            ) -> i32 {
+                log!("_getsockname called (RR2 bypass)");
+                // Return a dummy address (0.0.0.0:0)
+                let dummy = crate::libc::sys::socket::sockaddr::from_ipv4_parts([0, 0, 0, 0], 0);
+                env.mem.write(addr, dummy);
+                env.mem.write(addrlen, 16); // sizeof(sockaddr_in)
+                0
+            }
+            return Some(
+                &(fake_getsockname
+                    as fn(
+                        &mut crate::Environment,
+                        i32,
+                        crate::mem::MutPtr<crate::libc::sys::socket::sockaddr>,
+                        crate::mem::MutPtr<crate::libc::netdb::socklen_t>,
+                    ) -> i32),
+            );
+        }
         // ==========================================================
         // 🏎️ REAL RACING 2 BYPASS: Stub _NSGetExecutablePath
         // ==========================================================
