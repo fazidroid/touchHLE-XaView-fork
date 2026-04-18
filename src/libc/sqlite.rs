@@ -5,7 +5,7 @@
  */
 //! SQLite3 stub functions
 
-use crate::dyld::{export_c_func, FunctionExports};
+use crate::dyld::{export_c_func, FunctionExports, HostDylib};
 use crate::mem::{ConstPtr, MutPtr, Ptr};
 use crate::Environment;
 
@@ -31,7 +31,6 @@ fn sqlite3_open(
     };
     log!("sqlite3_open: filename = {:?}", path);
 
-    // Create a dummy database handle (non‑null pointer)
     let dummy_db = Box::into_raw(Box::new(sqlite3 { _private: [] }));
     env.mem.write(pp_db, dummy_db);
 
@@ -46,7 +45,6 @@ fn sqlite3_close(_env: &mut Environment, db: *mut sqlite3) -> i32 {
     SQLITE_OK
 }
 
-// Stub for other common functions (add as needed)
 fn sqlite3_exec(
     _env: &mut Environment,
     _db: *mut sqlite3,
@@ -60,7 +58,7 @@ fn sqlite3_exec(
 }
 
 fn sqlite3_errmsg(_env: &mut Environment, _db: *mut sqlite3) -> ConstPtr<u8> {
-    Ptr::from_bits(0xdeadbeef) // dummy pointer, games shouldn't dereference if no error
+    Ptr::from_bits(0xdeadbeef)
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -69,3 +67,11 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_exec(_, _, _, _, _)),
     export_c_func!(sqlite3_errmsg(_)),
 ];
+
+pub const DYLIB: HostDylib = HostDylib {
+    path: "/usr/lib/libsqlite3.dylib",
+    aliases: &[],
+    class_exports: &[],
+    constant_exports: &[],
+    function_exports: &[FUNCTIONS],
+};
