@@ -109,36 +109,31 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithContentsOfFile:(id)path {
-    if path == nil {
-        return nil;
-    }
-    let path = ns_string::to_rust_string(env, path);
-    let Ok(bytes) = env.fs.read(GuestPath::new(&path)) else {
-        release(env, this);
-        return nil;
-    };
-    
+- (id)initWithData:(id)data {
     // ==========================================================
     // 🏎️ DYNAMIC IMAGE BYPASS: NOVA 3 Exclusive PVR Absorb
     // ==========================================================
+    // 1. Check the bundle ID BEFORE we mutably borrow the environment!
     let mut is_nova3 = false;
     if !env.is_app_picker {
         is_nova3 = env.bundle.bundle_identifier().starts_with("com.gameloft.nova3");
     }
 
+    // 2. NOW we can safely extract the data slice!
+    let slice = ns_data::to_rust_slice(env, data);
+    
     let image = if is_nova3 {
-        match Image::from_bytes(&bytes) {
+        match Image::from_bytes(slice) {
             Ok(img) => img,
             Err(_) => {
-                println!("🎮 LOG: NOVA 3 EXCLUSIVE BYPASS! Safely ignored unknown proprietary image format in file [{}]!", path);
+                println!("🎮 LOG: NOVA 3 EXCLUSIVE BYPASS! Safely ignored unknown proprietary image format in NSData payload!");
                 release(env, this);
                 return nil;
             }
         }
     } else {
         // Standard touchHLE behavior for all other games!
-        Image::from_bytes(&bytes).unwrap()
+        Image::from_bytes(slice).unwrap()
     };
     
     let cg_image = cg_image::from_image(env, image);
