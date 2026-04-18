@@ -100,6 +100,18 @@ fn sqlite3_finalize(_env: &mut Environment, _stmt: u32) -> i32 {
     SQLITE_OK
 }
 
+fn sqlite3_prepare(
+    env: &mut Environment,
+    db: u32,
+    z_sql: ConstPtr<u8>,
+    n_byte: i32,
+    pp_stmt: MutPtr<u32>,
+    pz_tail: MutPtr<ConstPtr<u8>>,
+) -> i32 {
+    // Delegate to the v2 implementation
+    sqlite3_prepare_v2(env, db, z_sql, n_byte, pp_stmt, pz_tail)
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
     export_c_func!(sqlite3_close(_)),
@@ -108,6 +120,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_prepare_v2(_, _, _, _, _)),
     export_c_func!(sqlite3_step(_)),
     export_c_func!(sqlite3_finalize(_)),
+    export_c_func!(sqlite3_prepare(_, _, _, _, _, _)),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
