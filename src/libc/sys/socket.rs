@@ -434,8 +434,9 @@ fn connect(
 
     // OfflineConnectBypass
     if !env.options.network_access {
-        println!("WARNING: Bypassing connect() for offline mode!");
-        return 0;
+       log!("WARNING: Failing connect() with ENETUNREACH for offline mode");
+       set_errno(env, 51); // ENETUNREACH
+       return -1;
     }
 
     // Attempt real connection, but handle errors without panicking
