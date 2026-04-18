@@ -62,6 +62,19 @@ fn realloc(env: &mut Environment, ptr: MutVoidPtr, size: GuestUSize) -> MutVoidP
 }
 
 fn free(env: &mut Environment, ptr: MutVoidPtr) {
+    if ptr.is_null() {
+        // "If ptr is a NULL pointer, no operation is performed."
+        return;
+    }
+
+    // Guard: stack addresses (>= 0xffff0000) are never heap allocations.
+    // Asphalt 8 v1.0.0 passes stack pointers to free() due to C++ destructor
+    // bugs. Silently ignore these instead of crashing the allocator.
+    if ptr.to_bits() >= 0xffff0000 {
+        log_dbg!("free({:?}): ignoring stack-range address", ptr);
+        return;
+    }
+
     // We need to catch situations of freeing NSObjects early!
     if env.objc.get_host_object(ptr.cast()).is_some() {
         log!(
@@ -75,10 +88,6 @@ fn free(env: &mut Environment, ptr: MutVoidPtr) {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    if ptr.is_null() {
-        // "If ptr is a NULL pointer, no operation is performed."
-        return;
-    }
     env.mem.free(ptr);
 }
 
