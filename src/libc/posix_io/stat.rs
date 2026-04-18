@@ -98,6 +98,7 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
 }
 
 /// Helper for [stat()] and [fstat()] that fills the data in the stat struct
+/// Helper for [stat()] and [fstat()] that fills the data in the stat struct
 fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
@@ -110,18 +111,20 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
         GuestFile::File(_) | GuestFile::IpaBundleFile(_) | GuestFile::ResourceFile(_) => {
             stat.st_mode |= S_IFREG;
 
-            // Obtain file size
-            let real_size = file.file.stream_len().unwrap_or(0).try_into().unwrap();
-            stat.st_size = real_size;
+            // 1. Obtain file size as a strict unsigned 64-bit integer
+            let stream_len: u64 = file.file.stream_len().unwrap_or(0);
+            
+            // 2. Safely cast to signed i64 for the POSIX st_size requirement
+            stat.st_size = stream_len.try_into().unwrap();
 
             // ==========================================================
             // 🏎️ EA & GAMELOFT BYPASS: Populate missing block sizes!
             // ==========================================================
-            // C++ stream buffers check st_blksize to allocate disk writes.
-            // If it is 0, the extraction/save process aborts completely!
             stat.st_blksize = 4096;
-            stat.st_blocks = if real_size > 0 {
-                (real_size + 511) / 512
+            
+            // 3. Keep it unsigned (u64) for the st_blocks math!
+            stat.st_blocks = if stream_len > 0 {
+                (stream_len + 511) / 512
             } else {
                 8 // Fake a minimum allocation block for newly created files
             };
