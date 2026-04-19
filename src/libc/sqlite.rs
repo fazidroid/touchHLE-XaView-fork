@@ -123,6 +123,16 @@ fn sqlite3_bind_text(
     SQLITE_OK
 }
 
+fn sqlite3_bind_int(
+    _env: &mut Environment,
+    _stmt: u32,
+    _index: i32,
+    _value: i32,
+) -> i32 {
+    log!("sqlite3_bind_int: returning SQLITE_OK");
+    SQLITE_OK
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
     export_c_func!(sqlite3_close(_)),
@@ -131,30 +141,20 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_prepare_v2(_, _, _, _, _)),
     export_c_func!(sqlite3_step(_)),
     export_c_func!(sqlite3_finalize(_)),
-    // Manual entry for sqlite3_prepare
     (
         "_sqlite3_prepare",
         &(sqlite3_prepare
-            as fn(
-                &mut Environment,
-                u32,
-                ConstPtr<u8>,
-                i32,
-                MutPtr<u32>,
-                MutPtr<ConstPtr<u8>>,
-            ) -> i32),
+            as fn(_, _, _, _, _, _) -> _),
     ),
-        (
+    (
         "_sqlite3_bind_text",
         &(sqlite3_bind_text
-            as fn(
-                &mut Environment,
-                u32,
-                i32,
-                ConstPtr<u8>,
-                i32,
-                u32,
-            ) -> i32),
+            as fn(_, _, _, _, _, _) -> _),
+    ),
+    (
+        "_sqlite3_bind_int",
+        &(sqlite3_bind_int
+            as fn(_, _, _, _) -> _),
     ),
 ];
 
