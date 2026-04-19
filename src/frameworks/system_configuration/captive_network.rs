@@ -17,5 +17,5 @@ fn CNCopySupportedInterfaces(_env: &mut Environment) -> u32 {
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(CNCopySupportedInterfaces(_)),
+    export_c_func!(CNCopySupportedInterfaces()),
 ];
