@@ -28,7 +28,6 @@ const NSUserDomainMask: NSSearchPathDomainMask = 1;
 pub const NSFileModificationDate: &str = "NSFileModificationDate";
 pub const NSFileSize: &str = "NSFileSize";
 const NSFileSystemFreeSize: &str = "NSFileSystemFreeSize";
-const NSFileSystemSize: &str = "NSFileSystemSize";
 pub const NSFileType: &str = "NSFileType";
 pub const NSFileTypeDirectory: &str = "NSFileTypeDirectory";
 pub const NSFileTypeRegular: &str = "NSFileTypeRegular";
@@ -42,10 +41,6 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_NSFileSystemFreeSize",
         HostConstant::NSString(NSFileSystemFreeSize),
-    ),
-    (
-        "_NSFileSystemSize",
-        HostConstant::NSString(NSFileSystemSize),
     ),
     ("_NSFileType", HostConstant::NSString(NSFileType)),
     (
@@ -353,13 +348,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)contentsAtPath:(id)path { // NSString *
     // TODO: return nil if path is directory
-    
-    // EA BYPASS: Remove the strict absolute path assertion!
-    let is_absolute: bool = msg![env; path isAbsolutePath];
-    if !is_absolute {
-        println!("🎮 LOG: Bypassing relative path check for contentsAtPath!");
-    }
-    
+    // TODO: handle non-absolute paths?
+    assert!(msg![env; path isAbsolutePath]);
     msg_class![env; NSData dataWithContentsOfFile:path]
 }
 
@@ -419,20 +409,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
+    // TODO: other attributes
     log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
 
     let _ = error; // IgnoreErrorAssert
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // Report a generous 20 GB of free space (and total size) to prevent
-    // "insufficient space" alerts in games like NFS Most Wanted.
-    let size: u64 = 20 * 1024 * 1024 * 1024; // 20 GB
-    
+    // Reporting 1 Gb of free space should be enough
+    // TODO: unify with `statfs`
+    // TODO: account for path
+    let size: u64 = 1024 * 1024 * 1024;
     let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
-
-    let fs_size_key = get_static_str(env, NSFileSystemSize);
-    () = msg![env; dict setObject:size_num forKey:fs_size_key];
 
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
     () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
