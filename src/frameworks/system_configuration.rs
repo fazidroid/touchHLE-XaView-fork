@@ -6,6 +6,7 @@
 //! SystemConfiguration framework.
 
 mod sc_network_reachability;
+pub mod captive_network;
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration",
