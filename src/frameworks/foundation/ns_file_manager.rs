@@ -252,6 +252,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         env.fs.create_dir(GuestPath::new(&path_str))
     };
+    
     match res {
         Ok(()) => {
             log_dbg!("createDirectoryAtPath {} => true", path_str);
@@ -259,12 +260,15 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         Err(err) => {
             let _ = error; // IgnoreErrorAssert
-            log!(
-                "Warning: createDirectoryAtPath {} failed with {:?}, returning false",
-                path_str,
-                err,
-            );
-            false
+            
+            // ==========================================================
+            // 🏎️ EA BYPASS: Aggressively Fake Directory Success
+            // ==========================================================
+            println!("🎮 LOG: createDirectoryAtPath {} failed with {:?}, FAKING SUCCESS for EA bypass!", path_str, err);
+            
+            // Never return false! Always pretend the folder was 
+            // successfully created so the EA save-engine continues.
+            true 
         }
     }
 }
