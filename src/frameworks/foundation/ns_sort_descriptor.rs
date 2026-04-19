@@ -5,7 +5,7 @@
  */
 //! `NSSortDescriptor` stub.
 
-use crate::objc::{id, msg, msg_class, msg_super, objc_classes, ClassExports, HostObject};
+use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject};
 
 #[derive(Default)]
 struct NSSortDescriptorHostObject;
