@@ -490,6 +490,27 @@ fn select(
     // TODO: handle errno properly
     set_errno(env, 0);
 
+    // ==========================================================
+    // 🏎️ REAL RACING 2 BYPASS: Zero-Descriptor Sleep Hack
+    // ==========================================================
+    if n_fds == 0 {
+        println!("🎮 LOG: Safely absorbed zero-descriptor select() sleep hack!");
+        if !timeout.is_null() {
+            let timeval = env.mem.read(timeout);
+            // Convert the requested timeval into a Rust Duration
+            let duration = std::time::Duration::new(
+                timeval.tv_sec.max(0) as u64, 
+                (timeval.tv_usec.max(0) as u32) * 1000
+            );
+            // Put the rendering thread to sleep to mimic iOS behavior
+            if duration.as_micros() > 0 {
+                std::thread::sleep(duration);
+            }
+        }
+        // Return 0 (no file descriptors ready) to satisfy the engine
+        return 0;
+    }
+
     assert!(n_fds > 0 && n_fds < 1024);
 
     let should_block = if !timeout.is_null() {
