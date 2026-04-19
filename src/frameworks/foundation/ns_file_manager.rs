@@ -149,10 +149,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     let res_exists = if path == nil {
         false
     } else {
-        let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
+        let path_str = ns_string::to_rust_string(env, path); 
+        
+        // ==========================================================
+        // 🏎️ EA BYPASS: Break the Phantom File Loop!
+        // ==========================================================
+        // If the game is desperately looking for its profile, telemetry, 
+        // or an EA folder, we aggressively lie and say it exists!
+        if path_str.contains("EA") || path_str.contains("profile") || 
+           path_str.contains("telemetry") || path_str.contains("dynamic_options") {
+            println!("🎮 LOG: Faking fileExistsAtPath for EA loop bypass: {}", path_str);
+            return true;
+        }
+        
         // fileExistsAtPath: will return true for directories
         // hence Fs::exists() rather than Fs::is_file() is appropriate.
-        env.fs.exists(GuestPath::new(&path))
+        env.fs.exists(GuestPath::new(&path_str))
     };
     log_dbg!("[(NSFileManager*) {:?} fileExistsAtPath:{:?}] => {}", this, path, res_exists);
     res_exists
@@ -356,9 +368,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)contentsAtPath:(id)path { // NSString *
-    // TODO: return nil if path is directory
+    let path_str = ns_string::to_rust_string(env, path);
     
-    // EA BYPASS: Remove the strict absolute path assertion!
+    // 🏎️ EA BYPASS: Return empty data for our fake files instead of crashing!
+    if path_str.contains("EA") || path_str.contains("profile") || path_str.contains("telemetry") {
+        println!("🎮 LOG: Returning empty NSData for faked EA file: {}", path_str);
+        return msg_class![env; NSData data]; // Returns an empty, valid data object
+    }
+
     let is_absolute: bool = msg![env; path isAbsolutePath];
     if !is_absolute {
         println!("🎮 LOG: Bypassing relative path check for contentsAtPath!");
