@@ -33,6 +33,7 @@ use std::time::{Duration, Instant};
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum DeviceFamily {
     iPhone,
+    iPhone5, // 🏎️ NEW: Widescreen iPhone support!
     iPad,
 }
 impl std::fmt::Display for DeviceFamily {
@@ -44,6 +45,8 @@ impl DeviceFamily {
     pub fn portrait_size(&self) -> (u32, u32) {
         match self {
             DeviceFamily::iPhone => (320, 480),
+            // 🏎️ FIX: Real 16:9 aspect ratio for iPhone 5 is 320x568!
+            DeviceFamily::iPhone5 => (320, 568), 
             DeviceFamily::iPad => (768, 1024),
         }
     }
@@ -54,6 +57,7 @@ impl TryFrom<u64> for DeviceFamily {
         match value {
             1 => Ok(DeviceFamily::iPhone),
             2 => Ok(DeviceFamily::iPad),
+            5 => Ok(DeviceFamily::iPhone5), 
             _ => Err(()),
         }
     }
@@ -63,6 +67,7 @@ impl TryFrom<&str> for DeviceFamily {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
             "iphone" => Ok(DeviceFamily::iPhone),
+            "iphone5" => Ok(DeviceFamily::iPhone5),
             "ipad" => Ok(DeviceFamily::iPad),
             _ => Err(()),
         }
@@ -149,9 +154,13 @@ pub enum Event {
     /// OS has informed touchHLE it will soon become inactive.
     /// (iOS `applicationWillResignActive:`, Android `onPause()`)
     AppWillResignActive,
+    /// 🏎️ NEW: Added so the game can wake up from the background!
+    AppDidBecomeActive,
     /// OS has informed touchHLE it will soon terminate.
     /// (iOS `applicationWillTerminate:`, Android `onDestroy()`)
     AppWillTerminate,
+    /// 🏎️ NEW: Added to prevent crashes when Android sends a memory warning!
+    AppLowMemory,
     TouchesDown(HashMap<FingerId, Coords>),
     TouchesMove(HashMap<FingerId, Coords>),
     TouchesUp(HashMap<FingerId, Coords>),
@@ -254,34 +263,78 @@ impl Window {
     pub fn rotatable_fullscreen() -> bool {
         env::consts::OS == "android"
     }
+
     pub fn new(
         title: &str,
         icon: Option<Image>,
         launch_image: Option<Image>,
         options: &Options,
     ) -> Window {
-        let sdl_ctx = sdl2::init().unwrap();
-        let video_ctx = sdl_ctx.video().unwrap();
+        // TEMPORARY OVERRIDE FOR TESTING 
+        let mut options_clone = options.clone();
+        options_clone.use_angle = true;
+        // options_clone.use_turnip = true; 
+        
+        let options = &options_clone;
 
-        // The "hidapi" feature of rust-sdl2 is enabled so that sdl2::sensor
-        // is available, but we don't want to enable SDL's HIDAPI controller
-        // drivers because they cause duplicated controllers on macOS
-        // (https://github.com/libsdl-org/SDL/issues/7479). Once that's fixed,
-        // remove this (https://github.com/touchHLE/touchHLE/issues/85).
+        if env::consts::OS == "android" {
+            if options.use_turnip {
+                // Vulkan REQUIRES the absolute path to load custom ICD drivers!
+                let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
+                std::env::set_var("VK_ICD_FILENAMES", format!("{}libvulkan_freedreno.so", lib_dir));
+            }
+
+            if options.use_angle {
+                // Bare filenames only! Android will find them in jniLibs.
+                std::env::set_var("SDL_VIDEO_EGL_DRIVER", "libEGL_angle.so"); 
+                
+                if options.gles_version == 2 {
+                    std::env::set_var("SDL_VIDEO_GL_DRIVER", "libGLESv2_angle.so");
+                } else {
+                    std::env::set_var("SDL_VIDEO_GL_DRIVER", "libGLESv1_CM_angle.so");
+                }
+            }
+        }
+
+        // Initialize SDL2 AFTER the driver variables are set
+        let sdl_ctx = sdl2::init().unwrap();
+        let video_ctx = sdl_ctx.video().unwrap();        
+
         sdl2::hint::set("SDL_JOYSTICK_HIDAPI", "0");
 
         if env::consts::OS == "android" {
-            // It's important to set context version BEFORE window creation
-            // ref. https://wiki.libsdl.org/SDL2/SDL_GLattr
+            // Standard OpenGL context setup
             let attr = video_ctx.gl_attr();
             if options.gles_version == 2 {
-                attr.set_context_version(2, 0); // SetEsTwo
+                attr.set_context_version(2, 0);
             } else {
-                attr.set_context_version(1, 1); // SetEsOne
+                attr.set_context_version(1, 1);
             }
             attr.set_context_profile(sdl2::video::GLProfile::GLES);
+            sdl2::hint::set("SDL_ANDROID_BLOCK_ON_PAUSE", "0");
+        }
 
-            // Disable blocking of event loop when app is paused.
+        // Separate mouse and touch events
+        sdl2::hint::set("SDL_TOUCH_MOUSE_EVENTS", "0");        
+
+        if env::consts::OS == "android" {
+            // FORCE ANGLE TRANSLATION
+            let lib_dir = "/data/data/org.touchhle.android.xaview/lib/";
+            
+            if options.gles_version == 2 {
+                let _ = video_ctx.gl_load_library(format!("{}libGLESv2_angle.so", lib_dir).as_str());
+            } else {
+                let _ = video_ctx.gl_load_library(format!("{}libGLESv1_CM_angle.so", lib_dir).as_str());
+            }
+
+            // Standard OpenGL context setup
+            let attr = video_ctx.gl_attr();
+            if options.gles_version == 2 {
+                attr.set_context_version(2, 0);
+            } else {
+                attr.set_context_version(1, 1);
+            }
+            attr.set_context_profile(sdl2::video::GLProfile::GLES);
             sdl2::hint::set("SDL_ANDROID_BLOCK_ON_PAUSE", "0");
         }
 
@@ -296,7 +349,13 @@ impl Window {
         let scale_hack = options.scale_hack;
         // TODO: some apps specify their orientation in Info.plist, we could use
         // that here.
-        let device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
+        let mut device_family = options.device_family.unwrap_or(DeviceFamily::iPhone);
+        
+        // 🏎️ DYNAMIC SCREEN HACK: If we are spoofing an iPhone 5, auto-upgrade to 16:9!
+        if options.device_model.as_deref().unwrap_or("").starts_with("iPhone5") {
+            device_family = DeviceFamily::iPhone5;
+        }
+        
         let device_orientation = options.initial_orientation;
         let fullscreen = options.fullscreen;
 
@@ -551,7 +610,6 @@ impl Window {
             }
 
             self.event_queue.push_back(match event {
-                E::Quit { .. } => Event::Quit,
                 E::MouseButtonDown {
                     x,
                     y,
@@ -720,22 +778,27 @@ impl Window {
                         continue;
                     }
                 }
-                E::AppWillEnterBackground { .. } => {
-                    log!("Received app-will-resign-active event.");
-                    assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppWillResignActive);
-                    // For some reason, if we don't pause event polling, we will
-                    // never finish handling the event.
-                    // TODO: Add a mechanism for re-enabling polling, if at some
-                    // point we support returning touchHLE to the foreground.
-                    self.enable_event_polling = false;
+                E::AppTerminating { .. } | E::Quit { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored app-will-terminate event!");
                     continue;
                 }
-                E::AppTerminating { .. } => {
-                    log!("Received app-will-terminate event.");
+                E::AppLowMemory { .. } => {
+                    log!("Received app-low-memory event.");
                     assert!(self.high_priority_event.is_none());
-                    self.high_priority_event = Some(Event::AppWillTerminate);
-                    self.enable_event_polling = false;
+                    self.high_priority_event = Some(Event::AppLowMemory);
+                    continue;
+                }
+                E::AppWillEnterBackground { .. } | E::AppDidEnterBackground { .. } => {
+                    log!("🏎️ ANDROID BYPASS: Ignored background event to prevent sleep!");
+                    continue;
+                }
+                E::AppWillEnterForeground { .. } => {
+                    continue;
+                }
+                E::AppDidEnterForeground { .. } => {
+                    log!("Received app-did-enter-foreground event. Waking up!");
+                    assert!(self.high_priority_event.is_none());
+                    self.high_priority_event = Some(Event::AppDidBecomeActive);
                     continue;
                 }
                 E::FingerUp {
@@ -1153,8 +1216,18 @@ impl Window {
         (x, y, pressed)
     }
 
-    pub fn create_gl_context(&self, version: GLVersion) -> Result<GLContext, String> {
+        pub fn create_gl_context(&self, version: GLVersion) -> Result<GLContext, String> {
         let attr = self.video_ctx.gl_attr();
+
+        // ==========================================================
+        // 🏎️ GAMELOFT BYPASS: Force Global Context Sharing
+        // ==========================================================
+        // Android's ANGLE EGL driver frequently drops context sharing 
+        // requests if they are toggled dynamically. By forcefully locking 
+        // this to true, Gameloft's background thread can finally send its 
+        // 3D models to the main thread!
+        attr.set_share_with_current_context(true);
+
         match version {
             GLVersion::GLES11 => {
                 attr.set_context_version(1, 1);

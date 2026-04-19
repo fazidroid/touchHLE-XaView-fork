@@ -415,7 +415,13 @@ impl GLES for GLES1Native<'_> {
             gles11::StencilFunc(func, ref_, mask)
         }
     }
-    unsafe fn StencilFuncSeparate(&mut self, face: GLenum, func: GLenum, ref_: GLint, mask: GLuint) {
+    unsafe fn StencilFuncSeparate(
+        &mut self,
+        face: GLenum,
+        func: GLenum,
+        ref_: GLint,
+        mask: GLuint,
+    ) {
         // StencilFuncSeparateNative
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::StencilFuncSeparate(face, func, ref_, mask)
@@ -430,7 +436,13 @@ impl GLES for GLES1Native<'_> {
             gles11::StencilOp(sfail, dpfail, dppass)
         }
     }
-    unsafe fn StencilOpSeparate(&mut self, face: GLenum, sfail: GLenum, dpfail: GLenum, dppass: GLenum) {
+    unsafe fn StencilOpSeparate(
+        &mut self,
+        face: GLenum,
+        sfail: GLenum,
+        dpfail: GLenum,
+        dppass: GLenum,
+    ) {
         // StencilOpSeparateNative
         if self.is_gles2 {
             touchHLE_gl_bindings::gles20::StencilOpSeparate(face, sfail, dpfail, dppass)
@@ -1573,38 +1585,10 @@ impl GLES for GLES1Native<'_> {
             gles11::GetBufferParameteriv(target, pname, params)
         }
     }
-   unsafe fn MapBufferOES(&mut self, target: GLenum, access: GLenum) -> *mut GLvoid {
+    unsafe fn MapBufferOES(&mut self, target: GLenum, access: GLenum) -> *mut GLvoid {
         gles11::MapBufferOES(target, access)
     }
-    
     unsafe fn UnmapBufferOES(&mut self, target: GLenum) -> GLboolean {
         gles11::UnmapBufferOES(target)
-    }
-
-        unsafe fn BlendFuncSeparateOES( // <--- ADD 'OES' HERE
-        &mut self, 
-        sfactorRGB: GLenum, 
-        dfactorRGB: GLenum, 
-        sfactorAlpha: GLenum, 
-        dfactorAlpha: GLenum
-    ) {
-        if self.is_gles2 {
-            touchHLE_gl_bindings::gles20::BlendFuncSeparate(
-                sfactorRGB, 
-                dfactorRGB, 
-                sfactorAlpha, 
-                dfactorAlpha
-            );
-        } else {
-            self.BlendFunc(sfactorRGB, dfactorRGB);
-        }
-    }
-
-    unsafe fn BlendEquationSeparateOES(&mut self, modeRGB: GLenum, modeAlpha: GLenum) { // <--- ADD 'OES' HERE
-        if self.is_gles2 {
-            touchHLE_gl_bindings::gles20::BlendEquationSeparate(modeRGB, modeAlpha);
-        } else {
-            // Unimplemented in GLES 1.1 natively
-        }
     }
 }

@@ -5,20 +5,20 @@
  */
 //! SCNetworkReachability
 
-use crate::abi::GuestFunction;
+use crate::abi::{GuestFunction, CallFromHost};
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::core_foundation::cf_allocator::CFAllocatorRef;
 use crate::frameworks::core_foundation::CFTypeRef;
 use crate::libc::sys::socket::sockaddr;
-use crate::mem::{ConstPtr, MutPtr, MutVoidPtr};
+use crate::mem::{ConstPtr, MutPtr, MutVoidPtr, Ptr};
 use crate::objc::{objc_classes, msg, Class, ClassExports, HostObject};
 use crate::Environment;
 use std::net::SocketAddrV4;
 
 type SCNetworkReachabilityFlags = u32;
 const kSCNetworkReachabilityFlagsReachable: SCNetworkReachabilityFlags = 1 << 1;
-#[allow(dead_code)]
 const kSCNetworkReachabilityFlagsIsDirect: SCNetworkReachabilityFlags = 1 << 17;
+const kSCNetworkReachabilityFlagsIsWWAN: SCNetworkReachabilityFlags = 1 << 18;
 
 pub const CLASSES: ClassExports = objc_classes! {
     (env, this, _cmd);
@@ -26,10 +26,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     @end
 };
 
-#[allow(dead_code)]
 struct SCNetworkReachabilityHostObject {
     address: Option<SocketAddrV4>,
-    is_name_based: bool, // Track whether this is checking an internet hostname
+    is_name_based: bool,
+    callback: Option<GuestFunction>,
+    callback_context: MutVoidPtr,
 }
 impl HostObject for SCNetworkReachabilityHostObject {}
 
@@ -41,13 +42,13 @@ fn SCNetworkReachabilityCreateWithName(
     _nodename: ConstPtr<i8>,
 ) -> SCNetworkReachabilityRef {
     let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    
-    // FIXED: Let alloc_object safely create the new object using the actual class pointer
     env.objc.alloc_object(
         class,
-        Box::new(SCNetworkReachabilityHostObject { 
-            address: None, 
-            is_name_based: true 
+        Box::new(SCNetworkReachabilityHostObject {
+            address: None,
+            is_name_based: true,
+            callback: None,
+            callback_context: Ptr::null(),
         }),
         &mut env.mem,
     )
@@ -60,13 +61,13 @@ fn SCNetworkReachabilityCreateWithAddress(
 ) -> SCNetworkReachabilityRef {
     let addr = env.mem.read(address);
     let class: Class = env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem);
-    
-    // FIXED: Let alloc_object safely create the new object using the actual class pointer
     env.objc.alloc_object(
         class,
         Box::new(SCNetworkReachabilityHostObject {
             address: Some(addr.to_sockaddr_v4()),
             is_name_based: false,
+            callback: None,
+            callback_context: Ptr::null(),
         }),
         &mut env.mem,
     )
@@ -82,46 +83,45 @@ fn SCNetworkReachabilityGetFlags(
         target_class,
         env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
-    
-    let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
-    
-    if host_object.is_name_based {
-        // Ad networks (Burstly, Tapjoy, Gameloft Trackers) use CreateWithName to check internet servers.
-        // We return 0 (Unreachable) so they voluntarily disable themselves and prevent crashes!
-        env.mem.write(flags, 0);
-    } else {
-        // Games use CreateWithAddress (0.0.0.0) to check if the Wi-Fi hardware is turned on.
-        // We return Reachable so "No WIFI" alerts don't appear and Local Multiplayer works perfectly!
-        let out_flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect;
-        env.mem.write(flags, out_flags);
-    }
-    
+
+    // Always report reachable (WiFi + WWAN) to satisfy Asphalt 8.
+    let out_flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect | kSCNetworkReachabilityFlagsIsWWAN;
+    env.mem.write(flags, out_flags);
     true
 }
 
 fn SCNetworkReachabilitySetCallback(
     env: &mut Environment,
     target: SCNetworkReachabilityRef,
-    _callout: GuestFunction, 
-    _context: MutVoidPtr,    
+    callout: GuestFunction,
+    context: MutVoidPtr,
 ) -> bool {
     let target_class: Class = msg![env; target class];
     assert_eq!(
         target_class,
         env.objc.get_known_class("_touchHLE_SCNetworkReachability", &mut env.mem)
     );
-    
-    // Pretend the callback registered perfectly
+
+    let mut host_object = env.objc.borrow_mut::<SCNetworkReachabilityHostObject>(target);
+    host_object.callback = Some(callout);
+    host_object.callback_context = context;
+    log_dbg!("SCNetworkReachabilitySetCallback: stored callback");
     true
 }
 
 fn SCNetworkReachabilityScheduleWithRunLoop(
-    _env: &mut Environment,
-    _target: SCNetworkReachabilityRef,
+    env: &mut Environment,
+    target: SCNetworkReachabilityRef,
     _run_loop: MutVoidPtr,
     _run_loop_mode: MutVoidPtr,
 ) -> bool {
-    // FakeNetSchedule
+    let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
+    if let Some(callback) = host_object.callback {
+        let flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect | kSCNetworkReachabilityFlagsIsWWAN;
+        let context = host_object.callback_context;
+               log_dbg!("SCNetworkReachabilityScheduleWithRunLoop: firing callback with flags {:#x}", flags);
+        let _: u32 = callback.call_from_host(env, (target, flags, context));
+    }
     true
 }
 
@@ -131,7 +131,6 @@ fn SCNetworkReachabilityUnscheduleFromRunLoop(
     _run_loop: MutVoidPtr,
     _run_loop_mode: MutVoidPtr,
 ) -> bool {
-    // FakeNetUnschedule
     true
 }
 

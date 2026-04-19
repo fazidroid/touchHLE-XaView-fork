@@ -311,6 +311,14 @@ pub fn init_with_objects_and_keys(
 
 /// Helper function to share `initWithDictionary:` implementations
 fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) -> id {
+    // 🏎️ GAMELOFT BYPASS: Safely handle nil dictionaries (like empty save files)!
+    if other_dict == nil {
+        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
+        return this;
+    }
+
+    let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
+
     let mut host_object = <DictionaryHostObject as Default>::default();
     
     // SAFE BYPASS: Do not attempt to borrow 'nil' if the provided dictionary is empty
@@ -423,6 +431,51 @@ pub const CLASSES: ClassExports = objc_classes! {
     let new_dict: id = msg![env; this alloc];
     let new_dict: id = msg![env; new_dict initWithObjects:objects forKeys:keys];
     autorelease(env, new_dict)
+}
+
+// ==========================================================
+// 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: Save Profile / CRM Builder
+// ==========================================================
++ (id)dictionaryWithObjects:(crate::mem::ConstPtr<id>)objects
+                    forKeys:(crate::mem::ConstPtr<id>)keys
+                      count:(u32)count {
+    
+    // 1. Dynamically grab the game's iOS Bundle ID at runtime!
+    let main_bundle: id = msg_class![env; NSBundle mainBundle];
+    let mut is_asphalt_8 = false;
+    
+    if main_bundle != crate::objc::nil {
+        let bundle_id: id = msg![env; main_bundle bundleIdentifier];
+        if bundle_id != crate::objc::nil {
+            let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
+            is_asphalt_8 = bundle_str == "com.gameloft.asphalt8";
+        }
+    }
+
+    // 2. Only build the dictionary if the game is Asphalt 8
+    if is_asphalt_8 {
+        println!("🎮 ASPHALT 8 EXCLUSIVE: Building NSDictionary for CRM save profile!");
+        
+        let dict: id = msg_class![env; NSMutableDictionary alloc];
+        let dict: id = msg![env; dict initWithCapacity:count];
+        
+                for i in 0..count {
+            // 🏎️ FIX: Multiply index by 4 because iOS pointers (id) are 4 bytes!
+            // Adding just 'i' adds raw bytes, reading misaligned garbage memory!
+            let obj = env.mem.read(objects + (i * 4));
+            let key = env.mem.read(keys + (i * 4));
+            
+            if obj != crate::objc::nil && key != crate::objc::nil {
+                let _: () = msg![env; dict setObject:obj forKey:key];
+            }
+        }
+
+        crate::objc::autorelease(env, dict)
+    } else {
+        // 3. Standard touchHLE fallback for Need for Speed and all other games
+        log!("TODO: ignoring [NSDictionary dictionaryWithObjects:forKeys:count:{}]", count);
+        crate::objc::nil
+    }
 }
 
 + (id)dictionaryWithDictionary:(id)dict { // NSDictionary*

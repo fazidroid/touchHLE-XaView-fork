@@ -28,6 +28,8 @@ mod bundle;
 
 pub use bundle::BundleData;
 
+use crate::dyld::{export_c_func, FunctionExports};
+use crate::Environment;
 use crate::fs::bundle::{IpaFile, IpaFileRef};
 use crate::paths;
 use std::collections::HashMap;
@@ -58,6 +60,28 @@ pub enum FsError {
     InvalidParentDir,
     NonexistentParentDir,
     ReadonlyParentDir,
+}
+
+// POSIX file control stubs required by Gameloft games
+
+fn fcntl(env: &mut Environment, fd: i32, cmd: i32, arg: u32) -> i32 {
+    log!("fcntl(fd={}, cmd={:#x}, arg={:#x}) -> 0 (stubbed)", fd, cmd, arg);
+    match cmd {
+        // F_GETFL (3) -> return O_RDWR (2)
+        3 => 2,
+        // F_SETFL (4) -> ignore
+        4 => 0,
+        // F_GETFD (1), F_SETFD (2)
+        1 => 0,
+        2 => 0,
+        // Other commands return success
+        _ => 0,
+    }
+}
+
+pub fn flock(env: &mut Environment, fd: i32, operation: i32) -> i32 {
+    log!("flock(fd={}, operation={:#x}) -> 0 (stubbed)", fd, operation);
+    0 // success
 }
 
 #[derive(Debug)]
@@ -117,9 +141,6 @@ impl FsNode {
             },
         }
     }
-
-    // Convenience methods for constructing the read-only parts of the initial
-    // filesystem layout
 
     fn dir() -> Self {
         FsNode::Directory {
@@ -444,6 +465,13 @@ impl Read for GuestFile {
                 std::io::ErrorKind::IsADirectory,
                 "Attempt to read from a directory as a guest file",
             )),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX reads on Sockets!
+            // ==========================================================
+            GuestFile::Socket => {
+                println!("🎮 LOG: Absorbed read() on GuestFile::Socket to prevent unimplemented panic!");
+                Ok(0) // Return 0 to simulate EOF or no data
+            }
             _ => unimplemented!(),
         }
     }
@@ -460,6 +488,13 @@ impl Write for GuestFile {
                 panic!("Attempt to write to a read-only file: {file:?}")
             }
             GuestFile::Directory => panic!("Attempt to write to a directory as a guest file"),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX writes on Sockets!
+            // ==========================================================
+            GuestFile::Socket => {
+                println!("🎮 LOG: Absorbed write() on GuestFile::Socket to prevent unimplemented panic!");
+                Ok(buf.len()) // Pretend we successfully wrote the payload
+            }
             _ => unimplemented!(),
         }
     }
@@ -474,6 +509,10 @@ impl Write for GuestFile {
                 panic!("Attempt to flush a read-only file: {file:?}")
             }
             GuestFile::Directory => panic!("Attempt to flush a directory as a guest file"),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX flushes on Sockets!
+            // ==========================================================
+            GuestFile::Socket => Ok(()),
             _ => unimplemented!(),
         }
     }
@@ -1258,3 +1297,8 @@ impl Fs {
         Ok(())
     }
 }
+
+pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(fcntl(_, _, _)),
+    export_c_func!(flock(_, _)),
+];

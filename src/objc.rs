@@ -42,7 +42,7 @@ pub use objects::{
 pub use properties::todo_objc_setter;
 pub use selectors::{selector, SEL};
 
-use crate::mem::ConstVoidPtr;
+use crate::mem::{ConstVoidPtr, MutPtr, MutVoidPtr, Ptr};
 use crate::Environment;
 use classes::{ClassHostObject, FakeClass, UnimplementedClass};
 use messages::{

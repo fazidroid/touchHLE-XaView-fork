@@ -28,6 +28,7 @@ const NSUserDomainMask: NSSearchPathDomainMask = 1;
 pub const NSFileModificationDate: &str = "NSFileModificationDate";
 pub const NSFileSize: &str = "NSFileSize";
 const NSFileSystemFreeSize: &str = "NSFileSystemFreeSize";
+const NSFileSystemSize: &str = "NSFileSystemSize";
 pub const NSFileType: &str = "NSFileType";
 pub const NSFileTypeDirectory: &str = "NSFileTypeDirectory";
 pub const NSFileTypeRegular: &str = "NSFileTypeRegular";
@@ -41,6 +42,10 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_NSFileSystemFreeSize",
         HostConstant::NSString(NSFileSystemFreeSize),
+    ),
+    (
+        "_NSFileSystemSize",
+        HostConstant::NSString(NSFileSystemSize),
     ),
     ("_NSFileType", HostConstant::NSString(NSFileType)),
     (
@@ -348,8 +353,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)contentsAtPath:(id)path { // NSString *
     // TODO: return nil if path is directory
-    // TODO: handle non-absolute paths?
-    assert!(msg![env; path isAbsolutePath]);
+    
+    // EA BYPASS: Remove the strict absolute path assertion!
+    let is_absolute: bool = msg![env; path isAbsolutePath];
+    if !is_absolute {
+        println!("🎮 LOG: Bypassing relative path check for contentsAtPath!");
+    }
+    
     msg_class![env; NSData dataWithContentsOfFile:path]
 }
 
@@ -409,21 +419,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
-    // TODO: other attributes
-    log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
-
     let _ = error; // IgnoreErrorAssert
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // Reporting 1 Gb of free space should be enough
-    // TODO: unify with `statfs`
-    // TODO: account for path
-    let size: u64 = 1024 * 1024 * 1024;
-    let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
+    // Use 1 GB — must fit in 32 bits to avoid overflow when NSNumber
+    // only reads the low 32 bits. 20 GB = 0x500000000 whose low 32 bits
+    // are zero, which makes the game think there is no free space and
+    // shows the "free up space" screen.
+    // 1 GB = 0x40000000 fits safely in 32 bits.
+    let total_size: u32 = 1024 * 1024 * 1024; // 1 GB total
+    let free_size: u32  = 1024 * 1024 * 1024; // 1 GB free (all free)
 
+    let total_num: id = msg_class![env; NSNumber numberWithUnsignedInt:total_size];
+    let free_num: id  = msg_class![env; NSNumber numberWithUnsignedInt:free_size];
+
+    let fs_size_key      = get_static_str(env, NSFileSystemSize);
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
-    () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
+
+    () = msg![env; dict setObject:total_num forKey:fs_size_key];
+    () = msg![env; dict setObject:free_num  forKey:fs_free_size_key];
+
+    log_dbg!("attributesOfFileSystemForPath: returning total={}MB free={}MB",
+        total_size / (1024 * 1024), free_size / (1024 * 1024));
 
     let dict_imm = msg![env; dict copy];
     release(env, dict);

@@ -51,6 +51,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     let hour = greg_date.hours;
     let minute = greg_date.minutes;
     let second = greg_date.seconds;
+    
+    // Calculate fractional seconds (milliseconds)
+    let ms = (ti.fract().abs() * 1000.0) as u32;
 
     format = format.replace("yyyy", format!("{year:04}").as_str());
     format = format.replace("YYYY", format!("{year:04}").as_str());
@@ -59,6 +62,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     format = format.replace("HH", format!("{hour:02}").as_str());
     format = format.replace("mm", format!("{minute:02}").as_str());
     format = format.replace("ss", format!("{second:02}").as_str());
+    
+    // 🏎️ GAMELOFT BYPASS: Fractional seconds and Timezones
+    format = format.replace("SSS", format!("{ms:03}").as_str());
+    format = format.replace("SS", format!("{:02}", ms / 10).as_str());
+    format = format.replace("S", format!("{}", ms / 100).as_str());
+    format = format.replace("Z", "+0000");
+    format = format.replace("z", "GMT");
+    format = format.replace("a", if hour < 12 { "AM" } else { "PM" });
 
     // Ignore unsupported date format patterns instead of crashing
     format = format.chars().map(|c: char| {

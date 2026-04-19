@@ -9,7 +9,7 @@ use crate::abi::{CallFromHost, GuestFunction};
 use crate::dyld::{export_c_func, export_c_func_aliased, FunctionExports};
 use crate::fs::{resolve_path, GuestPath};
 use crate::libc::clocale::{setlocale, LC_CTYPE};
-use crate::libc::errno::{set_errno, EINVAL};
+use crate::libc::errno::{set_errno, EINVAL, ENOENT};
 use crate::libc::string::strlen;
 use crate::libc::wchar::wchar_t;
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, Ptr};
@@ -62,6 +62,19 @@ fn realloc(env: &mut Environment, ptr: MutVoidPtr, size: GuestUSize) -> MutVoidP
 }
 
 fn free(env: &mut Environment, ptr: MutVoidPtr) {
+    if ptr.is_null() {
+        // "If ptr is a NULL pointer, no operation is performed."
+        return;
+    }
+
+    // Guard: stack addresses (>= 0xffff0000) are never heap allocations.
+    // Asphalt 8 v1.0.0 passes stack pointers to free() due to C++ destructor
+    // bugs. Silently ignore these instead of crashing the allocator.
+    if ptr.to_bits() >= 0xffff0000 {
+        log_dbg!("free({:?}): ignoring stack-range address", ptr);
+        return;
+    }
+
     // We need to catch situations of freeing NSObjects early!
     if env.objc.get_host_object(ptr.cast()).is_some() {
         log!(
@@ -75,10 +88,6 @@ fn free(env: &mut Environment, ptr: MutVoidPtr) {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    if ptr.is_null() {
-        // "If ptr is a NULL pointer, no operation is performed."
-        return;
-    }
     env.mem.free(ptr);
 }
 
@@ -218,25 +227,24 @@ fn arc4random(env: &mut Environment) -> u32 {
 }
 
 fn getenv(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<u8> {
-    let name_cstr = env.mem.cstr_at(name);
-    let Some(&value) = env.env_vars.get(name_cstr) else {
-        log!(
-            "Warning: getenv() for {:?} ({:?}) unhandled",
-            name,
-            std::str::from_utf8(name_cstr)
-        );
-        return Ptr::null();
-    };
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or_default();
+    
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Safely absorb libcurl proxy checks!
+    // ==========================================================
+    let is_proxy_check = name_str.to_lowercase().contains("proxy");
+    if is_proxy_check {
+        println!("🎮 LOG: Safely stubbed getenv({:?}) to return empty string!", name_str);
+        // Returning a valid empty string safely bypasses the libcurl NULL pointer crash!
+        return env.mem.alloc_and_write_cstr(b""); 
+    }
 
-    log_dbg!(
-        "getenv({:?} ({:?})) => {:?} ({:?})",
-        name,
-        name_cstr,
-        value,
-        env.mem.cstr_at_utf8(value),
-    );
-    // Caller should not modify the result
-    value
+    if let Some(&ptr) = env.env_vars.get(env.mem.cstr_at(name)) {
+        ptr
+    } else {
+        log!("Warning: getenv() for {:?} (Ok({:?})) unhandled", name, name_str);
+        crate::mem::MutPtr::null()
+    }
 }
 fn setenv(env: &mut Environment, name: ConstPtr<u8>, value: ConstPtr<u8>, overwrite: i32) -> i32 {
     // TODO: handle errno properly
@@ -427,10 +435,17 @@ fn realpath(
 ) -> MutPtr<u8> {
     assert!(!resolve_name.is_null());
 
-    let file_name_str = env.mem.cstr_at_utf8(file_name).unwrap();
+    // BypassRealpathUnwrap
+    let file_name_str = match env.mem.cstr_at_utf8(file_name) {
+        Ok(s) => s,
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return crate::mem::Ptr::null();
+        }
+    };
     // TOD0: resolve symbolic links
     let resolved = resolve_path(
-        GuestPath::new(file_name_str),
+        GuestPath::new(&file_name_str),
         Some(env.fs.working_directory()),
     );
     let result = format!("/{}", resolved.join("/"));
@@ -742,8 +757,10 @@ fn CFUUIDCreateString(
     let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
     let sel_alloc = env.objc.lookup_selector("alloc").unwrap();
     let sel_init = env.objc.lookup_selector("initWithUTF8String:").unwrap();
-    let alloced: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (nsstring_class, sel_alloc));
-    let string: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (alloced, sel_init, cstr_ptr.cast_const()));
+    let alloced: crate::objc::id =
+        crate::objc::msg_send_no_type_checking(env, (nsstring_class, sel_alloc));
+    let string: crate::objc::id =
+        crate::objc::msg_send_no_type_checking(env, (alloced, sel_init, cstr_ptr.cast_const()));
     string.cast()
 }
 
@@ -780,7 +797,9 @@ fn _Unwind_SjLj_RaiseException(env: &mut Environment, _ex: ConstVoidPtr) -> i32 
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -799,7 +818,9 @@ fn _Unwind_SjLj_Resume(env: &mut Environment, _ex: ConstVoidPtr) {
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -817,7 +838,9 @@ fn _Unwind_SjLj_Resume_or_Rethrow(env: &mut Environment, _ex: ConstVoidPtr) -> i
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -836,7 +859,9 @@ fn abort(env: &mut Environment) {
     // BypassExceptionUnwind
     let mut fp = env.cpu.regs()[7];
     for _ in 0..30 {
-        if fp == 0 { break; }
+        if fp == 0 {
+            break;
+        }
         let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
         let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
@@ -860,22 +885,33 @@ fn __stack_chk_fail(env: &mut Environment) {
     while curr <= fp + 32 {
         let val: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(curr));
         let b = val.to_le_bytes();
-        let c0 = if b[0] >= 32 && b[0] <= 126 { b[0] as char } else { '.' };
-        let c1 = if b[1] >= 32 && b[1] <= 126 { b[1] as char } else { '.' };
-        let c2 = if b[2] >= 32 && b[2] <= 126 { b[2] as char } else { '.' };
-        let c3 = if b[3] >= 32 && b[3] <= 126 { b[3] as char } else { '.' };
-        dump.push_str(&format!("[DEBUG] {:#010x}: {:08x} | {}{}{}{}\n", curr, val, c0, c1, c2, c3));
+        let c0 = if b[0] >= 32 && b[0] <= 126 {
+            b[0] as char
+        } else {
+            '.'
+        };
+        let c1 = if b[1] >= 32 && b[1] <= 126 {
+            b[1] as char
+        } else {
+            '.'
+        };
+        let c2 = if b[2] >= 32 && b[2] <= 126 {
+            b[2] as char
+        } else {
+            '.'
+        };
+        let c3 = if b[3] >= 32 && b[3] <= 126 {
+            b[3] as char
+        } else {
+            '.'
+        };
+        dump.push_str(&format!(
+            "[DEBUG] {:#010x}: {:08x} | {}{}{}{}\n",
+            curr, val, c0, c1, c2, c3
+        ));
         curr += 4;
     }
     panic!("{}", dump);
-}
-
-fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutVoidPtr {
-    // FakeHost
-    if let Ok(s) = env.mem.cstr_at_utf8(name) {
-        println!("WARNING: gethostbyname called for: {}", s);
-    }
-    crate::mem::Ptr::null()
 }
 
 fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) -> i32 {
@@ -885,12 +921,13 @@ fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) 
     -1
 }
 
-fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32 {
-    // FakeDladdr
-    0
-}
-
-fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd: ConstVoidPtr, val: MutVoidPtr, offset: i32) {
+fn objc_setProperty_nonatomic(
+    env: &mut Environment,
+    self_ptr: MutVoidPtr,
+    _cmd: ConstVoidPtr,
+    val: MutVoidPtr,
+    offset: i32,
+) {
     // ImplSetPropertyNonatomic
     if !self_ptr.is_null() {
         let addr = (self_ptr.to_bits() as i32 + offset) as u32;
@@ -899,11 +936,127 @@ fn objc_setProperty_nonatomic(env: &mut Environment, self_ptr: MutVoidPtr, _cmd:
     }
 }
 
+fn setrlimit(_env: &mut Environment, resource: i32, _rlp: ConstVoidPtr) -> i32 {
+    // FakeSetrlimit
+    log!(
+        "WARNING: setrlimit called with resource: {}. Faking success.",
+        resource
+    );
+    0
+}
+
+fn CGColorGetComponents(env: &mut Environment, _color: ConstVoidPtr) -> MutVoidPtr {
+    // FakeColorComponents
+    let ptr = env.mem.alloc(16);
+    let f32_ptr: crate::mem::MutPtr<f32> = ptr.cast();
+    env.mem.write(f32_ptr, 0.0);
+    env.mem.write(f32_ptr + 1, 0.0);
+    env.mem.write(f32_ptr + 2, 0.0);
+    env.mem.write(f32_ptr + 3, 0.0);
+    ptr
+}
+
+fn CGContextSetFillColor(
+    _env: &mut Environment,
+    _context: ConstVoidPtr,
+    _components: ConstVoidPtr,
+) {
+    // FakeSetFillColor
+}
+
+fn CGContextBeginPath(_env: &mut Environment, _context: ConstVoidPtr) {
+    // FakeBeginPath
+}
+
+fn CGContextMoveToPoint(_env: &mut Environment, _context: ConstVoidPtr, _x: f32, _y: f32) {
+    // FakeMoveToPoint
+}
+
+fn CGContextAddLineToPoint(_env: &mut Environment, _context: ConstVoidPtr, _x: f32, _y: f32) {
+    // FakeAddLine
+}
+
+fn CGContextClosePath(_env: &mut Environment, _context: ConstVoidPtr) {
+    // FakeClosePath
+}
+
+fn CGContextFillPath(_env: &mut Environment, _context: ConstVoidPtr) {
+    // FakeFillPath
+}
+
+fn CGContextStrokePath(_env: &mut Environment, _context: ConstVoidPtr) {
+    // FakeStrokePath
+}
+
+fn CGContextSetStrokeColorWithColor(
+    _env: &mut Environment,
+    _context: ConstVoidPtr,
+    _color: ConstVoidPtr,
+) {
+    // FakeSetStrokeColor
+}
+
+fn CGContextSetLineWidth(_env: &mut Environment, _context: ConstVoidPtr, _width: f32) {
+    // FakeSetLineWidth
+}
+
+fn CGContextClip(_env: &mut Environment, _context: ConstVoidPtr) {
+    // FakeClip
+}
+
+fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32 {
+    // FakeDladdr
+    0
+}
+
+fn times(env: &mut Environment, buf: MutVoidPtr) -> i32 {
+    // FakeTimes
+    if !buf.is_null() {
+        let ptr: crate::mem::MutPtr<u32> = buf.cast();
+        env.mem.write(ptr, 0);
+        env.mem.write(ptr + 1, 0);
+        env.mem.write(ptr + 2, 0);
+        env.mem.write(ptr + 3, 0);
+    }
+    0
+}
+
+fn kqueue(_env: &mut Environment) -> i32 {
+    // FakeKqueue
+    999
+}
+
+fn kevent(
+    _env: &mut Environment,
+    _kq: i32,
+    _changelist: ConstVoidPtr,
+    _nchanges: i32,
+    _eventlist: MutVoidPtr,
+    _nevents: i32,
+    _timeout: ConstVoidPtr,
+) -> i32 {
+    // FakeKevent
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(kqueue()),
+    export_c_func!(kevent(_, _, _, _, _, _)),
+    export_c_func!(CGColorGetComponents(_)),
+    export_c_func!(CGContextAddLineToPoint(_, _, _)),
+    export_c_func!(CGContextBeginPath(_)),
+    export_c_func!(CGContextClip(_)),
+    export_c_func!(CGContextClosePath(_)),
+    export_c_func!(CGContextFillPath(_)),
+    export_c_func!(CGContextMoveToPoint(_, _, _)),
+    export_c_func!(CGContextSetFillColor(_, _)),
+    export_c_func!(CGContextSetLineWidth(_, _)),
+    export_c_func!(CGContextSetStrokeColorWithColor(_, _)),
+    export_c_func!(CGContextStrokePath(_)),
     export_c_func!(dladdr(_, _)),
     export_c_func!(objc_setProperty_nonatomic(_, _, _, _)),
+    export_c_func!(setrlimit(_, _)),
     export_c_func!(syscall(_, _, _, _)),
-    export_c_func!(gethostbyname(_)),
     export_c_func!(class_respondsToSelector(_, _)),
     export_c_func!(__cxa_guard_acquire(_)),
     export_c_func!(__cxa_guard_release(_)),
@@ -973,6 +1126,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(wcstombs(_, _, _)),
     export_c_func!(system(_)),
     export_c_func!(div(_, _)),
+    export_c_func!(times(_)),
 ];
 
 /// A simple wrapper around [atof_inner_generic] for the case of C string.

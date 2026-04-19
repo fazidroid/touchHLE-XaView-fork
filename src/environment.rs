@@ -129,6 +129,10 @@ enum ThreadNextAction {
     DebugCpuError(cpu::CpuError),
 }
 
+pub fn is_asphalt8(env: &Environment) -> bool {
+    env.bundle.bundle_identifier() == "com.gameloft.asphalt8"
+}
+
 /// If/what a thread is blocked by.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ThreadBlock {
@@ -438,41 +442,37 @@ impl Environment {
             .unwrap();
 
         // RobustEntryPointFix
-        echo!("Original entry_point_addr from Mach-O: {:#010x}", entry_point_addr);
+        echo!(
+            "Original entry_point_addr from Mach-O: {:#010x}",
+            entry_point_addr
+        );
 
-        if (entry_point_addr & !1) <= 0x2000 {
-            echo!("WARNING: Entry point seems corrupted (points to header). Scanning for __text...");
-            let mut lc_ptr = 0x101c;
-            let ncmds: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(0x1010));
-            let mut found_text = false;
-            for _ in 0..ncmds {
-                let cmd: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr));
-                let cmdsize: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr + 4));
-                if cmd == 1 {
-                    let nsects: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(lc_ptr + 48));
-                    let mut sect_ptr = lc_ptr + 56;
-                    for _ in 0..nsects {
-                        let sectname_0: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr));
-                        let sectname_1: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 4));
-                        if sectname_0 == 0x65745f5f && sectname_1 == 0x00007478 {
-                            let sect_addr: u32 = mem.read(mem::ConstPtr::<u32>::from_bits(sect_ptr + 32));
-                            echo!("Found __text section at {:#010x}. Overriding entry point!", sect_addr);
-                            entry_point_addr = sect_addr | 1;
-                            found_text = true;
-                            break;
-                        }
-                        sect_ptr += 68;
-                    }
-                }
-                if found_text { break; }
-                lc_ptr += cmdsize;
+                        // ==========================================================
+        // 🏎️ CRACKED IPA BYPASS: EA & Firemint Exclusive
+        // ==========================================================
+        let bundle_id = bundle.bundle_identifier();
+        let is_ea_or_firemint = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
+
+        if is_ea_or_firemint {
+            // Bypass the cracked Mach-O header and jump directly to the compiler's true start symbol!
+            if let Some(&real_start) = executable.exported_symbols.get("start")
+                .or_else(|| executable.exported_symbols.get("_start"))
+                .or_else(|| executable.exported_symbols.get("_main")) 
+            {
+                echo!("🎮 EA/FIREMINT BYPASS: Overriding cracked entry point {:#010x} with real start symbol at {:#010x}!", entry_point_addr, real_start);
+                entry_point_addr = real_start;
+            } else {
+                echo!("🎮 EA/FIREMINT BYPASS: Could not find 'start' symbol to override!");
             }
         }
 
         let entry_point_addr = abi::GuestFunction::from_addr_with_thumb_bit(entry_point_addr);
 
         echo!("--- ENTRY POINT TRACE ---");
-        echo!("Final Entry Point to execute: {:#x}", entry_point_addr.addr_with_thumb_bit());
+        echo!(
+            "Final Entry Point to execute: {:#x}",
+            entry_point_addr.addr_with_thumb_bit()
+        );
 
         let mut bins = dylibs;
         bins.insert(0, executable);
@@ -527,7 +527,10 @@ impl Environment {
                             }
                             // BypassLibcppCrash
                             if addr == 0x3748b2c4 {
-                                echo!("WARNING: Skipping crashy libstdc++ init func {:#010x}", addr);
+                                echo!(
+                                    "WARNING: Skipping crashy libstdc++ init func {:#010x}",
+                                    addr
+                                );
                                 continue;
                             }
                             echo!("Calling init func {:#010x} for {:?}", addr, bin_name);
@@ -569,7 +572,10 @@ impl Environment {
                     // Manually call here, since running call_from_host pushes
                     // a stack frame and disrupts abi for _start.
                     // LogMainEntryPoint
-                    echo!("Jumping to main entry point: {:#010x}", entry_point_addr.addr_without_thumb_bit());
+                    echo!(
+                        "Jumping to main entry point: {:#010x}",
+                        entry_point_addr.addr_without_thumb_bit()
+                    );
                     env.cpu
                         .branch_with_link(entry_point_addr, env.dyld.thread_exit_routine());
                     env.run_call();
@@ -1596,21 +1602,32 @@ impl Environment {
                     }
                     dyld::Dyld::SVC_THREAD_EXIT => {
                         // HandleThreadExit
-                        echo!("WARNING: Thread {} cleanly exiting via SVC_THREAD_EXIT.", self.current_thread);
+                        echo!(
+                            "WARNING: Thread {} cleanly exiting via SVC_THREAD_EXIT.",
+                            self.current_thread
+                        );
                         ThreadNextAction::ReturnToHost
                     }
                 }
             }
             cpu::CpuState::Error(e) => {
-                if matches!(e, cpu::CpuError::UndefinedInstruction) || matches!(e, cpu::CpuError::Breakpoint) {
+                if matches!(e, cpu::CpuError::UndefinedInstruction)
+                    || matches!(e, cpu::CpuError::Breakpoint)
+                {
                     let pc = self.cpu.regs()[cpu::Cpu::PC];
-                    
+
                     // ReturnFromBadJump
                     if pc <= 0x2000 {
                         let lr = self.cpu.regs()[cpu::Cpu::LR];
                         let r12 = self.cpu.regs()[12];
-                        echo!("WARNING: Bypassing bad jump to {:#010x}. LR: {:#010x}, R12: {:#x}", pc, lr, r12);
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                        echo!(
+                            "WARNING: Bypassing bad jump to {:#010x}. LR: {:#010x}, R12: {:#x}",
+                            pc,
+                            lr,
+                            r12
+                        );
+                        // KillThreadOnAbort
+                        self.cpu.branch(self.dyld.thread_exit_routine());
                         return ThreadNextAction::Continue;
                     }
 
@@ -1671,10 +1688,11 @@ impl Environment {
                     let fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp2 + 4));
                     echo!("Recovered Deep Return Address: {:#010x}", target_lr);
-                    self.cpu.regs_mut()[7] = fp2; 
-                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8; 
-                    self.cpu.regs_mut()[0] = 0; 
-                    self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                    self.cpu.regs_mut()[7] = fp2;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu
+                        .branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
                 // RestoreConditionalUnwinds
@@ -1684,12 +1702,19 @@ impl Environment {
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
                     let current_lr = self.cpu.regs()[14];
                     // CheckNetworkModule
-                    if (current_lr & 0xFFFF0000) == 0x005b0000 || (target_lr & 0xFFFF0000) == 0x005b0000 {
-                        echo!("WARNING: Network deadlock safely unwound at {:#010x}! LR: {:#010x}", pc, target_lr);
+                    if (current_lr & 0xFFFF0000) == 0x005b0000
+                        || (target_lr & 0xFFFF0000) == 0x005b0000
+                    {
+                        echo!(
+                            "WARNING: Network deadlock safely unwound at {:#010x}! LR: {:#010x}",
+                            pc,
+                            target_lr
+                        );
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
                         self.cpu.regs_mut()[0] = 0;
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                        self.cpu
+                            .branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                     }
                 } else if (pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
                     let fp0 = self.cpu.regs()[7];
@@ -1698,23 +1723,37 @@ impl Environment {
                     let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
                     // FilterAudioThreads
                     if (target_lr & 0xFFFF0000) == 0x005b0000 {
-                        echo!("WARNING: Deep unwinding infinite parser loop! LR: {:#010x}", target_lr);
+                        echo!(
+                            "WARNING: Deep unwinding infinite parser loop! LR: {:#010x}",
+                            target_lr
+                        );
                         self.cpu.regs_mut()[7] = prev_fp;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
                         self.cpu.regs_mut()[0] = 0;
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
+                        self.cpu
+                            .branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                     }
                 } else if pc == 0x00c32b3c {
                     // TargetedDoubleUnwind
-                    echo!("WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}", pc, self.current_thread);
+                    echo!(
+                        "WARNING: Unwinding smashed stack frame at {:#010x}! Thread: {}",
+                        pc,
+                        self.current_thread
+                    );
                     let fp0 = self.cpu.regs()[7];
-                    
+
                     let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    
+
                     if fp1 > fp0 && fp1.wrapping_sub(fp0) < 0x1000 {
-                        let saved_r4: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
-                        let saved_r5: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
-                        let saved_r6: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
+                        let saved_r4: u32 = self
+                            .mem
+                            .read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
+                        let saved_r5: u32 = self
+                            .mem
+                            .read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
+                        let saved_r6: u32 = self
+                            .mem
+                            .read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
                         let saved_r7: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
                         let saved_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
 
@@ -1724,18 +1763,42 @@ impl Environment {
                         self.cpu.regs_mut()[7] = saved_r7;
                         self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
                         self.cpu.regs_mut()[0] = 0;
-                        
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(saved_lr | 1));
+
+                        self.cpu
+                            .branch(GuestFunction::from_addr_with_thumb_bit(saved_lr | 1));
                     } else {
                         echo!("FATAL: Stack chain corrupted beyond fp0!");
-                        self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
+                        self.cpu
+                            .branch(GuestFunction::from_addr_with_thumb_bit(0x00a8a1bd | 1));
                     }
+                }
+
+                // BypassAsphaltOverdriveDeadlocks
+                let lr = self.cpu.regs()[cpu::Cpu::LR];
+                if (pc == 0x009d7784 && (lr == 0x0039418f || lr == 0x0039419b))
+                    || (pc == 0x009d7464 && lr == 0x0078df65)
+                    || (pc == 0x009d8334 && lr == 0x001722e1)
+                {
+                    echo!("WARNING: Unwinding Asphalt Overdrive Deadlock at PC: {:#010x}, LR: {:#010x}", pc, lr);
+                    let fp0 = self.cpu.regs()[7];
+                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    self.cpu.regs_mut()[7] = prev_fp;
+                    self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
+                    self.cpu.regs_mut()[0] = 0;
+                    self.cpu
+                        .branch(GuestFunction::from_addr_with_thumb_bit(target_lr));
                 }
 
                 // PrintDebugHeartbeat
                 if last_heartbeat.elapsed().as_secs() >= 1 {
                     let lr = self.cpu.regs()[cpu::Cpu::LR];
-                    echo!("[Heartbeat] Thread {}, PC: {:#010x}, LR: {:#010x}", self.current_thread, pc, lr);
+                    echo!(
+                        "[Heartbeat] Thread {}, PC: {:#010x}, LR: {:#010x}",
+                        self.current_thread,
+                        pc,
+                        lr
+                    );
                     last_heartbeat = Instant::now();
                 }
 
@@ -1933,9 +1996,7 @@ impl Environment {
             .unwrap()
             .as_millis();
         let fake_home = format!("{}/fakedir_{}", self.fs.home_directory().as_str(), time);
-        let home_value_cstr = self
-            .mem
-            .alloc_and_write_cstr(fake_home.as_bytes());
+        let home_value_cstr = self.mem.alloc_and_write_cstr(fake_home.as_bytes());
         self.env_vars.insert(b"HOME".to_vec(), home_value_cstr);
     }
 

@@ -212,6 +212,28 @@ pub fn pthread_mutex_destroy(env: &mut Environment, mutex: MutPtr<pthread_mutex_
     env.mutex_state.destroy_mutex(mutex_id).err().unwrap_or(0)
 }
 
+// --- 🛡️ GAMELOFT BYPASS: Fake Read-Write Locks ---
+fn pthread_rwlock_init(_env: &mut Environment, _rwlock: u32, _attr: u32) -> i32 {
+    0 // 0 means success
+}
+
+fn pthread_rwlock_destroy(_env: &mut Environment, _rwlock: u32) -> i32 {
+    0
+}
+
+fn pthread_rwlock_rdlock(_env: &mut Environment, _rwlock: u32) -> i32 {
+    0
+}
+
+fn pthread_rwlock_wrlock(_env: &mut Environment, _rwlock: u32) -> i32 {
+    0
+}
+
+fn pthread_rwlock_unlock(_env: &mut Environment, _rwlock: u32) -> i32 {
+    0
+}
+// --------------------------------------------------
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_mutexattr_init(_)),
     export_c_func!(pthread_mutexattr_setpshared(_, _)),
@@ -222,4 +244,11 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_mutex_trylock(_)),
     export_c_func!(pthread_mutex_unlock(_)),
     export_c_func!(pthread_mutex_destroy(_)),
+    
+    // Export the fake RWLocks to the emulator
+    export_c_func!(pthread_rwlock_init(_, _)),
+    export_c_func!(pthread_rwlock_destroy(_)),
+    export_c_func!(pthread_rwlock_rdlock(_)),
+    export_c_func!(pthread_rwlock_wrlock(_)),
+    export_c_func!(pthread_rwlock_unlock(_)),
 ];

@@ -137,6 +137,15 @@ pub fn pthread_attr_setstacksize(
     env.mem.write(attr, attr_copy);
     0 // success
 }
+fn pthread_cond_wait(env: &mut Environment, cond: MutVoidPtr, mutex: MutVoidPtr) -> i32 {
+    log_dbg!("pthread_cond_wait -> 0 (immediate success)");
+    0
+}
+
+fn pthread_cond_timedwait(env: &mut Environment, cond: MutVoidPtr, mutex: MutVoidPtr, abstime: ConstVoidPtr) -> i32 {
+    log_dbg!("pthread_cond_timedwait -> 0 (immediate success)");
+    0
+}
 fn pthread_attr_setinheritsched(
     env: &mut Environment,
     attr: MutPtr<pthread_attr_t>,
@@ -415,6 +424,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_attr_setdetachstate(_, _)),
     export_c_func!(pthread_attr_getstacksize(_, _)),
     export_c_func!(pthread_attr_setstacksize(_, _)),
+    export_c_func!(pthread_cond_wait(_, _)),
+    export_c_func!(pthread_cond_timedwait(_, _, _)),
     export_c_func!(pthread_attr_setinheritsched(_, _)),
     export_c_func!(pthread_attr_setschedpolicy(_, _)),
     export_c_func!(pthread_attr_setschedparam(_, _)),

@@ -203,7 +203,8 @@ unsafe impl<T, const MUT: bool> SafeRead for Ptr<T, MUT> {}
 pub trait SafeWrite: Sized {}
 impl<T: SafeRead> SafeWrite for T {}
 
-type Bytes = [u8; 1 << 32];
+// BypassOOBPanic
+type Bytes = [u8; (1_usize << 32) + 4096];
 
 pub const PAGE_SIZE: GuestUSize = 4096;
 pub const PAGE_SIZE_ALIGN_MASK: GuestUSize = 0xfff;
@@ -467,7 +468,8 @@ impl Mem {
         let guest_mem_range = self.bytes().as_ptr_range();
         assert!(guest_mem_range.contains(&host_ptr));
         let guest_addr = host_ptr as usize - guest_mem_range.start as usize;
-        Ptr::from_bits(u32::try_from(guest_addr).unwrap())
+        // BypassGuestAddrOverflow
+        Ptr::from_bits(guest_addr as u32)
     }
 
     /// Read a value for memory. This is the preferred way to read memory in
@@ -501,18 +503,17 @@ impl Mem {
     pub fn memmove(&mut self, dest: MutVoidPtr, src: ConstVoidPtr, size: GuestUSize) {
         let src_u32 = src.to_bits();
         let dest_u32 = dest.to_bits();
-        
+
         // IgnoreGarbageSize
         if src_u32.checked_add(size).is_none() || dest_u32.checked_add(size).is_none() {
             return;
         }
-        
+
         let src = src_u32 as usize;
         let dest = dest_u32 as usize;
         let size = size as usize;
-        
-        self.bytes_mut()
-            .copy_within(src..src + size, dest)
+
+        self.bytes_mut().copy_within(src..src + size, dest)
     }
 
     /// Allocate `size` bytes.

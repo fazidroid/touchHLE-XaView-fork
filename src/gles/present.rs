@@ -54,9 +54,12 @@ pub unsafe fn present_frame(
     use gles11::types::*;
     //DebugPresentArgs
     let is_gles2 = gles.is_gles2();
-    log!("DEBUG_PRESENT: present_frame called! viewport: {:?}, is_gles2: {}", viewport, is_gles2);
+    //log!("DEBUG_PRESENT: present_frame called! viewport: {:?}, is_gles2: {}",
+    //    viewport,
+    //    is_gles2
+    //);
     let m = rotation_matrix.columns();
-    log!("DEBUG_PRESENT: rotation_matrix: [{:?}, {:?}]", m[0], m[1]);
+    //log!("DEBUG_PRESENT: rotation_matrix: [{:?}, {:?}]", m[0], m[1]);
 
     let mut old_prog: GLint = 0;
     let mut old_array_buf: GLint = 0;
@@ -126,9 +129,9 @@ pub unsafe fn present_frame(
     let matrix = Matrix::<4>::from(&rotation_matrix);
 
     // DebugPresentGeom
-    log!("DEBUG_PRESENT: Quad Vertices: {:?}", vertices);
-    log!("DEBUG_PRESENT: Quad TexCoords: {:?}", tex_coords);
-    log!("DEBUG_PRESENT: Applied TexMatrix: {:?}", matrix.columns());
+    //log!("DEBUG_PRESENT: Quad Vertices: {:?}", vertices);
+    //log!("DEBUG_PRESENT: Quad TexCoords: {:?}", tex_coords);
+    //log!("DEBUG_PRESENT: Applied TexMatrix: {:?}", matrix.columns());
 
     if is_gles2 {
         let vs_src = "attribute vec4 position;\nattribute vec2 texCoord;\nuniform mat4 texMatrix;\nvarying vec2 v_texCoord;\nvoid main() {\n    gl_Position = position;\n    v_texCoord = (texMatrix * vec4(texCoord, 0.0, 1.0)).xy;\n}\0";
@@ -195,13 +198,13 @@ pub unsafe fn present_frame(
                 tex_coords.as_ptr() as *const _,
             );
         }
-        
+
         //DebugDrawArrays
         while gles.GetError() != 0 {}
         gles.DrawArrays(gles11::TRIANGLES, 0, 6);
         let draw_err = gles.GetError();
         if draw_err != 0 {
-            log!("DEBUG_PRESENT: ERROR after DrawArrays: {:#x}", draw_err);
+            //log!("DEBUG_PRESENT: ERROR after DrawArrays: {:#x}", draw_err);
         }
 
         if let Some((x, y, pressed)) = virtual_cursor_visible_at {

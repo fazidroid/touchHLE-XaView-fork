@@ -23,7 +23,6 @@ enum NSURLHostObject {
         ns_string: id,
         working_directory: GuestPathBuf,
     },
-    /// Non-file URL.
     OtherURL { ns_string: id },
 }
 impl HostObject for NSURLHostObject {}
@@ -39,19 +38,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, Box::new(host_object), &mut env.mem)
 }
 
-+ (id)URLWithString:(id)url { // NSString*
++ (id)URLWithString:(id)url { 
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initWithString:url];
     autorelease(env, new)
 }
 
-+ (id)fileURLWithPath:(id)path { // NSString*
++ (id)fileURLWithPath:(id)path { 
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initFileURLWithPath:path];
     autorelease(env, new)
 }
 
-+ (id)fileURLWithPath:(id)path // NSString*
++ (id)fileURLWithPath:(id)path 
           isDirectory:(bool)is_dir {
     let new: id = msg![env; this alloc];
     let new: id = msg![env; new initFileURLWithPath:path isDirectory:is_dir];
@@ -74,7 +73,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initFileURLWithPath:path isDirectory:false]
 }
 
-- (id)initFileURLWithPath:(id)path // NSString*
+- (id)initFileURLWithPath:(id)path 
               isDirectory:(bool)_is_dir {
     let path_str = to_rust_string(env, path);
     if path_str.starts_with("file:") {
@@ -87,7 +86,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (id)initWithString:(id)url { // NSString*
+- (id)initWithString:(id)url { 
     if url == nil {
         return nil;
     }
@@ -167,7 +166,7 @@ pub const CLASSES: ClassExports = objc_classes! {
                           encoding:NSUTF8StringEncoding]
 }
 
-- (id)URLByAppendingPathComponent:(id)path_component // NSString *
+- (id)URLByAppendingPathComponent:(id)path_component 
                       isDirectory:(bool)is_directory {
     let &NSURLHostObject::FileURL { ns_string, .. } = env.objc.borrow(this) else {
         return nil;

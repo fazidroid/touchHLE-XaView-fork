@@ -224,10 +224,7 @@ fn write_return_to_host_routine(mem: &mut Mem, svc: u32) -> GuestFunction {
     ptr
 }
 pub struct Dyld {
-    /// List of host functions that have been "linked" and had SVCs assigned.
-    ///
-    /// The `&'static str` part here is purely for debugging and could be
-    /// removed in release builds if it's ever necessary.
+    pub is_64_bit: bool, // 🏎️ ADD THIS FLAG
     linked_host_functions: Vec<(&'static str, HostFunction)>,
     return_to_host_routine: Option<GuestFunction>,
     thread_exit_routine: Option<GuestFunction>,
@@ -257,6 +254,7 @@ impl Dyld {
 
     pub fn new() -> Dyld {
         Dyld {
+            is_64_bit: false, // 🏎️ INITIALIZE IT TO FALSE
             linked_host_functions: Vec::new(),
             return_to_host_routine: None,
             thread_exit_routine: None,
@@ -264,7 +262,6 @@ impl Dyld {
             non_lazy_host_functions: HashMap::new(),
         }
     }
-
     pub fn return_to_host_routine(&self) -> GuestFunction {
         self.return_to_host_routine.unwrap()
     }
@@ -594,6 +591,19 @@ impl Dyld {
                 continue;
             }
 
+            // ___stack_chk_guard must be a non-zero sentinel or any
+            // stack-protected function will silently corrupt or crash.
+            // On real iOS this is randomized per-boot; a fixed value is fine
+            // for emulation — we only need it non-zero so the canary check
+            // doesn't immediately trigger.
+            if symbol == "___stack_chk_guard" {
+                let canary: u32 = 0xDEAD_C0DE;
+                let canary_ptr = mem.alloc_and_write(canary);
+                mem.write(ptr_ptr, canary_ptr.cast().cast_const());
+                log_dbg!("Initialized ___stack_chk_guard sentinel at {:?}", canary_ptr);
+                continue;
+            }
+
             log!(
                 "Warning: unhandled non-lazy symbol {:?} at {:?} in \"{}\"",
                 symbol,
@@ -723,38 +733,44 @@ impl Dyld {
             (stub_function_ptr, la_symbol_ptr)
         }
 
-        let Some((stubs, pic_offset)) = bins
-            .iter()
-            .find_map(|bin| {
-                let stubs = bin.get_section(SectionType::SymbolStubs)?;
-                if !(stubs.addr..(stubs.addr + stubs.size)).contains(&svc_pc) {
-                    return None;
-                }
-                let pic_offset = bin
-                    .get_section(SectionType::LazySymbolPointers)
-                    .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
-                Some((stubs, pic_offset))
-            }) else {
-                let r12 = cpu.regs()[12];
-                let r0 = cpu.regs()[0];
-                // LogInlineSvc
-                log!("WARNING: Unresolved inline SVC at {:#010x}! Syscall ID (R12): {}, R0: {:#x}", svc_pc, r12, r0);
-                // SafeInlineSvc
-                fn safe_fallback(env: &mut crate::Environment) {
-                    let r12 = env.cpu.regs()[12];
-                    if r12 == 10 {
-                        let r1 = env.cpu.regs()[1];
-                        let r2 = env.cpu.regs()[2];
-                        let ptr = env.mem.alloc(r2).to_bits();
-                        env.mem.write(crate::mem::MutPtr::<u32>::from_bits(r1), ptr);
-                        env.cpu.regs_mut()[0] = 0;
-                        println!("WARNING: Inline mach_vm_allocate size: {:#x} -> {:#x}", r2, ptr);
-                        return;
-                    }
+        let Some((stubs, pic_offset)) = bins.iter().find_map(|bin| {
+            let stubs = bin.get_section(SectionType::SymbolStubs)?;
+            if !(stubs.addr..(stubs.addr + stubs.size)).contains(&svc_pc) {
+                return None;
+            }
+            let pic_offset = bin
+                .get_section(SectionType::LazySymbolPointers)
+                .map_or(0, |lazy_ptrs| lazy_ptrs.addr - stubs.addr);
+            Some((stubs, pic_offset))
+        }) else {
+            let r12 = cpu.regs()[12];
+            let r0 = cpu.regs()[0];
+            // LogInlineSvc
+            log!(
+                "WARNING: Unresolved inline SVC at {:#010x}! Syscall ID (R12): {}, R0: {:#x}",
+                svc_pc,
+                r12,
+                r0
+            );
+            // SafeInlineSvc
+            fn safe_fallback(env: &mut crate::Environment) {
+                let r12 = env.cpu.regs()[12];
+                if r12 == 10 {
+                    let r1 = env.cpu.regs()[1];
+                    let r2 = env.cpu.regs()[2];
+                    let ptr = env.mem.alloc(r2).to_bits();
+                    env.mem.write(crate::mem::MutPtr::<u32>::from_bits(r1), ptr);
                     env.cpu.regs_mut()[0] = 0;
+                    println!(
+                        "WARNING: Inline mach_vm_allocate size: {:#x} -> {:#x}",
+                        r2, ptr
+                    );
+                    return;
                 }
-                return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
-            };
+                env.cpu.regs_mut()[0] = 0;
+            }
+            return Some(&(safe_fallback as fn(&mut crate::Environment) -> ()));
+        };
 
         let info = stubs.dyld_indirect_symbol_info.as_ref().unwrap();
 
@@ -834,21 +850,210 @@ impl Dyld {
                 return None;
             }
         }
+                // ==========================================================
+        // 🏎️ GT RACING 2 BYPASS: Stub _host_info
+        // ==========================================================
+        if symbol == "_host_info" {
+            fn fake_host_info(
+                env: &mut crate::Environment,
+                host: u32,
+                flavor: i32,
+                host_info_out: crate::mem::MutPtr<u32>,
+                host_info_out_cnt: crate::mem::MutPtr<u32>,
+            ) -> i32 {
+                log!("_host_info called (host={}, flavor={})", host, flavor);
+                // HOST_BASIC_INFO = 1, HOST_SCHED_INFO = 3, etc.
+                // We'll return a minimal HOST_BASIC_INFO structure.
+                match flavor {
+                    1 => { // HOST_BASIC_INFO
+                        // Structure: max_cpus (i32), avail_cpus (i32), memory_size (u32), cpu_type (u32), cpu_subtype (u32)
+                        let basic_info: [u32; 5] = [1, 1, 512 * 1024 * 1024, 12, 0];
+                        let count = env.mem.read(host_info_out_cnt);
+                        let copy_len = count.min(basic_info.len() as u32);
+                        for i in 0..copy_len {
+                            env.mem.write(host_info_out + i, basic_info[i as usize]);
+                        }
+                        env.mem.write(host_info_out_cnt, copy_len);
+                        0 // KERN_SUCCESS
+                    }
+                    _ => {
+                        log!("_host_info flavor {} unimplemented, returning KERN_INVALID_ARGUMENT", flavor);
+                        4 // KERN_INVALID_ARGUMENT
+                    }
+                }
+            }
+            return Some(
+                &(fake_host_info
+                    as fn(
+                        &mut crate::Environment,
+                        u32,
+                        i32,
+                        crate::mem::MutPtr<u32>,
+                        crate::mem::MutPtr<u32>,
+                    ) -> i32),
+            );
+        }
 
-        // FakeForkCall
+                // FakeForkCall
         if symbol == "_fork" {
             fn fake_fork(env: &mut crate::Environment) {
                 env.cpu.regs_mut()[0] = 0xffffffff;
             }
             return Some(&(fake_fork as fn(&mut crate::Environment) -> ()));
         }
+                // ==========================================================
+        // 🏎️ REAL RACING 2 BYPASS: Stub _getsockname
+        // ==========================================================
+        if symbol == "_getsockname" {
+            fn fake_getsockname(
+                env: &mut crate::Environment,
+                _socket: i32,
+                addr: crate::mem::MutPtr<crate::libc::sys::socket::sockaddr>,
+                addrlen: crate::mem::MutPtr<crate::libc::netdb::socklen_t>,
+            ) -> i32 {
+                log!("_getsockname called (RR2 bypass)");
+                // Return a dummy address (0.0.0.0:0)
+                let dummy = crate::libc::sys::socket::sockaddr::from_ipv4_parts([0, 0, 0, 0], 0);
+                env.mem.write(addr, dummy);
+                env.mem.write(addrlen, 16); // sizeof(sockaddr_in)
+                0
+            }
+            return Some(
+                &(fake_getsockname
+                    as fn(
+                        &mut crate::Environment,
+                        i32,
+                        crate::mem::MutPtr<crate::libc::sys::socket::sockaddr>,
+                        crate::mem::MutPtr<crate::libc::netdb::socklen_t>,
+                    ) -> i32),
+            );
+        }
+        // ==========================================================
+        // 🏎️ REAL RACING 2 BYPASS: Stub _NSGetExecutablePath
+        // ==========================================================
+        if symbol == "__NSGetExecutablePath" {
+            fn fake_NSGetExecutablePath(
+                env: &mut crate::Environment,
+                buf: crate::mem::MutPtr<u8>,
+                bufsize: crate::mem::MutPtr<u32>,
+            ) -> i32 {
+                log!("_NSGetExecutablePath called (RR2 bypass)");
+                let path = b"/path/to/app.app/app\0";
+                let required_size = path.len() as u32;
 
+                let current_size = env.mem.read(bufsize);
+                if current_size < required_size {
+                    env.mem.write(bufsize, required_size);
+                    return -1;
+                }
+
+                for (i, &b) in path.iter().enumerate() {
+                    env.mem.write(buf + i as u32, b);
+                }
+                0
+            }
+            return Some(
+                &(fake_NSGetExecutablePath
+                    as fn(&mut crate::Environment, crate::mem::MutPtr<u8>, crate::mem::MutPtr<u32>) -> i32),
+            );
+        }
+
+        // ==========================================================
+        // 🏎️ GAMELOFT BYPASS: Safely intercept _pthread_exit
+        // ==========================================================
+        if symbol == "_pthread_exit" {
+            fn fake_pthread_exit(env: &mut crate::Environment, ret_val: u32) {
+                println!("🎮 LOG: Safely intercepted pthread_exit({:#x}) to prevent panic!", ret_val);
+                
+                // 1. Ensure the thread's return value is placed in CPU register 0
+                env.cpu.regs_mut()[0] = ret_val; 
+                
+                // 2. Safely branch to touchHLE's built-in thread cleanup routine
+                let exit_routine = env.dyld.thread_exit_routine();
+                env.cpu.branch(exit_routine); 
+            }
+            return Some(&(fake_pthread_exit as fn(&mut crate::Environment, u32) -> ()));
+        }
+        // ==========================================================
+// 🏎️ BYPASS: _pthread_setname_np (thread naming, safe to ignore)
+// ==========================================================
+if symbol == "_pthread_setname_np" {
+    fn fake_pthread_setname_np(_env: &mut crate::Environment, _thread: u32, _name: crate::mem::ConstPtr<u8>) -> i32 {
+        log!("_pthread_setname_np bypassed");
+        0 // success
+    }
+    return Some(
+        &(fake_pthread_setname_np
+            as fn(&mut crate::Environment, u32, crate::mem::ConstPtr<u8>) -> i32),
+    );
+}
+
+        // ==========================================================
+        // 🏎️ EA BYPASS: Safely absorb IPSP ADK Logger
+        // ==========================================================
+        if symbol == "_ipsp_logger" { // Replace with the exact symbol from your log!
+            fn fake_ipsp_logger(env: &mut crate::Environment) {
+                println!("🎮 LOG: Safely absorbed IPSP ADK logger call!");
+                env.cpu.regs_mut()[0] = 0; // Return success
+            }
+            return Some(&(fake_ipsp_logger as fn(&mut crate::Environment) -> ()));
+        }
+        
         // ImplDifftime
         if symbol == "_difftime" {
             fn impl_difftime(_env: &mut crate::Environment, time1: i32, time0: i32) -> f64 {
                 (time1 as f64) - (time0 as f64)
             }
             return Some(&(impl_difftime as fn(&mut crate::Environment, i32, i32) -> f64));
+        }
+
+        // ImplStrncatChk
+        if symbol == "___strncat_chk" {
+            fn impl_strncat_chk(
+                env: &mut crate::Environment,
+                dest: crate::mem::MutPtr<u8>,
+                src: crate::mem::ConstPtr<u8>,
+                n: u32,
+                destlen: u32,
+            ) -> crate::mem::MutPtr<u8> {
+                let src_str = env.mem.cstr_at_utf8(src).unwrap_or("<invalid utf8>");
+                log_dbg!(
+                    "___strncat_chk(dest: {:?}, src: {:?} ('{}'), n: {}, destlen: {})",
+                    dest,
+                    src,
+                    src_str,
+                    n,
+                    destlen
+                );
+
+                let mut dest_len = 0;
+                while env.mem.read(dest + dest_len) != 0 {
+                    dest_len += 1;
+                }
+
+                let mut i = 0;
+                while i < n {
+                    let c = env.mem.read(src + i);
+                    if c == 0 {
+                        break;
+                    }
+                    env.mem.write(dest + dest_len + i, c);
+                    i += 1;
+                }
+                env.mem.write(dest + dest_len + i, 0);
+
+                dest
+            }
+            return Some(
+                &(impl_strncat_chk
+                    as fn(
+                        &mut crate::Environment,
+                        crate::mem::MutPtr<u8>,
+                        crate::mem::ConstPtr<u8>,
+                        u32,
+                        u32,
+                    ) -> crate::mem::MutPtr<u8>),
+            );
         }
 
         panic!("Call to unimplemented function {symbol}");
@@ -900,7 +1105,7 @@ impl Dyld {
 
     pub fn create_guest_function(
         &mut self,
-        mem: &mut Mem,
+        mem: &mut Mem, // 🏎️ REVERT: Back to 'mem: &mut Mem' to appease the Borrow Checker!
         symbol: &'static str,
         f: HostFunction,
     ) -> GuestFunction {
@@ -911,10 +1116,27 @@ impl Dyld {
 
         // Create guest function to call this host function
         let function_ptr = mem.alloc(8);
-        let function_ptr: MutPtr<u32> = function_ptr.cast();
-        mem.write(function_ptr + 0, encode_a32_svc(svc));
-        mem.write(function_ptr + 1, encode_a32_ret());
+        let ptr_slice = mem.bytes_at_mut(function_ptr.cast::<u8>(), 8);
 
+        // ==========================================================
+        // 🏎️ AARCH64 DYNAMIC STUB GENERATION
+        // ==========================================================
+        if self.is_64_bit { // 🏎️ Check Dyld's internal flag!
+            // AArch64 SVC instruction: 0xD4000001 | (imm16 << 5)
+            let svc_inst: u32 = 0xd4000001 | ((svc & 0xffff) << 5);
+            // AArch64 RET instruction: 0xD65F03C0
+            let ret_inst: u32 = 0xd65f03c0; 
+            
+            ptr_slice[0..4].copy_from_slice(&svc_inst.to_le_bytes());
+            ptr_slice[4..8].copy_from_slice(&ret_inst.to_le_bytes());
+        } else {
+            // 🏎️ FIX: ARMv7 Unconditional SVC is 0xEF000000, NOT 0xDF000000
+            let svc_inst: u32 = 0xef000000 | (svc & 0xffffff); 
+            let bx_lr_inst: u32 = 0xe12fff1e;
+            
+            ptr_slice[0..4].copy_from_slice(&svc_inst.to_le_bytes());
+            ptr_slice[4..8].copy_from_slice(&bx_lr_inst.to_le_bytes());
+        }
         GuestFunction::from_addr_with_thumb_bit(function_ptr.to_bits())
     }
 }

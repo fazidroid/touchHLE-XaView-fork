@@ -118,6 +118,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSMutableURLRequest: NSURLRequest
 
+// ==========================================================
+// 🏎️ EA BYPASS: Absorb the Network Timeout to Prevent Freezes
+// ==========================================================
+- (())setTimeoutInterval:(NSTimeInterval)timeout_interval {
+    // Safely store the timeout value so the C++ engine is satisfied
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).timeout_interval = timeout_interval;
+    println!("🎮 LOG: NSMutableURLRequest setTimeoutInterval: {} safely absorbed!", timeout_interval);
+}
+
 - (())setHTTPMethod:(id)http_method { // NSString *
     if http_method == nil { return; }
     let http_method_copy = msg![env; http_method copy];

@@ -182,6 +182,21 @@ fn CFURLHasDirectoryPath(env: &mut Environment, url: CFURLRef) -> bool {
         || msg![env; last isEqual:(get_static_str(env, ".."))]
 }
 
+// 🏎️ GAMELOFT BYPASS: Stub for URL encoding to prevent the GT Racing crash!
+fn CFURLCreateStringByAddingPercentEscapes(
+    env: &mut Environment,
+    _allocator: CFAllocatorRef,
+    original_string: CFStringRef,
+    _characters_to_leave_unescaped: CFStringRef,
+    _legal_url_characters_to_be_escaped: CFStringRef,
+    _encoding: CFStringEncoding,
+) -> CFStringRef {
+    log!("🏎️ GAMELOFT BYPASS: Intercepted CFURLCreateStringByAddingPercentEscapes! Returning unescaped string.");
+    // The "Create" rule in Apple's CoreFoundation means we must return an object with a +1 retain count.
+    // Calling `copy` on the original string satisfies the memory manager perfectly!
+    msg![env; original_string copy]
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLGetFileSystemRepresentation(_, _, _, _)),
     export_c_func!(CFURLCreateFromFileSystemRepresentation(_, _, _, _)),
@@ -192,4 +207,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLCreateCopyAppendingPathComponent(_, _, _, _)),
     export_c_func!(CFURLCreateCopyDeletingLastPathComponent(_, _)),
     export_c_func!(CFURLHasDirectoryPath(_)),
+    export_c_func!(CFURLCreateStringByAddingPercentEscapes(_, _, _, _, _)), // 🏎️ Added our new bypass function
 ];

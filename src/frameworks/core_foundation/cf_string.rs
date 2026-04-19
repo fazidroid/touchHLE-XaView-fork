@@ -39,6 +39,24 @@ fn CFStringAppend(
 ) {
     msg![env; the_string appendString:appended_string]
 }
+// ==========================================================
+// 🏎️ EA BYPASS: Dynamic String Building for NFS Most Wanted
+// ==========================================================
+fn CFStringAppendCharacters(
+    env: &mut Environment,
+    the_string: CFMutableStringRef,
+    chars: ConstPtr<unichar>,
+    num_chars: CFIndex,
+) {
+    // 1. Convert the CFIndex length to an iOS-compatible NSUInteger
+    let length: NSUInteger = num_chars.try_into().unwrap();
+    
+    // 2. Safely create a new NSString out of the raw unicode characters
+    let to_append: id = msg_class![env; NSString stringWithCharacters:chars length:length];
+    
+    // 3. Append the new string to the target buffer!
+    msg![env; the_string appendString:to_append]
+}
 
 fn CFStringAppendCString(
     env: &mut Environment,
@@ -95,6 +113,127 @@ fn CFStringConvertNSStringEncodingToEncoding(
         _ => unimplemented!("Unhandled: NSStringEncoding {:#x}", encoding),
     }
 }
+
+fn CFStringCreateWithSubstring(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    string: CFStringRef,
+    range: CFRange,
+) -> CFStringRef {
+    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
+    let ns_range = NSRange {
+        location: range.location.try_into().unwrap(),
+        length: range.length.try_into().unwrap(),
+    };
+    log_dbg!("CFStringCreateWithSubstring(range: {:?})", ns_range);
+    msg![env; string substringWithRange:ns_range]
+}
+
+fn CFStringCreateWithCStringNoCopy(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    c_string: ConstPtr<u8>,
+    encoding: CFStringEncoding,
+    contents_deallocator: CFAllocatorRef,
+) -> CFStringRef {
+    log_dbg!("CFStringCreateWithCStringNoCopy -> delegating to CFStringCreateWithCString");
+    // We ignore the "no copy" and deallocator hints; just copy the string.
+    CFStringCreateWithCString(env, allocator, c_string, encoding)
+}
+
+fn CFStringGetBytes(
+    env: &mut Environment,
+    the_string: CFStringRef,
+    range: CFRange,
+    encoding: CFStringEncoding,
+    loss_byte: u8,
+    _is_external_representation: bool,
+    buffer: MutPtr<u8>,
+    max_buf_len: CFIndex,
+    used_buf_len: MutPtr<CFIndex>,
+) -> CFIndex {
+    log_dbg!(
+        "CFStringGetBytes called with encoding {:#x}, max_buf_len {}",
+        encoding,
+        max_buf_len
+    );
+    if the_string.is_null() {
+        return 0;
+    }
+    // Convert to owned Rust string
+    let rust_string = ns_string::to_rust_string(env, the_string).to_string();
+    // Extract the requested range
+    let range_start = range.location as usize;
+    let range_len = range.length as usize;
+    let sub_string = if range_start == 0 && range_len >= rust_string.len() {
+        rust_string
+    } else {
+        rust_string
+            .chars()
+            .skip(range_start)
+            .take(range_len)
+            .collect::<String>()
+    };
+    // Encode to bytes based on encoding
+    let bytes = match CFStringConvertEncodingToNSStringEncoding(env, encoding) {
+        ns_string::NSUTF8StringEncoding => sub_string.into_bytes(),
+        ns_string::NSASCIIStringEncoding => sub_string.as_bytes().to_vec(),
+        ns_string::NSISOLatin1StringEncoding => sub_string
+            .chars()
+            .filter_map(|c| if (c as u32) <= 0xFF { Some(c as u8) } else { None })
+            .collect(),
+        ns_string::NSUTF16StringEncoding | ns_string::NSUTF16LittleEndianStringEncoding => {
+            sub_string
+                .encode_utf16()
+                .flat_map(|u: u16| u.to_le_bytes())
+                .collect()
+        }
+        ns_string::NSUTF16BigEndianStringEncoding => {
+            sub_string
+                .encode_utf16()
+                .flat_map(|u: u16| u.to_be_bytes())
+                .collect()
+        }
+        other => {
+            log!("Warning: CFStringGetBytes unhandled encoding {:#x}", other);
+            return 0;
+        }
+    };
+    let total_len = bytes.len() as CFIndex;
+    // Write to buffer if provided
+    if !buffer.is_null() {
+        let to_copy = std::cmp::min(total_len, max_buf_len) as usize;
+        env.mem
+            .bytes_at_mut(buffer, to_copy as u32)
+            .copy_from_slice(&bytes[..to_copy]);
+        if !used_buf_len.is_null() {
+            env.mem.write(used_buf_len, to_copy as CFIndex);
+        }
+        to_copy as CFIndex
+    } else {
+        if !used_buf_len.is_null() {
+            env.mem.write(used_buf_len, total_len);
+        }
+        total_len
+    }
+}
+
+fn CFURLCreateStringByReplacingPercentEscapesUsingEncoding(
+    _env: &mut Environment,
+    _allocator: CFAllocatorRef,
+    original_string: CFStringRef,
+    _characters_to_leave_escaped: CFStringRef,
+    _encoding: CFStringEncoding,
+) -> CFStringRef {
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Fake URL String Decoding
+    // ==========================================================
+    println!("🎮 LOG: Safely stubbed CFURLCreateStringByReplacingPercentEscapesUsingEncoding in cf_string.rs!");
+    
+    // Instead of messing with CPU registers, we safely return the pointer directly!
+    original_string 
+}
+
 
 fn CFStringCreateCopy(
     env: &mut Environment,
@@ -341,10 +480,15 @@ fn CFStringGetPascalString(
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringAppend(_, _)),
+    export_c_func!(CFStringAppendCharacters(_, _, _)),
     export_c_func!(CFStringAppendCString(_, _, _)),
     export_c_func!(CFStringAppendFormat(_, _, _, _)),
     export_c_func!(CFStringConvertEncodingToNSStringEncoding(_)),
     export_c_func!(CFStringConvertNSStringEncodingToEncoding(_)),
+    export_c_func!(CFStringCreateWithSubstring(_, _, _)),
+    export_c_func!(CFStringCreateWithCStringNoCopy(_, _, _, _)),
+    export_c_func!(CFStringGetBytes(_, _, _, _, _, _, _, _)),
+   export_c_func!(CFURLCreateStringByReplacingPercentEscapesUsingEncoding(_, _, _, _)),
     export_c_func!(CFStringCreateCopy(_, _)),
     export_c_func!(CFStringCreateMutable(_, _)),
     export_c_func!(CFStringCreateMutableCopy(_, _, _)),

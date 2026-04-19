@@ -43,14 +43,27 @@ pub struct statfs {
 }
 unsafe impl SafeRead for statfs {}
 
-pub fn statfs_inner(env: &mut Environment, path: ConstPtr<u8>) -> (i32, statfs) {
-    // FIXME does directory matter?
-    assert!(env
-        .mem
-        .cstr_at_utf8(path)
-        .is_ok_and(|path| path.starts_with(env.fs.home_directory().join("Documents").as_str())));
+/// Returns true if the current app is Asphalt 8 or an NFS game that needs
+/// a huge free space report to avoid "insufficient space" alerts.
+/// Returns true if the current app is Asphalt 8 or an NFS game that needs
+/// a huge free space report to avoid "insufficient space" alerts.
+fn needs_large_fs(env: &mut Environment) -> bool {
+    let main_bundle: crate::objc::id = crate::objc::msg_class![env; NSBundle mainBundle];
+    if main_bundle != crate::objc::nil {
+        let bundle_id: crate::objc::id = crate::objc::msg![env; main_bundle bundleIdentifier];
+        if bundle_id != crate::objc::nil {
+            let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
+            return bundle_str.to_lowercase().contains("asphalt") ||
+                   bundle_str.starts_with("com.ea.nfs") ||
+                   bundle_str == "com.ea.nfss2.inc" ||
+                   bundle_str == "com.ea.nfss2.bv";
+        }
+    }
+    false
+}
 
-    // Values are taken from a test run of iOS 4.3 Simulator
+pub fn statfs_inner(env: &mut Environment, _path: ConstPtr<u8>) -> (i32, statfs) {
+    // Start with the default iOS 4.3 simulator values
     let mut statfs = statfs {
         f_bsize: 4096,
         f_iosize: 1048576,
@@ -74,6 +87,17 @@ pub fn statfs_inner(env: &mut Environment, path: ConstPtr<u8>) -> (i32, statfs) 
     statfs.f_fstypename[..3].copy_from_slice(b"hfs");
     statfs.f_mntonname[..1].copy_from_slice(b"/");
     statfs.f_mntfromname[..12].copy_from_slice(b"/dev/disk0s2");
+
+    // For Asphalt 8 and NFS games, spoof a huge 100 GB filesystem
+    if needs_large_fs(env) {
+        let blocks_100gb = 100u64 * 1024 * 1024 * 1024 / 4096; // 26,214,400 blocks of 4KB
+        statfs.f_blocks = blocks_100gb;
+        statfs.f_bfree = blocks_100gb;
+        statfs.f_bavail = blocks_100gb;
+        statfs.f_files = 10000000; // plenty of inodes
+        statfs.f_ffree = 10000000;
+    }
+
     (0, statfs)
 }
 

@@ -6,7 +6,7 @@
 //! `UIAlertView`.
 
 use crate::frameworks::foundation::ns_string;
-use crate::objc::{id, msg_super, nil, objc_classes, ClassExports};
+use crate::objc::{id, msg, msg_super, nil, objc_classes, ClassExports};
 use std::borrow::Cow;
 
 pub const CLASSES: ClassExports = objc_classes! {
@@ -21,21 +21,25 @@ pub const CLASSES: ClassExports = objc_classes! {
             cancelButtonTitle:(id)cancelButtonTitle
             otherButtonTitles:(id)otherButtonTitles {
 
-    log!("TODO: [(UIAlertView*){:?} initWithTitle:{:?} message:{:?} delegate:{:?} cancelButtonTitle:{:?} otherButtonTitles:{:?}]", this, title, message, delegate, cancelButtonTitle, otherButtonTitles);
-
-    let msg = if message == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, message) };
-    let title = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
-    log!("UIAlertView: title: {:?}, message: {:?}", title, msg);
-
+    log!("UIAlertView init: title={:?}, msg={:?}", title, message);
     msg_super![env; this init]
 }
 
 - (())addButtonWithTitle:(id)title {
-    log!("TODO: [(UIAlertView *){:?} addButtonWithTitle:{}]", this, ns_string::to_rust_string(env, title));
+    log!("UIAlertView addButton: {}", ns_string::to_rust_string(env, title));
 }
 
 - (())show {
-    log!("TODO: [(UIAlertView*){:?} show]", this);
+    log!("UIAlertView: AUTO-DISMISS (storage alert bypass)");
+
+    // Retrieve the delegate that was set during init
+    let delegate: id = msg![env; this delegate];
+    if delegate != nil {
+        let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
+        let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
+    }
+
+    // Do NOT call msg_super to prevent actual display.
 }
 
 @end

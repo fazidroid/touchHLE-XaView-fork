@@ -145,16 +145,46 @@ impl State {
     }
 }
 
+fn is_asphalt_or_nfs(env: &Environment) -> bool {
+    let bundle_id = env.bundle.bundle_identifier();
+    bundle_id.contains("asphalt") ||
+    bundle_id.starts_with("com.ea.nfs") ||
+    bundle_id == "com.ea.nfss2.inc" ||
+    bundle_id == "com.ea.nfss2.bv"
+}
+
 fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> FileDescriptor {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    // OfflineSocketBypass
+        // OfflineSocketBypass
     if !env.options.network_access {
         println!("WARNING: Creating offline socket!");
     }
 
-    assert_eq!(domain, AF_INET);
+    // ==========================================================
+    // 🏎️ GT RACING EXCLUSIVE BYPASS: AF_UNIX Local Socket
+    // ==========================================================
+    let main_bundle: crate::objc::id = crate::objc::msg_class![env; NSBundle mainBundle];
+    let mut is_gt_racing = false;
+    
+    if main_bundle != crate::objc::nil {
+        let bundle_id: crate::objc::id = crate::objc::msg![env; main_bundle bundleIdentifier];
+        if bundle_id != crate::objc::nil {
+            let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
+            is_gt_racing = bundle_str == "com.gameloft.GTRacingFreemiumHD" ||
+                           bundle_str == "com.gameloft.GTRacingFreemium" ||
+                           bundle_str == "com.gameloft.GTRacingFreemiumUK";
+        }
+    }
+
+    if is_gt_racing && domain != AF_INET {
+        println!("🎮 GT RACING EXCLUSIVE: Bypassing strict AF_INET socket check for domain {}!", domain);
+    } else {
+        // Standard touchHLE behavior: Enforce AF_INET for Need for Speed and all other games
+        assert_eq!(domain, AF_INET);
+    }
+
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
     assert!(protocol == IPPROTO_TCP || protocol == IPPROTO_UDP || protocol == 0);
 
@@ -202,7 +232,10 @@ fn getsockopt(
 
     // RelaxGetsockopt
     if level != SOL_SOCKET || option_name != SO_ERROR {
-        println!("WARNING: Ignoring getsockopt for level {}, option {}", level, option_name);
+        println!(
+            "WARNING: Ignoring getsockopt for level {}, option {}",
+            level, option_name
+        );
         return 0;
     }
 
@@ -255,11 +288,17 @@ fn setsockopt(
 
     // RelaxSetsockopt
     if level != SOL_SOCKET {
-        println!("WARNING: Ignoring setsockopt for level {}, option {}", level, option_name);
+        println!(
+            "WARNING: Ignoring setsockopt for level {}, option {}",
+            level, option_name
+        );
         return 0;
     }
     if option_name != SO_REUSEADDR && option_name != SO_BROADCAST {
-        println!("WARNING: Ignoring setsockopt unsupported option {}", option_name);
+        println!(
+            "WARNING: Ignoring setsockopt unsupported option {}",
+            option_name
+        );
         return 0;
     }
 
@@ -286,15 +325,14 @@ fn bind(
     let type_ = socket_host_object.type_;
     assert!(type_ == SOCK_STREAM || type_ == SOCK_DGRAM);
 
-    assert_eq!(address_len, guest_size_of::<sockaddr>());
-    let sockaddr_val = env.mem.read(address);
-    log_dbg!(
-        "bind({}, {:?} ({:?}), {})",
-        socket,
-        address,
-        sockaddr_val,
-        address_len
+    if address_len != guest_size_of::<sockaddr>() {
+    log!(
+        "Warning: bind() addr_len {} != expected {}, using first 16 bytes",
+        address_len,
+        guest_size_of::<sockaddr>()
     );
+}
+let sockaddr_val = env.mem.read(address);
 
     let socket_address = sockaddr_val.to_sockaddr_v4();
     let type_str = match type_ {
@@ -349,18 +387,20 @@ fn bind(
 }
 
 fn listen(env: &mut Environment, socket: i32, backlog: i32) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
-
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
-    log!(
-        "Warning: listen(socket: {}, backlog: {}), ignoring",
-        socket,
-        backlog
-    );
-    0 // Success
+    let is_asphalt8 = env.bundle.bundle_identifier() == "com.gameloft.asphalt8";
+    if is_asphalt8 {
+        // Asphalt 8 expects listen to succeed and the socket to become readable later.
+        log!("Asphalt8: listen(socket: {}, backlog: {}) -> 0", socket, backlog);
+        // Mark socket as listening (you may add a field to SocketHostObject).
+        0
+    } else {
+        log!("Warning: listen(socket: {}, backlog: {}), ignoring", socket, backlog);
+        0
+    }
 }
 
 fn connect(
@@ -375,7 +415,13 @@ fn connect(
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
-    assert_eq!(address_len, guest_size_of::<sockaddr>());
+    if address_len != guest_size_of::<sockaddr>() {
+        log!(
+            "Warning: connect() addr_len {} != expected {}, using first 16 bytes",
+            address_len,
+            guest_size_of::<sockaddr>()
+        );
+    }
     let sockaddr_val = env.mem.read(address);
     log_dbg!(
         "connect({:?} ({:?}), {})",
@@ -396,11 +442,31 @@ fn connect(
 
     // OfflineConnectBypass
     if !env.options.network_access {
-        println!("WARNING: Bypassing connect() for offline mode!");
-        return 0;
-    }
+        log!("WARNING: Failing connect() with ENETUNREACH for offline mode");
+        set_errno(env, 51); // ENETUNREACH
+        return -1;
+     }
+// else existing stub behavior
 
-    let host_stream = TcpStream::connect(socket_address).unwrap();
+    // Attempt real connection, but handle errors without panicking
+    let host_stream = match TcpStream::connect(socket_address) {
+        Ok(stream) => stream,
+        Err(e) => {
+            log!("connect: failed to connect to {:?}: {}", socket_address, e);
+            // Map the OS error to a guest errno
+            let errno = match e.raw_os_error() {
+                Some(code) => code,
+                None => match e.kind() {
+                    std::io::ErrorKind::ConnectionRefused => 61, // ECONNREFUSED
+                    std::io::ErrorKind::TimedOut => 60,          // ETIMEDOUT
+                    std::io::ErrorKind::AddrNotAvailable => 49,  // EADDRNOTAVAIL
+                    _ => 60,                                     // ETIMEDOUT as fallback
+                },
+            };
+            set_errno(env, errno);
+            return -1;
+        }
+    };
     // We set host socket as non-blocking in order to have
     // more control of how and when it's used
     host_stream.set_nonblocking(true).unwrap();
@@ -441,24 +507,22 @@ fn select(
         true
     };
 
-    // OfflineSelectBypass
-    if !env.options.network_access {
-        let mut count = 0;
-        if !read_fds.is_null() {
-            let set = env.mem.read(read_fds);
-            let bits = set.fds_bits;
-            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
-        }
-        if !write_fds.is_null() {
-            let set = env.mem.read(write_fds);
-            let bits = set.fds_bits;
-            count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
-        }
-        if !error_fds.is_null() {
-            env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
-        }
-        return count;
+// OfflineSelectBypass
+// OfflineSelectBypass
+if !env.options.network_access {
+    log_dbg!("select (offline): returning 0 with cleared sets");
+    if !read_fds.is_null() {
+        env.mem.write(read_fds, fd_set { fds_bits: [0; 32] });
     }
+    if !write_fds.is_null() {
+        env.mem.write(write_fds, fd_set { fds_bits: [0; 32] });
+    }
+    if !error_fds.is_null() {
+        env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
+    }
+    return 0;
+}
+// else existing stub behavior
 
     let mut count = 0;
 
@@ -748,8 +812,7 @@ fn accept(
         State::get_mut(env).sockets.insert(new_fd, host_object);
         assert!(!address.is_null());
         let peer_guest_addr = sockaddr::from_sockaddr_v4(&addr);
-        env.mem.write(address, peer_guest_addr);
-        assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
+        //assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
         env.mem.write(address_len, guest_size_of::<sockaddr>());
         return new_fd;
     }
@@ -824,9 +887,12 @@ fn recvfrom(
     assert_eq!(flags, 0); // TODO
 
     // OfflineRecvBypass
-    if !env.options.network_access {
-        return 0;
-    }
+if !env.options.network_access {
+    log!("WARNING: Failing recvfrom() with ENOTCONN for offline mode");
+    set_errno(env, 57); // ENOTCONN
+    return -1;
+}
+// else existing stub behavior
     let (num_bytes_read, addr) = match type_ {
         SOCK_DGRAM => {
             let udp_socket = env
@@ -855,7 +921,7 @@ fn recvfrom(
             if !address.is_null() {
                 let guest_addr = sockaddr::from_sockaddr_v4(&addr);
                 env.mem.write(address, guest_addr);
-                assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
+                //assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
                 env.mem.write(address_len, guest_size_of::<sockaddr>());
             }
             (read, Ok(addr))
@@ -917,12 +983,15 @@ fn send(
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_STREAM);
 
-    assert_eq!(flags, 0); // TODO
+    //assert_eq!(flags, 0); // TODO
 
     // OfflineSendBypass
-    if !env.options.network_access {
-        return length as i32;
-    }
+if !env.options.network_access {
+    log!("WARNING: Failing send() with ENOTCONN for offline mode");
+    set_errno(env, 57); // ENOTCONN
+    return -1;
+}
+// else existing stub behavior
     let num_bytes_written = match type_ {
         SOCK_STREAM => {
             let mut tcp_stream = env
@@ -967,15 +1036,20 @@ fn sendto(
     dest_address: MutPtr<sockaddr>,
     dest_address_len: socklen_t,
 ) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
 
     let type_ = State::get(env).sockets.get(&socket).unwrap().type_;
     assert!(type_ == SOCK_DGRAM);
-
     assert_eq!(flags, 0); // TODO
 
-    assert_eq!(dest_address_len, guest_size_of::<sockaddr>());
+    // Relax length check – the first 16 bytes contain the valid sockaddr_in.
+    if dest_address_len != guest_size_of::<sockaddr>() {
+        log!(
+            "Warning: sendto() addr_len {} != expected {}, using first 16 bytes",
+            dest_address_len,
+            guest_size_of::<sockaddr>()
+        );
+    }
     let sockaddr_val = env.mem.read(dest_address);
     let socket_address = sockaddr_val.to_sockaddr_v4();
     log_dbg!(
@@ -991,9 +1065,12 @@ fn sendto(
     );
 
     // OfflineSendtoBypass
-    if !env.options.network_access {
-        return length as i32;
-    }
+if !env.options.network_access {
+    log!("WARNING: Failing sendto() with ENOTCONN for offline mode");
+    set_errno(env, 57); // ENOTCONN
+    return -1;
+}
+// else existing stub behavior
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
             if State::get(env)
@@ -1074,6 +1151,35 @@ fn if_nametoindex(_env: &mut Environment, _ifname: ConstPtr<u8>) -> u32 {
     1
 }
 
+fn getsockname(
+    env: &mut Environment,
+    socket: i32,
+    address: MutPtr<sockaddr>,
+    address_len: MutPtr<socklen_t>,
+) -> i32 {
+    log_dbg!("getsockname({}, {:?}, {:?})", socket, address, address_len);
+    set_errno(env, 0);
+
+    if !State::get(env).sockets.contains_key(&socket) {
+        set_errno(env, EBADF);
+        return -1;
+    }
+
+    // Offline mode: return a dummy local address
+    if !env.options.network_access {
+        let dummy_addr = sockaddr::from_ipv4_parts([0, 0, 0, 0], 0);
+        env.mem.write(address, dummy_addr);
+        env.mem.write(address_len, guest_size_of::<sockaddr>());
+        return 0;
+    }
+
+    // For now, we don't track bound addresses properly, so just return a dummy.
+    let dummy_addr = sockaddr::from_ipv4_parts([0, 0, 0, 0], 0);
+    env.mem.write(address, dummy_addr);
+    env.mem.write(address_len, guest_size_of::<sockaddr>());
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(socket(_, _, _)),
     export_c_func!(ioctl(_, _, _)),
@@ -1089,7 +1195,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(send(_, _, _, _)),
     export_c_func!(sendto(_, _, _, _, _, _)),
     export_c_func!(shutdown(_, _)),
-    export_c_func!(if_nametoindex(_)), // Зарегистрировали нашу функцию
+    export_c_func!(if_nametoindex(_)),
+    export_c_func!(getsockname(_, _, _)),
 ];
 
 /// A helper to close a socket, not a part of API

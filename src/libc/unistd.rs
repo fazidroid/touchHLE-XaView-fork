@@ -23,6 +23,7 @@ const R_OK: i32 = 4; // read permission
 
 /// SycConf name type. This alias is for readability, POSIX just uses `int`.
 type SysConfName = i32;
+const _SC_CLK_TCK: SysConfName = 3;
 const _SC_PAGESIZE: SysConfName = 29;
 const _SC_NPROCESSORS_ONLN: SysConfName = 58;
 
@@ -76,7 +77,16 @@ fn access(env: &mut Environment, path: ConstPtr<u8>, mode: i32) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let binding = env.mem.cstr_at_utf8(path).unwrap();
+    // BypassAccessLoop
+    let binding = match env.mem.cstr_at_utf8(path) {
+        Ok(s) => {
+            if s.contains("//") {
+                return 0;
+            }
+            s
+        }
+        Err(_) => return 0,
+    };
     let guest_path = GuestPath::new(&binding);
     let (exists, read, write, execute) = env.fs.access(guest_path);
     // TODO: support ORing
@@ -122,9 +132,17 @@ fn unlink(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    log_dbg!("unlink({:?} '{:?}')", path, env.mem.cstr_at_utf8(path));
+    // BypassUnlinkUnwrap
+    let path_str = match env.mem.cstr_at_utf8(path) {
+        Ok(s) => s,
+        Err(_) => {
+            set_errno(env, ENOENT);
+            return -1;
+        }
+    };
 
-    let path_str = env.mem.cstr_at_utf8(path).unwrap();
+    log_dbg!("unlink({:?} '{:?}')", path, path_str);
+
     let guest_path = GuestPath::new(&path_str);
     match env.fs.remove(guest_path) {
         Ok(()) => 0,
@@ -162,10 +180,12 @@ fn readlink(
     buf: MutPtr<u8>,
     buf_size: GuestISize,
 ) -> GuestISize {
+    // BypassReadlinkUnwrap
+    let path_str = env.mem.cstr_at_utf8(path).unwrap_or_default();
     log!(
         "TODO: readlink({:?} '{}', {:?}, {}) -> -1",
         path,
-        env.mem.cstr_at_utf8(path).unwrap(),
+        path_str,
         buf,
         buf_size,
     );
@@ -183,6 +203,7 @@ fn getdtablesize(_env: &mut Environment) -> i32 {
 
 fn sysconf(_env: &mut Environment, name: i32) -> i32 {
     match name {
+        _SC_CLK_TCK => 100, // ImplSysconfClock
         _SC_PAGESIZE => PAGE_SIZE.try_into().unwrap(),
         _SC_NPROCESSORS_ONLN => 1,
         _ => unimplemented!("TODO: sysconf(name: {})", name),

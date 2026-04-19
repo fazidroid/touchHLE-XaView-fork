@@ -280,7 +280,6 @@ pub fn with_format(env: &mut Environment, format: id, args: VaList) -> String {
     // TODO: what if it's not valid UTF-8?
     String::from_utf8_lossy(&res).into_owned()
 }
-
 pub fn from_rust_ordering(ordering: std::cmp::Ordering) -> NSComparisonResult {
     match ordering {
         std::cmp::Ordering::Less => NSOrderedAscending,
@@ -299,6 +298,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 // We can pick whichever subclass we want for the various alloc methods.
 // For the time being, that will always be _touchHLE_NSString.
 @implementation NSString: NSObject
+
+// 🛡️ GAMELOFT BYPASS: Simulate offline mode so the game doesn't crash trying to download data
++ (id)stringWithContentsOfURL:(id)_url encoding:(u32)_enc error:(id)_error {
+    println!("🛡️ GAMELOFT BYPASS: Ignored stringWithContentsOfURL (Simulating offline mode)");
+    crate::objc::nil 
+}
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    // 🛠️ FIX: Safely initialize with an empty string instead of trying to use .default()
+    let host_object = Box::new(StringHostObject::Utf8(Cow::Borrowed("")));
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
 
 + (id)allocWithZone:(NSZonePtr)zone {
     // NSString might be subclassed by something which needs allocWithZone:
@@ -804,7 +815,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (ConstPtr<u8>)cStringUsingEncoding:(NSStringEncoding)encoding {
     let string = to_rust_string(env, this);
-    
+
     // SanitizeLegacyString
     let safe_string = if encoding == NSASCIIStringEncoding
         || encoding == NSMacOSRomanStringEncoding
@@ -837,11 +848,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     let bytes_size = bytes.len() as GuestUSize;
     let total_size: GuestUSize = bytes_size + null_size;
-    
+
     // FixNullTerminator
     let c_string: MutPtr<u8> = env.mem.calloc(total_size).cast();
     _ = env.mem.bytes_at_mut(c_string, bytes_size).write(&bytes).unwrap();
-    
+
     let _: id = msg_class![env; NSData dataWithBytesNoCopy:(c_string.cast_void())
                                                     length:total_size];
     c_string.cast_const()
@@ -2087,14 +2098,17 @@ pub fn get_bytes_buffer_inner(
     );
 
     let src = to_rust_string(env, str);
-    
+
     // SanitizeLegacyEncoding
     let safe_src = if encoding == NSASCIIStringEncoding
         || encoding == NSMacOSRomanStringEncoding
         || encoding == NSISOLatin1StringEncoding
     {
         if !src.as_bytes().iter().all(|byte| byte.is_ascii()) {
-            let sanitized: String = src.chars().map(|c| if c.is_ascii() { c } else { '?' }).collect();
+            let sanitized: String = src
+                .chars()
+                .map(|c| if c.is_ascii() { c } else { '?' })
+                .collect();
             Cow::Owned(sanitized)
         } else {
             src
