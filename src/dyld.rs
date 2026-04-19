@@ -850,6 +850,20 @@ impl Dyld {
                 return None;
             }
         }
+
+        // ==========================================================
+        // 🏎️ GT RACING 2 BYPASS: Stub __dyld_image_count
+        // ==========================================================
+        if symbol == "__dyld_image_count" {
+            fn fake_dyld_image_count(_env: &mut crate::Environment) -> u32 {
+                println!("🎮 LOG: Bypassing __dyld_image_count (Jailbreak/Anti-cheat check)!");
+                // Returning 0 forces the game to skip its library-scanning loop entirely
+                0 
+            }
+            return Some(&(fake_dyld_image_count as fn(&mut crate::Environment) -> u32));
+        }
+
+        panic!("Call to unimplemented function {symbol}");
                 // ==========================================================
         // 🏎️ GT RACING 2 BYPASS: Stub _host_info
         // ==========================================================
