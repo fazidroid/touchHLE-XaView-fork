@@ -444,13 +444,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // Use 1 GB — must fit in 32 bits to avoid overflow when NSNumber
-    // only reads the low 32 bits. 20 GB = 0x500000000 whose low 32 bits
-    // are zero, which makes the game think there is no free space and
-    // shows the "free up space" screen.
-    // 1 GB = 0x40000000 fits safely in 32 bits.
-    let total_size: u32 = 1024 * 1024 * 1024; // 1 GB total
-    let free_size: u32  = 1024 * 1024 * 1024; // 1 GB free (all free)
+    // ==========================================================
+    // 🏎️ ASPHALT 8 BYPASS: 3 GB Storage Spoof
+    // ==========================================================
+    // 1 GB is too small for modern Gameloft titles! 
+    // We increase this to 3 GB (which safely fits inside a 32-bit 
+    // unsigned integer without overflowing the NSNumber).
+    let total_size: u32 = 3_u32 * 1024 * 1024 * 1024; // 3 GB total
+    let free_size: u32  = 3_u32 * 1024 * 1024 * 1024; // 3 GB free
 
     let total_num: id = msg_class![env; NSNumber numberWithUnsignedInt:total_size];
     let free_num: id  = msg_class![env; NSNumber numberWithUnsignedInt:free_size];
