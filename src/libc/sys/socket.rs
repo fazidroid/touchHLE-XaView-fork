@@ -441,10 +441,11 @@ fn connect(
         .is_none());
 
     // OfflineConnectBypass
-    if !env.options.network_access && is_asphalt_or_nfs(env) {
-    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
-    return -1;
-}
+    if !env.options.network_access {
+        log!("WARNING: Failing connect() with ENETUNREACH for offline mode");
+        set_errno(env, 51); // ENETUNREACH
+        return -1;
+     }
 // else existing stub behavior
 
     // Attempt real connection, but handle errors without panicking
@@ -507,9 +508,19 @@ fn select(
     };
 
 // OfflineSelectBypass
-if !env.options.network_access && is_asphalt_or_nfs(env) {
-    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
-    return -1;
+// OfflineSelectBypass
+if !env.options.network_access {
+    log_dbg!("select (offline): returning 0 with cleared sets");
+    if !read_fds.is_null() {
+        env.mem.write(read_fds, fd_set { fds_bits: [0; 32] });
+    }
+    if !write_fds.is_null() {
+        env.mem.write(write_fds, fd_set { fds_bits: [0; 32] });
+    }
+    if !error_fds.is_null() {
+        env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
+    }
+    return 0;
 }
 // else existing stub behavior
 
@@ -876,8 +887,9 @@ fn recvfrom(
     assert_eq!(flags, 0); // TODO
 
     // OfflineRecvBypass
-    if !env.options.network_access && is_asphalt_or_nfs(env) {
-    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+if !env.options.network_access {
+    log!("WARNING: Failing recvfrom() with ENOTCONN for offline mode");
+    set_errno(env, 57); // ENOTCONN
     return -1;
 }
 // else existing stub behavior
@@ -974,8 +986,9 @@ fn send(
     //assert_eq!(flags, 0); // TODO
 
     // OfflineSendBypass
-    if !env.options.network_access && is_asphalt_or_nfs(env) {
-    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+if !env.options.network_access {
+    log!("WARNING: Failing send() with ENOTCONN for offline mode");
+    set_errno(env, 57); // ENOTCONN
     return -1;
 }
 // else existing stub behavior
@@ -1052,8 +1065,9 @@ fn sendto(
     );
 
     // OfflineSendtoBypass
-    if !env.options.network_access && is_asphalt_or_nfs(env) {
-    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+if !env.options.network_access {
+    log!("WARNING: Failing sendto() with ENOTCONN for offline mode");
+    set_errno(env, 57); // ENOTCONN
     return -1;
 }
 // else existing stub behavior
