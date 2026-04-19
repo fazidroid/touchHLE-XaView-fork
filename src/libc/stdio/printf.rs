@@ -1083,6 +1083,29 @@ where
                     matched_args -= 1;
                 }
             }
+                        b'c' => {
+                // %c reads a single character (whitespace is not skipped)
+                // Width limit is respected if max_width > 0.
+                let limit = if max_width > 0 { max_width } else { 1 };
+                let mut dst_ptr: MutPtr<u8> = args.next(env);
+                let mut chars_read = 0;
+                while chars_read < limit {
+                    let x = getc_fn(env, subject, src_char_idx);
+                    if x.is_err() {
+                        break;
+                    }
+                    let cc: u8 = x.unwrap().into();
+                    // %c does NOT skip whitespace; it reads exactly the next character.
+                    env.mem.write(dst_ptr, cc);
+                    dst_ptr += 1;
+                    src_char_idx += 1;
+                    chars_read += 1;
+                }
+                // If no characters were read (EOF), matching fails.
+                if chars_read == 0 {
+                    break 'outer; // or matched_args -= 1; depending on desired behavior
+                }
+            }
             b's' => {
                 assert!(length_modifier.is_none());
                 let orig_dst_ptr: MutPtr<u8> = args.next(env);
