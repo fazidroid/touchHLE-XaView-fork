@@ -863,8 +863,9 @@ impl Dyld {
             return Some(&(fake_dyld_image_count as fn(&mut crate::Environment) -> u32));
         }
 
-        panic!("Call to unimplemented function {symbol}");
-                // ==========================================================
+        panic!("Call to unimplemented function {symbol}"); // ❌ DELETE THIS LINE!
+
+        // ==========================================================
         // 🏎️ GT RACING 2 BYPASS: Stub _host_info
         // ==========================================================
         if symbol == "_host_info" {
