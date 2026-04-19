@@ -5,7 +5,7 @@
  */
 //! `NSSortDescriptor` stub.
 
-use crate::objc::{id, msg, msg_class, objc_classes, ClassExports, HostObject};
+use crate::objc::{id, msg, msg_class, msg_super, objc_classes, ClassExports, HostObject};
 
 #[derive(Default)]
 struct NSSortDescriptorHostObject;
@@ -29,17 +29,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithKey:(id)_key ascending:(bool)_ascending {
     log_dbg!("NSSortDescriptor initWithKey:ascending: stub");
-    msg![env; this init]
+    msg_super![env; this init]
 }
 
 - (id)initWithKey:(id)_key ascending:(bool)_ascending selector:(id)_selector {
     log_dbg!("NSSortDescriptor initWithKey:ascending:selector: stub");
-    msg![env; this init]
+    msg_super![env; this init]
 }
 
 - (id)key {
-    // Return a dummy key to avoid nil
-    crate::frameworks::foundation::ns_string::from_rust_string(env, "stubKey")
+    crate::frameworks::foundation::ns_string::from_rust_string(env, String::from("stubKey"))
 }
 
 - (bool)ascending {
@@ -47,8 +46,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)selector {
-    // Return a dummy selector name
-    crate::frameworks::foundation::ns_string::from_rust_string(env, "compare:")
+    crate::frameworks::foundation::ns_string::from_rust_string(env, String::from("compare:"))
 }
 
 @end
