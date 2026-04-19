@@ -24,10 +24,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("NSConditionLock initWithCondition: {}", condition);
     let this = msg_super![env; this init];
     if this != crate::objc::nil {
-        // Use put_host_object to assign the new struct
-        env.objc.put_host_object(this, NSConditionLockHostObject {
-            condition,
-        });
+        let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+        host_obj.condition = condition;
     }
     this
 }
@@ -36,10 +34,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("NSConditionLock init");
     let this = msg_super![env; this init];
     if this != crate::objc::nil {
-        // Use put_host_object to assign the new struct
-        env.objc.put_host_object(this, NSConditionLockHostObject {
-            condition: 0,
-        });
+        let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+        host_obj.condition = 0;
     }
     this
 }
