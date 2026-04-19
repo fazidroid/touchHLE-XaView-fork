@@ -38,26 +38,26 @@ pub struct statvfs {
 unsafe impl SafeRead for statvfs {}
 
 fn statvfs(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<statvfs>) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
     let (result, statfs) = statfs_inner(env, path);
 
-    // ==========================================================
-    // 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: 32GB Free Space Spoof
-    // ==========================================================
+    // Detect game bundle IDs that need generous free space
     let main_bundle: crate::objc::id = crate::objc::msg_class![env; NSBundle mainBundle];
-    let mut is_asphalt = false;
+    let mut large_fs = false;
     if main_bundle != crate::objc::nil {
         let bundle_id: crate::objc::id = crate::objc::msg![env; main_bundle bundleIdentifier];
         if bundle_id != crate::objc::nil {
             let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
-            is_asphalt = bundle_str.to_lowercase().contains("asphalt");
+            large_fs = bundle_str.to_lowercase().contains("asphalt") ||
+                       bundle_str.starts_with("com.ea.nfs") ||
+                       bundle_str == "com.ea.nfss2.inc" ||
+                       bundle_str == "com.ea.nfss2.bv";
         }
     }
 
-    let (f_bsize, f_frsize, f_blocks, f_bfree, f_bavail) = if is_asphalt {
-        // 32GB fake drive for Asphalt 8
-        (4096, 4096, 8388608, 8388608, 8388608) 
+    let (f_bsize, f_frsize, f_blocks, f_bfree, f_bavail) = if large_fs {
+        // 32 GB fake drive for Asphalt 8 and NFS games
+        (4096, 4096, 8388608, 8388608, 8388608)
     } else {
         // Standard touchHLE sandbox for all other games
         (
@@ -77,14 +77,14 @@ fn statvfs(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<statvfs>) -> i
         f_bavail,
         f_files: statfs.f_files.try_into().unwrap(),
         f_ffree: statfs.f_ffree.try_into().unwrap(),
-        f_favail: statfs.f_ffree.try_into().unwrap(), // TODO: Is this right?
+        f_favail: statfs.f_ffree.try_into().unwrap(),
         f_fsid: 0,
         f_flag: statfs.f_flags & ST_RDONLY & ST_NOSUID,
         f_namemax: 255,
     };
     env.mem.write(buf, statvfs);
     log!(
-        "TODO: statvfs({:?} {:?}, {:?}) -> {}",
+        "statvfs({:?} {:?}, {:?}) -> {}",
         path,
         env.mem.cstr_at_utf8(path),
         buf,
