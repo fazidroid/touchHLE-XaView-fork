@@ -491,10 +491,12 @@ fn select(
     set_errno(env, 0);
 
     // ==========================================================
-    // 🏎️ REAL RACING 2 BYPASS: Zero-Descriptor Sleep Hack
+    // 🏎️ REAL RACING 2 BYPASS: Ultimate Select() Armor
     // ==========================================================
-    if n_fds == 0 {
-        println!("🎮 LOG: Safely absorbed zero-descriptor select() sleep hack!");
+    // If the game passes 0, a negative number, or an overflowed number,
+    // we catch it here instead of violently panicking.
+    if n_fds <= 0 || n_fds >= 1024 {
+        println!("🎮 LOG: Safely absorbed invalid select() call with n_fds: {}", n_fds);
         if !timeout.is_null() {
             let timeval = env.mem.read(timeout);
             // Convert the requested timeval into a Rust Duration
@@ -507,11 +509,11 @@ fn select(
                 std::thread::sleep(duration);
             }
         }
-        // Return 0 (no file descriptors ready) to satisfy the engine
+        // Return 0 to satisfy the engine without checking fake sockets
         return 0;
     }
 
-    assert!(n_fds > 0 && n_fds < 1024);
+    // ❌ MAKE SURE YOU DELETED the `assert!(n_fds > 0 && n_fds < 1024);` line!
 
     let should_block = if !timeout.is_null() {
         let timeval = env.mem.read(timeout);
