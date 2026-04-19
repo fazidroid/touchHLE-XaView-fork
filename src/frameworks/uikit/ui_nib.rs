@@ -115,13 +115,10 @@ pub const CLASSES: ClassExports = objc_classes! {
             objects
         }
         Err(_) => {
-            println!("🎮 LOG: NIB load failed! Injecting EAGLView fallback directly into the owner!");
+            println!("🎮 LOG: NIB load failed! Injecting UIView fallback directly into the owner!");
             
-            // 1. Try to find the game's custom OpenGL view class (EAGLView)
-            let mut view_class = env.objc.get_class("EAGLView");
-            if view_class == crate::objc::nil {
-                view_class = env.objc.get_known_class("UIView", &mut env.mem);
-            }
+            // 1. Safely get the standard UIView class using the public method
+            let view_class = env.objc.get_known_class("UIView", &mut env.mem);
 
             // 2. Allocate and initialize our blank canvas
             let fallback_view: id = msg![env; view_class alloc];
