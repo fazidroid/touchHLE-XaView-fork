@@ -24,8 +24,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("NSConditionLock initWithCondition: {}", condition);
     let this = msg_super![env; this init];
     if this != crate::objc::nil {
-        let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
-        host_obj.condition = condition;
+        // We set the host object instead of borrowing it
+        env.objc.set_host_object(this, NSConditionLockHostObject {
+            condition,
+        });
     }
     this
 }
@@ -34,8 +36,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("NSConditionLock init");
     let this = msg_super![env; this init];
     if this != crate::objc::nil {
-        let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
-        host_obj.condition = 0;
+        // We set the host object instead of borrowing it
+        env.objc.set_host_object(this, NSConditionLockHostObject {
+            condition: 0,
+        });
     }
     this
 }
