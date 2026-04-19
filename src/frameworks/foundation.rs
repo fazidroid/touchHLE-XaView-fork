@@ -52,6 +52,7 @@ pub mod ns_value;
 pub mod ns_xml_parser;
 pub mod ns_condition_lock;
 pub mod ns_sort_descriptor;
+pub mod ns_invocation;
 
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
