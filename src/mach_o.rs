@@ -224,7 +224,10 @@ impl Reloc {
     }
 }
 
-fn cpu_subtype_to_str(ty: cpu_subtype_t) -> &'static str {
+fn cpu_subtype_to_str(ty: cpu_subtype_t, is_64bit: bool) -> &'static str {
+    if is_64bit {
+        return "arm64";
+    }
     match ty {
         mach_object::CPU_SUBTYPE_ARM_ALL => "armv???",
         mach_object::CPU_SUBTYPE_ARM_V4T => "armv4t",
@@ -236,7 +239,7 @@ fn cpu_subtype_to_str(ty: cpu_subtype_t) -> &'static str {
         mach_object::CPU_SUBTYPE_ARM_V7S => "armv7s",
         mach_object::CPU_SUBTYPE_ARM_V7K => "armv7k",
         mach_object::CPU_SUBTYPE_ARM_V8 => "armv8",
-        _ => panic!("Unexpected cpu subtype: {ty:?}"),
+        _ => "unknown", // 🏎️ Prevent panic on unmapped 64-bit subtypes
     }
 }
 
@@ -262,6 +265,16 @@ impl MachO {
                 let mut best_subslice = None;
                 let mut best_type = None;
                 for (arch, _) in files {
+                    // ==========================================================
+                    // 🏎️ 64-BIT BYPASS: Hunt for the AArch64 Slice (0x0100000C)
+                    // ==========================================================
+                    #[cfg(feature = "aarch64")]
+                    if arch.cputype == 0x0100000C {
+                        best_subslice = Some(&bytes[arch.offset as usize..arch.offset as usize + arch.size as usize]);
+                        best_type = Some(arch.cpusubtype);
+                        break; // We found the 64-bit slice, take it immediately!
+                    }
+
                     if arch.cputype != mach_object::CPU_TYPE_ARM {
                         continue;
                     }
@@ -286,6 +299,40 @@ impl MachO {
                 return Err("Unexpected Mach-O file kind: not an executable");
             }
         };
+
+        // ==========================================================
+        // 🏎️ 64-BIT BYPASS: Allow CPU_TYPE_ARM64
+        // ==========================================================
+        #[cfg(not(feature = "aarch64"))]
+        if header.cputype != mach_object::CPU_TYPE_ARM {
+            return Err("Executable is not for an ARM CPU!");
+        }
+        
+        #[cfg(feature = "aarch64")]
+        if header.cputype != mach_object::CPU_TYPE_ARM && header.cputype != 0x0100000C {
+            return Err("Executable is not for an ARM or ARM64 CPU!");
+        }
+
+        log!(
+            "Loading {} slice for {:?}",
+            cpu_subtype_to_str(header.cpusubtype, header.is_64bit()),
+            name
+        );
+
+        let is_bigend = header.is_bigend();
+        if is_bigend {
+            return Err("Executable is not little-endian!");
+        }
+        
+        let is_64bit = header.is_64bit();
+        
+        // ==========================================================
+        // 🏎️ 64-BIT BYPASS: Disable the 32-bit strict lock
+        // ==========================================================
+        #[cfg(not(feature = "aarch64"))]
+        if is_64bit {
+            return Err("Executable is not 32-bit!");
+        }
 
         if header.cputype != mach_object::CPU_TYPE_ARM {
             return Err("Executable is not for an ARM CPU!");
