@@ -133,6 +133,11 @@ fn sqlite3_bind_int(
     SQLITE_OK
 }
 
+fn sqlite3_last_insert_rowid(_env: &mut Environment, _db: u32) -> i64 {
+    log!("sqlite3_last_insert_rowid: returning 0");
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
     export_c_func!(sqlite3_close(_)),
@@ -175,6 +180,7 @@ pub const FUNCTIONS: FunctionExports = &[
             i32,
         ) -> i32),
 ),
+export_c_func!(sqlite3_last_insert_rowid(_)),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
