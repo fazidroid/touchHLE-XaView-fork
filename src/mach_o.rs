@@ -339,7 +339,7 @@ impl MachO {
         }
         log!(
             "Loading {} slice for {:?}",
-            cpu_subtype_to_str(header.cpusubtype),
+            cpu_subtype_to_str(header.cpusubtype, header.is_64bit()),
             name
         );
 
