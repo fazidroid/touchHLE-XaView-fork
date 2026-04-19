@@ -3,14 +3,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-//! SystemConfiguration framework.
+//! Captive Network API stubs.
 
-mod sc_network_reachability;
+use crate::dyld::{export_c_func, FunctionExports};
+use crate::Environment;
 
-pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
-    path: "/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration",
-    aliases: &[],
-    class_exports: &[sc_network_reachability::CLASSES],
-    constant_exports: &[],
-    function_exports: &[sc_network_reachability::FUNCTIONS],
-};
+// ==========================================================
+// 🏎️ GT RACING 2 BYPASS: Network Interface Stub
+// ==========================================================
+fn CNCopySupportedInterfaces(_env: &mut Environment) -> u32 {
+    println!("🎮 LOG: Safely stubbed CNCopySupportedInterfaces! Returning NULL.");
+    0 
+}
+
+pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(CNCopySupportedInterfaces(_)),
+];
