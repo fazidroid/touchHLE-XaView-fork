@@ -5,7 +5,8 @@
  */
 //! `NSInvocation` stub.
 
-use crate::objc::{id, msg_class, objc_classes, ClassExports, HostObject};
+use crate::frameworks::foundation::NSUInteger;
+use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject};
 
 #[derive(Default)]
 struct NSInvocationHostObject;
@@ -24,31 +25,31 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithMethodSignature:(id)_signature {
     log_dbg!("NSInvocation initWithMethodSignature: stub");
-    crate::objc::msg_super![env; this init]
+    msg_super![env; this init]
 }
 
-- (void)setTarget:(id)_target {
+- (())setTarget:(id)_target {
     // ignore
 }
 
-- (void)setSelector:(id)_selector {
+- (())setSelector:(id)_selector {
     // ignore
 }
 
-- (void)setArgument:(id)_argument atIndex:(usize)_index {
+- (())setArgument:(id)_argument atIndex:(NSUInteger)_index {
     // ignore
 }
 
-- (void)invoke {
+- (())invoke {
     log_dbg!("NSInvocation invoke (no-op)");
 }
 
-- (void)invokeWithTarget:(id)_target {
+- (())invokeWithTarget:(id)_target {
     log_dbg!("NSInvocation invokeWithTarget: (no-op)");
 }
 
-- (void)getReturnValue:(crate::mem::MutVoidPtr)_buffer {
-    // Return a default value (e.g., 0 for scalar)
+- (())getReturnValue:(crate::mem::MutVoidPtr)_buffer {
+    // Return a default value (e.g., 0 for scalar) - nothing to write for void returns usually
 }
 
 @end
