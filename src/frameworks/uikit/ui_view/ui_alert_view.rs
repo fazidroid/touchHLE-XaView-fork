@@ -9,10 +9,12 @@ use crate::frameworks::foundation::ns_string;
 use crate::objc::{id, msg, msg_super, nil, objc_classes, ClassExports};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
-lazy_static::lazy_static! {
-    static ref ALERT_DELEGATES: Mutex<HashMap<usize, id>> = Mutex::new(HashMap::new());
+static ALERT_DELEGATES: OnceLock<Mutex<HashMap<usize, id>>> = OnceLock::new();
+
+fn delegates() -> &'static Mutex<HashMap<usize, id>> {
+    ALERT_DELEGATES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 pub const CLASSES: ClassExports = objc_classes! {
@@ -33,9 +35,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     let title_str = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
     log!("UIAlertView: title: {:?}, message: {:?}", title_str, msg_str);
 
-    // Store delegate in global map using `this` as key
+    // Store delegate globally, keyed by alert instance
     let key = this.to_bits() as usize;
-    ALERT_DELEGATES.lock().unwrap().insert(key, delegate);
+    delegates().lock().unwrap().insert(key, delegate);
 
     msg_super![env; this init]
 }
@@ -47,13 +49,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())show {
     log!("UIAlertView: auto-dismissing alert");
     let key = this.to_bits() as usize;
-    let delegate = ALERT_DELEGATES.lock().unwrap().remove(&key).unwrap_or(nil);
+    let delegate = delegates().lock().unwrap().remove(&key).unwrap_or(nil);
     if delegate != nil {
-        // Simulate tapping the first button (index 0)
         let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
         let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
     }
-    // Do not call msg_super to avoid actual display
+    // Suppress actual UI display
 }
 
 @end
