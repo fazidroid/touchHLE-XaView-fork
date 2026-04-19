@@ -3,12 +3,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-//! NSConditionLock stub.
+//! `NSConditionLock` stub to prevent thread deadlocks.
 
-use crate::objc::{id, msg, objc_classes, ClassExports, HostObject};
+use crate::frameworks::foundation::NSInteger;
+use crate::objc::{id, msg, msg_super, objc_classes, ClassExports, HostObject};
 
 #[derive(Default)]
-struct NSConditionLockHostObject;
+struct NSConditionLockHostObject {
+    condition: NSInteger,
+}
 impl HostObject for NSConditionLockHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {
@@ -17,18 +20,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSConditionLock: NSObject
 
-- (id)initWithCondition:(crate::objc::NSInteger)condition {
-    log_dbg!("NSConditionLock init with condition {}", condition);
-    msg![env; this init]
+- (id)initWithCondition:(NSInteger)condition {
+    log_dbg!("NSConditionLock initWithCondition: {}", condition);
+    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+    host_obj.condition = condition;
+    msg_super![env; this init]
 }
 
-- (())lockWhenCondition:(crate::objc::NSInteger)_condition {
-    log_dbg!("NSConditionLock lockWhenCondition: (immediate success)");
-    // Do nothing; pretend lock was acquired instantly.
+- (id)init {
+    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+    host_obj.condition = 0;
+    msg_super![env; this init]
 }
 
-- (())unlockWithCondition:(crate::objc::NSInteger)_condition {
-    log_dbg!("NSConditionLock unlockWithCondition:");
+- (())lockWhenCondition:(NSInteger)condition {
+    log_dbg!("NSConditionLock lockWhenCondition: {} (immediate success)", condition);
+    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+    host_obj.condition = condition;
+}
+
+- (())unlockWithCondition:(NSInteger)condition {
+    log_dbg!("NSConditionLock unlockWithCondition: {}", condition);
+    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+    host_obj.condition = condition;
 }
 
 - (())lock {
@@ -39,10 +53,33 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("NSConditionLock unlock");
 }
 
-- (crate::objc::NSInteger)condition {
-    // Return a dummy condition that matches what the app expects.
-    // Many games use 0 as the base condition.
-    0
+- (NSInteger)condition {
+    let host_obj = env.objc.borrow::<NSConditionLockHostObject>(this);
+    host_obj.condition
+}
+
+- (bool)tryLock {
+    log_dbg!("NSConditionLock tryLock -> true");
+    true
+}
+
+- (bool)tryLockWhenCondition:(NSInteger)condition {
+    log_dbg!("NSConditionLock tryLockWhenCondition: {} -> true", condition);
+    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+    host_obj.condition = condition;
+    true
+}
+
+- (())lockBeforeDate:(id)_limit {
+    log_dbg!("NSConditionLock lockBeforeDate: (immediate success)");
+}
+
+- (id)name {
+    crate::objc::nil
+}
+
+- (())setName:(id)_name {
+    // ignore
 }
 
 @end
