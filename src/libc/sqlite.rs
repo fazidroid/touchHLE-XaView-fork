@@ -143,6 +143,11 @@ fn sqlite3_reset(_env: &mut Environment, _stmt: u32) -> i32 {
     SQLITE_OK
 }
 
+fn sqlite3_clear_bindings(_env: &mut Environment, _stmt: u32) -> i32 {
+    log!("sqlite3_clear_bindings: returning SQLITE_OK");
+    SQLITE_OK
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_open(_, _)),
     export_c_func!(sqlite3_close(_)),
@@ -187,6 +192,7 @@ pub const FUNCTIONS: FunctionExports = &[
 ),
 export_c_func!(sqlite3_last_insert_rowid(_)),
 export_c_func!(sqlite3_reset(_)),
+export_c_func!(sqlite3_clear_bindings(_)),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
