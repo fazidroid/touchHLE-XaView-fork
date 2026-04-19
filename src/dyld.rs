@@ -835,6 +835,50 @@ impl Dyld {
             }
         }
 
+                // ==========================================================
+        // 🏎️ GT RACING 2 BYPASS: Stub _host_info
+        // ==========================================================
+        if symbol == "_host_info" {
+            fn fake_host_info(
+                env: &mut crate::Environment,
+                host: u32,
+                flavor: i32,
+                host_info_out: crate::mem::MutPtr<u32>,
+                host_info_out_cnt: crate::mem::MutPtr<u32>,
+            ) -> i32 {
+                log!("_host_info called (host={}, flavor={})", host, flavor);
+                // HOST_BASIC_INFO = 1, HOST_SCHED_INFO = 3, etc.
+                // We'll return a minimal HOST_BASIC_INFO structure.
+                match flavor {
+                    1 => { // HOST_BASIC_INFO
+                        // Structure: max_cpus (i32), avail_cpus (i32), memory_size (u32), cpu_type (u32), cpu_subtype (u32)
+                        let basic_info: [u32; 5] = [1, 1, 512 * 1024 * 1024, 12, 0];
+                        let count = env.mem.read(host_info_out_cnt);
+                        let copy_len = count.min(basic_info.len() as u32);
+                        for i in 0..copy_len {
+                            env.mem.write(host_info_out + i, basic_info[i as usize]);
+                        }
+                        env.mem.write(host_info_out_cnt, copy_len);
+                        0 // KERN_SUCCESS
+                    }
+                    _ => {
+                        log!("_host_info flavor {} unimplemented, returning KERN_INVALID_ARGUMENT", flavor);
+                        4 // KERN_INVALID_ARGUMENT
+                    }
+                }
+            }
+            return Some(
+                &(fake_host_info
+                    as fn(
+                        &mut crate::Environment,
+                        u32,
+                        i32,
+                        crate::mem::MutPtr<u32>,
+                        crate::mem::MutPtr<u32>,
+                    ) -> i32),
+            );
+        }
+
         // FakeForkCall
         if symbol == "_fork" {
             fn fake_fork(env: &mut crate::Environment) {
