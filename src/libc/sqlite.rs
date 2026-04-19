@@ -142,20 +142,39 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sqlite3_step(_)),
     export_c_func!(sqlite3_finalize(_)),
     (
-        "_sqlite3_prepare",
-        &(sqlite3_prepare
-            as fn(_, _, _, _, _, _) -> _),
-    ),
-    (
-        "_sqlite3_bind_text",
-        &(sqlite3_bind_text
-            as fn(_, _, _, _, _, _) -> _),
-    ),
-    (
-        "_sqlite3_bind_int",
-        &(sqlite3_bind_int
-            as fn(_, _, _, _) -> _),
-    ),
+    "_sqlite3_prepare",
+    &(sqlite3_prepare
+        as fn(
+            &mut Environment,
+            u32,
+            ConstPtr<u8>,
+            i32,
+            MutPtr<u32>,
+            MutPtr<ConstPtr<u8>>,
+        ) -> i32),
+),
+(
+    "_sqlite3_bind_text",
+    &(sqlite3_bind_text
+        as fn(
+            &mut Environment,
+            u32,
+            i32,
+            ConstPtr<u8>,
+            i32,
+            u32,
+        ) -> i32),
+),
+(
+    "_sqlite3_bind_int",
+    &(sqlite3_bind_int
+        as fn(
+            &mut Environment,
+            u32,
+            i32,
+            i32,
+        ) -> i32),
+),
 ];
 
 pub const DYLIB: HostDylib = HostDylib {
