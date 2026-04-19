@@ -850,6 +850,42 @@ impl Dyld {
                 return None;
             }
         }
+        // ==========================================================
+        // 🏎️ THE DNS SINKHOLE: Kill EA/Gameloft Telemetry Deadlocks
+        // ==========================================================
+        if symbol == "_gethostbyname" {
+            fn fake_gethostbyname(env: &mut crate::Environment, name_ptr: u32) -> u32 {
+                let name = if name_ptr != 0 {
+                    env.mem.cstr_at_utf8(crate::mem::ConstPtr::<u8>::from_bits(name_ptr)).unwrap_or("unknown")
+                } else {
+                    "null"
+                };
+                println!("🎮 LOG: DNS Sinkholed gethostbyname request to: {}", name);
+                0 // Return NULL to instantly fail the connection!
+            }
+            return Some(&(fake_gethostbyname as fn(&mut crate::Environment, u32) -> u32));
+        }
+
+        if symbol == "_getaddrinfo" {
+            fn fake_getaddrinfo(env: &mut crate::Environment, node: u32, _service: u32, _hints: u32, _res: u32) -> i32 {
+                let name = if node != 0 {
+                    env.mem.cstr_at_utf8(crate::mem::ConstPtr::<u8>::from_bits(node)).unwrap_or("unknown")
+                } else {
+                    "null"
+                };
+                println!("🎮 LOG: DNS Sinkholed getaddrinfo request to: {}", name);
+                8 // EAI_NONAME (nodename nor servname provided, or not known)
+            }
+            return Some(&(fake_getaddrinfo as fn(&mut crate::Environment, u32, u32, u32, u32) -> i32));
+        }
+
+        if symbol == "_connect" {
+            fn fake_connect(_env: &mut crate::Environment, _socket: i32, _addr: u32, _len: u32) -> i32 {
+                println!("🎮 LOG: Aggressively blocked socket connect() attempt!");
+                -1 // -1 = Connection Refused
+            }
+            return Some(&(fake_connect as fn(&mut crate::Environment, i32, u32, u32) -> i32));
+        }
 
         // ==========================================================
         // 🏎️ GT RACING 2 BYPASS: Stub __dyld_image_count
