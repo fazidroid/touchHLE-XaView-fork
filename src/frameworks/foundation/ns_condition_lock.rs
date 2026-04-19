@@ -6,7 +6,7 @@
 //! `NSConditionLock` stub to prevent thread deadlocks.
 
 use crate::frameworks::foundation::NSInteger;
-use crate::objc::{id, msg, msg_super, objc_classes, ClassExports, HostObject};
+use crate::objc::{id, msg_super, objc_classes, ClassExports, HostObject};
 
 #[derive(Default)]
 struct NSConditionLockHostObject {
@@ -22,15 +22,22 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithCondition:(NSInteger)condition {
     log_dbg!("NSConditionLock initWithCondition: {}", condition);
-    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
-    host_obj.condition = condition;
-    msg_super![env; this init]
+    let this = msg_super![env; this init];
+    if this != crate::objc::nil {
+        let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+        host_obj.condition = condition;
+    }
+    this
 }
 
 - (id)init {
-    let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
-    host_obj.condition = 0;
-    msg_super![env; this init]
+    log_dbg!("NSConditionLock init");
+    let this = msg_super![env; this init];
+    if this != crate::objc::nil {
+        let host_obj = env.objc.borrow_mut::<NSConditionLockHostObject>(this);
+        host_obj.condition = 0;
+    }
+    this
 }
 
 - (())lockWhenCondition:(NSInteger)condition {
