@@ -203,7 +203,14 @@ pub const CLASSES: ClassExports = objc_classes! {
             let &NSLocaleHostObject { country_code, .. } = env.objc.borrow(this);
             country_code
         },
-        _ => unimplemented!()
+        // ==========================================================
+        // 🏎️ GT RACING 2 BYPASS: Don't panic on unknown locale keys!
+        // ==========================================================
+        _ => {
+            println!("🎮 LOG: Safely ignored unimplemented NSLocale key: {}", key_str);
+            // Return 'nil' so the game safely falls back to defaults
+            crate::objc::nil
+        }
     }
 }
 
