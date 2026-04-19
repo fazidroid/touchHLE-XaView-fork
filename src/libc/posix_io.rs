@@ -110,6 +110,8 @@ pub const LOCK_UN: FLockFlag = 8;
 /// and a directory already exists at that path, remove the directory first.
 /// For Asphalt 8 and NFS games, if we are about to open a file with O_CREAT
 /// and a directory already exists at that path, remove the directory first.
+/// For Asphalt 8 and NFS games, if we are about to open a file with O_CREAT
+/// and a directory already exists at that path, remove the directory first.
 fn ensure_not_directory_for_creation(env: &mut Environment, path: &str) {
     let bundle_id = env.bundle.bundle_identifier();
     let is_asphalt = bundle_id.contains("asphalt");
@@ -122,9 +124,9 @@ fn ensure_not_directory_for_creation(env: &mut Environment, path: &str) {
     let guest_path = GuestPath::new(path);
     if env.fs.is_dir(guest_path) {
         log!("WARNING: Found directory at file path '{}'. Removing it to allow file creation.", path);
-        let _ = env.fs.remove_dir_all(guest_path);
+        let _ = env.fs.remove(guest_path); // removes empty directory or file
     }
-}
+} 
 
 fn open(env: &mut Environment, path: ConstPtr<u8>, flags: i32, _args: DotDotDot) -> FileDescriptor {
     set_errno(env, 0);
