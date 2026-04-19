@@ -219,9 +219,17 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
                 0
             }
             Err(FsError::ReadonlyParentDir) => {
-                log_dbg!("stat: '{}' is a read-only bundle directory", path_str);
-                write_dir_stat(env, buf);
-                0
+                // ==========================================================
+                // 🏎️ EA BYPASS: Stop treating missing files as directories!
+                // ==========================================================
+                // If the parent is read-only and the item doesn't exist, 
+                // it is genuinely a missing file, NOT a read-only directory!
+                // Returning 0 here corrupts the EA Virtual File System!
+                log_dbg!("stat: '{}' creation failed (read-only). It is truly missing!", path_str);
+                
+                // Properly report to the game that the file does not exist
+                set_errno(env, ENOENT);
+                -1
             }
             Err(FsError::NonexistentParentDir) => {
                 set_errno(env, ENOENT);
