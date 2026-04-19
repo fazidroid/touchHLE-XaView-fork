@@ -104,10 +104,45 @@ pub const CLASSES: ClassExports = objc_classes! {
     assert!(env.objc.borrow::<UINibHostObject>(this).file_owner == nil);
     env.objc.borrow_mut::<UINibHostObject>(this).file_owner = owner;
 
-    let unarchiver = load_nib_file(env, this, GuestPathBuf::from(nib_path)).unwrap();
-    let top_level_objects_key = get_static_str(env, "UINibTopLevelObjectsKey");
-    let top_level_objects = msg![env; unarchiver decodeObjectForKey:top_level_objects_key];
-    release(env, unarchiver);
+    // ==========================================================
+    // 🏎️ ASPHALT 8 BYPASS: NIB Fallback Injector
+    // ==========================================================
+    let top_level_objects = match load_nib_file(env, this, GuestPathBuf::from(nib_path)) {
+        Ok(unarchiver) => {
+            let top_level_objects_key = get_static_str(env, "UINibTopLevelObjectsKey");
+            let objects = msg![env; unarchiver decodeObjectForKey:top_level_objects_key];
+            release(env, unarchiver);
+            objects
+        }
+        Err(_) => {
+            println!("🎮 LOG: NIB load failed! Injecting EAGLView fallback directly into the owner!");
+            
+            // 1. Try to find the game's custom OpenGL view class (EAGLView)
+            let mut view_class = env.objc.get_class("EAGLView");
+            if view_class == crate::objc::nil {
+                view_class = env.objc.get_known_class("UIView", &mut env.mem);
+            }
+
+            // 2. Allocate and initialize our blank canvas
+            let fallback_view: id = msg![env; view_class alloc];
+            
+            // Get the main screen bounds to make sure the view fills the window
+            let screen: id = msg_class![env; UIScreen mainScreen];
+            let bounds: crate::frameworks::core_graphics::cg_geometry::CGRect = msg![env; screen bounds];
+            let fallback_view: id = msg![env; fallback_view initWithFrame:bounds];
+
+            // 3. Forcefully attach this new view to the EA/Gameloft View Controller!
+            if owner != crate::objc::nil {
+                let _: () = msg![env; owner setView:fallback_view];
+                println!("🎮 LOG: Successfully forced rootViewController to accept the fallback view!");
+            }
+
+            // 4. Wrap our single fallback view in an array and hand it back
+            let objects = vec![fallback_view];
+            crate::frameworks::foundation::ns_array::from_vec(env, objects)
+        }
+    };
+
     env.objc.borrow_mut::<UINibHostObject>(this).file_owner = nil;
 
     top_level_objects
