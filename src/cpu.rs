@@ -298,7 +298,9 @@ impl Cpu {
 
     pub fn invalidate_cache_range(&mut self, base: VAddr, size: GuestUSize) {
         unsafe {
-            touchHLE_DynarmicWrapper_invalidate_cache_range(self.dynarmic_wrapper, base as u64, size)
+            // Remove the 'as u64' cast and use 'as _' to let the compiler infer the 
+            // correct FFI type depending on whether you are in 32-bit or 64-bit mode!
+            touchHLE_DynarmicWrapper_invalidate_cache_range(self.dynarmic_wrapper, base as _, size)
         }
     }
 
