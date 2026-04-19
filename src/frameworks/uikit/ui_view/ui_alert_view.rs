@@ -8,14 +8,6 @@
 use crate::frameworks::foundation::ns_string;
 use crate::objc::{id, msg, msg_super, nil, objc_classes, ClassExports};
 use std::borrow::Cow;
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-
-static ALERT_DELEGATES: OnceLock<Mutex<HashMap<usize, id>>> = OnceLock::new();
-
-fn delegates() -> &'static Mutex<HashMap<usize, id>> {
-    ALERT_DELEGATES.get_or_init(|| Mutex::new(HashMap::new()))
-}
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -29,32 +21,25 @@ pub const CLASSES: ClassExports = objc_classes! {
             cancelButtonTitle:(id)cancelButtonTitle
             otherButtonTitles:(id)otherButtonTitles {
 
-    log!("TODO: [(UIAlertView*){:?} initWithTitle:{:?} message:{:?} delegate:{:?} cancelButtonTitle:{:?} otherButtonTitles:{:?}]", this, title, message, delegate, cancelButtonTitle, otherButtonTitles);
-
-    let msg_str = if message == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, message) };
-    let title_str = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
-    log!("UIAlertView: title: {:?}, message: {:?}", title_str, msg_str);
-
-    // Store delegate globally, keyed by alert instance
-    let key = this.to_bits() as usize;
-    delegates().lock().unwrap().insert(key, delegate);
-
+    log!("UIAlertView init: title={:?}, msg={:?}", title, message);
     msg_super![env; this init]
 }
 
 - (())addButtonWithTitle:(id)title {
-    log!("TODO: [(UIAlertView *){:?} addButtonWithTitle:{}]", this, ns_string::to_rust_string(env, title));
+    log!("UIAlertView addButton: {}", ns_string::to_rust_string(env, title));
 }
 
 - (())show {
-    log!("UIAlertView: auto-dismissing alert");
-    let key = this.to_bits() as usize;
-    let delegate = delegates().lock().unwrap().remove(&key).unwrap_or(nil);
+    log!("UIAlertView: AUTO-DISMISS (storage alert bypass)");
+
+    // Retrieve the delegate that was set during init
+    let delegate: id = msg![env; this delegate];
     if delegate != nil {
         let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
         let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
     }
-    // Suppress actual UI display
+
+    // Do NOT call msg_super to prevent actual display.
 }
 
 @end
