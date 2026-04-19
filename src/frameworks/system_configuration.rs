@@ -13,6 +13,9 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     aliases: &[],
     class_exports: &[sc_network_reachability::CLASSES],
     constant_exports: &[],
-    function_exports: &[sc_network_reachability::FUNCTIONS],
-    captive_network::FUNCTIONS,
+    // Make sure BOTH functions are inside this exact bracket array!
+    function_exports: &[
+        sc_network_reachability::FUNCTIONS,
+        captive_network::FUNCTIONS,
+    ],
 };
