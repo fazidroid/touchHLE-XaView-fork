@@ -45,7 +45,9 @@ unsafe impl SafeRead for statfs {}
 
 /// Returns true if the current app is Asphalt 8 or an NFS game that needs
 /// a huge free space report to avoid "insufficient space" alerts.
-fn needs_large_fs(env: &Environment) -> bool {
+/// Returns true if the current app is Asphalt 8 or an NFS game that needs
+/// a huge free space report to avoid "insufficient space" alerts.
+fn needs_large_fs(env: &mut Environment) -> bool {
     let main_bundle: crate::objc::id = crate::objc::msg_class![env; NSBundle mainBundle];
     if main_bundle != crate::objc::nil {
         let bundle_id: crate::objc::id = crate::objc::msg![env; main_bundle bundleIdentifier];
