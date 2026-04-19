@@ -6,14 +6,14 @@
 //! `UIAlertView`.
 
 use crate::frameworks::foundation::ns_string;
-use crate::objc::{id, msg, msg_super, nil, objc_classes, ClassExports, HostObject};
+use crate::objc::{id, msg, msg_super, nil, objc_classes, ClassExports};
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
-struct UIAlertViewHostObject {
-    delegate: id,
-    button_count: usize,
+lazy_static::lazy_static! {
+    static ref ALERT_DELEGATES: Mutex<HashMap<usize, id>> = Mutex::new(HashMap::new());
 }
-impl HostObject for UIAlertViewHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -29,28 +29,25 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     log!("TODO: [(UIAlertView*){:?} initWithTitle:{:?} message:{:?} delegate:{:?} cancelButtonTitle:{:?} otherButtonTitles:{:?}]", this, title, message, delegate, cancelButtonTitle, otherButtonTitles);
 
-    let msg = if message == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, message) };
-    let title = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
-    log!("UIAlertView: title: {:?}, message: {:?}", title, msg);
+    let msg_str = if message == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, message) };
+    let title_str = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
+    log!("UIAlertView: title: {:?}, message: {:?}", title_str, msg_str);
 
-    // Store delegate in host object
-    let host_obj = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
-    host_obj.delegate = delegate;
-    host_obj.button_count = 0;
+    // Store delegate in global map using `this` as key
+    let key = this.to_bits() as usize;
+    ALERT_DELEGATES.lock().unwrap().insert(key, delegate);
 
     msg_super![env; this init]
 }
 
 - (())addButtonWithTitle:(id)title {
     log!("TODO: [(UIAlertView *){:?} addButtonWithTitle:{}]", this, ns_string::to_rust_string(env, title));
-    let host_obj = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
-    host_obj.button_count += 1;
 }
 
 - (())show {
     log!("UIAlertView: auto-dismissing alert");
-    let host_obj = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
-    let delegate = host_obj.delegate;
+    let key = this.to_bits() as usize;
+    let delegate = ALERT_DELEGATES.lock().unwrap().remove(&key).unwrap_or(nil);
     if delegate != nil {
         // Simulate tapping the first button (index 0)
         let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
