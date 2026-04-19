@@ -419,7 +419,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
-    // TODO: other attributes
     log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
 
     let _ = error; // IgnoreErrorAssert
@@ -427,35 +426,33 @@ pub const CLASSES: ClassExports = objc_classes! {
     let dict = msg_class![env; NSMutableDictionary new];
 
     // ==========================================================
-    // 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: 32GB Free Space Spoof
+    // 🏎️ BYPASS: Report large free space to avoid storage alerts
     // ==========================================================
     let main_bundle: id = msg_class![env; NSBundle mainBundle];
     let mut is_asphalt = false;
+    let mut is_nfs = false;
     if main_bundle != nil {
         let bundle_id: id = msg![env; main_bundle bundleIdentifier];
         if bundle_id != nil {
             let bundle_str = ns_string::to_rust_string(env, bundle_id);
             is_asphalt = bundle_str.to_lowercase().contains("asphalt");
+            is_nfs = bundle_str.to_lowercase().contains("nfs");
         }
     }
 
-    // Reporting 1 Gb of free space should be enough for normal games
-    // TODO: unify with `statfs`
-    // TODO: account for path
     let size: u64 = if is_asphalt {
-        // 🏎️ FIX: Use an unsigned 32-bit maximum (4.2 GB) to pass the 2.8GB requirement!
-        4200000000 
+        4200000000 // 4.2 GB for Asphalt
+    } else if is_nfs {
+        10 * 1024 * 1024 * 1024 // 10 GB for NFS games
     } else {
-        1024 * 1024 * 1024 // 1 GB default for other games
+        10 * 1024 * 1024 * 1024 // Default 10 GB for all others
     };
     
     let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
 
-    // 🏎️ FIX: Tell the game the Total Drive Size is 32GB
     let fs_size_key = get_static_str(env, NSFileSystemSize);
     () = msg![env; dict setObject:size_num forKey:fs_size_key];
 
-    // 🏎️ FIX: Tell the game the Free Space is also 32GB
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
     () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
 
