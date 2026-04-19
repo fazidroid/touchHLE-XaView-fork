@@ -931,6 +931,19 @@ impl Dyld {
             }
             return Some(&(fake_pthread_exit as fn(&mut crate::Environment, u32) -> ()));
         }
+        // ==========================================================
+// 🏎️ BYPASS: _pthread_setname_np (thread naming, safe to ignore)
+// ==========================================================
+if symbol == "_pthread_setname_np" {
+    fn fake_pthread_setname_np(_env: &mut crate::Environment, _thread: u32, _name: crate::mem::ConstPtr<u8>) -> i32 {
+        log!("_pthread_setname_np bypassed");
+        0 // success
+    }
+    return Some(
+        &(fake_pthread_setname_np
+            as fn(&mut crate::Environment, u32, crate::mem::ConstPtr<u8>) -> i32),
+    );
+}
 
         // ==========================================================
         // 🏎️ EA BYPASS: Safely absorb IPSP ADK Logger
