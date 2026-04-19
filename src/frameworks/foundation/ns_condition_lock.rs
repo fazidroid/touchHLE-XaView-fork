@@ -6,7 +6,7 @@
 //! `NSConditionLock` stub to prevent thread deadlocks.
 
 use crate::frameworks::foundation::NSInteger;
-use crate::objc::{id, msg_super, objc_classes, ClassExports, HostObject};
+use crate::objc::{id, msg_super, objc_classes, ClassExports, HostObject, NSZonePtr};
 
 #[derive(Default)]
 struct NSConditionLockHostObject {
@@ -19,6 +19,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 (env, this, _cmd);
 
 @implementation NSConditionLock: NSObject
+
+// ==========================================================
+// 🏎️ EA BYPASS: Explicit Host Object Allocation
+// ==========================================================
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::new(NSConditionLockHostObject::default());
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
 
 - (id)initWithCondition:(NSInteger)condition {
     log_dbg!("NSConditionLock initWithCondition: {}", condition);
