@@ -6,8 +6,15 @@
 //! `UIAlertView`.
 
 use crate::frameworks::foundation::ns_string;
-use crate::objc::{id, msg_super, nil, objc_classes, ClassExports};
+use crate::objc::{id, msg, msg_super, nil, objc_classes, ClassExports, HostObject};
 use std::borrow::Cow;
+
+struct UIAlertViewHostObject {
+    delegate: id,
+    // We don't strictly need button count, but it's useful for logging
+    button_count: usize,
+}
+impl HostObject for UIAlertViewHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -27,15 +34,37 @@ pub const CLASSES: ClassExports = objc_classes! {
     let title = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
     log!("UIAlertView: title: {:?}, message: {:?}", title, msg);
 
+    // Store delegate in host object
+    let host_obj = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
+    host_obj.delegate = delegate;
+    host_obj.button_count = 0;
+
     msg_super![env; this init]
 }
 
 - (())addButtonWithTitle:(id)title {
     log!("TODO: [(UIAlertView *){:?} addButtonWithTitle:{}]", this, ns_string::to_rust_string(env, title));
+    let host_obj = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
+    host_obj.button_count += 1;
 }
 
 - (())show {
-    log!("TODO: [(UIAlertView*){:?} show]", this);
+    log!("UIAlertView: auto-dismissing alert");
+    let host_obj = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
+    let delegate = host_obj.delegate;
+    if delegate != nil {
+        // Simulate tapping the first button (index 0)
+        let clicked_sel = env.objc.get_known_selector("alertView:clickedButtonAtIndex:", &mut env.mem);
+        if msg![env; delegate respondsToSelector:clicked_sel] {
+            msg![env; delegate alertView:this clickedButtonAtIndex:0];
+        }
+        // Also call didDismiss if implemented
+        let dismissed_sel = env.objc.get_known_selector("alertView:didDismissWithButtonIndex:", &mut env.mem);
+        if msg![env; delegate respondsToSelector:dismissed_sel] {
+            msg![env; delegate alertView:this didDismissWithButtonIndex:0];
+        }
+    }
+    // Do not call msg_super to avoid actual display
 }
 
 @end
