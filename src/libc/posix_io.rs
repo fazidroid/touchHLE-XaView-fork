@@ -106,6 +106,28 @@ pub const LOCK_EX: FLockFlag = 2;
 pub const LOCK_NB: FLockFlag = 4;
 pub const LOCK_UN: FLockFlag = 8;
 
+/// For certain games (Asphalt 8, NFS), if we are about to open a file with O_CREAT
+/// and a directory already exists at that path, remove the directory first.
+fn ensure_not_directory_for_creation(env: &mut Environment, path: &str) {
+    // Only apply to known problematic games
+    let bundle_id = env.bundle.bundle_identifier();
+    let is_asphalt = bundle_id.contains("asphalt");
+    let is_nfs = bundle_id.starts_with("com.ea.nfs");
+
+    if !is_asphalt && !is_nfs {
+        return;
+    }
+
+    // Check if a directory exists at this path
+    let guest_path = GuestPath::new(path);
+    if let Ok(metadata) = env.fs.metadata(guest_path) {
+        if metadata.is_dir() {
+            log!("WARNING: Found directory at file path '{}'. Removing it to allow file creation.", path);
+            let _ = env.fs.remove_dir_all(guest_path);
+        }
+    }
+}
+
 fn open(env: &mut Environment, path: ConstPtr<u8>, flags: i32, _args: DotDotDot) -> FileDescriptor {
     set_errno(env, 0);
     self::open_direct(env, path, flags)
@@ -134,10 +156,15 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
         Ok(path_str) => path_str.to_owned(),
         Err(_) => { set_errno(env, EINVAL); return -1; }
     };
-    
+
+    // --- FIX: Remove any pre-existing directory that conflicts with file creation ---
+    if (flags & O_CREAT) != 0 {
+        ensure_not_directory_for_creation(env, &path_string);
+    }
+
     let res = match env.fs.open_with_options(GuestPath::new(&path_string), options) {
         Ok(file) => {
-            // FIXED: Reject attempts to open directories as files to break Asphalt 6 loop
+            // Reject attempts to open directories as regular files
             if matches!(file, GuestFile::Directory) {
                 log_dbg!("Blocking attempt to open directory as a file: {}", path_string);
                 set_errno(env, EISDIR);
