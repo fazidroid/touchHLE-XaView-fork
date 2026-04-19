@@ -11,7 +11,6 @@ use std::borrow::Cow;
 
 struct UIAlertViewHostObject {
     delegate: id,
-    // We don't strictly need button count, but it's useful for logging
     button_count: usize,
 }
 impl HostObject for UIAlertViewHostObject {}
@@ -54,15 +53,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     let delegate = host_obj.delegate;
     if delegate != nil {
         // Simulate tapping the first button (index 0)
-        let clicked_sel = env.objc.get_known_selector("alertView:clickedButtonAtIndex:", &mut env.mem);
-        if msg![env; delegate respondsToSelector:clicked_sel] {
-            msg![env; delegate alertView:this clickedButtonAtIndex:0];
-        }
-        // Also call didDismiss if implemented
-        let dismissed_sel = env.objc.get_known_selector("alertView:didDismissWithButtonIndex:", &mut env.mem);
-        if msg![env; delegate respondsToSelector:dismissed_sel] {
-            msg![env; delegate alertView:this didDismissWithButtonIndex:0];
-        }
+        let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
+        let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
     }
     // Do not call msg_super to avoid actual display
 }
