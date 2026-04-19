@@ -888,6 +888,25 @@ impl Dyld {
         }
 
         // ==========================================================
+        // 🏎️ KEYCHAIN BYPASS: Prevent Garbage Pointer Crashes!
+        // ==========================================================
+        if symbol == "_SecItemCopyMatching" || symbol == "_SecItemAdd" || 
+           symbol == "_SecItemUpdate" || symbol == "_SecItemDelete" {
+            
+            // We use a generic 2-argument stub. If the game passes fewer, AArch64/ARMv7 
+            // safely ignores the extra register, preventing stack corruption!
+            fn fake_sec_item(_env: &mut crate::Environment, _query: u32, _result: u32) -> i32 {
+                println!("🎮 LOG: Safely blocked iOS Keychain request! Returning errSecItemNotFound.");
+                
+                // -25300 is the official iOS error code for 'errSecItemNotFound'.
+                // This forces the game to gracefully build a new save file instead 
+                // of trying to read uninitialized garbage memory!
+                -25300 
+            }
+            return Some(&(fake_sec_item as fn(&mut crate::Environment, u32, u32) -> i32));
+        }
+
+        // ==========================================================
         // 🏎️ GT RACING 2 BYPASS: Stub __dyld_image_count
         // ==========================================================
         if symbol == "__dyld_image_count" {
