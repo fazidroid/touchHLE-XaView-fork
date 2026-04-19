@@ -425,28 +425,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // ==========================================================
-    // 🏎️ BYPASS: Report large free space to avoid storage alerts
-    // ==========================================================
-    let main_bundle: id = msg_class![env; NSBundle mainBundle];
-    let mut is_asphalt = false;
-    let mut is_nfs = false;
-    if main_bundle != nil {
-        let bundle_id: id = msg![env; main_bundle bundleIdentifier];
-        if bundle_id != nil {
-            let bundle_str = ns_string::to_rust_string(env, bundle_id);
-            is_asphalt = bundle_str.to_lowercase().contains("asphalt");
-            is_nfs = bundle_str.to_lowercase().contains("nfs");
-        }
-    }
-
-    let size: u64 = if is_asphalt {
-        4200000000 // 4.2 GB for Asphalt
-    } else if is_nfs {
-        10 * 1024 * 1024 * 1024 // 10 GB for NFS games
-    } else {
-        10 * 1024 * 1024 * 1024 // Default 10 GB for all others
-    };
+    // Report a generous 20 GB of free space (and total size) to prevent
+    // "insufficient space" alerts in games like NFS Most Wanted.
+    let size: u64 = 20 * 1024 * 1024 * 1024; // 20 GB
     
     let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
 
