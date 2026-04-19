@@ -145,6 +145,14 @@ impl State {
     }
 }
 
+fn is_asphalt_or_nfs(env: &Environment) -> bool {
+    let bundle_id = env.bundle.bundle_identifier();
+    bundle_id.contains("asphalt") ||
+    bundle_id.starts_with("com.ea.nfs") ||
+    bundle_id == "com.ea.nfss2.inc" ||
+    bundle_id == "com.ea.nfss2.bv"
+}
+
 fn socket(env: &mut Environment, domain: i32, type_: i32, protocol: i32) -> FileDescriptor {
     // TODO: handle errno properly
     set_errno(env, 0);
@@ -433,11 +441,11 @@ fn connect(
         .is_none());
 
     // OfflineConnectBypass
-    if !env.options.network_access {
-       log!("WARNING: Failing connect() with ENETUNREACH for offline mode");
-       set_errno(env, 51); // ENETUNREACH
-       return -1;
-    }
+    if !env.options.network_access && is_asphalt_or_nfs(env) {
+    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+    return -1;
+}
+// else existing stub behavior
 
     // Attempt real connection, but handle errors without panicking
     let host_stream = match TcpStream::connect(socket_address) {
@@ -499,28 +507,11 @@ fn select(
     };
 
 // OfflineSelectBypass
-if !env.options.network_access {
-    let mut count = 0;
-    if !read_fds.is_null() {
-        let set = env.mem.read(read_fds);
-        // Copy bits to local array to avoid unaligned reference
-        let bits = set.fds_bits;
-        count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
-        // Write back unchanged – all requested fds are "ready"
-        env.mem.write(read_fds, set);
-    }
-    if !write_fds.is_null() {
-        let set = env.mem.read(write_fds);
-        let bits = set.fds_bits;
-        count += bits.iter().map(|b| b.count_ones() as i32).sum::<i32>();
-        env.mem.write(write_fds, set);
-    }
-    if !error_fds.is_null() {
-        env.mem.write(error_fds, fd_set { fds_bits: [0; 32] });
-    }
-    log_dbg!("select (offline): returning {} ready fds", count);
-    return count;
+if !env.options.network_access && is_asphalt_or_nfs(env) {
+    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+    return -1;
 }
+// else existing stub behavior
 
     let mut count = 0;
 
@@ -885,9 +876,11 @@ fn recvfrom(
     assert_eq!(flags, 0); // TODO
 
     // OfflineRecvBypass
-    if !env.options.network_access {
-        return 0;
-    }
+    if !env.options.network_access && is_asphalt_or_nfs(env) {
+    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+    return -1;
+}
+// else existing stub behavior
     let (num_bytes_read, addr) = match type_ {
         SOCK_DGRAM => {
             let udp_socket = env
@@ -981,9 +974,11 @@ fn send(
     //assert_eq!(flags, 0); // TODO
 
     // OfflineSendBypass
-    if !env.options.network_access {
-        return length as i32;
-    }
+    if !env.options.network_access && is_asphalt_or_nfs(env) {
+    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+    return -1;
+}
+// else existing stub behavior
     let num_bytes_written = match type_ {
         SOCK_STREAM => {
             let mut tcp_stream = env
@@ -1057,9 +1052,11 @@ fn sendto(
     );
 
     // OfflineSendtoBypass
-    if !env.options.network_access {
-        return length as i32;
-    }
+    if !env.options.network_access && is_asphalt_or_nfs(env) {
+    set_errno(env, 51); // ENETUNREACH or 57 ENOTCONN
+    return -1;
+}
+// else existing stub behavior
     let num_bytes_written = match type_ {
         SOCK_DGRAM => {
             if State::get(env)
