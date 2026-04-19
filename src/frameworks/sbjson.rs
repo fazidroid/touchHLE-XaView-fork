@@ -5,7 +5,9 @@
  */
 //! Stubs for SBJSON classes used by some games.
 
-use crate::objc::{id, msg, objc_classes, ClassExports, HostObject};
+use crate::frameworks::foundation::ns_string;
+use crate::mem::ConstPtr;
+use crate::objc::{id, msg, msg_class, msg_super, objc_classes, ClassExports, HostObject};
 
 #[derive(Default)]
 struct SBJsonWriterHostObject;
@@ -22,18 +24,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation SBJsonWriter: NSObject
 
 - (id)init {
-    msg![env; this init]
+    msg_super![env; this init]
 }
 
 - (id)stringWithObject:(id)_obj {
     log_dbg!("SBJsonWriter stringWithObject: returning empty JSON object");
-    crate::frameworks::foundation::ns_string::from_rust_string(env, "{}")
+    ns_string::from_rust_string(env, "{}")
 }
 
 - (id)dataWithObject:(id)_obj {
-    // Return empty JSON data
-    let empty_json = "{}".as_bytes();
-    crate::frameworks::foundation::ns_data::from_slice(env, empty_json)
+    // Return empty JSON data as NSData
+    let empty_json = b"{}";
+    let bytes = ConstPtr::<u8>::from_ptr(empty_json.as_ptr());
+    msg_class![env; NSData dataWithBytes:bytes length:2]
 }
 
 @end
@@ -41,7 +44,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation SBJsonParser: NSObject
 
 - (id)init {
-    msg![env; this init]
+    msg_super![env; this init]
 }
 
 - (id)objectWithString:(id)_string {
