@@ -419,23 +419,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
-    log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
-
     let _ = error; // IgnoreErrorAssert
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // Report a generous 20 GB of free space (and total size) to prevent
-    // "insufficient space" alerts in games like NFS Most Wanted.
-    let size: u64 = 20 * 1024 * 1024 * 1024; // 20 GB
-    
-    let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
+    // Use 1 GB — must fit in 32 bits to avoid overflow when NSNumber
+    // only reads the low 32 bits. 20 GB = 0x500000000 whose low 32 bits
+    // are zero, which makes the game think there is no free space and
+    // shows the "free up space" screen.
+    // 1 GB = 0x40000000 fits safely in 32 bits.
+    let total_size: u32 = 1024 * 1024 * 1024; // 1 GB total
+    let free_size: u32  = 1024 * 1024 * 1024; // 1 GB free (all free)
 
-    let fs_size_key = get_static_str(env, NSFileSystemSize);
-    () = msg![env; dict setObject:size_num forKey:fs_size_key];
+    let total_num: id = msg_class![env; NSNumber numberWithUnsignedInt:total_size];
+    let free_num: id  = msg_class![env; NSNumber numberWithUnsignedInt:free_size];
 
+    let fs_size_key      = get_static_str(env, NSFileSystemSize);
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
-    () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
+
+    () = msg![env; dict setObject:total_num forKey:fs_size_key];
+    () = msg![env; dict setObject:free_num  forKey:fs_free_size_key];
+
+    log_dbg!("attributesOfFileSystemForPath: returning total={}MB free={}MB",
+        total_size / (1024 * 1024), free_size / (1024 * 1024));
 
     let dict_imm = msg![env; dict copy];
     release(env, dict);
