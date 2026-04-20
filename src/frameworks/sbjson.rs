@@ -6,7 +6,7 @@
 //! Stubs for SBJSON classes used by some games.
 
 use crate::frameworks::foundation::ns_string;
-use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject};
+use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject, NSZonePtr};
 
 #[derive(Default)]
 struct SBJsonWriterHostObject;
@@ -22,6 +22,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation SBJsonWriter: NSObject
 
++ (id)allocWithZone:(NSZonePtr)_zone {
+    env.objc.alloc_object(this, Box::new(SBJsonWriterHostObject), &mut env.mem)
+}
+
 - (id)init {
     msg_super![env; this init]
 }
@@ -32,7 +36,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)dataWithObject:(id)_obj {
-    // Return empty NSData (avoids pointer issues)
     log_dbg!("SBJsonWriter dataWithObject: returning empty NSData");
     msg_class![env; NSData data]
 }
@@ -40,6 +43,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 @implementation SBJsonParser: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    env.objc.alloc_object(this, Box::new(SBJsonParserHostObject), &mut env.mem)
+}
 
 - (id)init {
     msg_super![env; this init]
