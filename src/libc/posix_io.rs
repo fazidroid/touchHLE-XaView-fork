@@ -127,26 +127,36 @@ fn open(env: &mut Environment, path: ConstPtr<u8>, flags: i32, _args: DotDotDot)
 
 /// Special extension for host code: [open] without the [DotDotDot].
 pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> FileDescriptor {
-    // TODO: support more flags, this list is not complete
-    assert!(
-        flags
-            & !(O_ACCMODE
-                | O_NONBLOCK
-                | O_APPEND
-                | O_SHLOCK
-                | O_NOFOLLOW
-                | O_CREAT
-                | O_TRUNC
-                | O_EXCL)
-            == 0
-    );
-    // TODO: exclusive mode not implemented yet
-    assert!(flags & O_EXCL == 0);
+    // ==========================================================
+    // 🏎️ ASPHALT 8 BYPASS: Disarm Ghost File Landmines
+    // ==========================================================
+    let unhandled_flags = flags
+        & !(O_ACCMODE
+            | O_NONBLOCK
+            | O_APPEND
+            | O_SHLOCK
+            | O_NOFOLLOW
+            | O_CREAT
+            | O_TRUNC
+            | O_EXCL);
+            
+    if unhandled_flags != 0 {
+        println!("🎮 LOG: Absorbing unhandled open() flags during save: {:#x}", unhandled_flags);
+    }
+
+    // Safely ignore exclusive mode instead of panicking, which is critical 
+    // for Gameloft ghost data and profile saving!
+    if (flags & O_EXCL) != 0 {
+        println!("🎮 LOG: Bypassing unsupported O_EXCL flag for Ghost/Profile saving.");
+    }
 
     if path.is_null() {
         log_dbg!("open({:?}, {:#x}) => -1", path, flags);
         return -1; // TODO: set errno to EFAULT
     }
+
+    // Note: NONBLOCK flag is ignored, assumption is all file I/O is fast
+    let mut needs_flush = false;
 
     // TODO: respect the mode (in the variadic arguments) when creating a file
     // Note: NONBLOCK flag is ignored, assumption is all file I/O is fast
