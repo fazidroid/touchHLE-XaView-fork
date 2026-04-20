@@ -817,10 +817,7 @@ fn fcntl(
         }
         _ => {
             // BypassFcntl
-            println!(
-                "WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.",
-                cmd, fd
-            );
+            println!("WARNING: Unimplemented fcntl cmd: {} for fd: {}. Bypassing.", cmd, fd);
             return 0;
         }
     }
