@@ -183,23 +183,20 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
             return -1;
         }
 
-        // ==========================================================
-        // 🏎️ ASPHALT 8 BYPASS: StreamUtil.cpp Crash Fix
-        // ==========================================================
-        // Gameloft's engine explicitly checks if these folders exist.
-        // If we don't force 'success' here, it panics and hangs.
-        if path_str == "." || path_str == ".." || path_str == "/" ||
-           path_str.contains("texter_fonts") || path_str.contains("shaders") ||
-           path_str.contains("levels") || path_str.contains("pvs") ||
-           path_str.contains("gui") || path_str.contains("xml") {
-            
+        // ── Step 1: try to open as a regular file first ─────────────────────
+        // Try file open before anything else. This handles both real files and
+        // IPA bundle files. The old hardcoded path-keyword bypass was removed
+        // because it returned S_IFDIR for paths like "ghosts/1.bWU=.ghost" which
+        // happened to contain substrings like the legitimate directory names,
+        // causing the game to treat save-file paths as directories.
+        //
+        // Pure virtual dot-entries are always safe to report as directories.
+        if path_str == "." || path_str == ".." || path_str == "/" {
             write_dir_stat(env, buf);
-            return 0; // SUCCESS!
+            return 0;
         }
 
-        // ── Step 1: try to open as a regular file ────────────────────────────
-        // FIXED: Removed the invalid .cast_const() call here
-        let fd = open_direct(env, path, 0); 
+        let fd = open_direct(env, path, 0);
         if fd != -1 {
             let result = fstat_inner(env, fd, buf);
             assert!(close(env, fd) == 0);
@@ -207,29 +204,31 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
         }
 
         // ── Step 2: open_direct failed — probe whether it is a directory ─────
+        // NonDestructiveProbe: use create_dir ONLY to distinguish "existing dir"
+        // from "does not exist". If create_dir SUCCEEDS it means the path did
+        // NOT previously exist as a directory — immediately remove the spurious
+        // directory we just created and return ENOENT.
+        // This prevents ghost directories from being stranded at paths the game
+        // later wants to create as files (e.g. ghosts/1.bWU=.ghost → EISDIR crash).
         match env.fs.create_dir(GuestPath::new(&path_str)) {
             Ok(()) => {
-                log_dbg!("stat: '{}' created as directory (probe side-effect)", path_str);
-                write_dir_stat(env, buf);
-                0
+                // We accidentally created a directory while probing. Undo it.
+                let _ = env.fs.remove(GuestPath::new(&path_str));
+                log_dbg!("stat: '{}' did not exist (probe-and-remove), ENOENT", path_str);
+                set_errno(env, ENOENT);
+                -1
             }
             Err(FsError::AlreadyExist) => {
+                // Path exists as an existing writable directory.
                 log_dbg!("stat: '{}' is an existing writable directory", path_str);
                 write_dir_stat(env, buf);
                 0
             }
             Err(FsError::ReadonlyParentDir) => {
-                // ==========================================================
-                // 🏎️ EA BYPASS: Stop treating missing files as directories!
-                // ==========================================================
-                // If the parent is read-only and the item doesn't exist, 
-                // it is genuinely a missing file, NOT a read-only directory!
-                // Returning 0 here corrupts the EA Virtual File System!
-                log_dbg!("stat: '{}' creation failed (read-only). It is truly missing!", path_str);
-                
-                // Properly report to the game that the file does not exist
-                set_errno(env, ENOENT);
-                -1
+                // Parent is read-only IPA bundle — this IS a bundle asset directory.
+                log_dbg!("stat: '{}' is a read-only bundle directory", path_str);
+                write_dir_stat(env, buf);
+                0
             }
             Err(FsError::NonexistentParentDir) => {
                 set_errno(env, ENOENT);
