@@ -748,22 +748,16 @@ fn fcntl(
             let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
             return file.flags;
         }
-        F_SETFD => {
-            // SET/GETFD are responsible for managing the CLOEXEC flag on an FD.
-            // When set, exec* calls automatically close open FDs to prevent
-            // them from leaking. Since touchHLE only runs a single process and
-            // non-jailbroken apps can not call exec* functions, it's safe to
-            // ignore the flag being set.
-
-            // TODO: When exec* is added implement CLOEXEC functionality
+                F_SETFD => {
             let flags: i32 = args.start().next(env);
-            assert!(matches!(flags, FD_CLOEXEC | 0));
+            
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb FD flag changes!
+            // ==========================================================
+            // ❌ DELETED: assert!(matches!(flags, FD_CLOEXEC | 0));
+            
             if flags & FD_CLOEXEC == FD_CLOEXEC {
-                log!(
-                    "TODO: fcntl({}, F_SETFD, {}) called. CLOEXEC currently not supported.",
-                    fd,
-                    flags
-                );
+                log!("TODO: fcntl({}, F_SETFD, {}) called. CLOEXEC currently not supported.", fd, flags);
             }
             let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
             file.flags = flags;
@@ -816,11 +810,13 @@ fn fcntl(
         F_NOCACHE => {
             let mut args = args.start();
             let arg: i32 = args.next(env);
-            assert_eq!(arg, 1);
-            log!(
-                "TODO: Ignoring enabling F_NOCACHE for file descriptor {}",
-                fd
-            );
+            
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Don't panic on F_NOCACHE toggles!
+            // ==========================================================
+            // ❌ DELETED: assert_eq!(arg, 1);
+            
+            println!("🎮 LOG: Safely absorbed F_NOCACHE state change to {} for fd {}!", arg, fd);
         }
         F_RDADVISE => {
             log_dbg!("TODO: Ignoring F_RDADVISE for file descriptor {}", fd);
