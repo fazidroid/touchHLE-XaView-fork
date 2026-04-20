@@ -459,9 +459,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
     () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
 
-    let dict_imm = msg![env; dict copy];
-    release(env, dict);
-    autorelease(env, dict_imm)
+        // ==========================================================
+    // 🏎️ EA BYPASS: Prevent NSDictionary Host Object Panic!
+    // ==========================================================
+    autorelease(env, dict)
 }
 
 @end
@@ -515,7 +516,8 @@ fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
         () = msg![env; dict setObject:file_type_directory forKey:file_type_key];
     }
 
-    let dict_imm = msg![env; dict copy];
-    release(env, dict);
-    autorelease(env, dict_imm)
+    // ==========================================================
+    // 🏎️ EA BYPASS: Prevent NSDictionary Host Object Panic!
+    // ==========================================================
+    autorelease(env, dict)
 }
