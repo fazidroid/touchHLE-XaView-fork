@@ -79,6 +79,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.dealloc_object(this, &mut env.mem);
 }
 
+// ==========================================================
+    // 🏎️ EA BYPASS: Absorb CADisplayLink Pause/Unpause
+    // ==========================================================
+    - (())setPaused:(bool)paused {
+        println!("🎮 LOG: Caught [CADisplayLink setPaused:{}]. Absorbing safely!", paused);
+    }
+
+    - (bool)isPaused {
+        // Return false so the engine always thinks the render loop is active!
+        false 
+    }
+
 @end
 
 };
