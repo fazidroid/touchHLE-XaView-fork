@@ -446,10 +446,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("attributesOfFileSystemForPath: returning total={}MB free={}MB",
         total_size / (1024 * 1024), free_size / (1024 * 1024));
 
-                        // ==========================================================
+                                // ==========================================================
         // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
         // ==========================================================
-        let bundle_id = env.bundle.info.bundle_identifier.as_str();
+        let bundle_id = env.bundle.as_ref().info.bundle_identifier.as_str();
         let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
                      bundle_id == "com.ea.nfs13.inc";
 
@@ -515,10 +515,10 @@ fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
         () = msg![env; dict setObject:file_type_directory forKey:file_type_key];
     }
 
-                        // ==========================================================
+                                // ==========================================================
         // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
         // ==========================================================
-        let bundle_id = env.bundle.info.bundle_identifier.as_str();
+        let bundle_id = env.bundle.as_ref().info.bundle_identifier.as_str();
         let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
                      bundle_id == "com.ea.nfs13.inc";
 
