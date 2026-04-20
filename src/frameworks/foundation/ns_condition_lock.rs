@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-//! `NSConditionLock` stub to prevent thread deadlocks.
+//! `NSConditionLock` stub.
 
 use crate::frameworks::foundation::NSInteger;
 use crate::objc::{id, msg_super, objc_classes, ClassExports, HostObject, NSZonePtr};
@@ -20,12 +20,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSConditionLock: NSObject
 
-// ==========================================================
-// 🏎️ EA BYPASS: Explicit Host Object Allocation
-// ==========================================================
 + (id)allocWithZone:(NSZonePtr)_zone {
-    let host_object = Box::new(NSConditionLockHostObject::default());
-    env.objc.alloc_object(this, host_object, &mut env.mem)
+    env.objc.alloc_object(this, Box::new(NSConditionLockHostObject::default()), &mut env.mem)
 }
 
 - (id)initWithCondition:(NSInteger)condition {

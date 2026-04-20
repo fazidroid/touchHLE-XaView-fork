@@ -5,7 +5,7 @@
  */
 //! `NSSortDescriptor` stub.
 
-use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject};
+use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject, NSZonePtr};
 
 #[derive(Default)]
 struct NSSortDescriptorHostObject;
@@ -16,6 +16,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 (env, this, _cmd);
 
 @implementation NSSortDescriptor: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    env.objc.alloc_object(this, Box::new(NSSortDescriptorHostObject), &mut env.mem)
+}
 
 + (id)sortDescriptorWithKey:(id)_key ascending:(bool)_ascending {
     log_dbg!("NSSortDescriptor sortDescriptorWithKey:ascending: stub");

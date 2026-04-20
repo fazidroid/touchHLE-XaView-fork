@@ -6,7 +6,8 @@
 //! `NSInvocation` stub.
 
 use crate::frameworks::foundation::NSUInteger;
-use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject};
+use crate::mem::MutVoidPtr;
+use crate::objc::{id, msg_class, msg_super, objc_classes, ClassExports, HostObject, NSZonePtr};
 
 #[derive(Default)]
 struct NSInvocationHostObject;
@@ -17,6 +18,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 (env, this, _cmd);
 
 @implementation NSInvocation: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    env.objc.alloc_object(this, Box::new(NSInvocationHostObject), &mut env.mem)
+}
 
 + (id)invocationWithMethodSignature:(id)_signature {
     log_dbg!("NSInvocation invocationWithMethodSignature: stub");
@@ -48,8 +53,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("NSInvocation invokeWithTarget: (no-op)");
 }
 
-- (())getReturnValue:(crate::mem::MutVoidPtr)_buffer {
-    // Return a default value (e.g., 0 for scalar) - nothing to write for void returns usually
+- (())getReturnValue:(MutVoidPtr)_buffer {
+    // no-op
 }
 
 @end
