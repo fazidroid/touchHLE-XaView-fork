@@ -252,24 +252,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         env.fs.create_dir(GuestPath::new(&path_str))
     };
-            match res {
-            Ok(()) => {
-                log_dbg!("createDirectoryAtPath {} => true", path_str);
-                true
-            }
-            Err(err) => {
-                let _ = error; // IgnoreErrorAssert
-                println!("🎮 LOG: Caught directory creation error for '{}': {:?}. Forcing SUCCESS to prevent Gameloft panic!", path_str, err);
-                
-                // ==========================================================
-                // 🏎️ GAMELOFT BYPASS: Fake Folder Creation Success
-                // ==========================================================
-                // Games frequently attempt to recreate save folders that already exist,
-                // and violently panic if this function returns 'false'. We forcefully
-                // return 'true' so the engine safely proceeds to write the file!
-                true
-            }
+    match res {
+        Ok(()) => {
+            log_dbg!("createDirectoryAtPath {} => true", path_str);
+            true
         }
+        Err(err) => {
+            let _ = error; // IgnoreErrorAssert
+            log!(
+                "Warning: createDirectoryAtPath {} failed with {:?}, returning false",
+                path_str,
+                err,
+            );
+            false
+        }
+    }
 }
 
 - (id)enumeratorAtPath:(id)path { // NSString*
@@ -422,50 +419,49 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)attributesOfFileSystemForPath:(id)_path
                               error:(MutPtr<id>)error {
+    // TODO: other attributes
+    log_once!("Warning: NSFileManager attributesOfFileSystemForPath:error: returns only NSFileSystemFreeSize attribute!");
+
     let _ = error; // IgnoreErrorAssert
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // Use 1 GB — must fit in 32 bits to avoid overflow when NSNumber
-    // only reads the low 32 bits. 20 GB = 0x500000000 whose low 32 bits
-    // are zero, which makes the game think there is no free space and
-    // shows the "free up space" screen.
-    // 1 GB = 0x40000000 fits safely in 32 bits.
-    let total_size: u32 = 1024 * 1024 * 1024; // 1 GB total
-    let free_size: u32  = 1024 * 1024 * 1024; // 1 GB free (all free)
-
-    let total_num: id = msg_class![env; NSNumber numberWithUnsignedInt:total_size];
-    let free_num: id  = msg_class![env; NSNumber numberWithUnsignedInt:free_size];
-
-    let fs_size_key      = get_static_str(env, NSFileSystemSize);
-    let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
-
-    () = msg![env; dict setObject:total_num forKey:fs_size_key];
-    () = msg![env; dict setObject:free_num  forKey:fs_free_size_key];
-
-    log_dbg!("attributesOfFileSystemForPath: returning total={}MB free={}MB",
-        total_size / (1024 * 1024), free_size / (1024 * 1024));
-
-                                        // ==========================================================
-    // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
     // ==========================================================
-    let mut is_nfs = false;
+    // 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: 32GB Free Space Spoof
+    // ==========================================================
+    let main_bundle: id = msg_class![env; NSBundle mainBundle];
+    let mut is_asphalt = false;
     if main_bundle != nil {
         let bundle_id: id = msg![env; main_bundle bundleIdentifier];
         if bundle_id != nil {
             let bundle_str = ns_string::to_rust_string(env, bundle_id);
-            is_nfs = bundle_str == "com.ea.nfs13.bv" || bundle_str == "com.ea.nfs13.inc";
+            is_asphalt = bundle_str.to_lowercase().contains("asphalt");
         }
     }
 
-    if is_nfs {
-        println!("🎮 LOG: NFS Most Wanted detected! Bypassing NSDictionary copy!");
-        autorelease(env, dict)
+    // Reporting 1 Gb of free space should be enough for normal games
+    // TODO: unify with `statfs`
+    // TODO: account for path
+    let size: u64 = if is_asphalt {
+        // 🏎️ FIX: Use an unsigned 32-bit maximum (4.2 GB) to pass the 2.8GB requirement!
+        4200000000 
     } else {
-        let dict_imm = msg![env; dict copy];
-        release(env, dict);
-        autorelease(env, dict_imm)
-    }    
+        1024 * 1024 * 1024 // 1 GB default for other games
+    };
+    
+    let size_num: id = msg_class![env; NSNumber numberWithUnsignedLongLong:size];
+
+    // 🏎️ FIX: Tell the game the Total Drive Size is 32GB
+    let fs_size_key = get_static_str(env, NSFileSystemSize);
+    () = msg![env; dict setObject:size_num forKey:fs_size_key];
+
+    // 🏎️ FIX: Tell the game the Free Space is also 32GB
+    let fs_free_size_key = get_static_str(env, NSFileSystemFreeSize);
+    () = msg![env; dict setObject:size_num forKey:fs_free_size_key];
+
+    let dict_imm = msg![env; dict copy];
+    release(env, dict);
+    autorelease(env, dict_imm)
 }
 
 @end
@@ -519,27 +515,7 @@ fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
         () = msg![env; dict setObject:file_type_directory forKey:file_type_key];
     }
 
-                                        // ==========================================================
-    // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
-    // ==========================================================
-    // We MUST define main_bundle here because this is a separate function!
-    let main_bundle: id = msg_class![env; NSBundle mainBundle];
-    let mut is_nfs = false;
-    
-    if main_bundle != nil {
-        let bundle_id: id = msg![env; main_bundle bundleIdentifier];
-        if bundle_id != nil {
-            let bundle_str = ns_string::to_rust_string(env, bundle_id);
-            is_nfs = bundle_str == "com.ea.nfs13.bv" || bundle_str == "com.ea.nfs13.inc";
-        }
-    }
-
-    if is_nfs {
-        println!("🎮 LOG: NFS Most Wanted detected! Bypassing NSDictionary copy!");
-        autorelease(env, dict)
-    } else {
-        let dict_imm = msg![env; dict copy];
-        release(env, dict);
-        autorelease(env, dict_imm)
-    }
+    let dict_imm = msg![env; dict copy];
+    release(env, dict);
+    autorelease(env, dict_imm)
 }
