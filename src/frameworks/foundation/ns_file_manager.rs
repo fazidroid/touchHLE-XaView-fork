@@ -149,22 +149,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     let res_exists = if path == nil {
         false
     } else {
-        let path_str = ns_string::to_rust_string(env, path); 
-        
-        // ==========================================================
-        // 🏎️ EA BYPASS: Break the Phantom File Loop!
-        // ==========================================================
-        // If the game is desperately looking for its profile, telemetry, 
-        // or an EA folder, we aggressively lie and say it exists!
-        if path_str.contains("EA") || path_str.contains("profile") || 
-           path_str.contains("telemetry") || path_str.contains("dynamic_options") {
-            println!("🎮 LOG: Faking fileExistsAtPath for EA loop bypass: {}", path_str);
-            return true;
-        }
-        
+        let path = ns_string::to_rust_string(env, path); // TODO: avoid copy
         // fileExistsAtPath: will return true for directories
         // hence Fs::exists() rather than Fs::is_file() is appropriate.
-        env.fs.exists(GuestPath::new(&path_str))
+        env.fs.exists(GuestPath::new(&path))
     };
     log_dbg!("[(NSFileManager*) {:?} fileExistsAtPath:{:?}] => {}", this, path, res_exists);
     res_exists
@@ -264,25 +252,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         env.fs.create_dir(GuestPath::new(&path_str))
     };
-    
-    match res {
-        Ok(()) => {
-            log_dbg!("createDirectoryAtPath {} => true", path_str);
-            true
+            match res {
+            Ok(()) => {
+                log_dbg!("createDirectoryAtPath {} => true", path_str);
+                true
+            }
+            Err(err) => {
+                let _ = error; // IgnoreErrorAssert
+                println!("🎮 LOG: Caught directory creation error for '{}': {:?}. Forcing SUCCESS to prevent Gameloft panic!", path_str, err);
+                
+                // ==========================================================
+                // 🏎️ GAMELOFT BYPASS: Fake Folder Creation Success
+                // ==========================================================
+                // Games frequently attempt to recreate save folders that already exist,
+                // and violently panic if this function returns 'false'. We forcefully
+                // return 'true' so the engine safely proceeds to write the file!
+                true
+            }
         }
-        Err(err) => {
-            let _ = error; // IgnoreErrorAssert
-            
-            // ==========================================================
-            // 🏎️ EA BYPASS: Aggressively Fake Directory Success
-            // ==========================================================
-            println!("🎮 LOG: createDirectoryAtPath {} failed with {:?}, FAKING SUCCESS for EA bypass!", path_str, err);
-            
-            // Never return false! Always pretend the folder was 
-            // successfully created so the EA save-engine continues.
-            true 
-        }
-    }
 }
 
 - (id)enumeratorAtPath:(id)path { // NSString*
@@ -368,14 +355,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)contentsAtPath:(id)path { // NSString *
-    let path_str = ns_string::to_rust_string(env, path);
+    // TODO: return nil if path is directory
     
-    // 🏎️ EA BYPASS: Return empty data for our fake files instead of crashing!
-    if path_str.contains("EA") || path_str.contains("profile") || path_str.contains("telemetry") {
-        println!("🎮 LOG: Returning empty NSData for faked EA file: {}", path_str);
-        return msg_class![env; NSData data]; // Returns an empty, valid data object
-    }
-
+    // EA BYPASS: Remove the strict absolute path assertion!
     let is_absolute: bool = msg![env; path isAbsolutePath];
     if !is_absolute {
         println!("🎮 LOG: Bypassing relative path check for contentsAtPath!");
@@ -444,14 +426,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let dict = msg_class![env; NSMutableDictionary new];
 
-    // ==========================================================
-    // 🏎️ ASPHALT 8 BYPASS: 3 GB Storage Spoof
-    // ==========================================================
-    // 1 GB is too small for modern Gameloft titles! 
-    // We increase this to 3 GB (which safely fits inside a 32-bit 
-    // unsigned integer without overflowing the NSNumber).
-    let total_size: u32 = 3_u32 * 1024 * 1024 * 1024; // 3 GB total
-    let free_size: u32  = 3_u32 * 1024 * 1024 * 1024; // 3 GB free
+    // Use 1 GB — must fit in 32 bits to avoid overflow when NSNumber
+    // only reads the low 32 bits. 20 GB = 0x500000000 whose low 32 bits
+    // are zero, which makes the game think there is no free space and
+    // shows the "free up space" screen.
+    // 1 GB = 0x40000000 fits safely in 32 bits.
+    let total_size: u32 = 1024 * 1024 * 1024; // 1 GB total
+    let free_size: u32  = 1024 * 1024 * 1024; // 1 GB free (all free)
 
     let total_num: id = msg_class![env; NSNumber numberWithUnsignedInt:total_size];
     let free_num: id  = msg_class![env; NSNumber numberWithUnsignedInt:free_size];
