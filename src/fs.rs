@@ -1309,6 +1309,7 @@ impl Fs {
         },
     );
     Ok(())
+    }
 }
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(fcntl(_, _, _)),
