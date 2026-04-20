@@ -446,7 +446,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("attributesOfFileSystemForPath: returning total={}MB free={}MB",
         total_size / (1024 * 1024), free_size / (1024 * 1024));
 
-                                    // ==========================================================
+                                        // ==========================================================
     // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
     // ==========================================================
     let mut is_nfs = false;
@@ -465,7 +465,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         let dict_imm = msg![env; dict copy];
         release(env, dict);
         autorelease(env, dict_imm)
-    }
+    }    
 }
 
 @end
@@ -519,11 +519,13 @@ fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
         () = msg![env; dict setObject:file_type_directory forKey:file_type_key];
     }
 
-                                    // ==========================================================
+                                        // ==========================================================
     // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
     // ==========================================================
+    // We MUST define main_bundle here because this is a separate function!
     let main_bundle: id = msg_class![env; NSBundle mainBundle];
     let mut is_nfs = false;
+    
     if main_bundle != nil {
         let bundle_id: id = msg![env; main_bundle bundleIdentifier];
         if bundle_id != nil {
