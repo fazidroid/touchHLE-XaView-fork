@@ -447,21 +447,20 @@ pub const CLASSES: ClassExports = objc_classes! {
         total_size / (1024 * 1024), free_size / (1024 * 1024));
 
                                 // ==========================================================
-        // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
-        // ==========================================================
-        let bundle_id = env.bundle.as_ref().info.bundle_identifier.as_str();
-        let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
-                     bundle_id == "com.ea.nfs13.inc";
+// 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
+// ==========================================================
+let bundle_id = env.bundle_id();
+let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
+             bundle_id == "com.ea.nfs13.inc";
 
-        if is_nfs {
-        println!("🎮 LOG: NFS Most Wanted detected! Bypassing NSDictionary copy to prevent crash.");
-        autorelease(env, dict)
-    } else {
-        // Standard iOS behavior for all other games!
-        let dict_imm = msg![env; dict copy];
-        release(env, dict);
-        autorelease(env, dict_imm)
-    }
+if is_nfs {
+    println!("🎮 LOG: NFS Most Wanted detected! Bypassing NSDictionary copy to prevent crash.");
+    autorelease(env, dict)
+} else {
+    let dict_imm = msg![env; dict copy];
+    release(env, dict);
+    autorelease(env, dict_imm)
+}
 }
 
 @end
@@ -516,18 +515,17 @@ fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
     }
 
                                 // ==========================================================
-        // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
-        // ==========================================================
-        let bundle_id = env.bundle.as_ref().info.bundle_identifier.as_str();
-        let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
-                     bundle_id == "com.ea.nfs13.inc";
+// 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
+// ==========================================================
+let bundle_id = env.bundle_id();
+let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
+             bundle_id == "com.ea.nfs13.inc";
 
-        if is_nfs {
-        autorelease(env, dict)
-    } else {
-        // Standard iOS behavior for all other games!
-        let dict_imm = msg![env; dict copy];
-        release(env, dict);
-        autorelease(env, dict_imm)
-    }
+if is_nfs {
+    autorelease(env, dict)
+} else {
+    let dict_imm = msg![env; dict copy];
+    release(env, dict);
+    autorelease(env, dict_imm)
+}
 }
