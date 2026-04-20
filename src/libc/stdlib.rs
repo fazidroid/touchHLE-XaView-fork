@@ -739,10 +739,23 @@ fn __divsi3(_env: &mut Environment, a: i32, b: i32) -> i32 {
     }
 }
 
-fn CFUUIDCreate(_env: &mut Environment, _alloc: ConstVoidPtr) -> MutVoidPtr {
-    // ImplUUIDCreate
-    log!("CFUUIDCreate: returning null to safely bypass CFRelease");
-    crate::mem::Ptr::null()
+fn CFUUIDCreate(env: &mut Environment, _alloc: ConstVoidPtr) -> MutVoidPtr {
+    // ==========================================================
+    // 🏎️ ASPHALT 8 BYPASS: Safe CFUUID Dummy Object
+    // ==========================================================
+    println!("🎮 LOG: CFUUIDCreate called! Returning a dummy NSString to survive CFRelease!");
+    
+    // Instead of returning null, we return a valid Objective-C object.
+    // Because iOS uses "Toll-Free Bridging", the game's CFRelease() call 
+    // will safely message this object instead of dereferencing a 0x0 pointer!
+    let nsstring_class = env.objc.get_known_class("NSString", &mut env.mem);
+    let sel_alloc = env.objc.lookup_selector("alloc").unwrap();
+    let sel_init = env.objc.lookup_selector("init").unwrap();
+    
+    let alloced: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (nsstring_class, sel_alloc));
+    let string: crate::objc::id = crate::objc::msg_send_no_type_checking(env, (alloced, sel_init));
+    
+    string.cast()
 }
 
 fn CFUUIDCreateString(
