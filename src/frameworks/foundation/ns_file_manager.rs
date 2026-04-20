@@ -446,21 +446,26 @@ pub const CLASSES: ClassExports = objc_classes! {
     log_dbg!("attributesOfFileSystemForPath: returning total={}MB free={}MB",
         total_size / (1024 * 1024), free_size / (1024 * 1024));
 
-                                // ==========================================================
-// 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
-// ==========================================================
-let bundle_id = env.bundle_id();
-let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
-             bundle_id == "com.ea.nfs13.inc";
+                                    // ==========================================================
+    // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
+    // ==========================================================
+    let mut is_nfs = false;
+    if main_bundle != nil {
+        let bundle_id: id = msg![env; main_bundle bundleIdentifier];
+        if bundle_id != nil {
+            let bundle_str = ns_string::to_rust_string(env, bundle_id);
+            is_nfs = bundle_str == "com.ea.nfs13.bv" || bundle_str == "com.ea.nfs13.inc";
+        }
+    }
 
-if is_nfs {
-    println!("🎮 LOG: NFS Most Wanted detected! Bypassing NSDictionary copy to prevent crash.");
-    autorelease(env, dict)
-} else {
-    let dict_imm = msg![env; dict copy];
-    release(env, dict);
-    autorelease(env, dict_imm)
-}
+    if is_nfs {
+        println!("🎮 LOG: NFS Most Wanted detected! Bypassing NSDictionary copy!");
+        autorelease(env, dict)
+    } else {
+        let dict_imm = msg![env; dict copy];
+        release(env, dict);
+        autorelease(env, dict_imm)
+    }
 }
 
 @end
@@ -514,18 +519,25 @@ fn file_attributes_common(env: &mut Environment, guest_path: &GuestPath) -> id {
         () = msg![env; dict setObject:file_type_directory forKey:file_type_key];
     }
 
-                                // ==========================================================
-// 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
-// ==========================================================
-let bundle_id = env.bundle_id();
-let is_nfs = bundle_id == "com.ea.nfs13.bv" || 
-             bundle_id == "com.ea.nfs13.inc";
+                                    // ==========================================================
+    // 🏎️ EA BYPASS: Exclusive NSDictionary Copy Hack
+    // ==========================================================
+    let main_bundle: id = msg_class![env; NSBundle mainBundle];
+    let mut is_nfs = false;
+    if main_bundle != nil {
+        let bundle_id: id = msg![env; main_bundle bundleIdentifier];
+        if bundle_id != nil {
+            let bundle_str = ns_string::to_rust_string(env, bundle_id);
+            is_nfs = bundle_str == "com.ea.nfs13.bv" || bundle_str == "com.ea.nfs13.inc";
+        }
+    }
 
-if is_nfs {
-    autorelease(env, dict)
-} else {
-    let dict_imm = msg![env; dict copy];
-    release(env, dict);
-    autorelease(env, dict_imm)
-}
+    if is_nfs {
+        println!("🎮 LOG: NFS Most Wanted detected! Bypassing NSDictionary copy!");
+        autorelease(env, dict)
+    } else {
+        let dict_imm = msg![env; dict copy];
+        release(env, dict);
+        autorelease(env, dict_imm)
+    }
 }
