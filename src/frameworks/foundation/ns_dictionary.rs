@@ -38,8 +38,7 @@ pub(super) struct DictionaryHostObject {
     /// Since we need custom hashing and custom equality, and these both need a
     /// `&mut Environment`, we can't just use a `HashMap<id, id>`.
     /// So here we are using a `HashMap` as a primitive for implementing a
-    /// hash-map, which is not ideally efficient.
-    ///
+    /// hash-map, which is not ideally efficient. :)
     /// The keys are the hash values, the values are a list of key-value pairs
     /// where the keys have the same hash value.
     pub(super) map: HashMap<Hash, Vec<(id, id)>>,
@@ -68,6 +67,7 @@ impl DictionaryHostObject {
         let hash: Hash = msg![env; key hash];
 
         let value = retain(env, value);
+
         let Some(collisions) = self.map.get_mut(&hash) else {
             self.map.insert(hash, vec![(key, value)]);
             self.count += 1;
@@ -299,8 +299,7 @@ pub fn init_with_objects_and_keys(
             break;
         }
         let key: id = va_args.next(env);
-        assert!(key != nil);
-        // TODO: raise proper exception
+        assert!(key != nil); // TODO: raise proper exception
         host_object.insert(env, key, object, /* copy_key: */ true);
     }
 
@@ -311,27 +310,17 @@ pub fn init_with_objects_and_keys(
 
 /// Helper function to share `initWithDictionary:` implementations
 fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) -> id {
-    // 🏎️ GAMELOFT BYPASS: Safely handle nil dictionaries (like empty save files)!
-    if other_dict == nil {
-        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
-        return this;
-    }
-
     let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
 
     let mut host_object = <DictionaryHostObject as Default>::default();
-    
-    // SAFE BYPASS: Do not attempt to borrow 'nil' if the provided dictionary is empty
-    if other_dict != nil {
-        let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
-        for key in other_host_object.iter_keys() {
-            let object = other_host_object.lookup(env, key);
-            host_object.insert(env, key, object, /* copy_key: */ true);
-        }
-        *env.objc.borrow_mut(other_dict) = other_host_object;
+
+    for key in other_host_object.iter_keys() {
+        let object = other_host_object.lookup(env, key);
+        host_object.insert(env, key, object, /* copy_key: */ true);
     }
 
     *env.objc.borrow_mut(this) = host_object;
+    *env.objc.borrow_mut(other_dict) = other_host_object;
     this
 }
 
@@ -339,8 +328,7 @@ fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) 
 fn init_with_objects_for_keys_common(env: &mut Environment, this: id, objects: id, keys: id) -> id {
     let keys_size: NSUInteger = msg![env; keys count];
     let objects_size: NSUInteger = msg![env; objects count];
-    assert_eq!(keys_size, objects_size);
-    // TODO: raise proper exception
+    assert_eq!(keys_size, objects_size); // TODO: raise proper exception
 
     let mut host_object = <DictionaryHostObject as Default>::default();
 
@@ -380,6 +368,7 @@ fn all_keys_common(env: &mut Environment, this: id) -> id {
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
+
 // NSDictionary is an abstract class. A subclass must provide:
 // - (id)initWithObjects:(id*)forKeys:(id*)count:(NSUInteger)
 // - (NSUInteger)count
@@ -390,7 +379,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSDictionary: NSObject
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    // Safely force allocation of native _touchHLE_NSDictionary to bypass broken NSObject subclasses
+    // NSDictionary might be subclassed by something which needs allocWithZone:
+    // to have the normal behaviour. Unimplemented: call superclass alloc then.
+    assert!(this == env.objc.get_known_class("NSDictionary", &mut env.mem));
     msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
 }
 
@@ -401,8 +392,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)dictionaryWithObject:(id)object forKey:(id)key {
-    assert_ne!(key, nil);
-    // TODO: raise proper exception
+    assert_ne!(key, nil); // TODO: raise proper exception
 
     let new_dict = dict_from_keys_and_objects(env, &[(key, object)]);
     autorelease(env, new_dict)
@@ -431,51 +421,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let new_dict: id = msg![env; this alloc];
     let new_dict: id = msg![env; new_dict initWithObjects:objects forKeys:keys];
     autorelease(env, new_dict)
-}
-
-// ==========================================================
-// 🏎️ ASPHALT 8 EXCLUSIVE BYPASS: Save Profile / CRM Builder
-// ==========================================================
-+ (id)dictionaryWithObjects:(crate::mem::ConstPtr<id>)objects
-                    forKeys:(crate::mem::ConstPtr<id>)keys
-                      count:(u32)count {
-    
-    // 1. Dynamically grab the game's iOS Bundle ID at runtime!
-    let main_bundle: id = msg_class![env; NSBundle mainBundle];
-    let mut is_asphalt_8 = false;
-    
-    if main_bundle != crate::objc::nil {
-        let bundle_id: id = msg![env; main_bundle bundleIdentifier];
-        if bundle_id != crate::objc::nil {
-            let bundle_str = crate::frameworks::foundation::ns_string::to_rust_string(env, bundle_id);
-            is_asphalt_8 = bundle_str == "com.gameloft.asphalt8";
-        }
-    }
-
-    // 2. Only build the dictionary if the game is Asphalt 8
-    if is_asphalt_8 {
-        println!("🎮 ASPHALT 8 EXCLUSIVE: Building NSDictionary for CRM save profile!");
-        
-        let dict: id = msg_class![env; NSMutableDictionary alloc];
-        let dict: id = msg![env; dict initWithCapacity:count];
-        
-                for i in 0..count {
-            // 🏎️ FIX: Multiply index by 4 because iOS pointers (id) are 4 bytes!
-            // Adding just 'i' adds raw bytes, reading misaligned garbage memory!
-            let obj = env.mem.read(objects + (i * 4));
-            let key = env.mem.read(keys + (i * 4));
-            
-            if obj != crate::objc::nil && key != crate::objc::nil {
-                let _: () = msg![env; dict setObject:obj forKey:key];
-            }
-        }
-
-        crate::objc::autorelease(env, dict)
-    } else {
-        // 3. Standard touchHLE fallback for Need for Speed and all other games
-        log!("TODO: ignoring [NSDictionary dictionaryWithObjects:forKeys:count:{}]", count);
-        crate::objc::nil
-    }
 }
 
 + (id)dictionaryWithDictionary:(id)dict { // NSDictionary*
@@ -564,7 +509,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSMutableDictionary: NSDictionary
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    // Safely force allocation of native _touchHLE_NSMutableDictionary to bypass broken NSObject subclasses
+    // NSDictionary might be subclassed by something which needs allocWithZone:
+    // to have the normal behaviour. Unimplemented: call superclass alloc then.
+    assert!(this == env.objc.get_known_class("NSMutableDictionary", &mut env.mem));
     msg_class![env; _touchHLE_NSMutableDictionary allocWithZone:zone]
 }
 
@@ -619,6 +566,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())dealloc {
     std::mem::take(env.objc.borrow_mut::<DictionaryHostObject>(this)).release(env);
+
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
@@ -706,6 +654,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())dealloc {
     std::mem::take(env.objc.borrow_mut::<DictionaryHostObject>(this)).release(env);
+
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
@@ -750,6 +699,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         unimplemented!()
     };
+
     release(env, this);
     let dict = dict_from_keys_and_objects(env, &tuples);
 
@@ -845,9 +795,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())addEntriesFromDictionary:(id)other { // NSDictionary *
-    // SAFE BYPASS: Do not attempt to read from a 'nil' dictionary
-    if other == nil { return; }
-    
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other));
     for (k, v) in host_obj.map.values().flatten() {
         () = msg![env; this setObject:(*v) forKey:(*k)];
@@ -867,6 +814,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let values: Vec<id> = host_obj.map.values().flatten().map(|&(_key, value)| value).collect();
     *env.objc.borrow_mut(this) = host_obj;
+
     for &val in &values {
         retain(env, val);
     }
@@ -976,10 +924,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 };
+
 /// Direct constructor for use by host code, similar to
 /// `[[NSDictionary alloc] initWithObjectsAndKeys:]` but without variadics and
-/// with a more intuitive argument order.
-/// Unlike [super::ns_array::from_vec],
+/// with a more intuitive argument order. Unlike [super::ns_array::from_vec],
 /// this **does** copy and retain!
 pub fn dict_from_keys_and_objects(env: &mut Environment, keys_and_objects: &[(id, id)]) -> id {
     let dict: id = msg_class![env; NSDictionary alloc];
