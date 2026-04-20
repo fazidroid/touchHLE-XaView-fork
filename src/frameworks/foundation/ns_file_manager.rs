@@ -461,6 +461,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         release(env, dict);
         autorelease(env, dict_imm)
     }
+}
 
 @end
 
