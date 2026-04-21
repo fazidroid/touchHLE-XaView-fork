@@ -26,6 +26,18 @@ pub type CGDataProviderRef = CFTypeRef;
 /// `(*void)(void *info, const void *data, size_t size)`
 type CGDataProviderReleaseDataCallback = GuestFunction;
 
+// ==========================================================
+// NEW: Sequential data provider callbacks struct
+// ==========================================================
+#[repr(C)]
+pub struct CGDataProviderSequentialCallbacks {
+    pub version: u32,
+    pub getBytes: Option<extern "C" fn(*mut std::ffi::c_void, *mut u8, usize) -> usize>,
+    pub skipForward: Option<extern "C" fn(*mut std::ffi::c_void, i64)>,
+    pub rewind: Option<extern "C" fn(*mut std::ffi::c_void)>,
+    pub releaseInfo: Option<extern "C" fn(*mut std::ffi::c_void)>,
+}
+
 // A CGDataProvider is supposed to be a collection of callbacks used for
 // accessing data, but at least for now, we instead only support some specific
 // use-cases.
@@ -202,6 +214,26 @@ fn CGDataProviderCreateWithCFData(env: &mut Environment, data: CFDataRef) -> CGD
     )
 }
 
+// ==========================================================
+// NEW: Stub for _CGDataProviderCreateSequential
+// ==========================================================
+fn CGDataProviderCreateSequential(
+    env: &mut Environment,
+    info: *mut std::ffi::c_void,
+    callbacks: *const CGDataProviderSequentialCallbacks,
+) -> CGDataProviderRef {
+    log!("_CGDataProviderCreateSequential stub called: info={:?}, callbacks={:?}", info, callbacks);
+    // Return a dummy empty data provider to avoid crashes.
+    // The game likely expects to read data later; we'll just give it nothing.
+    CGDataProviderCreateWithData(
+        env,
+        std::ptr::null_mut(),
+        std::ptr::null(),
+        0,
+        GuestFunction::from_ptr(std::ptr::null()),
+    )
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGDataProviderRetain(_)),
     export_c_func!(CGDataProviderRelease(_)),
@@ -209,4 +241,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGDataProviderCopyData(_)),
     export_c_func!(CGDataProviderCreateWithURL(_)),
     export_c_func!(CGDataProviderCreateWithCFData(_)),
+    // NEW: Export the sequential provider function
+    export_c_func!(CGDataProviderCreateSequential(_, _, _)),
 ];
