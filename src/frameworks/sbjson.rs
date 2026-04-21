@@ -40,6 +40,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; NSData data]
 }
 
+// KVO stubs to prevent crashes when games observe JSON objects
+- (())willChangeValueForKey:(id)key {
+    log_dbg!("SBJsonWriter willChangeValueForKey: ignored");
+}
+- (())didChangeValueForKey:(id)key {
+    log_dbg!("SBJsonWriter didChangeValueForKey: ignored");
+}
+
 @end
 
 @implementation SBJsonParser: NSObject
@@ -60,6 +68,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)objectWithData:(id)_data {
     log_dbg!("SBJsonParser objectWithData: returning empty dictionary");
     msg_class![env; NSMutableDictionary new]
+}
+
+// KVO stubs for parser too
+- (())willChangeValueForKey:(id)key {
+    log_dbg!("SBJsonParser willChangeValueForKey: ignored");
+}
+- (())didChangeValueForKey:(id)key {
+    log_dbg!("SBJsonParser didChangeValueForKey: ignored");
 }
 
 @end
