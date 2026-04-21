@@ -104,24 +104,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let new = env.objc.alloc_object(this, Box::new(host_object), &mut env.mem);
     autorelease(env, new)
 }
-- (id)fontName {
-    let host_object = env.objc.borrow::<UIFontHostObject>(this);
-    let name = match host_object.kind {
-        FontKind::MonoRegular => "Courier",
-        FontKind::MonoBold => "Courier-Bold",
-        FontKind::MonoBoldItalic => "Courier-BoldOblique",
-        FontKind::MonoItalic => "Courier-Oblique",
-        FontKind::SansRegular => "Helvetica",
-        FontKind::SansBold => "Helvetica-Bold",
-        FontKind::SansBoldItalic => "Helvetica-BoldOblique",
-        FontKind::SansItalic => "Helvetica-Oblique",
-        FontKind::SerifRegular => "TimesNewRomanPSMT",
-        FontKind::SerifBold => "TimesNewRomanPS-BoldMT",
-        FontKind::SerifBoldItalic => "TimesNewRomanPS-BoldItalicMT",
-        FontKind::SerifItalic => "TimesNewRomanPS-ItalicMT",
-    };
-    get_static_str(env, name)
-}
 + (id)boldSystemFontOfSize:(CGFloat)size {
     let host_object = UIFontHostObject {
         size,
@@ -166,6 +148,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_object = env.objc.borrow::<UIFontHostObject>(this);
     let font = env.framework_state.uikit.ui_font.get_font_by_kind(host_object.kind);
     font.line_gap(host_object.size)
+}
+- (id)fontName {
+    let host_object = env.objc.borrow::<UIFontHostObject>(this);
+    let name = match host_object.kind {
+        FontKind::MonoRegular => "Courier",
+        FontKind::MonoBold => "Courier-Bold",
+        FontKind::MonoBoldItalic => "Courier-BoldOblique",
+        FontKind::MonoItalic => "Courier-Oblique",
+        FontKind::SansRegular => "Helvetica",
+        FontKind::SansBold => "Helvetica-Bold",
+        FontKind::SansBoldItalic => "Helvetica-BoldOblique",
+        FontKind::SansItalic => "Helvetica-Oblique",
+        FontKind::SerifRegular => "TimesNewRomanPSMT",
+        FontKind::SerifBold => "TimesNewRomanPS-BoldMT",
+        FontKind::SerifBoldItalic => "TimesNewRomanPS-BoldItalicMT",
+        FontKind::SerifItalic => "TimesNewRomanPS-ItalicMT",
+    };
+    get_static_str(env, name)
 }
 
 @end
