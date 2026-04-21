@@ -289,7 +289,7 @@ pub fn AudioFileGetProperty(
         .get_mut(&in_audio_file)
         .unwrap();
 
-    match in_property_id {
+        match in_property_id {
         kAudioFilePropertyDataFormat => {
             let audio::AudioDescription {
                 sample_rate,
@@ -324,19 +324,17 @@ pub fn AudioFileGetProperty(
                         _reserved: 0,
                     }
                 }
-                audio::AudioFormat::AppleIma4 => {
-                    AudioStreamBasicDescription {
-                        sample_rate,
-                        format_id: kAudioFormatAppleIMA4,
-                        format_flags: 0,
-                        bytes_per_packet,
-                        frames_per_packet,
-                        bytes_per_frame: 0, // compressed
-                        channels_per_frame,
-                        bits_per_channel,
-                        _reserved: 0,
-                    }
-                }
+                audio::AudioFormat::AppleIma4 => AudioStreamBasicDescription {
+                    sample_rate,
+                    format_id: kAudioFormatAppleIMA4,
+                    format_flags: 0,
+                    bytes_per_packet,
+                    frames_per_packet,
+                    bytes_per_frame: 0, // compressed
+                    channels_per_frame,
+                    bits_per_channel,
+                    _reserved: 0,
+                },
             };
             env.mem.write(out_property_data.cast(), desc);
         }
@@ -368,8 +366,9 @@ pub fn AudioFileGetProperty(
         }
         kAudioFilePropertyInfoDictionary => {
             log!("AudioFileGetProperty: kAudioFilePropertyInfoDictionary requested");
-            // Write a null dictionary pointer (empty info)
             env.mem.write(out_property_data.cast::<CFTypeRef>(), 0 as CFTypeRef);
+        }
+        _ => unreachable!(),
     }
 
     0 // success
