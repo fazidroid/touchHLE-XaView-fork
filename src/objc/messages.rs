@@ -312,9 +312,24 @@ Type mismatch when sending message {} to {:?}!
             env.cpu.regs_mut()[0..2].fill(0);
             return;
         } else {
-            panic!(
-                "Item {class:?} in superclass chain of object {receiver:?}'s class {orig_class:?} has an unexpected host object type."
+            // UnexpectedHostObjectBypass: class has a host object type that is
+            // none of ClassHostObject / UnimplementedClass / FakeClass.
+            // This happens when a game registers a dynamic ObjC class at runtime
+            // via objc_allocateClassPair / objc_registerClassPair; the resulting
+            // class pair gets a different internal host object tag.
+            // Previously this was a hard panic. Now we log and return nil so
+            // the game can continue — same behaviour as an unimplemented class.
+            log!(
+                "Warning: Item {:?} in superclass chain of object {:?}'s class {:?} \
+                has an unexpected host object type (likely a runtime-registered dynamic class). \
+                Treating message \"{}\" as sent to nil.",
+                class,
+                receiver,
+                orig_class,
+                selector.as_str(&env.mem),
             );
+            env.cpu.regs_mut()[0..2].fill(0);
+            return;
         }
     }
 }
