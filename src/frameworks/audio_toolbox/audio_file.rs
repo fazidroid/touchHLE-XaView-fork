@@ -366,7 +366,7 @@ pub fn AudioFileGetProperty(
         }
         kAudioFilePropertyInfoDictionary => {
             log!("AudioFileGetProperty: kAudioFilePropertyInfoDictionary requested");
-            env.mem.write(out_property_data.cast::<CFTypeRef>(), 0 as CFTypeRef);
+            env.mem.write(out_property_data.cast::<CFTypeRef>(), nil);
         }
         _ => unreachable!(),
     }
