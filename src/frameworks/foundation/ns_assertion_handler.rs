@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use crate::objc::{id, sel, SEL};
+use crate::objc::{id, ClassExports, SEL};
 
 pub const CLASSES: ClassExports = &[
     (
