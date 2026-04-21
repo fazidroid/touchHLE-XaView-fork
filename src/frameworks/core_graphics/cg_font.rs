@@ -8,7 +8,7 @@
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
-use crate::mem::ConstVoidPtr;
+use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr};
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
@@ -47,7 +47,7 @@ pub fn CGFontRetain(env: &mut Environment, font: CGFontRef) -> CGFontRef {
 
 fn _CGFontCreateWithDataProvider(
     env: &mut Environment,
-    _provider: CFTypeRef, // CGDataProviderRef
+    _provider: CFTypeRef,
 ) -> CGFontRef {
     log!("_CGFontCreateWithDataProvider stub called");
     let class = env
@@ -79,12 +79,12 @@ fn _CGFontGetLeading(_env: &mut Environment, _font: CGFontRef) -> i32 {
 fn _CGFontGetGlyphAdvances(
     _env: &mut Environment,
     _font: CGFontRef,
-    _glyphs: *const u16,
-    _count: usize,
-    _advances: *mut i32,
+    _glyphs: ConstPtr<u16>,
+    _count: GuestUSize,
+    _advances: MutPtr<i32>,
 ) -> i32 {
     log!("_CGFontGetGlyphAdvances stub called");
-    0 // success
+    0
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -95,5 +95,5 @@ pub const FUNCTIONS: FunctionExports = &[
     ("_CGFontGetAscent", &(_CGFontGetAscent as fn(&mut Environment, CGFontRef) -> i32)),
     ("_CGFontGetDescent", &(_CGFontGetDescent as fn(&mut Environment, CGFontRef) -> i32)),
     ("_CGFontGetLeading", &(_CGFontGetLeading as fn(&mut Environment, CGFontRef) -> i32)),
-    ("_CGFontGetGlyphAdvances", &(_CGFontGetGlyphAdvances as fn(&mut Environment, CGFontRef, *const u16, usize, *mut i32) -> i32)),
+    ("_CGFontGetGlyphAdvances", &(_CGFontGetGlyphAdvances as fn(&mut Environment, CGFontRef, ConstPtr<u16>, GuestUSize, MutPtr<i32>) -> i32)),
 ];
