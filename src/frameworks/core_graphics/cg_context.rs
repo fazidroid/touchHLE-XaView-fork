@@ -248,6 +248,10 @@ fn _CGContextSetFont(_env: &mut Environment, _context: CGContextRef, _font: CGFo
     log!("_CGContextSetFont stub called");
 }
 
+fn _CGContextSetFontSize(_env: &mut Environment, _context: CGContextRef, _size: CGFloat) {
+    log!("_CGContextSetFontSize stub called");
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextRetain(_)),
     export_c_func!(CGContextRelease(_)),
@@ -268,4 +272,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextSetInterpolationQuality(_, _)),
     ("_CGContextSetTextMatrix", &(_CGContextSetTextMatrix as fn(&mut Environment, CGContextRef, CGAffineTransform))),
     ("_CGContextSetFont", &(_CGContextSetFont as fn(&mut Environment, CGContextRef, CGFontRef))),
+    ("_CGContextSetFontSize", &(_CGContextSetFontSize as fn(&mut Environment, CGContextRef, CGFloat))),
 ];
