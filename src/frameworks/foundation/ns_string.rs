@@ -1611,13 +1611,15 @@ pub const CLASSES: ClassExports = objc_classes! {
         return;
     }
 
-    let host_object = env.objc.borrow_mut::<StringHostObject>(this);
-    let (this_utf16, _) = host_object.convert_to_utf16_inplace();
-
+    // Collect the string to insert as UTF-16 BEFORE borrowing self mutably
     let insert_utf16: Vec<u16> = {
         let insert_host = env.objc.borrow::<StringHostObject>(aString);
         insert_host.iter_code_units().collect()
     };
+
+    // Now borrow self mutably
+    let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+    let (this_utf16, _) = host_object.convert_to_utf16_inplace();
 
     let idx = index as usize;
     if idx > this_utf16.len() {
