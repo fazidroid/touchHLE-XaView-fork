@@ -522,8 +522,8 @@ pub const CLASSES: ClassExports = objc_classes! {
             let key: id = msg![env; descriptor key];
             let ascending: bool = msg![env; descriptor ascending];
 
-            let val_a: id = msg![env; *a valueForKey:key];
-            let val_b: id = msg![env; *b valueForKey:key];
+            let val_a: id = msg![env; (*a) valueForKey:key];
+            let val_b: id = msg![env; (*b) valueForKey:key];
 
             let ordering: i32 = msg![env; val_a compare:val_b];
             if ordering != 0 {
