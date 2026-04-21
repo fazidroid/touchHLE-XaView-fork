@@ -10,6 +10,7 @@ use crate::font::{Font, TextAlignment, WrapMode};
 use crate::frameworks::core_graphics::cg_bitmap_context::CGBitmapContextDrawer;
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
 use crate::frameworks::foundation::ns_string::to_rust_string;
+use crate::frameworks::foundation::ns_string::{get_static_str, to_rust_string};
 use crate::frameworks::foundation::NSInteger;
 use crate::objc::{autorelease, id, objc_classes, ClassExports, HostObject};
 use crate::Environment;
@@ -102,6 +103,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     let new = env.objc.alloc_object(this, Box::new(host_object), &mut env.mem);
     autorelease(env, new)
+}
+- (id)fontName {
+    let host_object = env.objc.borrow::<UIFontHostObject>(this);
+    let name = match host_object.kind {
+        FontKind::MonoRegular => "Courier",
+        FontKind::MonoBold => "Courier-Bold",
+        FontKind::MonoBoldItalic => "Courier-BoldOblique",
+        FontKind::MonoItalic => "Courier-Oblique",
+        FontKind::SansRegular => "Helvetica",
+        FontKind::SansBold => "Helvetica-Bold",
+        FontKind::SansBoldItalic => "Helvetica-BoldOblique",
+        FontKind::SansItalic => "Helvetica-Oblique",
+        FontKind::SerifRegular => "TimesNewRomanPSMT",
+        FontKind::SerifBold => "TimesNewRomanPS-BoldMT",
+        FontKind::SerifBoldItalic => "TimesNewRomanPS-BoldItalicMT",
+        FontKind::SerifItalic => "TimesNewRomanPS-ItalicMT",
+    };
+    get_static_str(env, name)
 }
 + (id)boldSystemFontOfSize:(CGFloat)size {
     let host_object = UIFontHostObject {
