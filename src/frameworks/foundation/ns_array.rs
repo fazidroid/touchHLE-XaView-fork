@@ -727,6 +727,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 
+- (())removeObjectsInArray:(id)otherArray {
+    if otherArray == nil {
+        return;
+    }
+    let count: NSUInteger = msg![env; otherArray count];
+    for i in 0..count {
+        let obj: id = msg![env; otherArray objectAtIndex:i];
+        // Reuse the existing removeObject: logic
+        () = msg![env; this removeObject:obj];
+    }
+}
+
 - (())removeObjectAtIndex:(NSUInteger)index {
     let object = env.objc.borrow_mut::<ArrayHostObject>(this).array.remove(index as usize);
     release(env, object)
