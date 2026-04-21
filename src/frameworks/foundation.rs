@@ -53,7 +53,6 @@ pub mod ns_xml_parser;
 pub mod ns_condition_lock;
 pub mod ns_sort_descriptor;
 pub mod ns_invocation;
-pub mod ns_assertion_handler;
 
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
@@ -100,7 +99,6 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         ns_xml_parser::CLASSES,
         ns_condition_lock::CLASSES,
         ns_sort_descriptor::CLASSES,
-        ns_assertion_handler::CLASSES,
     ],
     constant_exports: &[
         ns_error::CONSTANTS,
