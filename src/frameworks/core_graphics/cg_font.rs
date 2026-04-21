@@ -104,7 +104,10 @@ fn _CGFontGetGlyphBBoxes(
     _bboxes: MutPtr<CGRect>,
 ) -> CGRect {
     log!("_CGFontGetGlyphBBoxes stub called");
-    CGRect::ZERO
+    CGRect {
+        origin: CGPointZero,
+        size: CGSizeZero,
+    }
 }
 
 pub const FUNCTIONS: FunctionExports = &[
