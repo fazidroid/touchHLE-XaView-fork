@@ -18,6 +18,7 @@ use crate::frameworks::core_audio_types::{
 use crate::frameworks::core_foundation::cf_url::CFURLRef;
 use crate::frameworks::foundation::ns_url::to_rust_path;
 use crate::mem::{guest_size_of, GuestUSize, MutPtr, MutVoidPtr, SafeRead};
+use crate::frameworks::core_foundation::CFTypeRef;
 use crate::Environment;
 use std::collections::HashMap;
 
@@ -66,6 +67,7 @@ pub const kAudioFilePropertyPacketSizeUpperBound: AudioFilePropertyID = fourcc(b
 const kAudioFilePropertyMagicCookieData: AudioFilePropertyID = fourcc(b"mgic");
 const kAudioFilePropertyChannelLayout: AudioFilePropertyID = fourcc(b"cmap");
 const kAudioFilePropertyEstimatedDuration: AudioFilePropertyID = fourcc(b"edur");
+const kAudioFilePropertyInfoDictionary: AudioFilePropertyID = fourcc(b"pnfo");
 
 pub fn AudioFileOpenURL(
     env: &mut Environment,
@@ -230,6 +232,7 @@ fn property_size(property_id: AudioFilePropertyID) -> GuestUSize {
         kAudioFilePropertyAudioDataPacketCount => guest_size_of::<u64>(),
         kAudioFilePropertyPacketSizeUpperBound => guest_size_of::<u32>(),
         kAudioFilePropertyEstimatedDuration => guest_size_of::<f64>(),
+        kAudioFilePropertyInfoDictionary => guest_size_of::<CFTypeRef>(), // <-- NEW
         _ => unimplemented!("Unimplemented property ID: {}", debug_fourcc(property_id)),
     }
 }
@@ -363,7 +366,10 @@ pub fn AudioFileGetProperty(
                 / (bytes_per_packet as f64 * sample_rate);
             env.mem.write(out_property_data.cast(), estimated_duration);
         }
-        _ => unreachable!(),
+        kAudioFilePropertyInfoDictionary => {
+            log!("AudioFileGetProperty: kAudioFilePropertyInfoDictionary requested");
+            // Write a null dictionary pointer (empty info)
+            env.mem.write(out_property_data.cast::<CFTypeRef>(), 0 as CFTypeRef);
     }
 
     0 // success
