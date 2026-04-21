@@ -45,22 +45,55 @@ pub fn CGFontRetain(env: &mut Environment, font: CGFontRef) -> CGFontRef {
     }
 }
 
-// Private function stub - note the leading underscore in the Rust name
 fn _CGFontCreateWithDataProvider(
     env: &mut Environment,
     _provider: CFTypeRef, // CGDataProviderRef
 ) -> CGFontRef {
     log!("_CGFontCreateWithDataProvider stub called");
-    // Create a dummy font object to avoid null crashes
     let class = env
         .objc
         .get_known_class("_touchHLE_CGFont", &mut env.mem);
     env.objc.alloc_object(class, Box::new(CGFontHostObject), &mut env.mem)
 }
 
+fn _CGFontGetUnitsPerEm(_env: &mut Environment, _font: CGFontRef) -> i32 {
+    log!("_CGFontGetUnitsPerEm stub called -> returning 1000");
+    1000
+}
+
+fn _CGFontGetAscent(_env: &mut Environment, _font: CGFontRef) -> i32 {
+    log!("_CGFontGetAscent stub called -> returning 800");
+    800
+}
+
+fn _CGFontGetDescent(_env: &mut Environment, _font: CGFontRef) -> i32 {
+    log!("_CGFontGetDescent stub called -> returning -200");
+    -200
+}
+
+fn _CGFontGetLeading(_env: &mut Environment, _font: CGFontRef) -> i32 {
+    log!("_CGFontGetLeading stub called -> returning 100");
+    100
+}
+
+fn _CGFontGetGlyphAdvances(
+    _env: &mut Environment,
+    _font: CGFontRef,
+    _glyphs: *const u16,
+    _count: usize,
+    _advances: *mut i32,
+) -> i32 {
+    log!("_CGFontGetGlyphAdvances stub called");
+    0 // success
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGFontRelease(_)),
     export_c_func!(CGFontRetain(_)),
-    // Manual export with single underscore prefix
     ("_CGFontCreateWithDataProvider", &(_CGFontCreateWithDataProvider as fn(&mut Environment, CFTypeRef) -> CGFontRef)),
+    ("_CGFontGetUnitsPerEm", &(_CGFontGetUnitsPerEm as fn(&mut Environment, CGFontRef) -> i32)),
+    ("_CGFontGetAscent", &(_CGFontGetAscent as fn(&mut Environment, CGFontRef) -> i32)),
+    ("_CGFontGetDescent", &(_CGFontGetDescent as fn(&mut Environment, CGFontRef) -> i32)),
+    ("_CGFontGetLeading", &(_CGFontGetLeading as fn(&mut Environment, CGFontRef) -> i32)),
+    ("_CGFontGetGlyphAdvances", &(_CGFontGetGlyphAdvances as fn(&mut Environment, CGFontRef, *const u16, usize, *mut i32) -> i32)),
 ];
