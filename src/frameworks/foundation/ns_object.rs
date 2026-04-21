@@ -318,4 +318,20 @@ forUndefinedKey:(id)key { // NSString*
 
 @end
 
+@implementation NSAssertionHandler
+
++ (id)currentHandler {
+    return self;
+}
+
+- (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(NSInteger)line description:(id)description {
+    log_dbg!("NSAssertionHandler handleFailureInMethod:... ignored");
+}
+
+- (())handleFailureInFunction:(id)function file:(id)file lineNumber:(NSInteger)line description:(id)description {
+    log_dbg!("NSAssertionHandler handleFailureInFunction:... ignored");
+}
+
+@end
+
 };
