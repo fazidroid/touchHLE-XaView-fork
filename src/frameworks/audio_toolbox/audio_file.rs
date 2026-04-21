@@ -19,6 +19,7 @@ use crate::frameworks::core_foundation::cf_url::CFURLRef;
 use crate::frameworks::foundation::ns_url::to_rust_path;
 use crate::mem::{guest_size_of, GuestUSize, MutPtr, MutVoidPtr, SafeRead};
 use crate::frameworks::core_foundation::CFTypeRef;
+use crate::objc::nil;
 use crate::Environment;
 use std::collections::HashMap;
 
@@ -365,8 +366,8 @@ pub fn AudioFileGetProperty(
             env.mem.write(out_property_data.cast(), estimated_duration);
         }
         kAudioFilePropertyInfoDictionary => {
-            log!("AudioFileGetProperty: kAudioFilePropertyInfoDictionary requested");
-            env.mem.write(out_property_data.cast::<CFTypeRef>(), nil);
+    log!("AudioFileGetProperty: kAudioFilePropertyInfoDictionary requested");
+    env.mem.write(out_property_data.cast::<CFTypeRef>(), nil);
         }
         _ => unreachable!(),
     }
