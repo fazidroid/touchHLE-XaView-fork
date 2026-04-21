@@ -4,17 +4,17 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-use crate::objc::{id, nil, objc_classes, ClassExports, sel, SEL};
+use crate::objc::{id, sel, SEL};
 
 pub const CLASSES: ClassExports = &[
     (
         "NSAssertionHandler",
         vec![
             // Class methods
-            sel!(currentHandler) => current_handler,
+            sel!(currentHandler => current_handler),
             // Instance methods
-            sel!(handleFailureInMethod:object:file:lineNumber:description:) => handle_failure,
-            sel!(handleFailureInFunction:file:lineNumber:description:) => handle_failure_func,
+            sel!(handleFailureInMethod:object:file:lineNumber:description: => handle_failure),
+            sel!(handleFailureInFunction:file:lineNumber:description: => handle_failure_func),
         ],
         None,
     ),
