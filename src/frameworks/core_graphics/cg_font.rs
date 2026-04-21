@@ -8,7 +8,7 @@
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
-use crate::mem::{ConstVoidPtr, MutVoidPtr};
+use crate::mem::ConstVoidPtr;
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
@@ -45,7 +45,7 @@ pub fn CGFontRetain(env: &mut Environment, font: CGFontRef) -> CGFontRef {
     }
 }
 
-// Private function stub
+// Private function stub - note the leading underscore in the Rust name
 fn _CGFontCreateWithDataProvider(
     env: &mut Environment,
     _provider: CFTypeRef, // CGDataProviderRef
@@ -61,6 +61,6 @@ fn _CGFontCreateWithDataProvider(
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGFontRelease(_)),
     export_c_func!(CGFontRetain(_)),
-    // Manual export for private function
-    ("__CGFontCreateWithDataProvider", &(_CGFontCreateWithDataProvider as fn(&mut Environment, CFTypeRef) -> CGFontRef)),
+    // Manual export with single underscore prefix
+    ("_CGFontCreateWithDataProvider", &(_CGFontCreateWithDataProvider as fn(&mut Environment, CFTypeRef) -> CGFontRef)),
 ];
