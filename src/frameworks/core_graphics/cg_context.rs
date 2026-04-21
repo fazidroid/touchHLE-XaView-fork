@@ -10,6 +10,7 @@ use super::cg_font::CGFontRef; // <-- NEW IMPORT
 use super::cg_image::CGImageRef;
 use super::{cg_bitmap_context, cg_color, CGFloat, CGRect};
 use crate::dyld::{export_c_func, FunctionExports};
+use crate::mem::{ConstPtr, GuestUSize};
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
 use crate::frameworks::core_graphics::cg_bitmap_context::{
     CGBitmapContextGetHeight, CGBitmapContextGetWidth,
@@ -252,6 +253,17 @@ fn _CGContextSetFontSize(_env: &mut Environment, _context: CGContextRef, _size: 
     log!("_CGContextSetFontSize stub called");
 }
 
+fn _CGContextShowGlyphsAtPoint(
+    _env: &mut Environment,
+    _context: CGContextRef,
+    _x: CGFloat,
+    _y: CGFloat,
+    _glyphs: ConstPtr<u16>,
+    _count: GuestUSize,
+) {
+    log!("_CGContextShowGlyphsAtPoint stub called");
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextRetain(_)),
     export_c_func!(CGContextRelease(_)),
@@ -273,4 +285,5 @@ pub const FUNCTIONS: FunctionExports = &[
     ("_CGContextSetTextMatrix", &(_CGContextSetTextMatrix as fn(&mut Environment, CGContextRef, CGAffineTransform))),
     ("_CGContextSetFont", &(_CGContextSetFont as fn(&mut Environment, CGContextRef, CGFontRef))),
     ("_CGContextSetFontSize", &(_CGContextSetFontSize as fn(&mut Environment, CGContextRef, CGFloat))),
+    ("_CGContextShowGlyphsAtPoint", &(_CGContextShowGlyphsAtPoint as fn(&mut Environment, CGContextRef, CGFloat, CGFloat, ConstPtr<u16>, GuestUSize))),
 ];
