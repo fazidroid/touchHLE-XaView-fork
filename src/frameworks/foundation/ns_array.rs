@@ -516,7 +516,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let mut vec = std::mem::take(&mut host_object.array);
 
     vec.sort_by(|a, b| {
-        let count: usize = msg![env; sortDescriptors count];
+        let count: NSUInteger = msg![env; sortDescriptors count];
         for i in 0..count {
             let descriptor: id = msg![env; sortDescriptors objectAtIndex:i];
             let key: id = msg![env; descriptor key];
