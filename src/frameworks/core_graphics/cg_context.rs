@@ -6,6 +6,7 @@
 //! `CGContext.h`
 
 use super::cg_affine_transform::CGAffineTransform;
+use super::cg_font::CGFontRef; // <-- NEW IMPORT
 use super::cg_image::CGImageRef;
 use super::{cg_bitmap_context, cg_color, CGFloat, CGRect};
 use crate::dyld::{export_c_func, FunctionExports};
@@ -154,7 +155,6 @@ pub fn CGContextConcatCTM(
     host_obj.transform = transform.concat(host_obj.transform);
 }
 pub fn CGContextGetCTM(env: &mut Environment, context: CGContextRef) -> CGAffineTransform {
-    // Возвращаем единичную матрицу
     if context.is_null() {
         return CGAffineTransform::make_scale(1.0, 1.0);
     }
@@ -239,9 +239,13 @@ fn CGContextSetInterpolationQuality(
     );
 }
 
+// NEW STUBS
 fn _CGContextSetTextMatrix(_env: &mut Environment, _context: CGContextRef, _matrix: CGAffineTransform) {
     log!("_CGContextSetTextMatrix stub called");
-    // No-op for now
+}
+
+fn _CGContextSetFont(_env: &mut Environment, _context: CGContextRef, _font: CGFontRef) {
+    log!("_CGContextSetFont stub called");
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -262,5 +266,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextSaveGState(_)),
     export_c_func!(CGContextRestoreGState(_)),
     export_c_func!(CGContextSetInterpolationQuality(_, _)),
-     ("_CGContextSetTextMatrix", &(_CGContextSetTextMatrix as fn(&mut Environment, CGContextRef, CGAffineTransform))),
+    ("_CGContextSetTextMatrix", &(_CGContextSetTextMatrix as fn(&mut Environment, CGContextRef, CGAffineTransform))),
+    ("_CGContextSetFont", &(_CGContextSetFont as fn(&mut Environment, CGContextRef, CGFontRef))),
 ];
