@@ -69,6 +69,7 @@ const kAudioFilePropertyMagicCookieData: AudioFilePropertyID = fourcc(b"mgic");
 const kAudioFilePropertyChannelLayout: AudioFilePropertyID = fourcc(b"cmap");
 const kAudioFilePropertyEstimatedDuration: AudioFilePropertyID = fourcc(b"edur");
 const kAudioFilePropertyInfoDictionary: AudioFilePropertyID = fourcc(b"pnfo");
+const kAudioFilePropertyFirstPacketOffset: AudioFilePropertyID = fourcc(b"frpk");
 
 pub fn AudioFileOpenURL(
     env: &mut Environment,
@@ -233,7 +234,8 @@ fn property_size(property_id: AudioFilePropertyID) -> GuestUSize {
         kAudioFilePropertyAudioDataPacketCount => guest_size_of::<u64>(),
         kAudioFilePropertyPacketSizeUpperBound => guest_size_of::<u32>(),
         kAudioFilePropertyEstimatedDuration => guest_size_of::<f64>(),
-        kAudioFilePropertyInfoDictionary => guest_size_of::<CFTypeRef>(), // <-- NEW
+        kAudioFilePropertyInfoDictionary => guest_size_of::<CFTypeRef>(),
+        kAudioFilePropertyFirstPacketOffset => guest_size_of::<i64>(), // <-- NEW
         _ => unimplemented!("Unimplemented property ID: {}", debug_fourcc(property_id)),
     }
 }
@@ -368,6 +370,11 @@ pub fn AudioFileGetProperty(
         kAudioFilePropertyInfoDictionary => {
     log!("AudioFileGetProperty: kAudioFilePropertyInfoDictionary requested");
     env.mem.write(out_property_data.cast::<CFTypeRef>(), nil);
+        }
+        kAudioFilePropertyFirstPacketOffset => {
+    log!("AudioFileGetProperty: kAudioFilePropertyFirstPacketOffset requested");
+    let offset: i64 = 0;
+    env.mem.write(out_property_data.cast(), offset);
         }
         _ => unreachable!(),
     }
