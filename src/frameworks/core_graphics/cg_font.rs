@@ -9,7 +9,7 @@ use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
 use crate::frameworks::foundation::ns_string;
-use crate::frameworks::core_graphics::cg_geometry::CGRect;
+use crate::frameworks::core_graphics::cg_geometry::{CGRect, CGPointZero, CGSizeZero};
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr};
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
