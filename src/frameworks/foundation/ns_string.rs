@@ -1606,6 +1606,28 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
+- (())insertString:(id)aString atIndex:(NSUInteger)index {
+    if aString == nil {
+        return;
+    }
+
+    let host_object = env.objc.borrow_mut::<StringHostObject>(this);
+    let (this_utf16, _) = host_object.convert_to_utf16_inplace();
+
+    let insert_utf16: Vec<u16> = {
+        let insert_host = env.objc.borrow::<StringHostObject>(aString);
+        insert_host.iter_code_units().collect()
+    };
+
+    let idx = index as usize;
+    if idx > this_utf16.len() {
+        log!("Warning: insertString:atIndex: index {} out of bounds (length {})", idx, this_utf16.len());
+        return;
+    }
+
+    this_utf16.splice(idx..idx, insert_utf16.into_iter());
+}
+
 - (id)initWithCapacity:(NSUInteger)_capacity {
     // TODO: capacity
     msg![env; this init]
