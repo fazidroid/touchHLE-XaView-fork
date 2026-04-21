@@ -216,8 +216,7 @@ fn CGDataProviderCreateSequential(
         MutVoidPtr::null(),
         ConstVoidPtr::null(),
         0,
-        // FIX: use GuestFunction::from_ptr with ConstVoidPtr::null()
-        GuestFunction::from_ptr(ConstVoidPtr::null()),
+        GuestFunction::null_ptr(),
     )
 }
 
