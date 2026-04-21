@@ -7,13 +7,14 @@
 
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
-use crate::frameworks::core_foundation::cf_string::{CFStringCreateWithCString, CFStringRef};
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
+use crate::frameworks::foundation::ns_string;
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr};
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
 pub type CGFontRef = CFTypeRef;
+pub type CFStringRef = CFTypeRef; // Added for clarity
 
 struct CGFontHostObject;
 impl HostObject for CGFontHostObject {}
@@ -88,13 +89,10 @@ fn _CGFontGetGlyphAdvances(
     0
 }
 
-// NEW: Stub for _CGFontCopyFullName
 fn _CGFontCopyFullName(env: &mut Environment, _font: CGFontRef) -> CFStringRef {
     log!("_CGFontCopyFullName stub called -> returning 'Helvetica'");
-    let c_str = b"Helvetica\0";
-    let ptr = env.mem.alloc_and_write_cstr(c_str);
-    // kCFStringEncodingUTF8 = 0x08000100
-    CFStringCreateWithCString(env, std::ptr::null_mut(), ptr, 0x08000100)
+    // Use NSString (toll-free bridged to CFString)
+    ns_string::from_rust_string(env, "Helvetica".to_string())
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -106,6 +104,5 @@ pub const FUNCTIONS: FunctionExports = &[
     ("_CGFontGetDescent", &(_CGFontGetDescent as fn(&mut Environment, CGFontRef) -> i32)),
     ("_CGFontGetLeading", &(_CGFontGetLeading as fn(&mut Environment, CGFontRef) -> i32)),
     ("_CGFontGetGlyphAdvances", &(_CGFontGetGlyphAdvances as fn(&mut Environment, CGFontRef, ConstPtr<u16>, GuestUSize, MutPtr<i32>) -> i32)),
-    // NEW: Export _CGFontCopyFullName
     ("_CGFontCopyFullName", &(_CGFontCopyFullName as fn(&mut Environment, CGFontRef) -> CFStringRef)),
 ];
