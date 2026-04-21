@@ -156,6 +156,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)query {
+    match *env.objc.borrow(this) {
+        NSURLHostObject::OtherURL { ns_string } => {
+            let s = to_rust_string(env, ns_string);
+            if let Some(query_start) = s.find('?') {
+                let query_part = &s[query_start + 1..];
+                let query_end = query_part.find('#').unwrap_or(query_part.len());
+                let query = &query_part[..query_end];
+                if !query.is_empty() {
+                    return from_rust_string(env, query.to_string());
+                }
+            }
+            nil
+        }
+        NSURLHostObject::FileURL { .. } => nil,
+    }
+}
+
 - (bool)getFileSystemRepresentation:(MutPtr<u8>)buffer
                           maxLength:(NSUInteger)buffer_size {
     let &NSURLHostObject::FileURL { ns_string, .. } = env.objc.borrow(this) else {
