@@ -9,6 +9,7 @@ use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
 use crate::frameworks::foundation::ns_string;
+use crate::frameworks::core_graphics::cg_geometry::CGRect;
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr};
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
@@ -95,6 +96,17 @@ fn _CGFontCopyFullName(env: &mut Environment, _font: CGFontRef) -> CFStringRef {
     ns_string::from_rust_string(env, "Helvetica".to_string())
 }
 
+fn _CGFontGetGlyphBBoxes(
+    _env: &mut Environment,
+    _font: CGFontRef,
+    _glyphs: ConstPtr<u16>,
+    _count: GuestUSize,
+    _bboxes: MutPtr<CGRect>,
+) -> CGRect {
+    log!("_CGFontGetGlyphBBoxes stub called");
+    CGRect::ZERO
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGFontRelease(_)),
     export_c_func!(CGFontRetain(_)),
@@ -105,4 +117,5 @@ pub const FUNCTIONS: FunctionExports = &[
     ("_CGFontGetLeading", &(_CGFontGetLeading as fn(&mut Environment, CGFontRef) -> i32)),
     ("_CGFontGetGlyphAdvances", &(_CGFontGetGlyphAdvances as fn(&mut Environment, CGFontRef, ConstPtr<u16>, GuestUSize, MutPtr<i32>) -> i32)),
     ("_CGFontCopyFullName", &(_CGFontCopyFullName as fn(&mut Environment, CGFontRef) -> CFStringRef)),
+    ("_CGFontGetGlyphBBoxes", &(_CGFontGetGlyphBBoxes as fn(&mut Environment, CGFontRef, ConstPtr<u16>, GuestUSize, MutPtr<CGRect>) -> CGRect)),
 ];
