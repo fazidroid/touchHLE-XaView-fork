@@ -239,6 +239,11 @@ fn CGContextSetInterpolationQuality(
     );
 }
 
+fn _CGContextSetTextMatrix(_env: &mut Environment, _context: CGContextRef, _matrix: CGAffineTransform) {
+    log!("_CGContextSetTextMatrix stub called");
+    // No-op for now
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextRetain(_)),
     export_c_func!(CGContextRelease(_)),
@@ -257,4 +262,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextSaveGState(_)),
     export_c_func!(CGContextRestoreGState(_)),
     export_c_func!(CGContextSetInterpolationQuality(_, _)),
+     ("_CGContextSetTextMatrix", &(_CGContextSetTextMatrix as fn(&mut Environment, CGContextRef, CGAffineTransform))),
 ];
