@@ -62,7 +62,8 @@ pub const CLASSES: ClassExports = objc_classes! {
             size,
             release_callback,
         } => {
-            if !release_callback.0.is_null() {
+            // FIX: use to_ptr() to check null
+            if !release_callback.to_ptr().is_null() {
                 let args: (MutVoidPtr, ConstVoidPtr, GuestUSize) = (info, data, size);
                 log_dbg!(
                     "Freeing {:?}, calling release callback {:?} with {:?}",
@@ -215,7 +216,8 @@ fn CGDataProviderCreateSequential(
         MutVoidPtr::null(),
         ConstVoidPtr::null(),
         0,
-        GuestFunction(ConstVoidPtr::null()),
+        // FIX: use GuestFunction::from_ptr with ConstVoidPtr::null()
+        GuestFunction::from_ptr(ConstVoidPtr::null()),
     )
 }
 
