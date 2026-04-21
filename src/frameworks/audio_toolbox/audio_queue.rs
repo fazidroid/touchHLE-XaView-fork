@@ -1093,6 +1093,16 @@ pub fn AudioQueueDispose(
     0 // success
 }
 
+fn _AudioQueueSetOfflineRenderFormat(
+    _env: &mut Environment,
+    _in_aq: AudioQueueRef,
+    _in_format: ConstPtr<AudioStreamBasicDescription>,
+    _in_layout: ConstVoidPtr,
+) -> OSStatus {
+    log!("_AudioQueueSetOfflineRenderFormat stub called");
+    0 // noErr
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(AudioQueueNewOutput(_, _, _, _, _, _, _)),
     export_c_func!(AudioQueueGetParameter(_, _, _)),
@@ -1112,4 +1122,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(AudioQueueFlush(_)),
     export_c_func!(AudioQueueFreeBuffer(_, _)),
     export_c_func!(AudioQueueDispose(_, _)),
+    ("_AudioQueueSetOfflineRenderFormat", &(_AudioQueueSetOfflineRenderFormat as fn(&mut Environment, AudioQueueRef, ConstPtr<AudioStreamBasicDescription>, ConstVoidPtr) -> OSStatus)),
 ];
