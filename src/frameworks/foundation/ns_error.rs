@@ -6,7 +6,7 @@
 
 use crate::dyld::{ConstantExports, HostConstant};
 use crate::frameworks::foundation::NSInteger;
-use crate::objc::{id, nil, release, retain, ClassExports, HostObject, NSZonePtr};
+use crate::objc::{autorelease, id, msg, nil, release, retain, ClassExports, HostObject, NSZonePtr};
 use crate::objc_classes;
 
 /// `NSString*`
