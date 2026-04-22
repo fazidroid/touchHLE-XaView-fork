@@ -109,6 +109,7 @@ fn fopen(env: &mut Environment, filename: ConstPtr<u8>, mode: ConstPtr<u8>) -> M
                 res,
                 FILEHostObject {
                     pushbacks: Vec::new(),
+                    error_flag: false,
                 },
             );
             res
@@ -135,7 +136,7 @@ fn fread(
     }
 
     let mut total_size = item_size.checked_mul(n_items).unwrap();
-    let FILEHostObject { ref mut pushbacks } = env
+    let FILEHostObject { ref mut pushbacks, .. } = env
         .libc_state
         .stdio
         .get_file_host_obj_mut(&mut env.mem, file_ptr);
@@ -174,7 +175,7 @@ fn fgetc(env: &mut Environment, file_ptr: MutPtr<FILE>) -> i32 {
     set_errno(env, 0);
 
     let FILE { fd } = env.mem.read(file_ptr);
-    let FILEHostObject { ref mut pushbacks } = env
+    let FILEHostObject { ref mut pushbacks, .. } = env
         .libc_state
         .stdio
         .get_file_host_obj_mut(&mut env.mem, file_ptr);
@@ -227,7 +228,7 @@ fn ungetc(env: &mut Environment, c: i32, file_ptr: MutPtr<FILE>) -> i32 {
     assert!(curr_offset > 0);
     let new_offset = posix_io::lseek(env, fd, -1, SEEK_CUR);
     assert!(new_offset >= 0); 
-    let FILEHostObject { ref mut pushbacks } = env
+    let FILEHostObject { ref mut pushbacks, .. } = env
         .libc_state
         .stdio
         .get_file_host_obj_mut(&mut env.mem, file_ptr);
@@ -339,7 +340,7 @@ fn fseek(env: &mut Environment, file_ptr: MutPtr<FILE>, offset: i32, whence: i32
     match posix_io::lseek(env, fd, offset.into(), whence) {
         -1 => -1,
         _cur_pos => {
-            let FILEHostObject { ref mut pushbacks } = env
+            let FILEHostObject { ref mut pushbacks, .. } = env
                 .libc_state
                 .stdio
                 .get_file_host_obj_mut(&mut env.mem, file_ptr);
@@ -422,7 +423,7 @@ fn fsetpos(env: &mut Environment, file_ptr: MutPtr<FILE>, pos: ConstPtr<fpos_t>)
     if res == -1 {
         -1
     } else {
-        let FILEHostObject { ref mut pushbacks } = env
+        let FILEHostObject { ref mut pushbacks, .. } = env
             .libc_state
             .stdio
             .get_file_host_obj_mut(&mut env.mem, file_ptr);
@@ -512,15 +513,10 @@ fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
 }
 
 fn rename(env: &mut Environment, old: ConstPtr<u8>, new: ConstPtr<u8>) -> i32 {
-    let old_str = env.mem.cstr_at_utf8(old).unwrap_or_default();
-    let new_str = env.mem.cstr_at_utf8(new).unwrap_or_default();
-    
-    // ==========================================================
-    // 🏎️ GAMELOFT BYPASS: Unimplemented VFS Rename
-    // ==========================================================
-    println!("🎮 LOG: Safely bypassed rename from [{}] to [{}] to prevent fs.rs panic!", old_str, new_str);
-    
-    0 // Return 0 (success) so the game thinks the rename worked!
+    // DelegateToReal: stdio rename() must call the real posix rename implementation.
+    // Previously a no-op that silently discarded all saves written via the
+    // fopen/fwrite/fclose/rename pattern (C stdio atomic-write used by NFS/EA).
+    posix_io::rename(env, old, new)
 }
 
 fn setbuf(env: &mut Environment, stream: MutPtr<FILE>, buf: ConstPtr<u8>) {
