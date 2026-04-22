@@ -36,6 +36,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow_mut::<NSDateFormatterHostObject>(this).date_format = Some(date_format);
 }
 
+- (())setTimeZone:(id)tz {
+    // Stub - ignore timezone for now
+    log_dbg!("NSDateFormatter setTimeZone: ignored");
+}
+
+- (id)timeZone {
+    // Return nil or a dummy NSTimeZone
+    return nil;
+}
+
 - (id)stringFromDate:(id)date {
     let &NSDateFormatterHostObject {
         date_format
