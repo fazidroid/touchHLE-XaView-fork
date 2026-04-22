@@ -1375,6 +1375,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 // TODO: more init methods
+- (id)initWithBytesNoCopy:(ConstPtr<u8>)bytes
+                   length:(NSUInteger)len
+                 encoding:(NSStringEncoding)encoding
+            freeWhenDone:(bool)free {
+    let slice = env.mem.bytes_at(bytes, len);
+    let host_object = StringHostObject::decode(Cow::Borrowed(slice), encoding);
+    *env.objc.borrow_mut(this) = host_object;
+    // Note: freeWhenDone is ignored because we copied the data.
+    // The original buffer remains owned by the caller.
+    this
+}
 
 // NSCoding implementation
 - (id)initWithCoder:(id)coder {
