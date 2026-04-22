@@ -1630,6 +1630,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
+- (id)initWithCoder:(id)coder {
+    let class: Class = msg![env; coder class];
+    let nib_archive_class: Class = msg_class![env; _touchHLE_NIBArchiveDecoder class];
+    let new_str = if env.objc.class_is_subclass_of(class, nib_archive_class) {
+        _nib_archive_decoder::decode_current_string(env, coder)
+    } else {
+        // Fallback: call super's initWithCoder? Not implemented. Create empty string.
+        msg![env; this init]
+    };
+    release(env, this);
+    new_str
+}
+
 - (())insertString:(id)aString atIndex:(NSUInteger)index {
     if aString == nil {
         return;
