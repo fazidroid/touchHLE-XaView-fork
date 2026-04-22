@@ -442,7 +442,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     if len > 0 && range.location < len && range.length > 0 {
         return NSRange { location: range.location, length: 1 };
     }
-    return NSRange { location: NSNotFound, length: 0 };
+    return NSRange { location: (NSNotFound as NSUInteger), length: 0 };
 }
 
 - (id)initWithUTF8String:(ConstPtr<u8>)utf8_string {
