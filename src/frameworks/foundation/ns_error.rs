@@ -40,6 +40,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
++ (id)errorWithDomain:(NSErrorDomain)domain
+                 code:(NSInteger)code
+             userInfo:(id)userInfo {
+    id error = msg![env; this alloc];
+    error = msg![env; error initWithDomain:domain code:code userInfo:userInfo];
+    autorelease(env, error)
+}
+
 - (id)initWithDomain:(NSErrorDomain)domain
                 code:(NSInteger)code
             userInfo:(id)user_info {
