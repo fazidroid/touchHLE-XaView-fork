@@ -132,6 +132,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this mutableCopyWithZone:(MutVoidPtr::null())]
 }
 
+- (())willChangeValueForKey:(id)key {
+    // stub – ignore KVO change notifications
+    log_dbg!("NSObject willChangeValueForKey: ignored");
+}
+
+- (())didChangeValueForKey:(id)key {
+    log_dbg!("NSObject didChangeValueForKey: ignored");
+}
+
 - (())setValue:(id)value
        forKey:(id)key { // NSString*
     let key_string = to_rust_string(env, key);
