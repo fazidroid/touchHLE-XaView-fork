@@ -318,17 +318,20 @@ forUndefinedKey:(id)key { // NSString*
 
 @end
 
-@implementation NSAssertionHandler
+@implementation NSAssertionHandler: NSObject
 
 + (id)currentHandler {
-    return self;
+    // Create and return a new instance (singleton behavior not strictly needed)
+    id instance = msg_class![env; NSAssertionHandler alloc];
+    instance = msg_super![env; instance init];
+    instance
 }
 
-- (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(NSInteger)line description:(id)description {
+- (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(i32)line description:(id)description {
     log_dbg!("NSAssertionHandler handleFailureInMethod:... ignored");
 }
 
-- (())handleFailureInFunction:(id)function file:(id)file lineNumber:(NSInteger)line description:(id)description {
+- (())handleFailureInFunction:(id)function file:(id)file lineNumber:(i32)line description:(id)description {
     log_dbg!("NSAssertionHandler handleFailureInFunction:... ignored");
 }
 
