@@ -100,7 +100,7 @@ impl Default for Options {
             ignore_gl_errors: false,
             gles_version: 2, // DefaultEsVer
             use_angle: false,
-            use_turnip: true,
+            use_turnip: false,
         }
     }
 }
