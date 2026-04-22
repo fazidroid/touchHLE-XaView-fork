@@ -512,7 +512,7 @@ fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
     }
 }
 
-fn rename(env: &mut Environment, old: ConstPtr<u8>, new: ConstPtr<u8>) -> i32 {
+pub fn rename(env: &mut Environment, old: ConstPtr<u8>, new: ConstPtr<u8>) -> i32 {
     // DelegateToReal: stdio rename() must call the real posix rename implementation.
     // Previously a no-op that silently discarded all saves written via the
     // fopen/fwrite/fclose/rename pattern (C stdio atomic-write used by NFS/EA).
