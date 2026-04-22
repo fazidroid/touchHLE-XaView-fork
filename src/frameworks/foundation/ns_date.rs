@@ -6,6 +6,7 @@
 //! `NSDate`.
 
 use super::ns_string::{from_rust_ordering, from_rust_string, get_static_str};
+use crate::Environment;
 use super::{NSComparisonResult, NSTimeInterval};
 use crate::frameworks::core_foundation::time::{
     apple_epoch, CFAbsoluteTimeGetGregorianDate, SECS_FROM_UNIX_TO_APPLE_EPOCHS,
