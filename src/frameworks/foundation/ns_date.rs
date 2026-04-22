@@ -28,7 +28,7 @@ impl HostObject for NSDateHostObject {}
 // Helper to check if an object is really an NSDate
 fn is_nsdate(env: &mut Environment, obj: id) -> bool {
     if obj == nil { return false; }
-    let nsdate_class = msg_class![env; NSDate class];
+    let nsdate_class: id = msg_class![env; NSDate class];
     msg![env; obj isKindOfClass:nsdate_class]
 }
 
@@ -196,10 +196,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     if !is_nsdate(env, this) { return get_static_str(env, ""); }
     let time_interval = env.objc.borrow::<NSDateHostObject>(this).time_interval;
     let greg_date = CFAbsoluteTimeGetGregorianDate(env, time_interval, nil);
+    // Copy fields to local variables to avoid unaligned reference
+    let year = greg_date.year;
+    let month = greg_date.month;
+    let day = greg_date.day;
+    let hours = greg_date.hours;
+    let minutes = greg_date.minutes;
+    let seconds = greg_date.seconds;
     let desc = format!(
         "{:04}-{:02}-{:02} {:02}:{:02}:{:02} +0000",
-        greg_date.year, greg_date.month, greg_date.day,
-        greg_date.hours, greg_date.minutes, greg_date.seconds as i32
+        year, month, day, hours, minutes, seconds as i32
     );
     let desc_string = from_rust_string(env, desc);
     autorelease(env, desc_string)
