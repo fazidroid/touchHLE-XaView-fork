@@ -21,6 +21,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSTimeZone: NSObject
 
++ (id)systemTimeZone {
+    // Return a default time zone (e.g., UTC)
+    let tz_name = ns_string::get_static_str(env, "UTC");
+    let tz = msg![env; this timeZoneWithName:tz_name];
+    autorelease(env, tz)
+}
+
 + (id)knownTimeZoneNames {
     // Return a minimal array with one common time zone
     let tz_name = ns_string::get_static_str(env, "UTC");
