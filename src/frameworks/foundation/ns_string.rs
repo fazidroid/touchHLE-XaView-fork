@@ -428,7 +428,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set {
-    let len = msg![env; this length];
+    let len: NSUInteger = msg![env; this length];
     if len > 0 {
         return NSRange { location: 0, length: 1 };
     }
@@ -436,7 +436,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask {
-    let len = msg![env; this length];
+    let len: NSUInteger = msg![env; this length];
     if len > 0 {
         return NSRange { location: 0, length: 1 };
     }
@@ -444,7 +444,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask range:(NSRange)range {
-    let len = msg![env; this length];
+    let len: NSUInteger = msg![env; this length];
     if len > 0 && range.location < len && range.length > 0 {
         return NSRange { location: range.location, length: 1 };
     }
