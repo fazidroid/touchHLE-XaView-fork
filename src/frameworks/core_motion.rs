@@ -39,6 +39,7 @@ const CLASSES: ClassExports = objc_classes! {
 
 - (())setAccelerometerUpdateInterval:(f64)_interval {}
 - (())startAccelerometerUpdates {}
+- (())stopAccelerometerUpdates {}
 - (())setGyroUpdateInterval:(f64)_interval {}
 - (())startGyroUpdates {}
 - (())setDeviceMotionUpdateInterval:(f64)_interval {}
