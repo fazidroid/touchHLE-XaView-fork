@@ -321,10 +321,7 @@ forUndefinedKey:(id)key { // NSString*
 @implementation NSAssertionHandler: NSObject
 
 + (id)currentHandler {
-    // Create and return a new instance (singleton behavior not strictly needed)
-    id instance = msg_class![env; NSAssertionHandler alloc];
-    instance = msg_super![env; instance init];
-    instance
+    self   // return the class object itself
 }
 
 - (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(i32)line description:(id)description {
