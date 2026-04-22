@@ -428,17 +428,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set {
-    let fullRange = NSRange { location: 0, length: [self length] };
-    return [self rangeOfCharacterFromSet:set options:0 range:fullRange];
+    let fullRange = NSRange { location: 0, length: msg![env; this length] };
+    return msg![env; this rangeOfCharacterFromSet:set options:0 range:fullRange];
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask {
-    let fullRange = NSRange { location: 0, length: [self length] };
-    return [self rangeOfCharacterFromSet:set options:mask range:fullRange];
+    let fullRange = NSRange { location: 0, length: msg![env; this length] };
+    return msg![env; this rangeOfCharacterFromSet:set options:mask range:fullRange];
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask range:(NSRange)range {
-    let len = [self length];
+    let len = msg![env; this length];
     if len > 0 && range.location < len && range.length > 0 {
         return NSRange { location: range.location, length: 1 };
     }

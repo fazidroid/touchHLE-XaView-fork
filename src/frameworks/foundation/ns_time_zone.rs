@@ -5,10 +5,9 @@
  */
 //! `NSTimeZone`.
 
-use crate::msg_class;
 use crate::frameworks::foundation::{ns_string, NSInteger};
 use crate::objc::{autorelease, id, nil, release, retain, ClassExports, HostObject, NSZonePtr};
-use crate::{msg, objc_classes};
+use crate::{msg, msg_class, objc_classes};
 
 struct NSTimeZoneHostObject {
     // NSString*
