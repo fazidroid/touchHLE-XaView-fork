@@ -321,7 +321,7 @@ forUndefinedKey:(id)key { // NSString*
 @implementation NSAssertionHandler: NSObject
 
 + (id)currentHandler {
-    self   // return the class object itself
+    this   // return the class object
 }
 
 - (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(i32)line description:(id)description {
