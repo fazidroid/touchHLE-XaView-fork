@@ -9,6 +9,7 @@ use crate::frameworks;
 use crate::libc;
 use crate::objc;
 use crate::frameworks::mobile_core_services;
+use crate::frameworks::oauth_consumer;
 
 /// The single list of host dylibs that the linker (and Objective-C runtime)
 /// searches through.
@@ -33,10 +34,9 @@ pub const DYLIB_LIST: &[&super::HostDylib] = &[
     
     // ⚠️ CRITICAL: The User Interface framework!
     &frameworks::uikit::DYLIB,
-    
-    // 🏎️ ASPHALT 8 HACK: Turn on the Android Gyroscope!
     &frameworks::core_motion::DYLIB,
     &mobile_core_services::DYLIB,
+    &oauth_consumer::DYLIB,
 ];
 
 #[cfg(test)]
