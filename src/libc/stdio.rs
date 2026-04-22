@@ -513,11 +513,19 @@ fn remove(env: &mut Environment, path: ConstPtr<u8>) -> i32 {
 }
 
 pub fn rename(env: &mut Environment, old: ConstPtr<u8>, new: ConstPtr<u8>) -> i32 {
-    // DelegateToReal: stdio rename() must call the real posix rename implementation.
-    // Previously a no-op that silently discarded all saves written via the
-    // fopen/fwrite/fclose/rename pattern (C stdio atomic-write used by NFS/EA).
-    posix_io::rename(env, old, new)
+    // TODO: handle errno properly
+    set_errno(env, 0);
+
+    let old = env.mem.cstr_at_utf8(old).unwrap();
+    let new = env.mem.cstr_at_utf8(new).unwrap();
+    let res = match env.fs.rename(GuestPath::new(&old), GuestPath::new(&new)) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    };
+    log_dbg!("rename('{}', '{}') => {}", old, new, res);
+    res
 }
+
 
 fn setbuf(env: &mut Environment, stream: MutPtr<FILE>, buf: ConstPtr<u8>) {
     set_errno(env, 0);
