@@ -29,6 +29,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
+macro_rules! check_nsdate {
+    ($env:expr, $obj:expr) => {
+        if $obj == nil || !msg![$env; $obj isKindOfClass:msg_class![$env; NSDate class]] {
+            log!("Warning: NSDate method called on non-NSDate object ({:?}), returning default", $obj);
+            return Default::default();
+        }
+    };
+}
+
 @implementation NSDate: NSObject
 
 + (id)allocWithZone:(NSZonePtr)_zone {
@@ -162,6 +171,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSTimeInterval)timeIntervalSinceReferenceDate {
+    check_nsdate!(env, this);
     env.objc.borrow::<NSDateHostObject>(this).time_interval
 }
 

@@ -284,84 +284,86 @@ fn get_value_to_decode_for_key(env: &mut Environment, unarchiver: id, key: id) -
 /// The object returned is retained only by the archiver. Remember to retain and
 /// possibly autorelease it as appropriate.
 fn unarchive_key(env: &mut Environment, unarchiver: id, key: Uid) -> id {
-    let host_obj = borrow_host_obj(env, unarchiver);
-    if let Some(existing) = host_obj.already_unarchived[key.get() as usize] {
-        return existing;
-    }
+    // First, check if already unarchived (borrow is short-lived)
+    {
+        let host_obj = borrow_host_obj(env, unarchiver);
+        if let Some(existing) = host_obj.already_unarchived[key.get() as usize] {
+            return existing;
+        }
+    } // borrow ends here
 
-    let objects = host_obj.plist["$objects"].as_array().unwrap();
+    // Now we need to get the item and objects without holding a long-lived borrow.
+    // We'll clone the necessary data (the objects array and the item).
+    let (objects, item) = {
+        let host_obj = borrow_host_obj(env, unarchiver);
+        let objects = host_obj.plist["$objects"].as_array().unwrap().clone();
+        let item = objects[key.get() as usize].clone();
+        (objects, item)
+    }; // borrow ends here
 
-    let item = &objects[key.get() as usize];
-    let new_object = match item {
-        // The most general kind of item: a dictionary that contains the info
-        // needed to invoke `initWithCoder:` on a class implementing NSCoding.
+    let new_object = match &item {
         Value::Dictionary(dict) => {
             let class_key = dict["$class"].as_uid().copied().unwrap();
-            let class;
-            if let Some(existing) = host_obj.already_unarchived[class_key.get() as usize] {
-                class = existing;
-            } else {
-                let class_dict = &objects[class_key.get() as usize];
-                let class_dict = class_dict.as_dictionary().unwrap();
-
-                let class_name = class_dict["$classname"].as_string().unwrap();
-
-                class = {
-                    // get_known_class needs &mut ObjC, so we can't call it
-                    // while holding a reference to the class name, since it
-                    // is ultimately owned by ObjC via the host object
-                    let class_name = class_name.to_string();
-                    env.objc.get_known_class(&class_name, &mut env.mem)
-                };
-                let host_obj = borrow_host_obj(env, unarchiver); // reborrow
-
-                host_obj.already_unarchived[class_key.get() as usize] = Some(class);
+            // Resolve class (may need to recursively unarchive)
+            let class = {
+                let host_obj = borrow_host_obj(env, unarchiver);
+                if let Some(existing) = host_obj.already_unarchived[class_key.get() as usize] {
+                    existing
+                } else {
+                    let class_dict = &objects[class_key.get() as usize];
+                    let class_dict = class_dict.as_dictionary().unwrap();
+                    let class_name = class_dict["$classname"].as_string().unwrap().to_string();
+                    let class = env.objc.get_known_class(&class_name, &mut env.mem);
+                    let host_obj = borrow_host_obj(env, unarchiver);
+                    host_obj.already_unarchived[class_key.get() as usize] = Some(class);
+                    class
+                }
             };
-
-            let host_obj = borrow_host_obj(env, unarchiver); // reborrow
-            let old_current_key = host_obj.current_key;
-            host_obj.current_key = Some(key);
-
+            // Now unarchive the object
+            let old_current_key = {
+                let host_obj = borrow_host_obj(env, unarchiver);
+                let old = host_obj.current_key;
+                host_obj.current_key = Some(key);
+                old
+            };
             let new_object: id = msg![env; class alloc];
             let new_object: id = msg![env; new_object initWithCoder:unarchiver];
-
-            let host_obj = borrow_host_obj(env, unarchiver); // reborrow
-            host_obj.current_key = old_current_key;
-
+            {
+                let host_obj = borrow_host_obj(env, unarchiver);
+                host_obj.current_key = old_current_key;
+            }
             new_object
         }
         Value::String(s) => {
-            let s = s.to_string();
-            from_rust_string(env, s)
+            from_rust_string(env, s.to_string())
         }
         Value::Integer(int) => {
-            #[allow(clippy::clone_on_copy)]
-            let int = int.clone();
-            // Similar logic to deserialize_plist()
             let number: id = msg_class![env; NSNumber alloc];
-            // TODO: is this the correct order of preference? does it matter?
             if let Some(int64) = int.as_signed() {
-                let longlong: i64 = int64;
-                msg![env; number initWithLongLong:longlong]
+                msg![env; number initWithLongLong:int64]
             } else if let Some(uint64) = int.as_unsigned() {
-                let ulonglong: u64 = uint64;
-                msg![env; number initWithUnsignedLongLong:ulonglong]
+                msg![env; number initWithUnsignedLongLong:uint64]
             } else {
-                unreachable!(); // according to plist crate docs
+                unreachable!()
             }
         }
         Value::Boolean(b) => {
             let number: id = msg_class![env; NSNumber alloc];
-            if *b {
+            let result = if *b {
                 msg![env; number initWithBool:true]
             } else {
                 msg![env; number initWithBool:false]
-            }
+            };
+            // Store the result immediately and return (borrow already ended)
+            let host_obj = borrow_host_obj(env, unarchiver);
+            host_obj.already_unarchived[key.get() as usize] = Some(result);
+            return result;
         }
         _ => unimplemented!("Unarchive: {:#?}", item),
     };
 
-    let host_obj = borrow_host_obj(env, unarchiver); // reborrow
+    // Store the result for non-Boolean cases
+    let host_obj = borrow_host_obj(env, unarchiver);
     host_obj.already_unarchived[key.get() as usize] = Some(new_object);
     new_object
 }
