@@ -28,6 +28,8 @@ const EOF: i32 = -1;
 struct FILEHostObject {
     /// `ungetc()` implementation
     pushbacks: Vec<u8>,
+    /// Set when a read/write error occurs on the stream (cleared by clearerr)
+    error_flag: bool,
 }
 
 #[allow(clippy::upper_case_acronyms)]
@@ -58,6 +60,7 @@ impl State {
             log!("Unknown file fd {}. Creating dummy.", fd);
             FILEHostObject {
                 pushbacks: Vec::new(),
+                error_flag: false,
             }
         })
     }
@@ -394,10 +397,20 @@ fn fclose(env: &mut Environment, file_ptr: MutPtr<FILE>) -> i32 {
     }
 }
 
-fn ferror(env: &mut Environment, _file_ptr: MutPtr<FILE>) -> i32 {
+fn ferror(env: &mut Environment, file_ptr: MutPtr<FILE>) -> i32 {
     set_errno(env, 0);
-    log!("TODO: ferror() support.");
-    0
+    // Return non-zero if the error flag is set on this stream.
+    // NFS Most Wanted and other EA games poll ferror() after partial reads
+    // to decide whether to retry — returning 0 forever caused an infinite loop.
+    if file_ptr.is_null() {
+        return 0;
+    }
+    let has_error = State::get_mut(env)
+        .file_streams
+        .get(&file_ptr)
+        .map(|obj| obj.error_flag)
+        .unwrap_or(false);
+    if has_error { 1 } else { 0 }
 }
 
 fn fsetpos(env: &mut Environment, file_ptr: MutPtr<FILE>, pos: ConstPtr<fpos_t>) -> i32 {
@@ -440,6 +453,11 @@ fn feof(env: &mut Environment, file_ptr: MutPtr<FILE>) -> i32 {
 
 fn clearerr(env: &mut Environment, file_ptr: MutPtr<FILE>) {
     set_errno(env, 0);
+
+    // Clear the error flag on the stream.
+    if let Some(obj) = State::get_mut(env).file_streams.get_mut(&file_ptr) {
+        obj.error_flag = false;
+    }
 
     let FILE { fd } = env.mem.read(file_ptr);
     posix_io::clearerr(env, fd)
