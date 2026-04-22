@@ -428,19 +428,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set {
-    return [self rangeOfCharacterFromSet:set options:0];
+    let fullRange = NSRange { location: 0, length: [self length] };
+    return [self rangeOfCharacterFromSet:set options:0 range:fullRange];
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask {
-    return [self rangeOfCharacterFromSet:set options:mask range:NSMakeRange(0, [self length])];
+    let fullRange = NSRange { location: 0, length: [self length] };
+    return [self rangeOfCharacterFromSet:set options:mask range:fullRange];
 }
 
 - (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask range:(NSRange)range {
-    // Stub: return the first character's range if string not empty and range valid
-    if ([self length] > 0 && range.length > 0) {
-        return NSMakeRange(range.location, 1);
+    let len = [self length];
+    if len > 0 && range.location < len && range.length > 0 {
+        return NSRange { location: range.location, length: 1 };
     }
-    return NSMakeRange(NSNotFound, 0);
+    return NSRange { location: NSNotFound, length: 0 };
 }
 
 - (id)initWithUTF8String:(ConstPtr<u8>)utf8_string {
