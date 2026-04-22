@@ -32,8 +32,7 @@ pub type blksize_t = u32;
 
 // enum values sourced from ```man 2 stat```
 pub const S_IFDIR: mode_t = 0o0040000;
-pub const S_IFREG: mode_t  = 0o0100000;
-pub const S_IFSOCK: mode_t = 0o0140000;
+pub const S_IFREG: mode_t = 0o0100000;
 
 #[allow(non_camel_case_types)]
 #[derive(Default)]
@@ -99,6 +98,7 @@ fn mkdir(env: &mut Environment, path: ConstPtr<u8>, mode: mode_t) -> i32 {
 }
 
 /// Helper for [stat()] and [fstat()] that fills the data in the stat struct
+/// Helper for [stat()] and [fstat()] that fills the data in the stat struct
 fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
         set_errno(env, EBADF);
@@ -136,12 +136,7 @@ fn fstat_inner(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> 
             stat.st_blksize = 4096;
             stat.st_blocks = 8;
         }
-        _ => {
-            // Unknown file type — treat as a regular file with zero size.
-            stat.st_mode |= S_IFREG;
-            stat.st_blksize = 4096;
-            stat.st_blocks = 1;
-        }
+        _ => unimplemented!(),
     }
 
     env.mem.write(buf, stat);
@@ -230,32 +225,35 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
                 0
             }
             Err(FsError::ReadonlyParentDir) => {
-                // Parent is read-only (IPA bundle mount).
-                // We must distinguish bundle directories (shaders/, gui/, xml/) from
-                // bundle files (.nib, .png, .plist, etc.).
+                // ReadonlyParentDir: the parent is part of the IPA bundle (read-only).
+                // This can mean two very different things:
                 //
-                // Heuristic: if the last path component contains a '.' it is almost
-                // certainly a file. IPA bundle directories never have extensions.
-                // If there is no extension, treat it as a directory.
-                let last_component = path_str
-                    .rsplit('/')
-                    .next()
-                    .unwrap_or(&path_str);
-                let has_extension = last_component.contains('.');
-
-                if has_extension {
-                    // This is a bundle file (e.g. .nib, .png, .plist, .ghost).
-                    // It exists but cannot be opened as a fd because it is read-only.
-                    // Return a regular-file stat with zero size — callers only check
-                    // existence here (they open separately via fopen).
-                    log_dbg!("stat: '{}' is a read-only bundle file (has extension)", path_str);
+                //   A) The path IS a real bundle directory  → return S_IFDIR
+                //      e.g. "published/particles"
+                //
+                //   B) The path IS a real bundle FILE that open_direct couldn't open
+                //      → must return S_IFREG with size=0, NOT S_IFDIR
+                //      e.g. "published/particles/fx.bin", "published/data/pursuit_1.prefabs.sb"
+                //
+                // Without this distinction, stat() returns S_IFDIR for all bundle
+                // asset files. The game's asset loader calls stat() first to check
+                // existence, sees S_IFDIR, and when it tries fopen() it gets NULL
+                // (because open_direct rejects directories). The loading loop hangs.
+                //
+                // Heuristic: a last path component that contains '.' is a file.
+                // Bundle directories never have file extensions.
+                let last = path_str.rsplit('/').next().unwrap_or(&path_str);
+                if last.contains('.') {
+                    // It's a bundle file — report as a regular file so fopen() can open it.
+                    log_dbg!("stat: '{}' is a read-only bundle FILE (has extension)", path_str);
                     let mut s = stat::default();
                     s.st_mode  = S_IFREG;
                     s.st_nlink = 1;
+                    // st_size left as 0; the game will fopen() and fread() for actual size.
                     env.mem.write(buf, s);
                     0
                 } else {
-                    // No extension → treat as a bundle directory.
+                    // No extension → it is a bundle directory.
                     log_dbg!("stat: '{}' is a read-only bundle directory", path_str);
                     write_dir_stat(env, buf);
                     0
