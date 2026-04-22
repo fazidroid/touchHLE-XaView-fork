@@ -427,6 +427,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     NSUTF8StringEncoding
 }
 
+- (NSRange)rangeOfCharacterFromSet:(id)set {
+    return [self rangeOfCharacterFromSet:set options:0];
+}
+
+- (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask {
+    return [self rangeOfCharacterFromSet:set options:mask range:NSMakeRange(0, [self length])];
+}
+
+- (NSRange)rangeOfCharacterFromSet:(id)set options:(NSUInteger)mask range:(NSRange)range {
+    // Stub: return the first character's range if string not empty and range valid
+    if ([self length] > 0 && range.length > 0) {
+        return NSMakeRange(range.location, 1);
+    }
+    return NSMakeRange(NSNotFound, 0);
+}
+
 - (id)initWithUTF8String:(ConstPtr<u8>)utf8_string {
     msg![env; this initWithCString:utf8_string encoding:NSUTF8StringEncoding]
 }
