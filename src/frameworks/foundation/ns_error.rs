@@ -43,8 +43,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)errorWithDomain:(NSErrorDomain)domain
                  code:(NSInteger)code
              userInfo:(id)userInfo {
-    id error = msg![env; this alloc];
-    error = msg![env; error initWithDomain:domain code:code userInfo:userInfo];
+    let error = msg![env; this alloc];
+    let error = msg![env; error initWithDomain:domain code:code userInfo:userInfo];
     autorelease(env, error)
 }
 
