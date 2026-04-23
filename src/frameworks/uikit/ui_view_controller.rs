@@ -202,6 +202,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     todo_objc_setter!(this, wants);
 }
 
+- (id)modalViewController {
+        println!("🎮 LOG: Caught [UIViewController modalViewController]. Returning nil.");
+        nil
+    }
+
+    - (())presentModalViewController:(id)_vc animated:(bool)_animated {
+        println!("🎮 LOG: Caught [UIViewController presentModalViewController:animated:]. Absorbing safely!");
+    }
+
 - (())dismissModalViewControllerAnimated:(bool)animated {
     log!("TODO: [(UIViewController*){:?} dismissModalViewControllerAnimated:{}]", this, animated); // TODO
 }
