@@ -6,7 +6,7 @@
 //! `UIScreen`.
 
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
-use crate::objc::{autorelease, id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr};
+use crate::objc::{autorelease, id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr, TrivialHostObject};
 
 #[derive(Default)]
 pub struct State {
