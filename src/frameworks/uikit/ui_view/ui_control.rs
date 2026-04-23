@@ -346,9 +346,14 @@ forControlEvents:(UIControlEvents)events {
     }
 
     // 🏎️ Catch the game trying to read the typed text!
-    - (id)text {
-        println!("🎮 LOG: Caught [UITextField text]. Returning empty string placeholder!");
-        crate::frameworks::foundation::ns_string::from_rust_string(env, "".to_string())
+- (id)text {
+        println!("🎮 LOG: Caught [UITextField text]. Spoofing profile name!");
+        crate::frameworks::foundation::ns_string::from_rust_string(env, "Player".to_string())
+    }
+
+    - (bool)resignFirstResponder {
+        println!("🎮 LOG: Caught [UITextField resignFirstResponder]. Closing keyboard!");
+        true
     }
     
     - (())setText:(id)text { }
