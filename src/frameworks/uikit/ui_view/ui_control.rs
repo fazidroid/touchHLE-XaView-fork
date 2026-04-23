@@ -345,6 +345,15 @@ forControlEvents:(UIControlEvents)events {
     - (())setSecureTextEntry:(bool)secure {
         println!("🎮 LOG: Caught [UITextField setSecureTextEntry:{}]. Absorbing safely!", secure);
     }
+    
+    - (id)delegate {
+        println!("🎮 LOG: Caught [UITextField delegate] via UIControl parent! Returning nil.");
+        crate::objc::nil
+    }
+
+    - (())setDelegate:(id)delegate {
+        println!("🎮 LOG: Caught [UITextField setDelegate:] via UIControl parent! Absorbing safely.");
+    }
 
 @end
 
