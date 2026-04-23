@@ -382,6 +382,16 @@ forControlEvents:(UIControlEvents)events {
  - (())setClearButtonMode:(i32)mode {
         println!("🎮 LOG: Caught [UITextField setClearButtonMode:{}]. Absorbing safely.", mode);
     }
+    
+- (())setPlaceholder:(id)placeholder {
+        println!("🎮 LOG: Caught [UITextField setPlaceholder:] via UIControl parent! Absorbing safely.");
+    }
+    
+    // 🏎️ PROACTIVE STUBS: Catch the rest of the visual formatting!
+    - (())setTextColor:(id)color { }
+    - (())setFont:(id)font { }
+    - (())setTextAlignment:(i32)alignment { }
+    - (())setContentVerticalAlignment:(i32)alignment { }
 
 // TODO: more triggers/targets/actions stuff
 
