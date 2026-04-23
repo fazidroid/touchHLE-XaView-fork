@@ -145,6 +145,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     - (())scheduleInRunLoop:(id)runLoop forMode:(id)mode {
         println!("🎮 LOG: Caught [NSMachPort scheduleInRunLoop:forMode:]. Absorbing safely!");
     }
+    
+    - (())addPort:(id)port forMode:(NSRunLoopMode)mode {
+        println!("🎮 LOG: Caught [NSRunLoop addPort:forMode:]. Absorbing safely!");
+    }
+
+    - (())removePort:(id)port forMode:(NSRunLoopMode)mode {
+        println!("🎮 LOG: Caught [NSRunLoop removePort:forMode:]. Absorbing safely!");
+    }
 
 @end
 
