@@ -335,4 +335,17 @@ forControlEvents:(UIControlEvents)events {
 
 @end
 
+@implementation UITextField: UIControl
+
+    - (bool)isSecureTextEntry {
+        println!("🎮 LOG: Caught [UITextField isSecureTextEntry]. Returning false!");
+        false
+    }
+
+    - (())setSecureTextEntry:(bool)secure {
+        println!("🎮 LOG: Caught [UITextField setSecureTextEntry:{}]. Absorbing safely!", secure);
+    }
+
+@end
+
 };
