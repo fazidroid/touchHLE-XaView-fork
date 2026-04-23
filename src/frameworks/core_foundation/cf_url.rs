@@ -197,6 +197,17 @@ fn CFURLCreateStringByAddingPercentEscapes(
     msg![env; original_string copy]
 }
 
+// Private alias for CFURLCreateWithString
+fn _CFURLCreateWithString(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    string: CFStringRef,
+    base_url: CFURLRef,
+) -> CFURLRef {
+    log!("_CFURLCreateWithString stub called, forwarding to CFURLCreateWithString");
+    CFURLCreateWithString(env, allocator, string, base_url)
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLGetFileSystemRepresentation(_, _, _, _)),
     export_c_func!(CFURLCreateFromFileSystemRepresentation(_, _, _, _)),
@@ -208,4 +219,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLCreateCopyDeletingLastPathComponent(_, _)),
     export_c_func!(CFURLHasDirectoryPath(_)),
     export_c_func!(CFURLCreateStringByAddingPercentEscapes(_, _, _, _, _)), // 🏎️ Added our new bypass function
+    ("_CFURLCreateWithString", &(_CFURLCreateWithString as fn(&mut Environment, CFAllocatorRef, CFStringRef, CFURLRef) -> CFURLRef)),
 ];
