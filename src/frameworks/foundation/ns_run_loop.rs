@@ -153,6 +153,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     - (())removePort:(id)port forMode:(NSRunLoopMode)mode {
         println!("🎮 LOG: Caught [NSRunLoop removePort:forMode:]. Absorbing safely!");
     }
+    
+    - (())setBorderStyle:(crate::frameworks::foundation::NSInteger)style {
+        println!("🎮 LOG: Caught [UITextField setBorderStyle:{}] via UIControl parent! Absorbing safely.", style);
+    }
 
 @end
 
