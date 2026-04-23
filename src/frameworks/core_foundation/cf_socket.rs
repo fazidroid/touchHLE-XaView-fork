@@ -61,5 +61,5 @@ fn CFHTTPMessageSetHeaderFieldValue(
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFSocketCreate(_, _, _, _, _, _, _)),
     export_c_func!(CFHTTPMessageCreateRequest(_, _, _, _)),
-    export_c_func!(CFHTTPMessageSetHeaderFieldValue(_, _, _, _)),
+    export_c_func!(CFHTTPMessageSetHeaderFieldValue(_, _, _)),
 ];
