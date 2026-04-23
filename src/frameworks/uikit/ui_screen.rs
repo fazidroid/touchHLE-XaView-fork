@@ -102,8 +102,22 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)currentMode {
-    log!("UIScreen currentMode stub called -> returning nil");
-    nil
+    let bundle_id = env.bundle.bundle_identifier();
+    log!("UIScreen currentMode called (bundle: {})", bundle_id);
+    
+    // GT Racing 2 crashes when receiving a real UIScreenMode object,
+    // so we return nil only for that specific game.
+    if bundle_id == "com.gameloft.gtr2" {
+        log!("Returning nil for GT Racing 2 compatibility");
+        return nil;
+    }
+    
+    // For all other apps, return a valid UIScreenMode instance.
+    let bounds: CGRect = msg![env; this bounds];
+    let size = bounds.size;
+    let mode: id = msg_class![env; UIScreenMode alloc];
+    let mode: id = msg![env; mode initWithSize:size pixelAspectRatio:1.0];
+    autorelease(env, mode)
 }
 
 @end
