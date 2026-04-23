@@ -392,6 +392,17 @@ forControlEvents:(UIControlEvents)events {
     - (())setFont:(id)font { }
     - (())setTextAlignment:(i32)alignment { }
     - (())setContentVerticalAlignment:(i32)alignment { }
+    
+- (())setClearsOnBeginEditing:(bool)clears {
+        println!("🎮 LOG: Caught [UITextField setClearsOnBeginEditing:{}]. Absorbing safely.", clears);
+    }
+    
+    // 🏎️ PROACTIVE STUBS: The remaining common Gameloft text field settings!
+    - (())setAdjustsFontSizeToFitWidth:(bool)adjusts { }
+    - (())setMinimumFontSize:(f32)size { } 
+    - (())setBackground:(id)bg { }
+    - (())setDisabledBackground:(id)bg { }
+    - (())setEnablesReturnKeyAutomatically:(bool)enables { }
 
 // TODO: more triggers/targets/actions stuff
 
