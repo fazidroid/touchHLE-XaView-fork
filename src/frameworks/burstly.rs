@@ -6,7 +6,7 @@
 //! Stubs for the Burstly ad framework.
 
 use crate::dyld::HostDylib;
-use crate::objc::{id, objc_classes, ClassExports, HostObject, NSZonePtr};
+use crate::objc::{id, msg_class, objc_classes, ClassExports, HostObject, NSZonePtr};
 use crate::Environment;
 
 #[derive(Default)]
@@ -23,8 +23,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, Box::new(BurstlyCurrencyProcessRequestDataHostObject), &mut env.mem)
 }
 
-// Add any methods that crash later here, e.g.:
-// - (id)init { ... }
++ (id)superclass {
+    msg_class![env; NSObject class]
+}
+
+// If the game calls any other class methods, add stubs here.
 
 @end
 
