@@ -220,7 +220,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation MPMoviePlayerViewController: UIViewController
 
-- (id)initWithContentURL:(id)url {
+    - (id)initWithContentURL:(id)url {
         println!("🎮 LOG: Caught [MPMoviePlayerViewController initWithContentURL]. Returning dummy player!");
         // Properly initialize the ViewController instead of returning nil!
         crate::msg_super![env; this init]
@@ -241,17 +241,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     - (())stop { }
     - (())setControlStyle:(i32)style { }
     - (())setScalingMode:(i32)mode { }
-
-- (id)initWithContentURL:(id)url {
-    log!(
-        "TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?} ({:?})] -> nil",
-        this,
-        url,
-        ns_url::to_rust_path(env, url),
-    );
-    release(env, this);
-    nil // TODO
-}
 
 @end
 
