@@ -20,7 +20,7 @@ use crate::frameworks::foundation::ns_string::{
 };
 use crate::frameworks::foundation::NSUInteger;
 use crate::mem::{ConstPtr, MutPtr, Ptr};
-use crate::objc::{id, msg, msg_class, release};
+use crate::objc::{id, msg, msg_class, nil, release};
 use crate::Environment;
 
 pub type CFURLRef = super::CFTypeRef;
@@ -200,12 +200,20 @@ fn CFURLCreateStringByAddingPercentEscapes(
 // Private alias for CFURLCreateWithString
 fn _CFURLCreateWithString(
     env: &mut Environment,
-    allocator: CFAllocatorRef,
+    _allocator: CFAllocatorRef,
     string: CFStringRef,
-    base_url: CFURLRef,
+    _base_url: CFURLRef,
 ) -> CFURLRef {
-    log!("_CFURLCreateWithString stub called, forwarding to CFURLCreateWithString");
-    CFURLCreateWithString(env, allocator, string, base_url)
+    log!("_CFURLCreateWithString stub called");
+    if string.is_null() {
+        return nil;
+    }
+    // NSString and CFString are toll-free bridged, so we can use string directly as NSString
+    let url: id = msg_class![env; NSURL URLWithString:string];
+    if url == nil {
+        log!("_CFURLCreateWithString failed to create URL, returning nil");
+    }
+    url // CFURLRef is toll-free bridged to NSURL
 }
 
 pub const FUNCTIONS: FunctionExports = &[
