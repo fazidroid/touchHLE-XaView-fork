@@ -25,6 +25,7 @@ pub const DYLIB: HostDylib = HostDylib {
 };
 
 type CLLocationAccuracy = f64;
+type CLLocationDistance = f64;
 
 const CLASSES: ClassExports = objc_classes! {
 
@@ -34,6 +35,10 @@ const CLASSES: ClassExports = objc_classes! {
 
 + (bool)headingAvailable {
     false
+}
+
+- (())setDistanceFilter:(CLLocationDistance)distance {
+    log!("CLLocationManager setDistanceFilter: {} stub called", distance);
 }
 
 - (())setDelegate:(id)_delegate {
