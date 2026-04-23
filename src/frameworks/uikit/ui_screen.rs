@@ -106,23 +106,27 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)currentMode {
-    let bundle_id = env.bundle.bundle_identifier();
-    log!("UIScreen currentMode called (bundle: {})", bundle_id);
+        let bundle_id = env.bundle.bundle_identifier();
+        log!("UIScreen currentMode called (bundle: {})", bundle_id);
 
-    // GT Racing 2 crashes when receiving a real UIScreenMode object,
-    // so we return nil only for that specific game.
-    if bundle_id == "com.gameloft.gtr2" {
-        log!("Returning nil for GT Racing 2 compatibility");
-        return nil;
+        // GT Racing 2 crashes when receiving a real UIScreenMode object,
+        // so we return nil only for that specific game.
+        if bundle_id == "com.gameloft.gtr2" {
+            log!("Returning nil for GT Racing 2 compatibility");
+            return nil;
+        }
+
+        // For all other apps, return a valid UIScreenMode instance.
+        let bounds: CGRect = msg![env; this bounds];
+        let size = bounds.size;
+        let mode: id = msg_class![env; UIScreenMode alloc];
+        
+        // 🏎️ FIX: Cast 1.0 to CGFloat so it perfectly matches the f32 requirement!
+        let mode: id = msg![env; mode initWithSize:size pixelAspectRatio:(1.0 as CGFloat)];
+        
+        autorelease(env, mode)
     }
 
-    // For all other apps, return a valid UIScreenMode instance.
-    let bounds: CGRect = msg![env; this bounds];
-    let size = bounds.size;
-    let mode: id = msg_class![env; UIScreenMode alloc];
-    let mode: id = msg![env; mode initWithSize:size pixelAspectRatio:1.0];
-    autorelease(env, mode)
-}
 
 @end
 
