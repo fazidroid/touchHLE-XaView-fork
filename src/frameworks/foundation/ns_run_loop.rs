@@ -122,6 +122,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     true  // RunLoopDidRun: return true to indicate the loop ran, not false (timed out without running)
 }
 
+- (())addPort:(id)port forMode:(NSRunLoopMode)mode {
+        println!("🎮 LOG: Caught [NSRunLoop addPort:forMode:]. Absorbing safely!");
+    }
+
+    - (())removePort:(id)port forMode:(NSRunLoopMode)mode {
+        println!("🎮 LOG: Caught [NSRunLoop removePort:forMode:]. Absorbing safely!");
+    }
+
 // TODO: other run methods
 
 @end
@@ -144,14 +152,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     - (())scheduleInRunLoop:(id)runLoop forMode:(id)mode {
         println!("🎮 LOG: Caught [NSMachPort scheduleInRunLoop:forMode:]. Absorbing safely!");
-    }
-    
-    - (())addPort:(id)port forMode:(NSRunLoopMode)mode {
-        println!("🎮 LOG: Caught [NSRunLoop addPort:forMode:]. Absorbing safely!");
-    }
-
-    - (())removePort:(id)port forMode:(NSRunLoopMode)mode {
-        println!("🎮 LOG: Caught [NSRunLoop removePort:forMode:]. Absorbing safely!");
     }
     
     - (())setBorderStyle:(crate::frameworks::foundation::NSInteger)style {
