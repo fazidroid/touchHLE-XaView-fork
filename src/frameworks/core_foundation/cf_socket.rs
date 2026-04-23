@@ -68,11 +68,37 @@ fn CFHTTPMessageSetBody(
     log!("🎮 LOG: Caught CFHTTPMessageSetBody. Absorbing safely!");
 }
 
+fn CFReadStreamCreateForHTTPRequest(
+    _env: &mut Environment,
+    _alloc: CFTypeRef,
+    _request: CFTypeRef,
+) -> CFTypeRef {
+    log!("🎮 LOG: Caught CFReadStreamCreateForHTTPRequest. Returning null stream to force offline mode!");
+    Ptr::null()
+}
 
+// 🏎️ PROACTIVE STUBS: Just in case the game checks its work!
+fn CFHTTPMessageCopyHeaderFieldValue(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+    _header_field: CFTypeRef,
+) -> CFTypeRef {
+    Ptr::null()
+}
+
+fn CFHTTPMessageCopyAllHeaderFields(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+) -> CFTypeRef {
+    Ptr::null()
+}
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFSocketCreate(_, _, _, _, _, _, _)),
     export_c_func!(CFHTTPMessageCreateRequest(_, _, _, _)),
     export_c_func!(CFHTTPMessageSetHeaderFieldValue(_, _, _)),
     export_c_func!(CFHTTPMessageSetBody(_, _)),
+    export_c_func!(CFReadStreamCreateForHTTPRequest(_, _)),
+    export_c_func!(CFHTTPMessageCopyHeaderFieldValue(_, _)),
+    export_c_func!(CFHTTPMessageCopyAllHeaderFields(_)),
 ];
