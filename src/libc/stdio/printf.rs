@@ -38,38 +38,6 @@ const FLOAT_SPECIFIERS: [u8; 3] = [b'f', b'e', b'g'];
 ///
 /// `get_format_char` is a callback that returns the byte at a given index in
 /// the format string, or `'\0'` if the index is one past the last byte.
-#[repr(C)]
-pub struct iovec {
-    pub iov_base: MutVoidPtr,
-    pub iov_len: GuestUSize,
-}
-unsafe impl SafeRead for iovec {}
-
-pub fn writev(
-    env: &mut Environment,
-    fd: FileDescriptor,
-    iov: ConstPtr<iovec>,
-    iovcnt: i32,
-) -> GuestISize {
-    log_dbg!("writev(fd={}, iov={:?}, iovcnt={})", fd, iov, iovcnt);
-    let mut total_written: GuestISize = 0;
-    for i in 0..iovcnt {
-        let vec = env.mem.read(iov + i as u32);
-        if vec.iov_len == 0 {
-            continue;
-        }
-        let written = write(env, fd, vec.iov_base.cast_const(), vec.iov_len);
-        if written < 0 {
-            return written; // error
-        }
-        total_written += written;
-        if (written as GuestUSize) < vec.iov_len {
-            break; // partial write
-        }
-    }
-    total_written
-}
-
 pub fn printf_inner<const NS_LOG: bool, F: Fn(&Mem, GuestUSize) -> u8>(
     env: &mut Environment,
     get_format_char: F,
@@ -1374,7 +1342,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(printf(_, _)),
     export_c_func!(fprintf(_, _, _)),
     export_c_func!(vfprintf(_, _, _)),
-    export_c_func!(writev(_, _, _)),
 ];
 
 // Helper function, not a part of printf family
