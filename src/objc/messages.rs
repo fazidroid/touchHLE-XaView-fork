@@ -51,6 +51,24 @@ fn objc_msgSend_inner(
         println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
     }
     let message_type_info = env.objc.message_type_info.take();
+    
+    // ==========================================================
+    // 🏎️ THE SLEDGEHAMMER: Global Selector Intercepts
+    // ==========================================================
+    if sel_name == "isSecureTextEntry" {
+        println!("🎮 LOG: SLEDGEHAMMER BYPASS - Caught {} globally!", sel_name);
+        
+        // 1. Set the return value to 0 (false) in register r0
+        env.cpu.regs_mut()[0] = 0; 
+        
+        // 2. Grab the return address from the Link Register (r14)
+        let lr = env.cpu.regs()[14]; 
+        
+        // 3. Set the Program Counter (PC) to simulate an ARM 'bx lr' return
+        env.cpu.set_pc(lr); 
+        
+        return;
+    }
 
     if receiver == nil {
         // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjectiveC/Chapters/ocObjectsClasses.html#//apple_ref/doc/uid/TP30001163-CH11-SW7
