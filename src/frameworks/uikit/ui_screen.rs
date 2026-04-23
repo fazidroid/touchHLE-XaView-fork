@@ -6,14 +6,18 @@
 //! `UIScreen`.
 
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
-use crate::objc::{autorelease, id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr, TrivialHostObject};
+use crate::objc::{
+    autorelease, id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr,
+    TrivialHostObject,
+};
+use crate::Environment;
 
 #[derive(Default)]
 pub struct State {
     main_screen: Option<id>,
 }
 
-// Host object for UIScreenMode
+// Host object for UIScreenMode instances
 struct UIScreenModeHostObject {
     size: CGSize,
     pixel_aspect_ratio: CGFloat,
@@ -104,14 +108,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)currentMode {
     let bundle_id = env.bundle.bundle_identifier();
     log!("UIScreen currentMode called (bundle: {})", bundle_id);
-    
+
     // GT Racing 2 crashes when receiving a real UIScreenMode object,
     // so we return nil only for that specific game.
     if bundle_id == "com.gameloft.gtr2" {
         log!("Returning nil for GT Racing 2 compatibility");
         return nil;
     }
-    
+
     // For all other apps, return a valid UIScreenMode instance.
     let bounds: CGRect = msg![env; this bounds];
     let size = bounds.size;
@@ -122,15 +126,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
-// UIScreenMode stub implementation
+// UIScreenMode implementation
 @implementation UIScreenMode: NSObject
 
 + (id)allocWithZone:(NSZonePtr)_zone {
-    let host_object = Box::new(UIScreenModeHostObject {
+    let host = Box::new(UIScreenModeHostObject {
         size: CGSize { width: 0.0, height: 0.0 },
         pixel_aspect_ratio: 1.0,
     });
-    env.objc.alloc_object(this, host_object, &mut env.mem)
+    env.objc.alloc_object(this, host, &mut env.mem)
 }
 
 - (id)initWithSize:(CGSize)size pixelAspectRatio:(CGFloat)ratio {
