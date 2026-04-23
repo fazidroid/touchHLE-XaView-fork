@@ -126,6 +126,28 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+// ==========================================================
+// 🏎️ GAMELOFT BYPASS: Stub NSMachPort for GT Racing 2
+// ==========================================================
+@implementation NSMachPort: NSObject
+
+    + (id)port {
+        println!("🎮 LOG: Caught [NSMachPort port]. Returning dummy port!");
+        let port: id = msg![env; this new];
+        crate::objc::autorelease(env, port)
+    }
+
+    // Proactively stub the methods the game will likely call on the port next!
+    - (())setDelegate:(id)delegate {
+        println!("🎮 LOG: Caught [NSMachPort setDelegate:]. Absorbing safely!");
+    }
+
+    - (())scheduleInRunLoop:(id)runLoop forMode:(id)mode {
+        println!("🎮 LOG: Caught [NSMachPort scheduleInRunLoop:forMode:]. Absorbing safely!");
+    }
+
+@end
+
 };
 
 /// For use by Audio Toolbox.
