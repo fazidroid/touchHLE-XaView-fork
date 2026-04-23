@@ -363,8 +363,8 @@ forControlEvents:(UIControlEvents)events {
        // ==========================================================
     // 🏎️ GAMELOFT BYPASS: Catch Autocorrect Styling
     // ==========================================================
-- (())setAutocorrectionType:(i32)type {
-        println!("🎮 LOG: Caught [UITextField setAutocorrectionType:{}] via UIControl parent! Absorbing safely.", type);
+- (())setAutocorrectionType:(i32)type_ {
+        println!("🎮 LOG: Caught [UITextField setAutocorrectionType:{}] via UIControl parent! Absorbing safely.", type_);
     }
     
 
