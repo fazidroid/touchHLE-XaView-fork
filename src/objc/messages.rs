@@ -64,12 +64,12 @@ fn objc_msgSend_inner(
         // 2. Grab the return address from the Link Register (r14)
         let lr = env.cpu.regs()[14]; 
         
-        // 3. Set the Program Counter (PC) to simulate an ARM 'bx lr' return
-        env.cpu.set_pc(lr); 
+        // 3. Set the Program Counter (PC) to simulate an ARM 'bx lr' return.
+        // In ARM32, the Program Counter is Register 15!
+        env.cpu.regs_mut()[15] = lr; 
         
         return;
     }
-
     if receiver == nil {
         // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjectiveC/Chapters/ocObjectsClasses.html#//apple_ref/doc/uid/TP30001163-CH11-SW7
         log_dbg!("[nil {}]", selector.as_str(&env.mem));
