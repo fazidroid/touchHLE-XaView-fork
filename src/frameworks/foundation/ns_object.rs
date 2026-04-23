@@ -29,6 +29,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSObject
 
++ (id)superclass {
+    // Return the class of NSObject (or nil for NSObject itself)
+    if this == msg_class![env; NSObject class] {
+        return nil;
+    }
+    msg_class![env; NSObject class]
+}
+
 + (id)alloc {
     msg![env; this allocWithZone:(MutVoidPtr::null())]
 }
@@ -40,6 +48,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)new {
     let new_object: id = msg![env; this alloc];
     msg![env; new_object init]
+}
+
++ (Class)superclass {
+    // The superclass of the class object is stored in its isa's superclass field.
+    // For simplicity, we can just return the class of NSObject for now, or implement properly.
+    // Since we don't have full metaclass info at runtime, we can return the hardcoded superclass.
+    // However, to be safe, we can return the class of the superclass using ObjC runtime:
+    let this_class = env.objc.get_class_from_id(this);
+    let super_class = env.objc.class_get_superclass(this_class);
+    if super_class.is_null() {
+        nil
+    } else {
+        env.objc.class_to_id(super_class)
+    }
 }
 
 + (Class)class {
