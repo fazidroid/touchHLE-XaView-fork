@@ -367,6 +367,21 @@ forControlEvents:(UIControlEvents)events {
         println!("🎮 LOG: Caught [UITextField setAutocorrectionType:{}] via UIControl parent! Absorbing safely.", type_);
     }
     
+- (())setAutocapitalizationType:(i32)type_ {
+        println!("🎮 LOG: Caught [UITextField setAutocapitalizationType:{}] via UIControl parent! Absorbing safely.", type_);
+    }
+    
+    - (())setKeyboardType:(i32)type_ {
+        println!("🎮 LOG: Caught [UITextField setKeyboardType:{}]. Absorbing safely.", type_);
+    }
+
+- (())setReturnKeyType:(i32)type_ {
+        println!("🎮 LOG: Caught [UITextField setReturnKeyType:{}]. Absorbing safely.", type_);
+    }
+
+ - (())setClearButtonMode:(i32)mode {
+        println!("🎮 LOG: Caught [UITextField setClearButtonMode:{}]. Absorbing safely.", mode);
+    }
 
 // TODO: more triggers/targets/actions stuff
 
