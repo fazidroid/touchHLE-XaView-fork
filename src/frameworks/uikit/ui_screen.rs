@@ -104,8 +104,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)currentMode {
     log!("UIScreen currentMode stub called");
     let bounds: CGRect = msg![env; this bounds];
+    let size = bounds.size;
     let mode: id = msg_class![env; UIScreenMode alloc];
-    let mode: id = msg![env; mode initWithSize:bounds.size pixelAspectRatio:1.0f];
+    let mode: id = msg![env; mode initWithSize:size pixelAspectRatio:1.0f];
     autorelease(env, mode)
 }
 
