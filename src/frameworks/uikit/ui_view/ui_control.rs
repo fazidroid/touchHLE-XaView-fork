@@ -331,6 +331,28 @@ forControlEvents:(UIControlEvents)events {
     };
 }
 
+- (bool)canBecomeFirstResponder { true }
+    - (bool)becomeFirstResponder { true }
+    - (bool)isFirstResponder { true }
+    
+    - (bool)resignFirstResponder {
+        println!("🎮 LOG: Caught resignFirstResponder. Closing keyboard safely!");
+        true
+    }
+    
+    - (bool)endEditing:(bool)force {
+        println!("🎮 LOG: Caught endEditing. Absorbing safely!");
+        true
+    }
+
+    // 🏎️ Catch the game trying to read the typed text!
+    - (id)text {
+        println!("🎮 LOG: Caught [UITextField text]. Returning empty string placeholder!");
+        crate::frameworks::foundation::ns_string::from_rust_string(env, "".to_string())
+    }
+    
+    - (())setText:(id)text { }
+
 // TODO: more triggers/targets/actions stuff
 
 @end
