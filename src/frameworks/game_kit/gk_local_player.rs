@@ -6,7 +6,8 @@
 //! `GKLocalPlayer`.
 
 use crate::dyld::{ConstantExports, HostConstant};
-use crate::objc::{objc_classes, ClassExports};
+use crate::objc::{id, objc_classes, ClassExports};
+use crate::msg;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
