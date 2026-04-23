@@ -34,4 +34,22 @@ fn CFSocketCreate(
     Ptr::null()
 }
 
-pub const FUNCTIONS: FunctionExports = &[export_c_func!(CFSocketCreate(_, _, _, _, _, _, _))];
+// ==========================================================
+// 🏎️ EA/FIREMINT BYPASS: Stub CFHTTPMessageCreateRequest
+// ==========================================================
+fn CFHTTPMessageCreateRequest(
+    _env: &mut crate::Environment,
+    _alloc: crate::objc::id,
+    _request_method: crate::objc::id,
+    _url: crate::objc::id,
+    _http_version: crate::objc::id,
+) -> crate::objc::id {
+    println!("🎮 LOG: Caught CFHTTPMessageCreateRequest. Forcing offline mode!");
+    crate::objc::nil
+}
+
+
+pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(CFSocketCreate(_, _, _, _, _, _, _)),
+    export_c_func!(CFHTTPMessageCreateRequest(_, _, _, _)),
+];
