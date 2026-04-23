@@ -93,6 +93,34 @@ fn CFHTTPMessageCopyAllHeaderFields(
     Ptr::null()
 }
 
+fn CFReadStreamSetClient(
+    _env: &mut Environment,
+    _stream: CFTypeRef,
+    _stream_events: u32,
+    _client_cb: MutVoidPtr,
+    _client_context: MutVoidPtr,
+) -> bool {
+    log!("🎮 LOG: Caught CFReadStreamSetClient. Bypassed safely!");
+    true // Pretend we successfully set the client
+}
+
+fn CFReadStreamScheduleWithRunLoop(
+    _env: &mut Environment,
+    _stream: CFTypeRef,
+    _run_loop: CFTypeRef,
+    _run_loop_mode: CFTypeRef,
+) {
+    log!("🎮 LOG: Caught CFReadStreamScheduleWithRunLoop.");
+}
+
+fn CFReadStreamOpen(
+    _env: &mut Environment,
+    _stream: CFTypeRef,
+) -> bool {
+    log!("🎮 LOG: Caught CFReadStreamOpen. Forcing failure!");
+    false // Returning false safely tells the game the connection failed!
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFSocketCreate(_, _, _, _, _, _, _)),
     export_c_func!(CFHTTPMessageCreateRequest(_, _, _, _)),
@@ -101,4 +129,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFReadStreamCreateForHTTPRequest(_, _)),
     export_c_func!(CFHTTPMessageCopyHeaderFieldValue(_, _)),
     export_c_func!(CFHTTPMessageCopyAllHeaderFields(_)),
+    export_c_func!(CFReadStreamSetClient(_, _, _, _)),
+    export_c_func!(CFReadStreamScheduleWithRunLoop(_, _, _)),
+    export_c_func!(CFReadStreamOpen(_)),
 ];
