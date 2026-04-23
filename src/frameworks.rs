@@ -40,6 +40,8 @@ pub mod system_configuration;
 pub mod uikit;
 pub mod mobile_core_services;
 pub mod sbjson;
+pub mod oauthconsumer;
+pub mod burstly;
 
 /// Container for state of various child modules
 #[derive(Default)]
