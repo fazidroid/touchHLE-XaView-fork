@@ -20,6 +20,13 @@ use crate::mem::{
 use crate::Environment;
 use std::io::{Read, Seek, SeekFrom, Write};
 
+#[repr(C)]
+pub struct iovec {
+    pub iov_base: MutVoidPtr,
+    pub iov_len: GuestUSize,
+}
+unsafe impl SafeRead for iovec {}
+
 #[derive(Default)]
 pub struct State {
     /// File descriptors _other than stdin, stdout, and stderr_
@@ -123,6 +130,31 @@ fn open(env: &mut Environment, path: ConstPtr<u8>, flags: i32, _args: DotDotDot)
 
     // TODO: parse variadic arguments and pass them on (file creation mode)
     self::open_direct(env, path, flags)
+}
+
+pub fn writev(
+    env: &mut Environment,
+    fd: FileDescriptor,
+    iov: ConstPtr<iovec>,
+    iovcnt: i32,
+) -> GuestISize {
+    log_dbg!("writev(fd={}, iov={:?}, iovcnt={})", fd, iov, iovcnt);
+    let mut total_written: GuestISize = 0;
+    for i in 0..iovcnt {
+        let vec = env.mem.read(iov + i as u32);
+        if vec.iov_len == 0 {
+            continue;
+        }
+        let written = write(env, fd, vec.iov_base.cast_const(), vec.iov_len);
+        if written < 0 {
+            return written; // error
+        }
+        total_written += written;
+        if (written as GuestUSize) < vec.iov_len {
+            break; // partial write
+        }
+    }
+    total_written
 }
 
 /// Special extension for host code: [open] without the [DotDotDot].
@@ -901,6 +933,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(flock(_, _)),
     export_c_func!(fsync(_)),
     export_c_func!(ftruncate(_, _)),
+    export_c_func!(writev(_, _, _)),
 ];
 
 /// Helper function, not part of API
