@@ -337,25 +337,30 @@ forControlEvents:(UIControlEvents)events {
 
 @implementation UITextField: UIControl
 
-    -- (bool)isSecureTextEntry { false }
-    - (())setSecureTextEntry:(bool)secure { }
-    - (id)delegate { crate::objc::nil }
-    - (())setDelegate:(id)delegate { }
-    
-    // 🏎️ UI Styling Bypasses (Using primitive i32/id for macro compatibility)
-    - (())setBorderStyle:(i32)style {
-        println!("🎮 LOG: Caught [UITextField setBorderStyle:{}]. Safely bypassed!", style);
+    - (bool)isSecureTextEntry {
+        println!("🎮 LOG: Caught [UITextField isSecureTextEntry] via UIControl parent! Returning false.");
+        false
     }
-    - (())setTextColor:(id)color { }
-    - (())setFont:(id)font { }
-    - (())setTextAlignment:(i32)alignment { }
-    - (())setContentVerticalAlignment:(i32)alignment { }
-    - (())setPlaceholder:(id)placeholder { }
-    - (())setKeyboardType:(i32)type { }
-    - (())setReturnKeyType:(i32)type { }
-    - (())setAutocorrectionType:(i32)type { }
-    - (())setAutocapitalizationType:(i32)type { }
-    - (())setClearButtonMode:(i32)mode { }
+
+    - (())setSecureTextEntry:(bool)secure {
+        println!("🎮 LOG: Caught [UITextField setSecureTextEntry:{}] via UIControl parent! Absorbing safely.", secure);
+    }
+
+    - (id)delegate {
+        println!("🎮 LOG: Caught [UITextField delegate] via UIControl parent! Returning nil.");
+        crate::objc::nil
+    }
+
+    - (())setDelegate:(id)delegate {
+        println!("🎮 LOG: Caught [UITextField setDelegate:] via UIControl parent! Absorbing safely.");
+    }
+
+    // 🏎️ NEW: Catch the border styling command!
+    - (())setBorderStyle:(crate::frameworks::foundation::NSInteger)style {
+        println!("🎮 LOG: Caught [UITextField setBorderStyle:{}] via UIControl parent! Absorbing safely.", style);
+    }
+
+// TODO: more triggers/targets/actions stuff
 
 @end
 
