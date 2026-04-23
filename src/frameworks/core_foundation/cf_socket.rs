@@ -57,9 +57,22 @@ fn CFHTTPMessageSetHeaderFieldValue(
     log!("🎮 LOG: Caught CFHTTPMessageSetHeaderFieldValue. Absorbing safely!");
 }
 
+// ==========================================================
+// 🏎️ EA/FIREMINT BYPASS: Stub CFHTTPMessageSetBody
+// ==========================================================
+fn CFHTTPMessageSetBody(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+    _body_data: CFTypeRef,
+) {
+    log!("🎮 LOG: Caught CFHTTPMessageSetBody. Absorbing safely!");
+}
+
+
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFSocketCreate(_, _, _, _, _, _, _)),
     export_c_func!(CFHTTPMessageCreateRequest(_, _, _, _)),
     export_c_func!(CFHTTPMessageSetHeaderFieldValue(_, _, _)),
+    export_c_func!(CFHTTPMessageSetBody(_, _)),
 ];
