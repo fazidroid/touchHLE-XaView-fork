@@ -37,6 +37,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO
 @end
 
+@implementation GKMatchmaker: NSObject
+
+        + (id)sharedMatchmaker {
+            println!("🎮 LOG: Caught [GKMatchmaker sharedMatchmaker]. Returning nil to disable multiplayer!");
+            crate::objc::nil
+        }
+
+    @end
+
 };
 
 pub const GKPlayerAuthenticationDidChangeNotificationName: &str =
