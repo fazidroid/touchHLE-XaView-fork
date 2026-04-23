@@ -6,19 +6,12 @@
 //! `UIScreen`.
 
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
-use crate::objc::{autorelease, id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr, TrivialHostObject};
+use crate::objc::{id, msg, msg_class, objc_classes, ClassExports, TrivialHostObject};
 
 #[derive(Default)]
 pub struct State {
     main_screen: Option<id>,
 }
-
-// Host object for UIScreenMode
-struct UIScreenModeHostObject {
-    size: CGSize,
-    pixel_aspect_ratio: CGFloat,
-}
-impl HostObject for UIScreenModeHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -99,43 +92,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     // ReturnDisplayLinkStub
     let cls = env.objc.get_known_class("CADisplayLink", &mut env.mem);
     msg![env; cls displayLinkWithTarget:target selector:sel]
-}
-
-- (id)currentMode {
-    log!("UIScreen currentMode stub called");
-    let bounds: CGRect = msg![env; this bounds];
-    let size = bounds.size;
-    let mode: id = msg_class![env; UIScreenMode alloc];
-    let mode: id = msg![env; mode initWithSize:size pixelAspectRatio:1.0];
-    autorelease(env, mode)
-}
-
-@end
-
-// UIScreenMode stub implementation
-@implementation UIScreenMode: NSObject
-
-+ (id)allocWithZone:(NSZonePtr)_zone {
-    let host_object = Box::new(UIScreenModeHostObject {
-        size: CGSize { width: 0.0, height: 0.0 },
-        pixel_aspect_ratio: 1.0,
-    });
-    env.objc.alloc_object(this, host_object, &mut env.mem)
-}
-
-- (id)initWithSize:(CGSize)size pixelAspectRatio:(CGFloat)ratio {
-    let host = env.objc.borrow_mut::<UIScreenModeHostObject>(this);
-    host.size = size;
-    host.pixel_aspect_ratio = ratio;
-    this
-}
-
-- (CGSize)size {
-    env.objc.borrow::<UIScreenModeHostObject>(this).size
-}
-
-- (CGFloat)pixelAspectRatio {
-    env.objc.borrow::<UIScreenModeHostObject>(this).pixel_aspect_ratio
 }
 
 @end
