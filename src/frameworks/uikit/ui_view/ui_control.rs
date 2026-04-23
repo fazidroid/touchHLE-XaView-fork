@@ -359,6 +359,14 @@ forControlEvents:(UIControlEvents)events {
     - (())setBorderStyle:(crate::frameworks::foundation::NSInteger)style {
         println!("🎮 LOG: Caught [UITextField setBorderStyle:{}] via UIControl parent! Absorbing safely.", style);
     }
+    
+       // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Catch Autocorrect Styling
+    // ==========================================================
+- (())setAutocorrectionType:(i32)type {
+        println!("🎮 LOG: Caught [UITextField setAutocorrectionType:{}] via UIControl parent! Absorbing safely.", type);
+    }
+    
 
 // TODO: more triggers/targets/actions stuff
 
