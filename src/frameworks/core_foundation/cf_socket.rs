@@ -48,8 +48,18 @@ fn CFHTTPMessageCreateRequest(
     crate::objc::nil
 }
 
+fn CFHTTPMessageSetHeaderFieldValue(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+    _header_field: CFTypeRef,
+    _value: CFTypeRef,
+) {
+    log!("🎮 LOG: Caught CFHTTPMessageSetHeaderFieldValue. Absorbing safely!");
+}
+
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFSocketCreate(_, _, _, _, _, _, _)),
     export_c_func!(CFHTTPMessageCreateRequest(_, _, _, _)),
+    export_c_func!(CFHTTPMessageSetHeaderFieldValue(_, _, _, _)),
 ];
