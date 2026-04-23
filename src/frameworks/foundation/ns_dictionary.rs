@@ -506,15 +506,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 // - (void)removeObjectForKey:(id)key;
 // Note that it inherits from NSDictionary, so we must ensure we override
 // any default methods that would be inappropriate for mutability.
-@implementation NSMutableDictionary: NSDictionary
+@implementation NSDictionary: NSObject
 
 + (id)allocWithZone:(NSZonePtr)zone {
     // NSDictionary might be subclassed by something which needs allocWithZone:
     // to have the normal behaviour. Unimplemented: call superclass alloc then.
     
     // 🏎️ GAMELOFT BYPASS: Relax strict class check!
-    // assert!(this == env.objc.get_known_class("NSMutableDictionary", &mut env.mem));
-    msg_class![env; _touchHLE_NSMutableDictionary allocWithZone:zone]
+    // assert!(this == env.objc.get_known_class("NSDictionary", &mut env.mem));
+    msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
 }
 
 + (id)dictionaryWithCapacity:(NSUInteger)capacity {
