@@ -153,34 +153,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     let new: id = msg_class![env; NSMutableURLRequest alloc];
     let url: id = msg![env; this URL];
     let new: id = msg![env; new initWithURL:url];
-    
-    // Copy HTTP method
-    let method_ptr = env.objc.object_get_ivar(&env.mem, this, "_HTTPMethod");
-    if let Some(ptr) = method_ptr {
-        let method: id = env.mem.read(ptr.cast());
-        if method != nil {
-            () = msg![env; new setHTTPMethod:method];
-        }
+    let method: id = msg![env; this HTTPMethod];
+    if method != nil {
+        () = msg![env; new setHTTPMethod:method];
     }
-    
-    // Copy headers
-    let headers_ptr = env.objc.object_get_ivar(&env.mem, this, "_allHTTPHeaderFields");
-    if let Some(ptr) = headers_ptr {
-        let headers: id = env.mem.read(ptr.cast());
-        if headers != nil {
-            () = msg![env; new setAllHTTPHeaderFields:headers];
-        }
+    let headers: id = msg![env; this allHTTPHeaderFields];
+    if headers != nil {
+        () = msg![env; new setAllHTTPHeaderFields:headers];
     }
-    
-    // Copy body
-    let body_ptr = env.objc.object_get_ivar(&env.mem, this, "_HTTPBody");
-    if let Some(ptr) = body_ptr {
-        let body: id = env.mem.read(ptr.cast());
-        if body != nil {
-            () = msg![env; new setHTTPBody:body];
-        }
+    let body: id = msg![env; this HTTPBody];
+    if body != nil {
+        () = msg![env; new setHTTPBody:body];
     }
-    
     new
 }
 
