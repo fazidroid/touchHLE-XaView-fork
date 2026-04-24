@@ -178,8 +178,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         
         // Safety check to prevent crashing the app picker!
         if !env.is_app_picker {
-            let bundle_id = env.bundle.bundle_identifier();
-            is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
+            is_ea_game = env.bundle.bundle_identifier().starts_with("com.ea");
         }
 
         if is_ea_game {
@@ -220,31 +219,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation MPMoviePlayerViewController: UIViewController
 
-    - (id)initWithContentURL:(id)url {
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController initWithContentURL]. Returning dummy player!");
-        // Properly initialize the ViewController instead of returning nil!
-        crate::msg_super![env; this init]
-    }
-
-    - (id)moviePlayer {
-        // Return 'this' to trick the game into sending video commands to this object
-        this
-    }
-
-    - (())play { 
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController play]. Faking instant completion for Real Racing 2!");
-        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-        let finish_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-        let _: () = msg![env; center postNotificationName:finish_notif object:this];
-    }
-    
-    - (())stop { }
-    - (())setControlStyle:(i32)style { }
-    - (())setScalingMode:(i32)mode { }
-    
-- (())setFullscreen:(bool)fullscreen {
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController setFullscreen:{}]. Absorbing safely!", fullscreen);
-    }
+- (id)initWithContentURL:(id)url {
+    log!(
+        "TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?} ({:?})] -> nil",
+        this,
+        url,
+        ns_url::to_rust_path(env, url),
+    );
+    release(env, this);
+    nil // TODO
+}
 
 @end
 
