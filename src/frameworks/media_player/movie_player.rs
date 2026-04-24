@@ -50,6 +50,8 @@ pub const MPMoviePlayerContentPreloadDidFinishNotification: &str =
     "MPMoviePlayerContentPreloadDidFinishNotification";
 pub const MPMoviePlayerScalingModeDidChangeNotification: &str =
     "MPMoviePlayerScalingModeDidChangeNotification";
+pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
+    "MPMoviePlayerLoadStateDidChangeNotification";
 // TODO: More notifications?
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
@@ -71,6 +73,10 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMoviePlayerScalingModeDidChangeNotification",
         HostConstant::NSString(MPMoviePlayerScalingModeDidChangeNotification),
+    ),
+    (
+        "_MPMoviePlayerLoadStateDidChangeNotification",
+        HostConstant::NSString(MPMoviePlayerLoadStateDidChangeNotification),
     ),
     (
         "_MPMoviePlayerPlaybackDidFinishReasonUserInfoKey",
@@ -178,7 +184,8 @@ pub const CLASSES: ClassExports = objc_classes! {
         
         // Safety check to prevent crashing the app picker!
         if !env.is_app_picker {
-            is_ea_game = env.bundle.bundle_identifier().starts_with("com.ea");
+            let bundle_id = env.bundle.bundle_identifier();
+            is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
         }
 
         if is_ea_game {
@@ -219,16 +226,56 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation MPMoviePlayerViewController: UIViewController
 
-- (id)initWithContentURL:(id)url {
-    log!(
-        "TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?} ({:?})] -> nil",
-        this,
-        url,
-        ns_url::to_rust_path(env, url),
-    );
-    release(env, this);
-    nil // TODO
-}
+    - (id)initWithContentURL:(id)url {
+        log_dbg!("MPMoviePlayerViewController initWithContentURL: faking instant completion");
+
+        // Initialise the view controller normally so it has a valid object.
+        let this: id = crate::msg_super![env; this init];
+        if this == nil {
+            return nil;
+        }
+
+        // Fire notifications immediately so the game stops waiting for video.
+        // Real Racing 2 calls initWithContentURL: in a loop (66+ times) waiting
+        // for MPMoviePlayerLoadStateDidChangeNotification — it never calls play.
+
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+
+        // 1. Signal that the load state changed (video is "ready to play").
+        let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+        let _: () = msg![env; center postNotificationName:load_notif object:this];
+
+        // 2. Signal that duration is known.
+        let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(
+            env, "MPMovieDurationAvailableNotification".to_string());
+        let _: () = msg![env; center postNotificationName:duration_notif object:this];
+
+        // 3. Signal that playback is finished so the game moves past the intro.
+        let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+        let _: () = msg![env; center postNotificationName:finish_notif object:this];
+
+        this
+    }
+
+    - (id)moviePlayer {
+        // Return 'this' to trick the game into sending video commands to this object
+        this
+    }
+
+    - (())play { 
+        println!("🎮 LOG: Caught [MPMoviePlayerViewController play]. Faking instant completion for Real Racing 2!");
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+        let finish_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+        let _: () = msg![env; center postNotificationName:finish_notif object:this];
+    }
+    
+    - (())stop { }
+    - (())setControlStyle:(i32)style { }
+    - (())setScalingMode:(i32)mode { }
+    
+- (())setFullscreen:(bool)fullscreen {
+        println!("🎮 LOG: Caught [MPMoviePlayerViewController setFullscreen:{}]. Absorbing safely!", fullscreen);
+    }
 
 @end
 
