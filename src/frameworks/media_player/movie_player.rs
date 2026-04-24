@@ -226,67 +226,58 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation MPMoviePlayerViewController: UIViewController
 
 - (id)initWithContentURL:(id)url {
-    log_dbg!(
-        "MPMoviePlayerViewController initWithContentURL:{:?} — faking instant completion",
-        ns_url::to_rust_path(env, url),
-    );
+        let mut is_ea_game = false;
+        
+        // Check who the developer is before applying the bypass!
+        if !env.is_app_picker {
+            let bundle_id = env.bundle.bundle_identifier();
+            is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
+        }
 
-    // Initialise as a proper UIViewController so the object is valid.
-    let this: id = crate::msg_super![env; this init];
-    if this == nil {
-        return nil;
+        if is_ea_game {
+            println!("🎮 LOG: EA/Firemint Title Detected! Faking instant video completion.");
+            let this: id = crate::msg_super![env; this init];
+            if this == nil {
+                return nil;
+            }
+
+            let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+            
+            let load_notif = crate::frameworks::foundation::ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+            let _: () = msg![env; center postNotificationName:load_notif object:this];
+
+            let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
+            let _: () = msg![env; center postNotificationName:duration_notif object:this];
+
+            let finish_notif = crate::frameworks::foundation::ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+            let _: () = msg![env; center postNotificationName:finish_notif object:this];
+
+            this
+        } else {
+            println!("🎮 LOG: Gameloft Title Detected. Returning nil to preserve GT Racing!");
+            crate::objc::release(env, this);
+            crate::objc::nil
+        }
     }
 
-    // Real Racing 2 calls initWithContentURL: in a tight loop (66+ times)
-    // waiting for MPMoviePlayerLoadStateDidChangeNotification before it calls
-    // play. We fire all three signals immediately so the game moves past the
-    // intro without ever actually playing the video.
-    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+    - (id)moviePlayer { this }
 
-    // 1. Signal: video loaded and ready to play.
-    let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
-    let _: () = msg![env; center postNotificationName:load_notif object:this];
-
-    // 2. Signal: duration is known.
-    let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(
-        env, "MPMovieDurationAvailableNotification".to_string());
-    let _: () = msg![env; center postNotificationName:duration_notif object:this];
-
-    // 3. Signal: playback finished — game advances past intro screen.
-    let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
-    let _: () = msg![env; center postNotificationName:finish_notif object:this];
-
-    this
-}
-
-- (id)moviePlayer {
-    // Return self so the game can send video commands to this object.
-    this
-}
-
-- (())play {
-    // Fire finish notification in case the game calls play directly too.
-    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-    let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
-    let _: () = msg![env; center postNotificationName:finish_notif object:this];
-}
-
-- (())stop { }
-- (())pause { }
-- (())setControlStyle:(i32)_style { }
-- (())setScalingMode:(i32)_mode { }
-- (())setFullscreen:(bool)_fullscreen animated:(bool)_animated { }
-- (())setFullscreen:(bool)_fullscreen { }
-
-- (i32)loadState {
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController loadState]. Returning 3 (Playable & Playthrough OK)!");
-        // 3 tells the game the video is fully buffered and ready to play!
-        3
+    - (())play {
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+        let finish_notif = crate::frameworks::foundation::ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+        let _: () = msg![env; center postNotificationName:finish_notif object:this];
     }
 
- - (())setUseApplicationAudioSession:(bool)use_session {
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController setUseApplicationAudioSession:{}]. Absorbing safely!", use_session);
-    }
+    - (())stop { }
+    - (())pause { }
+    - (())setControlStyle:(i32)_style { }
+    - (())setScalingMode:(i32)_mode { }
+    - (())setFullscreen:(bool)_fullscreen animated:(bool)_animated { }
+    - (())setFullscreen:(bool)_fullscreen { }
+
+    - (i32)loadState { 3 }
+
+    - (())setUseApplicationAudioSession:(bool)use_session { }
 
 @end
 
