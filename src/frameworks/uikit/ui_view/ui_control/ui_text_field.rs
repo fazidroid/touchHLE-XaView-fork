@@ -408,15 +408,37 @@ pub fn handle_backspace(env: &mut Environment, text_field: id) {
 
 pub fn handle_return(env: &mut Environment, text_field: id) {
     log_dbg!("Calling handle_return for {:?}", text_field);
+
     let delegate: id = env
         .objc
         .borrow::<UITextFieldHostObject>(text_field)
         .delegate;
+
+    // Ask the delegate if we should process the Return key.
+    // If no delegate / delegate doesn't implement the method → assume YES.
     let sel: SEL = env
         .objc
         .register_host_selector("textFieldShouldReturn:".to_string(), &mut env.mem);
-    if msg![env; delegate respondsToSelector:sel] {
-        log_dbg!("handle_return");
-        () = msg![env; delegate textFieldShouldReturn:text_field];
+    let should_return: bool = if delegate != nil && msg![env; delegate respondsToSelector:sel] {
+        msg![env; delegate textFieldShouldReturn:text_field]
+    } else {
+        true
+    };
+
+    if !should_return {
+        return;
     }
+
+    // Dismiss the keyboard by resigning first responder.
+    // This in turn calls textFieldDidEndEditing: on the delegate so the
+    // game can read the typed text and proceed (e.g. save the profile name).
+    let _: bool = msg![env; text_field resignFirstResponder];
+
+    // Fire UIControlEventEditingDidEndOnExit (1 << 19) so any target-action
+    // pairs registered via addTarget:action:forControlEvents: are triggered.
+    // GT Racing Motor Academy uses this to confirm the profile name input.
+    use crate::frameworks::uikit::ui_view::ui_control::{
+        send_actions_from_text_field, UIControlEventEditingDidEndOnExit,
+    };
+    send_actions_from_text_field(env, text_field, UIControlEventEditingDidEndOnExit);
 }
