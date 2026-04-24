@@ -367,7 +367,7 @@ forControlEvents:(UIControlEvents)events {
     }
 
     - (())setText:(id)text {
-        let s = crate::frameworks::foundation::ns_string::to_rust_string(env, text);
+        let s = crate::frameworks::foundation::ns_string::to_rust_string(env, text).to_string();
         TEXT_STORE.lock().unwrap().insert(this.to_bits(), s);
     }
 
