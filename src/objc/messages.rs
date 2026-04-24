@@ -55,14 +55,29 @@ fn objc_msgSend_inner(
     // ==========================================================
     // 🏎️ THE SLEDGEHAMMER: Global Selector Intercepts
     // ==========================================================
-    if sel_name == "isSecureTextEntry" || sel_name == "modalViewController" || sel_name == "HTTPMethod" {
+    if sel_name == "isSecureTextEntry" || sel_name == "modalViewController" {
         println!("🎮 LOG: SLEDGEHAMMER BYPASS - Caught {} globally! Returning 0.", sel_name);
-        
         env.cpu.regs_mut()[0] = 0; 
         let lr = env.cpu.regs()[14]; 
         env.cpu.regs_mut()[15] = lr; 
-        
         return;
+    }
+
+    // 🔨 HAMMER 1.5: GT Racing 2 EXCLUSIVE URL Request Bypasses
+    if sel_name == "HTTPMethod" || sel_name == "allHTTPHeaderFields" {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: SLEDGEHAMMER BYPASS - Caught {} for GT Racing 2! Returning 0.", sel_name);
+            env.cpu.regs_mut()[0] = 0; 
+            let lr = env.cpu.regs()[14]; 
+            env.cpu.regs_mut()[15] = lr; 
+            return;
+        }
     }
     
     if receiver == nil {
