@@ -22,10 +22,6 @@ use crate::objc::{
 };
 use crate::Environment;
 
-/// Per-UITextField text storage keyed by object pointer bits.
-static TEXT_STORE: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<u32, String>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
-
 // TODO: There are many members of this enum missing.
 pub type UIControlEvents = NSUInteger;
 
@@ -351,48 +347,21 @@ forControlEvents:(UIControlEvents)events {
 }
 
 - (bool)canBecomeFirstResponder { true }
-    - (bool)becomeFirstResponder { true }
-    - (bool)isFirstResponder { true }
 
-    - (bool)resignFirstResponder {
-        // Notify the delegate that editing ended, then fire EditingDidEnd event.
-        log_dbg!("UIControl resignFirstResponder");
-        true
-    }
+- (bool)becomeFirstResponder { true }
 
-    - (bool)endEditing:(bool)_force {
-        log_dbg!("UIControl endEditing:");
-        true
-    }
+- (bool)isFirstResponder { true }
 
-    // UITextField text property — return actual keyboard input if available,
-    // otherwise fall back to a safe default name so profile creation works.
-    - (id)text {
-        let bits = this.to_bits();
-        let guard = TEXT_STORE.lock().unwrap();
-        let s = guard.get(&bits).cloned().unwrap_or_else(|| "Player".to_string());
-        drop(guard);
-        let ns = crate::frameworks::foundation::ns_string::from_rust_string(env, s);
-        crate::objc::autorelease(env, ns);
-        ns
-    }
+- (bool)resignFirstResponder {
+    // Base implementation — UITextField overrides this with the full
+    // keyboard-dismiss + delegate-callback logic.
+    true
+}
 
-    - (())setText:(id)text {
-        let s = crate::frameworks::foundation::ns_string::to_rust_string(env, text).to_string();
-        TEXT_STORE.lock().unwrap().insert(this.to_bits(), s);
-    }
-
-    // Called when the Return/Enter key is pressed in a UITextField.
-    // We call textFieldShouldReturn: on the delegate (if set), then fire
-    // UIControlEventEditingDidEndOnExit so registered targets are notified.
-    - (bool)textFieldShouldReturn:(id)_textField {
-        log_dbg!("UIControl textFieldShouldReturn: — forwarding to delegate and firing EditingDidEndOnExit");
-        // Fire the editing-did-end-on-exit control event so the game's
-        // action handler (e.g. "confirmName:") gets called.
-        let nil_event: id = crate::objc::nil;
-        send_actions(env, this, nil_event, UIControlEventEditingDidEndOnExit);
-        true
-    }
+- (bool)endEditing:(bool)_force {
+    // Base implementation — subclasses override as needed.
+    true
+}
 
 // TODO: more triggers/targets/actions stuff
 
