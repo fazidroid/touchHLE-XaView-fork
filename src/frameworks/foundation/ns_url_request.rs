@@ -149,6 +149,26 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 
+- (id)mutableCopyWithZone:(NSZonePtr)_zone {
+    // Create a new mutable request and copy the URL and headers
+    let new: id = msg_class![env; NSMutableURLRequest alloc];
+    let url: id = msg![env; this URL];
+    let new: id = msg![env; new initWithURL:url];
+    // Copy the HTTP method
+    if let Some(method) = env.objc.object_get_ivar(&env.mem, this, "_HTTPMethod") {
+        () = msg![env; new setHTTPMethod:*(method.cast())];
+    }
+    // Copy all HTTP headers
+    if let Some(headers) = env.objc.object_get_ivar(&env.mem, this, "_allHTTPHeaderFields") {
+        () = msg![env; new setAllHTTPHeaderFields:*(headers.cast())];
+    }
+    // Copy HTTP body
+    if let Some(body) = env.objc.object_get_ivar(&env.mem, this, "_HTTPBody") {
+        () = msg![env; new setHTTPBody:*(body.cast())];
+    }
+    new
+}
+
 - (())setHTTPMethod:(id)http_method { // NSString *
     if http_method == nil { return; }
     let http_method_copy = msg![env; http_method copy];
