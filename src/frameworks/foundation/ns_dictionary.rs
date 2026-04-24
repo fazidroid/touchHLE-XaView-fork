@@ -438,20 +438,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)init {
-    // Called on a custom NSDictionary subclass — initialise as an empty
-    // _touchHLE_NSDictionary so the object is usable. The subclass may
-    // override specific methods; this gives it a working base.
-    if this == nil {
-        return nil;
-    }
-    // If this is already a _touchHLE_NSDictionary instance, just return self.
-    let touchhle_cls = env.objc.get_known_class("_touchHLE_NSDictionary", &mut env.mem);
-    let this_cls = env.objc.get_obj_class(this, &mut env.mem);
-    if this_cls == touchhle_cls {
-        return this;
-    }
-    // For subclass instances, initialise the internal dict state to empty.
-    log_dbg!("NSDictionary -init: initialising subclass instance as empty dict");
+    // Called on a custom NSDictionary subclass — return self so the object
+    // is usable. The subclass may override specific methods on top of this.
+    log_dbg!("NSDictionary -init: returning self for subclass instance");
     this
 }
 
