@@ -127,6 +127,28 @@ pub const CLASSES: ClassExports = objc_classes! {
     println!("🎮 LOG: NSMutableURLRequest setTimeoutInterval: {} safely absorbed!", timeout_interval);
 }
 
+- (())addValue:(id)value // NSString*
+    forHTTPHeaderField:(id)field { // NSString*
+    if value == nil || field == nil { return; }
+    log_dbg!("[(NSMutableURLRequest*){:?} addValue:'{}' forHTTPHeaderField:'{}']", this, to_rust_string(env, value), to_rust_string(env, field));
+
+    let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
+    let http_header_fields = host_obj.http_header_fields;
+
+    // Check if a value already exists for this field
+    let existing_value: id = msg![env; http_header_fields objectForKey:field];
+    if existing_value != nil {
+        // Append the new value with a comma separator
+        let separator = ns_string::get_static_str(env, ", ");
+        let combined = msg![env; existing_value stringByAppendingString:separator];
+        let combined = msg![env; combined stringByAppendingString:value];
+        () = msg![env; http_header_fields setObject:combined forKey:field];
+    } else {
+        // No existing value, just set it
+        () = msg![env; http_header_fields setObject:value forKey:field];
+    }
+}
+
 - (())setHTTPMethod:(id)http_method { // NSString *
     if http_method == nil { return; }
     let http_method_copy = msg![env; http_method copy];
