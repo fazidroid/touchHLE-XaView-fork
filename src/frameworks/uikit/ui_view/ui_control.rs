@@ -357,13 +357,18 @@ forControlEvents:(UIControlEvents)events {
     // UITextField text property — return actual keyboard input if available,
     // otherwise fall back to a safe default name so profile creation works.
     - (id)text {
-        let text = crate::frameworks::uikit::ui_view::ui_control::ui_text_field::get_text(env, this);
-        crate::frameworks::foundation::ns_string::from_rust_string(env, text)
+        let bits = this.to_bits();
+        let guard = TEXT_STORE.lock().unwrap();
+        let s = guard.get(&bits).cloned().unwrap_or_else(|| "Player".to_string());
+        drop(guard);
+        let ns = crate::frameworks::foundation::ns_string::from_rust_string(env, s);
+        crate::objc::autorelease(env, ns);
+        ns
     }
 
     - (())setText:(id)text {
         let s = crate::frameworks::foundation::ns_string::to_rust_string(env, text);
-        crate::frameworks::uikit::ui_view::ui_control::ui_text_field::set_text(env, this, s);
+        TEXT_STORE.lock().unwrap().insert(this.to_bits(), s);
     }
 
     // Called when the Return/Enter key is pressed in a UITextField.
