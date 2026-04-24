@@ -379,10 +379,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSDictionary: NSObject
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    // NSDictionary might be subclassed by something which needs allocWithZone:
-    // to have the normal behaviour. Unimplemented: call superclass alloc then.
-    assert!(this == env.objc.get_known_class("NSDictionary", &mut env.mem));
-    msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
+    // NSDictionary is subclassed by apps (e.g. GT Racing 2 uses a custom
+    // NSDictionary subclass). When called on a subclass, fall through to the
+    // normal NSObject allocWithZone: behaviour so the subclass gets its own
+    // memory. Only redirect to our internal implementation when called directly
+    // on NSDictionary itself.
+    if this == env.objc.get_known_class("NSDictionary", &mut env.mem) {
+        msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
+    } else {
+        // Subclass: allocate normally via NSObject and return the instance.
+        log_dbg!("NSDictionary allocWithZone: called on subclass, using NSObject alloc");
+        msg![env; (env.objc.get_known_class("NSObject", &mut env.mem)) alloc]
+    }
 }
 
 + (id)dictionary {
@@ -430,7 +438,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)init {
-    todo!("TODO: Implement [dictionary init] for custom subclasses")
+    // Called on a custom NSDictionary subclass — initialise as an empty
+    // _touchHLE_NSDictionary so the object is usable. The subclass may
+    // override specific methods; this gives it a working base.
+    if this == nil {
+        return nil;
+    }
+    // If this is already a _touchHLE_NSDictionary instance, just return self.
+    let touchhle_cls = env.objc.get_known_class("_touchHLE_NSDictionary", &mut env.mem);
+    let this_cls = env.objc.get_obj_class(this, &mut env.mem);
+    if this_cls == touchhle_cls {
+        return this;
+    }
+    // For subclass instances, initialise the internal dict state to empty.
+    log_dbg!("NSDictionary -init: initialising subclass instance as empty dict");
+    this
 }
 
 // These probably comes from some category related to plists.
