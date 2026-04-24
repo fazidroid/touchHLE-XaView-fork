@@ -241,6 +241,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     - (())stop { }
     - (())setControlStyle:(i32)style { }
     - (())setScalingMode:(i32)mode { }
+    
+- (())setFullscreen:(bool)fullscreen {
+        println!("🎮 LOG: Caught [MPMoviePlayerViewController setFullscreen:{}]. Absorbing safely!", fullscreen);
+    }
 
 @end
 
