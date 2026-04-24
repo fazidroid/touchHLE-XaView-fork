@@ -94,6 +94,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)toJSONAs:(id)arg0 excludingInArray:(id)arg1 withTranslations:(id)arg2 {
+    log!("NSObject toJSONAs:excludingInArray:withTranslations: stub called, returning nil");
+    nil
+}
+
 - (id)init {
     this
 }
