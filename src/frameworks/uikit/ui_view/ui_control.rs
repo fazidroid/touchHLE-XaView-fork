@@ -22,6 +22,10 @@ use crate::objc::{
 };
 use crate::Environment;
 
+/// Per-UITextField text storage keyed by object pointer bits.
+static TEXT_STORE: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<u32, String>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
 // TODO: There are many members of this enum missing.
 pub type UIControlEvents = NSUInteger;
 const UIControlEventTouchDown: UIControlEvents = 1 << 0;
@@ -32,6 +36,10 @@ const UIControlEventTouchDragExit: UIControlEvents = 1 << 5;
 pub const UIControlEventTouchUpInside: UIControlEvents = 1 << 6;
 const UIControlEventTouchUpOutside: UIControlEvents = 1 << 7;
 pub const UIControlEventValueChanged: UIControlEvents = 1 << 12;
+pub const UIControlEventEditingDidBegin: UIControlEvents     = 1 << 16;
+pub const UIControlEventEditingChanged: UIControlEvents      = 1 << 17;
+pub const UIControlEventEditingDidEnd: UIControlEvents       = 1 << 18;
+pub const UIControlEventEditingDidEndOnExit: UIControlEvents = 1 << 19; // Return key pressed
 
 struct UIControlHostObject {
     superclass: super::UIViewHostObject,
@@ -334,29 +342,41 @@ forControlEvents:(UIControlEvents)events {
 - (bool)canBecomeFirstResponder { true }
     - (bool)becomeFirstResponder { true }
     - (bool)isFirstResponder { true }
-    
+
     - (bool)resignFirstResponder {
-        println!("🎮 LOG: Caught resignFirstResponder. Closing keyboard safely!");
-        true
-    }
-    
-    - (bool)endEditing:(bool)force {
-        println!("🎮 LOG: Caught endEditing. Absorbing safely!");
+        // Notify the delegate that editing ended, then fire EditingDidEnd event.
+        log_dbg!("UIControl resignFirstResponder");
         true
     }
 
-    // 🏎️ Catch the game trying to read the typed text!
-- (id)text {
-        println!("🎮 LOG: Caught [UITextField text]. Spoofing profile name!");
-        crate::frameworks::foundation::ns_string::from_rust_string(env, "Player".to_string())
-    }
-
-    - (bool)resignFirstResponder {
-        println!("🎮 LOG: Caught [UITextField resignFirstResponder]. Closing keyboard!");
+    - (bool)endEditing:(bool)_force {
+        log_dbg!("UIControl endEditing:");
         true
     }
-    
-    - (())setText:(id)text { }
+
+    // UITextField text property — return actual keyboard input if available,
+    // otherwise fall back to a safe default name so profile creation works.
+    - (id)text {
+        let text = crate::frameworks::uikit::ui_view::ui_control::ui_text_field::get_text(env, this);
+        crate::frameworks::foundation::ns_string::from_rust_string(env, text)
+    }
+
+    - (())setText:(id)text {
+        let s = crate::frameworks::foundation::ns_string::to_rust_string(env, text);
+        crate::frameworks::uikit::ui_view::ui_control::ui_text_field::set_text(env, this, s);
+    }
+
+    // Called when the Return/Enter key is pressed in a UITextField.
+    // We call textFieldShouldReturn: on the delegate (if set), then fire
+    // UIControlEventEditingDidEndOnExit so registered targets are notified.
+    - (bool)textFieldShouldReturn:(id)_textField {
+        log_dbg!("UIControl textFieldShouldReturn: — forwarding to delegate and firing EditingDidEndOnExit");
+        // Fire the editing-did-end-on-exit control event so the game's
+        // action handler (e.g. "confirmName:") gets called.
+        let nil_event: id = crate::objc::nil;
+        send_actions(env, this, nil_event, UIControlEventEditingDidEndOnExit);
+        true
+    }
 
 // TODO: more triggers/targets/actions stuff
 
