@@ -278,6 +278,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setFullscreen:(bool)_fullscreen animated:(bool)_animated { }
 - (())setFullscreen:(bool)_fullscreen { }
 
+- (i32)loadState {
+        println!("🎮 LOG: Caught [MPMoviePlayerViewController loadState]. Returning 3 (Playable & Playthrough OK)!");
+        // 3 tells the game the video is fully buffered and ready to play!
+        3
+    }
+
+ - (())setUseApplicationAudioSession:(bool)use_session {
+        println!("🎮 LOG: Caught [MPMoviePlayerViewController setUseApplicationAudioSession:{}]. Absorbing safely!", use_session);
+    }
+
 @end
 
 };
