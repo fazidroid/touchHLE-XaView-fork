@@ -87,6 +87,12 @@ pub const CLASSES: ClassExports = objc_classes! {
         println!("🎮 LOG: Caught [NSObject dictionaryWithValuesForKeys:]. Returning nil to bypass Burstly SDK!");
         crate::objc::nil
     }
+    
+- (id)initWithDictionary:(id)dict {
+    log!("NSObject initWithDictionary: stub called (class: {})", 
+         env.objc.get_class_name(ObjC::read_isa(this, &env.mem)));
+    this
+}
 
 - (id)init {
     this
