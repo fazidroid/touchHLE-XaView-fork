@@ -23,6 +23,7 @@ use crate::objc::{
     NSZonePtr, SEL,
 };
 use crate::Environment;
+use super::{send_actions_from_text_field, UIControlEventEditingDidEndOnExit};
 
 type UIKeyboardAppearance = NSInteger;
 type UIKeyboardType = NSInteger;
@@ -414,31 +415,25 @@ pub fn handle_return(env: &mut Environment, text_field: id) {
         .borrow::<UITextFieldHostObject>(text_field)
         .delegate;
 
-    // Ask the delegate if we should process the Return key.
-    // If no delegate / delegate doesn't implement the method → assume YES.
-    let sel: SEL = env
-        .objc
-        .register_host_selector("textFieldShouldReturn:".to_string(), &mut env.mem);
-    let should_return: bool = if delegate != nil && msg![env; delegate respondsToSelector:sel] {
-        msg![env; delegate textFieldShouldReturn:text_field]
-    } else {
-        true
-    };
-
-    if !should_return {
-        return;
+    // Ask the delegate whether editing should end. Default is YES.
+    let mut should_return = true;
+    if delegate != nil {
+        let sel: SEL = env
+            .objc
+            .register_host_selector("textFieldShouldReturn:".to_string(), &mut env.mem);
+        let responds: bool = msg![env; delegate respondsToSelector:sel];
+        if responds {
+            log_dbg!("handle_return: calling textFieldShouldReturn:");
+            should_return = msg![env; delegate textFieldShouldReturn:text_field];
+        }
     }
 
-    // Dismiss the keyboard by resigning first responder.
-    // This in turn calls textFieldDidEndEditing: on the delegate so the
-    // game can read the typed text and proceed (e.g. save the profile name).
-    let _: bool = msg![env; text_field resignFirstResponder];
+    if should_return {
+        // Fire UIControlEventEditingDidEndOnExit so any addTarget:action:forControlEvents:
+        // handler registered by the game (e.g. "confirmName:") gets invoked.
+        send_actions_from_text_field(env, text_field, UIControlEventEditingDidEndOnExit);
 
-    // Fire UIControlEventEditingDidEndOnExit (1 << 19) so any target-action
-    // pairs registered via addTarget:action:forControlEvents: are triggered.
-    // GT Racing Motor Academy uses this to confirm the profile name input.
-    use crate::frameworks::uikit::ui_view::ui_control::{
-        send_actions_from_text_field, UIControlEventEditingDidEndOnExit,
-    };
-    send_actions_from_text_field(env, text_field, UIControlEventEditingDidEndOnExit);
+        // Dismiss the keyboard — this also fires textFieldDidEndEditing: on the delegate.
+        let _: bool = msg![env; text_field resignFirstResponder];
+    }
 }
