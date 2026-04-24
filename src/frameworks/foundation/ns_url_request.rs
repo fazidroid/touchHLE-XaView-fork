@@ -140,8 +140,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     if existing_value != nil {
         // Append the new value with a comma separator
         let separator = ns_string::get_static_str(env, ", ");
-        let combined = msg![env; existing_value stringByAppendingString:separator];
-        let combined = msg![env; combined stringByAppendingString:value];
+        let combined: id = msg![env; existing_value stringByAppendingString:separator];
+        let combined: id = msg![env; combined stringByAppendingString:value];
         () = msg![env; http_header_fields setObject:combined forKey:field];
     } else {
         // No existing value, just set it
