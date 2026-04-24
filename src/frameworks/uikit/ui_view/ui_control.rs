@@ -28,6 +28,17 @@ static TEXT_STORE: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMa
 
 // TODO: There are many members of this enum missing.
 pub type UIControlEvents = NSUInteger;
+
+/// Exposed for use by `ui_text_field::handle_return` so it can fire
+/// `UIControlEventEditingDidEndOnExit` after the Return key is pressed.
+pub fn send_actions_from_text_field(
+    env: &mut Environment,
+    text_field: id,
+    control_event: UIControlEvents,
+) {
+    let nil_event: id = nil;
+    send_actions(env, text_field, nil_event, control_event);
+}
 const UIControlEventTouchDown: UIControlEvents = 1 << 0;
 const UIControlEventTouchDragInside: UIControlEvents = 1 << 2;
 const UIControlEventTouchDragOutside: UIControlEvents = 1 << 3;
