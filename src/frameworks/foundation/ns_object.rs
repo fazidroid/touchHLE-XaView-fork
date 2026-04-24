@@ -286,17 +286,44 @@ forUndefinedKey:(id)key { // NSString*
         log!("Applying game-specific hack for AssassinsCreed: ignoring performSelectorOnMainThread:SEL(moviePlayerInit:) waitUntilDone:true");
         return;
     }
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.Ferrari") && wait {
-        if sel == env.objc.lookup_selector("startMovie:").unwrap() {
-            log!("Applying game-specific hack for Ferrari GT: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
+    // Ferrari GT and GT Racing Motor Academy share the same Gameloft engine
+    // and the same UITextField dispatch pattern.
+    let is_ferrari_or_gtracing = env.bundle.bundle_identifier().starts_with("com.gameloft.Ferrari")
+        || env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing");
+    if is_ferrari_or_gtracing && wait {
+        if sel == env.objc.lookup_selector("startMovie:").unwrap()
+            || sel == env.objc.lookup_selector("stopMovie:").unwrap()
+        {
+            log!("Applying game-specific hack for Ferrari/GTRacing: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
             return;
         }
-        if sel == env.objc.lookup_selector("initTextInput:").unwrap() ||
-            sel == env.objc.lookup_selector("removeTextField:").unwrap() {
-            log!("Applying game-specific hack for Ferrari GT: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
+        if sel == env.objc.lookup_selector("initTextInput:").unwrap()
+            || sel == env.objc.lookup_selector("removeTextField:").unwrap()
+            || sel == env.objc.lookup_selector("showTextField:").unwrap()
+            || sel == env.objc.lookup_selector("hideTextField:").unwrap()
+            || sel == env.objc.lookup_selector("dismissKeyboard").unwrap()
+            || sel == env.objc.lookup_selector("dismissKeyboard:").unwrap()
+        {
+            log!("Applying game-specific hack for Ferrari/GTRacing: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
+            if sel.as_str(&env.mem).ends_with(':') {
+                () = msg_send(env, (this, sel, arg));
+            } else {
+                assert!(arg.is_null());
+                () = msg_send(env, (this, sel));
+            }
+            return;
+        }
+        // For any other waitUntilDone:true selector in this engine, execute
+        // it immediately on the current thread rather than ignoring it.
+        // This prevents the game from blocking forever on UI setup calls.
+        log!("Applying game-specific hack for Ferrari/GTRacing: executing performSelectorOnMainThread:SEL({}) on current thread {}", sel.as_str(&env.mem), env.current_thread);
+        if sel.as_str(&env.mem).ends_with(':') {
             () = msg_send(env, (this, sel, arg));
-            return;
+        } else {
+            assert!(arg.is_null());
+            () = msg_send(env, (this, sel));
         }
+        return;
     }
     if env.bundle.bundle_identifier().starts_with("com.gameloft.HOS2") && wait {
         if sel == env.objc.lookup_selector("loadMovie:").unwrap() ||
