@@ -22,7 +22,7 @@ use crate::frameworks::foundation::ns_file_manager::{
 use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::objc::{
-    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports,
+    autorelease, id, msg, msg_class, msg_send, nil, objc_classes, release, retain, Class, ClassExports,
     HostObject, NSZonePtr,
 };
 use crate::{impl_HostObject_with_superclass, Environment};
@@ -597,16 +597,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)keysSortedByValueUsingSelector:(SEL)comparator {
     let keys: id = msg![env; this allKeys];
     let count: NSUInteger = msg![env; keys count];
-    let mut vec: Vec<id> = (0..count).map(|i| {
+    let mut vec: Vec<id> = Vec::with_capacity(count as usize);
+    for i in 0..count {
         let key: id = msg![env; keys objectAtIndex:i];
-        key
-    }).collect();
+        vec.push(key);
+    }
     
-    // Sort keys by comparing their associated values using the comparator selector
     vec.sort_by(|a, b| {
-        let val_a: id = msg![env; this objectForKey:*a];
-        let val_b: id = msg![env; this objectForKey:*b];
-        let ordering: NSComparisonResult = msg_send(env, (val_a, comparator, val_b));
+        let val_a: id = msg![env; this objectForKey:a];
+        let val_b: id = msg![env; this objectForKey:b];
+        let ordering: i32 = msg_send(env, (val_a, comparator, val_b));
         if ordering < 0 {
             core::cmp::Ordering::Less
         } else if ordering > 0 {
@@ -723,15 +723,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)keysSortedByValueUsingSelector:(SEL)comparator {
     let keys: id = msg![env; this allKeys];
     let count: NSUInteger = msg![env; keys count];
-    let mut vec: Vec<id> = (0..count).map(|i| {
+    let mut vec: Vec<id> = Vec::with_capacity(count as usize);
+    for i in 0..count {
         let key: id = msg![env; keys objectAtIndex:i];
-        key
-    }).collect();
+        vec.push(key);
+    }
     
     vec.sort_by(|a, b| {
-        let val_a: id = msg![env; this objectForKey:*a];
-        let val_b: id = msg![env; this objectForKey:*b];
-        let ordering: NSComparisonResult = msg_send(env, (val_a, comparator, val_b));
+        let val_a: id = msg![env; this objectForKey:a];
+        let val_b: id = msg![env; this objectForKey:b];
+        let ordering: i32 = msg_send(env, (val_a, comparator, val_b));
         if ordering < 0 {
             core::cmp::Ordering::Less
         } else if ordering > 0 {
