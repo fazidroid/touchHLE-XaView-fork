@@ -29,8 +29,18 @@ const CLASSES: ClassExports = objc_classes! {
 @implementation CMMotionManager: NSObject
 
 + (id)allocWithZone:(NSZonePtr)_zone {
-    env.objc.alloc_object(this, Box::new(CMMotionManagerHostObject), &mut env.mem)
-}
+        let mut is_gtr2 = false;
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: GT Racing 2 Detected! Killing CMMotionManager to force UIAccelerometer tilt fallback!");
+            return nil; // This triggers the game's fallback!
+        }
+        
+        env.objc.alloc_object(this, Box::new(CMMotionManagerHostObject), &mut env.mem)
+    }
 - (id)init { this }
 
 - (bool)isGyroAvailable { false }
