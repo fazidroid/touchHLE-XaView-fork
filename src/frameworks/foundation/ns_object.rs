@@ -88,6 +88,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this description]
 }
 
+- (())performSelector:(SEL)sel onThread:(id)_thread withObject:(id)arg waitUntilDone:(bool)wait {
+    log_dbg!("NSObject performSelector:onThread:withObject:waitUntilDone: stub (sel: {}, wait: {})", sel.as_str(&env.mem), wait);
+    // For simplicity, perform immediately. The thread and wait flag are ignored.
+    if sel.as_str(&env.mem).ends_with(':') {
+        () = msg_send(env, (this, sel, arg));
+    } else {
+        () = msg_send(env, (this, sel));
+    }
+}
+
 - (id)dictionaryWithValuesForKeys:(id)keys {
         println!("🎮 LOG: Caught [NSObject dictionaryWithValuesForKeys:]. Returning nil to bypass Burstly SDK!");
         crate::objc::nil
