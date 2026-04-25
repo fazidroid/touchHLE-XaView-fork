@@ -594,6 +594,32 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
+- (id)keysSortedByValueUsingSelector:(SEL)comparator {
+    let keys: id = msg![env; this allKeys];
+    let count: NSUInteger = msg![env; keys count];
+    let mut vec: Vec<id> = (0..count).map(|i| {
+        let key: id = msg![env; keys objectAtIndex:i];
+        key
+    }).collect();
+    
+    // Sort keys by comparing their associated values using the comparator selector
+    vec.sort_by(|a, b| {
+        let val_a: id = msg![env; this objectForKey:*a];
+        let val_b: id = msg![env; this objectForKey:*b];
+        let ordering: NSComparisonResult = msg_send(env, (val_a, comparator, val_b));
+        if ordering < 0 {
+            core::cmp::Ordering::Less
+        } else if ordering > 0 {
+            core::cmp::Ordering::Greater
+        } else {
+            core::cmp::Ordering::Equal
+        }
+    });
+    
+    let sorted_keys = ns_array::from_vec(env, vec);
+    autorelease(env, sorted_keys)
+}
+
 - (id)initWithObjectsAndKeys:(id)first_object, ...dots {
     init_with_objects_and_keys(env, this, first_object, dots.start())
 }
@@ -692,6 +718,31 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)allocWithZone:(NSZonePtr)_zone {
     let host_object = Box::<DictionaryHostObject>::default();
     env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
+- (id)keysSortedByValueUsingSelector:(SEL)comparator {
+    let keys: id = msg![env; this allKeys];
+    let count: NSUInteger = msg![env; keys count];
+    let mut vec: Vec<id> = (0..count).map(|i| {
+        let key: id = msg![env; keys objectAtIndex:i];
+        key
+    }).collect();
+    
+    vec.sort_by(|a, b| {
+        let val_a: id = msg![env; this objectForKey:*a];
+        let val_b: id = msg![env; this objectForKey:*b];
+        let ordering: NSComparisonResult = msg_send(env, (val_a, comparator, val_b));
+        if ordering < 0 {
+            core::cmp::Ordering::Less
+        } else if ordering > 0 {
+            core::cmp::Ordering::Greater
+        } else {
+            core::cmp::Ordering::Equal
+        }
+    });
+    
+    let sorted_keys = ns_array::from_vec(env, vec);
+    autorelease(env, sorted_keys)
 }
 
 - (())dealloc {
