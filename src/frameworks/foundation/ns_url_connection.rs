@@ -40,7 +40,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- (void)cancel {
+- ()cancel {
     println!("🛡️ GAMELOFT BYPASS: Ignored NSURLConnection cancel");
 }
 
