@@ -71,6 +71,24 @@ fn objc_msgSend_inner(
             return;
         }
     }
+
+    if sel_name == "orientation" {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: SLEDGEHAMMER BYPASS - Spoofing UIDevice orientation for GT Racing 2!");
+            // 4 corresponds to LandscapeLeft / LandscapeRight depending on your physical device.
+            // If the screen is STILL upside down after building, simply change this 4 to a 3!
+            env.cpu.regs_mut()[0] = 4; 
+            let lr = env.cpu.regs()[14]; 
+            env.cpu.regs_mut()[15] = lr; 
+            return;
+        }
+    }
     
     // ==========================================================
     // 🏎️ THE SLEDGEHAMMER: Global Selector Intercepts
