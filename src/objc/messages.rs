@@ -55,7 +55,7 @@ fn objc_msgSend_inner(
     // ==========================================================
     // 🏎️ THE SLEDGEHAMMER: Global Selector Intercepts
     // ==========================================================
-    if sel_name == "isSecureTextEntry" || sel_name == "modalViewController" {
+    if sel_name == "modalViewController" {
         println!("🎮 LOG: SLEDGEHAMMER BYPASS - Caught {} globally! Returning 0.", sel_name);
         env.cpu.regs_mut()[0] = 0; 
         let lr = env.cpu.regs()[14]; 
