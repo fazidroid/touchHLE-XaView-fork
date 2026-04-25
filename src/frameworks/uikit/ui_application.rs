@@ -145,12 +145,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (UIInterfaceOrientation)statusBarOrientation {
-    match env.window().current_rotation() {
-        DeviceOrientation::Portrait => UIDeviceOrientationPortrait,
-        DeviceOrientation::LandscapeLeft => UIDeviceOrientationLandscapeLeft,
-        DeviceOrientation::LandscapeRight => UIDeviceOrientationLandscapeRight
+        let mut is_gtr2 = false;
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+
+        match env.window().current_rotation() {
+            DeviceOrientation::Portrait => UIDeviceOrientationPortrait,
+            DeviceOrientation::LandscapeLeft => {
+                if is_gtr2 {
+                    UIDeviceOrientationLandscapeRight // Spoof the opposite!
+                } else {
+                    UIDeviceOrientationLandscapeLeft
+                }
+            },
+            DeviceOrientation::LandscapeRight => {
+                if is_gtr2 {
+                    UIDeviceOrientationLandscapeLeft // Spoof the opposite!
+                } else {
+                    UIDeviceOrientationLandscapeRight
+                }
+            }
+        }
     }
-}
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation {
         // 1. Check the bundle ID *before* we lock the environment!
         let mut is_gtr2 = false;
