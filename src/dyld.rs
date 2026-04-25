@@ -905,6 +905,36 @@ impl Dyld {
             }
             return Some(&(fake_sec_item as fn(&mut crate::Environment, u32, u32) -> i32));
         }
+        
+        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6__initEPKcm" {
+            fn fake_libcxx_string_init(
+                env: &mut crate::Environment,
+                this_ptr: crate::mem::MutPtr<u8>,
+                str_src: crate::mem::ConstPtr<u8>,
+                size: u32,
+            ) -> crate::mem::MutPtr<u8> {
+                println!("🎮 LOG: Caught C++ std::string::__init! Faking safe string memory.");
+                
+                // Real Racing 2's libc++ expects the initialized string pointer to be returned.
+                // We'll write an empty null terminator to the start of the 'this' object
+                // to trick the C++ engine into thinking it's a valid empty string!
+                env.mem.write(this_ptr, 0u8);
+                
+                // Return the pointer back to the C++ runtime
+                this_ptr
+            }
+            return Some(
+                &(fake_libcxx_string_init
+                    as fn(
+                        &mut crate::Environment,
+                        crate::mem::MutPtr<u8>,
+                        crate::mem::ConstPtr<u8>,
+                        u32,
+                    ) -> crate::mem::MutPtr<u8>),
+            );
+        }
+
+        panic!("Call to unimplemented function {symbol}");
 
         // ==========================================================
         // 🏎️ GT RACING 2 BYPASS: Stub __dyld_image_count
