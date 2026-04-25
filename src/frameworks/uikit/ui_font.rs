@@ -132,6 +132,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     let new = env.objc.alloc_object(this, Box::new(host_object), &mut env.mem);
     autorelease(env, new)
 }
++ (CGFloat)systemFontSize {
+        14.0 // Standard default iOS system font size
+    }
+
+    + (CGFloat)smallSystemFontSize {
+        12.0
+    }
+
+    + (CGFloat)labelFontSize {
+        17.0
+    }
+
+    + (CGFloat)buttonFontSize {
+        18.0
+    }
 
 - (CGFloat)ascender {
     let host_object = env.objc.borrow::<UIFontHostObject>(this);
