@@ -7,6 +7,8 @@
 
 use crate::objc::{autorelease, id, msg, nil, objc_classes, retain, ClassExports};
 
+type void = (); // <-- add this
+
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
@@ -40,7 +42,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
-- ()cancel {
+- (void)cancel {
     println!("🛡️ GAMELOFT BYPASS: Ignored NSURLConnection cancel");
 }
 
