@@ -613,6 +613,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<DictionaryHostObject>(this).count
 }
 - (id)objectForKey:(id)key {
+    if this == nil || key == nil {
+        return nil;
+    }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let res = host_obj.lookup(env, key);
     *env.objc.borrow_mut(this) = host_obj;
