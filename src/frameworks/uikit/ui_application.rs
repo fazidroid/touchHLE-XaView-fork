@@ -70,9 +70,9 @@ pub const UIInterfaceOrientationPortrait: UIInterfaceOrientation = UIDeviceOrien
 pub const UIInterfaceOrientationPortraitUpsideDown: UIInterfaceOrientation =
     UIDeviceOrientationPortraitUpsideDown;
 pub const UIInterfaceOrientationLandscapeLeft: UIInterfaceOrientation =
-    UIDeviceOrientationLandscapeRight;
-pub const UIInterfaceOrientationLandscapeRight: UIInterfaceOrientation =
     UIDeviceOrientationLandscapeLeft;
+pub const UIInterfaceOrientationLandscapeRight: UIInterfaceOrientation =
+    UIDeviceOrientationLandscapeRight;
 
 type UIRemoteNotificationType = NSUInteger;
 type UIStatusBarAnimation = NSInteger;
@@ -154,14 +154,14 @@ pub const CLASSES: ClassExports = objc_classes! {
             DeviceOrientation::Portrait => UIDeviceOrientationPortrait,
             DeviceOrientation::LandscapeLeft => {
                 if is_gtr2 {
-                    UIDeviceOrientationLandscapeRight // Spoof the opposite!
+                    UIDeviceOrientationLandscapeRight // 🏎️ Spoof the opposite!
                 } else {
                     UIDeviceOrientationLandscapeLeft
                 }
             },
             DeviceOrientation::LandscapeRight => {
                 if is_gtr2 {
-                    UIDeviceOrientationLandscapeLeft // Spoof the opposite!
+                    UIDeviceOrientationLandscapeLeft // 🏎️ Spoof the opposite!
                 } else {
                     UIDeviceOrientationLandscapeRight
                 }
