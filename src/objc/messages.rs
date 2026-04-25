@@ -48,23 +48,6 @@ fn objc_msgSend_inner(
 
     // 1. Define sel_name FIRST so all of our hacks can use it!
     let sel_name = selector.as_str(&env.mem);
-
-    if !receiver.is_null() {
-        // Read the class of the object that is asking for the method
-        let receiver_class = crate::objc::ObjC::read_isa(receiver, &env.mem);
-        let class_name = env.objc.get_class_name(receiver_class);
-        
-        // If it's the Ad Manager, block the call entirely!
-        if class_name == "OAIAdManager" || class_name == "OAICachingAdManager" {
-            println!("🎮 LOG: ADWARE ASSASSIN - Blocked '{}' on {}!", sel_name, class_name);
-            
-            // Safely return 0 (void/nil) to bypass the ad request
-            env.cpu.regs_mut()[0] = 0; 
-            let lr = env.cpu.regs()[14]; 
-            env.cpu.regs_mut()[15] = lr; 
-            return;
-        }
-    }
     
     // TraceAudioCalls
     if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
@@ -180,6 +163,12 @@ fn objc_msgSend_inner(
                 is_metaclass,
                 ..
             } = class_host_object.as_any().downcast_ref().unwrap();
+
+            if name == "OAIAdManager" || name == "OAICachingAdManager" {
+                println!("🎮 LOG: ADWARE ASSASSIN - Safely blocked '{}' on {}!", selector.as_str(&env.mem), name);
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
 
             // BypassMethodSelector
             if selector.as_str(&env.mem) == "methodForSelector:" {
