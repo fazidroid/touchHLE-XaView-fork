@@ -37,9 +37,23 @@ const CLASSES: ClassExports = objc_classes! {
 - (bool)isDeviceMotionAvailable { false }
 - (bool)isAccelerometerAvailable { true }
 
-- (())setAccelerometerUpdateInterval:(f64)_interval {}
-- (())startAccelerometerUpdates {}
-- (())stopAccelerometerUpdates {}
+    - (())setAccelerometerUpdateInterval:(f64)interval {
+        println!("🎮 LOG: Caught [CMMotionManager setAccelerometerUpdateInterval:{}].", interval);
+    }
+    
+    - (())startAccelerometerUpdates {}
+
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Absorb CoreMotion Tilt Requests
+    // ==========================================================
+    - (())startAccelerometerUpdatesToQueue:(id)queue withHandler:(id)handler {
+        println!("🎮 LOG: Caught [CMMotionManager startAccelerometerUpdatesToQueue:withHandler:]. Absorbing safely!");
+    }
+
+    - (())stopAccelerometerUpdates {
+        println!("🎮 LOG: Caught [CMMotionManager stopAccelerometerUpdates]. Absorbing safely!");
+    }
+
 - (())setGyroUpdateInterval:(f64)_interval {}
 - (())startGyroUpdates {}
 - (())setDeviceMotionUpdateInterval:(f64)_interval {}
