@@ -237,49 +237,16 @@ pub const CLASSES: ClassExports = objc_classes! {
             // rotation, so we flip the sign exclusively for that bundle.
             let is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
             let transform = match orientation {
-                3 => {
-            let mut is_gtr2 = false;
-            if !env.is_app_picker {
-                is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
-            }
-            if is_gtr2 {
-                println!("🎮 LOG: GT Racing 2 Hack - Flipping orientation 3 (LandscapeRight) to LandscapeLeft!");
-                DeviceOrientation::LandscapeLeft // Flip 180!
-            } else {
-                // Original code for all other games
-                DeviceOrientation::LandscapeRight
-            }
-        },
-        4 => {
-            let mut is_gtr2 = false;
-            if !env.is_app_picker {
-                is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
-            }
-            if is_gtr2 {
-                println!("🎮 LOG: GT Racing 2 Hack - Flipping orientation 4 (LandscapeLeft) to LandscapeRight!");
-                DeviceOrientation::LandscapeRight // Flip 180!
-            } else {
-                // Original code for all other games
-                DeviceOrientation::LandscapeLeft
-            }
-        },
-        2 => {
-            let mut is_gtr2 = false;
-            if !env.is_app_picker {
-                is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
-            }
-            if is_gtr2 {
-                println!("🎮 LOG: GT Racing 2 Hack - Caught Upside Down (2)! Forcing to LandscapeRight!");
-                DeviceOrientation::LandscapeRight
-            } else {
-                // Or whatever the original N.O.V.A 3 hack fallback was here
-                println!("WARNING: Safely falling back to LandscapeRight for orientation 2");
-                DeviceOrientation::LandscapeRight 
-            }
-        },
-        
-        // Original code: Protects strict emulation for everything else
-        _ => unimplemented!("Orientation {} not handled yet", orientation),
+                UIInterfaceOrientationLandscapeLeft => {
+                    let angle = if is_gtr2 { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 };
+                    CGAffineTransform::make_rotation(angle)
+                }
+                UIInterfaceOrientationLandscapeRight => {
+                    let angle = if is_gtr2 { -std::f32::consts::FRAC_PI_2 } else { std::f32::consts::FRAC_PI_2 };
+                    CGAffineTransform::make_rotation(angle)
+                }
+                _ => unimplemented!(),
+            };
 
             let window_frame: CGRect = msg![env; this frame];
             log_dbg!("Window frame: {window_frame:?}");
