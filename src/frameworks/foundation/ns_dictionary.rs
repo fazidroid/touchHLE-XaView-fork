@@ -757,6 +757,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
+- (())encodeWithCoder:(id)_coder {
+    log!("_touchHLE_NSMutableDictionary encodeWithCoder: stub called");
+}
+
 - (id)initWithObjectsAndKeys:(id)first_object, ...dots {
     init_with_objects_and_keys(env, this, first_object, dots.start())
 }
