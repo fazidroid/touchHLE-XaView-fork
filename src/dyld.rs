@@ -1124,18 +1124,10 @@ if symbol == "_pthread_setname_np" {
             );
         }
 
-        panic!("Call to unimplemented function {symbol}");
-        log!("WARNING: unimplemented function {symbol}, using stub");
-
-        fn dummy(env: &mut crate::Environment) {
-            env.cpu.regs_mut()[0] = 0;
-        }
-
-        let f: HostFunction = &(dummy as fn(&mut crate::Environment) -> ());
-        Some(f)
-    }
-    
-            if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6__initEPKcm" {
+        // ==========================================================
+        // 🏎️ MODERN C++ BYPASS: std::string::__init (libc++)
+        // ==========================================================
+        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6__initEPKcm" {
             fn fake_libcxx_string_init(
                 env: &mut crate::Environment,
                 this_ptr: crate::mem::MutPtr<u8>,
@@ -1144,7 +1136,6 @@ if symbol == "_pthread_setname_np" {
             ) -> crate::mem::MutPtr<u8> {
                 println!("🎮 LOG: Caught C++ std::string::__init! Faking safe string memory.");
                 
-                // Real Racing 2's libc++ expects the initialized string pointer to be returned.
                 // We'll write an empty null terminator to the start of the 'this' object
                 // to trick the C++ engine into thinking it's a valid empty string!
                 env.mem.write(this_ptr, 0u8);
@@ -1164,8 +1155,15 @@ if symbol == "_pthread_setname_np" {
         }
 
         panic!("Call to unimplemented function {symbol}");
-        
+        log!("WARNING: unimplemented function {symbol}, using stub");
+
+        fn dummy(env: &mut crate::Environment) {
+            env.cpu.regs_mut()[0] = 0;
         }
+
+        let f: HostFunction = &(dummy as fn(&mut crate::Environment) -> ());
+        Some(f)
+    }
 
     /// Creates a guest function that will call a host function with the name
     /// `symbol`. This can be used to implement "get proc address" functions.
