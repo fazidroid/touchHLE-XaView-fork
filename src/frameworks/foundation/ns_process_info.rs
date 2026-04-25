@@ -64,6 +64,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; main_bundle objectForInfoDictionaryKey:name_key]
 }
 
+- (id)globallyUniqueString {
+    log!("NSProcessInfo globallyUniqueString stub called");
+    ns_string::get_static_str(env, "GT2-UUID-1234-5678")
+}
+
 @end
 
 };
