@@ -204,19 +204,25 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)modalViewController {
         println!("🎮 LOG: Caught [UIViewController modalViewController]. Returning nil.");
-        nil
+        crate::objc::nil
     }
 
     - (())presentModalViewController:(id)_vc animated:(bool)_animated {
         println!("🎮 LOG: Caught [UIViewController presentModalViewController:animated:]. Absorbing safely!");
     }
 
-- (())dismissModalViewControllerAnimated:(bool)animated {
-    log!("TODO: [(UIViewController*){:?} dismissModalViewControllerAnimated:{}]", this, animated); // TODO
-}
-- (())dismissMoviePlayerViewControllerAnimated {
-    log!("TODO: [(UIViewController*){:?} dismissMoviePlayerViewControllerAnimated]", this); // TODO
-}
+    - (())dismissModalViewControllerAnimated:(bool)animated {
+        println!("🎮 LOG: Caught [UIViewController dismissModalViewControllerAnimated:{}].", animated);
+    }
+
+    // 🏎️ The exact methods Real Racing 2 is crashing on right now!
+    - (())presentMoviePlayerViewControllerAnimated:(id)_vc {
+        println!("🎮 LOG: Caught [UIViewController presentMoviePlayerViewControllerAnimated:]. Absorbing safely!");
+    }
+
+    - (())dismissMoviePlayerViewControllerAnimated {
+        println!("🎮 LOG: Caught [UIViewController dismissMoviePlayerViewControllerAnimated].");
+    }
 
 // Заглушка для панели навигации
 - (id)navigationItem {
