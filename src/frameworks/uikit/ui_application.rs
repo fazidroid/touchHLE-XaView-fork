@@ -152,25 +152,48 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation {
-    env.on_parent_stack_in_coroutine(|window, _| {window.rotate_device(match orientation {
-        UIDeviceOrientationPortrait => DeviceOrientation::Portrait,
-        UIDeviceOrientationLandscapeLeft => DeviceOrientation::LandscapeLeft,
-        UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
-        
-        // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASSES - Flipped to LandscapeLeft!
-        0 => {
-            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 0");
-            DeviceOrientation::LandscapeLeft
-        },
-        2 => {
-            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 2");
-            DeviceOrientation::LandscapeLeft
-        },
-        
-        // Original code
-        _ => unimplemented!("Orientation {} not handled yet", orientation),
-    })});
-}
+        // 1. Check the bundle ID *before* we lock the environment!
+        let mut is_gtr2 = false;
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+
+        // 2. Pass the flag into the orientation router using 'move'
+        env.on_parent_stack_in_coroutine(move |window, _| {window.rotate_device(match orientation {
+            UIDeviceOrientationPortrait => DeviceOrientation::Portrait,
+            
+            // 🏎️ GT RACING 2 EXCLUSIVE: Flip Landscape Orientations 180 Degrees!
+            UIDeviceOrientationLandscapeLeft => {
+                if is_gtr2 {
+                    println!("🎮 LOG: GT Racing 2 Hack - Flipping LandscapeLeft to LandscapeRight!");
+                    DeviceOrientation::LandscapeRight
+                } else {
+                    DeviceOrientation::LandscapeLeft
+                }
+            },
+            UIDeviceOrientationLandscapeRight => {
+                if is_gtr2 {
+                    println!("🎮 LOG: GT Racing 2 Hack - Flipping LandscapeRight to LandscapeLeft!");
+                    DeviceOrientation::LandscapeLeft
+                } else {
+                    DeviceOrientation::LandscapeRight
+                }
+            },
+            
+            // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASSES - Flipped to LandscapeLeft!
+            0 => {
+                println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 0");
+                DeviceOrientation::LandscapeLeft
+            },
+            2 => {
+                println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 2");
+                DeviceOrientation::LandscapeLeft
+            },
+            
+            // Original code
+            _ => unimplemented!("Orientation {} not handled yet", orientation),
+        })});
+    }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation animated:(bool)_animated {
     msg![env; this setStatusBarOrientation:orientation]
 }
