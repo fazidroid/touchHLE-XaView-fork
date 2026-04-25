@@ -209,13 +209,20 @@ pub const CLASSES: ClassExports = objc_classes! {
         log_dbg!("[{:?} shouldAutorotateToInterfaceOrientation:{:?}] => {:?}", vc, orientation, should);
         if should {
             log_dbg!("App requested autorotation; applying orientation transform to view {:?}.", view);
+            // GT Racing 2 renders upside-down with the default landscape
+            // rotation, so we flip the sign for that specific bundle.
+            // TODO: verify bundle_id accessor name if this doesn't compile.
+            let bundle_id = env.current_app.bundle_identifier.as_str();
+            let is_gtr2 = bundle_id == "com.gameloft.gtr2";
             let transform = match orientation {
-                // LandscapeLeft  = device rotated counter-clockwise (home on right)
-                //   → content must rotate +90° (clockwise) to compensate
-                UIInterfaceOrientationLandscapeLeft => CGAffineTransform::make_rotation(std::f32::consts::FRAC_PI_2),
-                // LandscapeRight = device rotated clockwise (home on left)
-                //   → content must rotate -90° (counter-clockwise) to compensate
-                UIInterfaceOrientationLandscapeRight => CGAffineTransform::make_rotation(-std::f32::consts::FRAC_PI_2),
+                UIInterfaceOrientationLandscapeLeft => {
+                    let angle = if is_gtr2 { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 };
+                    CGAffineTransform::make_rotation(angle)
+                }
+                UIInterfaceOrientationLandscapeRight => {
+                    let angle = if is_gtr2 { -std::f32::consts::FRAC_PI_2 } else { std::f32::consts::FRAC_PI_2 };
+                    CGAffineTransform::make_rotation(angle)
+                }
                 _ => unimplemented!(),
             };
 
