@@ -51,6 +51,26 @@ fn objc_msgSend_inner(
         println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
     }
     let message_type_info = env.objc.message_type_info.take();
+
+    if sel_name == "orientation" || sel_name == "statusBarOrientation" {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: SLEDGEHAMMER BYPASS - Spoofing orientation to flip GT Racing 2 camera 180 degrees!");
+            
+            // 4 represents the opposite Landscape orientation in iOS.
+            // NOTE: If the screen is STILL upside down after building, simply change this 4 to a 3!
+            env.cpu.regs_mut()[0] = 4; 
+            
+            let lr = env.cpu.regs()[14]; 
+            env.cpu.regs_mut()[15] = lr; 
+            return;
+        }
+    }
     
     // ==========================================================
     // 🏎️ THE SLEDGEHAMMER: Global Selector Intercepts
