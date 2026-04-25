@@ -77,6 +77,7 @@ pub const UIInterfaceOrientationLandscapeRight: UIInterfaceOrientation =
 type UIRemoteNotificationType = NSUInteger;
 type UIStatusBarAnimation = NSInteger;
 type UIStatusBarStyle = NSInteger;
+type UIBackgroundTaskIdentifier = NSInteger;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -241,6 +242,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (NSInteger)applicationState { 0 }
 
+- (UIBackgroundTaskIdentifier)beginBackgroundTaskWithExpirationHandler:(id)_handler {
+    log!("UIApplication beginBackgroundTaskWithExpirationHandler: stub called, returning UIBackgroundTaskInvalid");
+    0 // UIBackgroundTaskInvalid
+}
 - (())setScheduledLocalNotifications:(id)_notifications {
     log!("TODO: ignoring setScheduledLocalNotifications");
 }
