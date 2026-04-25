@@ -78,6 +78,30 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (())setTransform:(CGAffineTransform)transform {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: GT Racing 2 Detected! Flipping UIWindow 180 degrees to match touch controls.");
+            
+            let mut flipped = transform;
+            // Negating the scaling/rotation components creates a perfect 180-degree mathematical flip!
+            flipped.a = -transform.a;
+            flipped.b = -transform.b;
+            flipped.c = -transform.c;
+            flipped.d = -transform.d;
+            
+            crate::msg_super![env; this setTransform:flipped]
+        } else {
+            // Let all other games rotate normally!
+            crate::msg_super![env; this setTransform:transform]
+        }
+    }
+
 - (())dealloc {
     if let Some(key_window) = env.framework_state.uikit.ui_view.ui_window.key_window {
         if key_window == this {
