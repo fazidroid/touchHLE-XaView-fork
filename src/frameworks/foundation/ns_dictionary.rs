@@ -23,8 +23,7 @@ use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::objc::{
     autorelease, id, msg, msg_class, msg_send, nil, objc_classes, release, retain, Class, ClassExports,
-    HostObject, NSZonePtr,
-};
+    HostObject, NSZonePtr, SEL,};
 use crate::{impl_HostObject_with_superclass, Environment};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -602,8 +601,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         let key: id = msg![env; keys objectAtIndex:i];
         vec.push(key);
     }
-    
+
     vec.sort_by(|a, b| {
+        // Dereference and bind to local variables
+        let a: id = *a;
+        let b: id = *b;
         let val_a: id = msg![env; this objectForKey:a];
         let val_b: id = msg![env; this objectForKey:b];
         let ordering: i32 = msg_send(env, (val_a, comparator, val_b));
@@ -615,7 +617,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             core::cmp::Ordering::Equal
         }
     });
-    
+
     let sorted_keys = ns_array::from_vec(env, vec);
     autorelease(env, sorted_keys)
 }
@@ -728,8 +730,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         let key: id = msg![env; keys objectAtIndex:i];
         vec.push(key);
     }
-    
+
     vec.sort_by(|a, b| {
+        // Dereference and bind to local variables
+        let a: id = *a;
+        let b: id = *b;
         let val_a: id = msg![env; this objectForKey:a];
         let val_b: id = msg![env; this objectForKey:b];
         let ordering: i32 = msg_send(env, (val_a, comparator, val_b));
@@ -741,7 +746,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             core::cmp::Ordering::Equal
         }
     });
-    
+
     let sorted_keys = ns_array::from_vec(env, vec);
     autorelease(env, sorted_keys)
 }
