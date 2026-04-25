@@ -262,22 +262,28 @@ pub const CLASSES: ClassExports = objc_classes! {
         this
     }
 
-    - (())play { 
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController play]. Faking instant completion for Real Racing 2!");
+- (())play {
+        println!("🎮 LOG: Caught [MPMoviePlayerViewController play].");
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-        let finish_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+        let finish_notif = crate::frameworks::foundation::ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
         let _: () = msg![env; center postNotificationName:finish_notif object:this];
     }
-    
+
     - (())stop { }
-    - (())setControlStyle:(i32)style { }
-    - (())setScalingMode:(i32)mode { }
-    
-- (())setFullscreen:(bool)fullscreen {
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController setFullscreen:{}]. Absorbing safely!", fullscreen);
-    }
-    
-- (())setMovieSourceType:(i32)source_type { }
+    - (())pause { }
+    - (())setControlStyle:(i32)_style { }
+    - (())setScalingMode:(i32)_mode { }
+    - (())setFullscreen:(bool)_fullscreen animated:(bool)_animated { }
+    - (())setFullscreen:(bool)_fullscreen { }
+
+    // ==========================================================
+    // 🏎️ THE MOVIE CONFIGURATION GAUNTLET: Absorb everything!
+    // ==========================================================
+    - (())setMovieSourceType:(i32)source_type { }
+    - (())setInitialPlaybackTime:(f64)time { }
+    - (())setEndPlaybackTime:(f64)time { }
+    - (())setShouldAutoplay:(bool)autoplay { }
+    - (())setRepeatMode:(i32)mode { }
 
     - (i32)loadState { 3 }
 
