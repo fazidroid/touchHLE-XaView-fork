@@ -109,6 +109,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+// ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Hardcode Profile Name & Keyboard Close
+    // ==========================================================
+    - (bool)isSecureTextEntry {
+        println!("🎮 LOG: Caught [UITextField isSecureTextEntry] safely! Returning false.");
+        false
+    }
+
+    - (id)text {
+        println!("🎮 LOG: Caught [UITextField text]. Spoofing profile name!");
+        crate::frameworks::foundation::ns_string::from_rust_string(env, "Player".to_string())
+    }
+
+    - (bool)resignFirstResponder {
+        println!("🎮 LOG: Caught [UITextField resignFirstResponder]. Closing keyboard!");
+        true
+    }
+
 - (())dealloc {
     let UITextFieldHostObject {
         text_label,
