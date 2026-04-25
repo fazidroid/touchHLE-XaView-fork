@@ -114,6 +114,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     nil
 }
 
+- (())setPersistent:(bool)persistent {
+    log!("NSObject setPersistent: {} stub called on class {}", persistent,
+         env.objc.get_class_name(ObjC::read_isa(this, &env.mem)));
+}
+
 - (id)init {
     this
 }
