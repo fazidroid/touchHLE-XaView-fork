@@ -127,6 +127,20 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
+- (id)initWithArray:(id)array {
+    let count: NSUInteger = msg![env; array count];
+    let null: id = msg_class![env; NSNull null];
+
+    let mut dict = <DictionaryHostObject as Default>::default();
+    for i in 0..count {
+        let obj: id = msg![env; array objectAtIndex:i];
+        dict.insert(env, obj, null, /* copy_key: */ false);
+    }
+
+    env.objc.borrow_mut::<SetHostObject>(this).dict = dict;
+    this
+}
+
 - (id)initWithObject:(id)object {
     let null: id = msg_class![env; NSNull null];
 
