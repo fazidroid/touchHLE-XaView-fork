@@ -46,6 +46,9 @@ fn objc_msgSend_inner(
         receiver
     );
 
+    // 1. Define sel_name FIRST so all of our hacks can use it!
+    let sel_name = selector.as_str(&env.mem);
+
     if !receiver.is_null() {
         // Read the class of the object that is asking for the method
         let receiver_class = crate::objc::ObjC::read_isa(receiver, &env.mem);
@@ -62,11 +65,12 @@ fn objc_msgSend_inner(
             return;
         }
     }
+    
     // TraceAudioCalls
-    let sel_name = selector.as_str(&env.mem);
     if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
         println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
     }
+    
     let message_type_info = env.objc.message_type_info.take();
 
     if sel_name == "orientation" || sel_name == "statusBarOrientation" {
