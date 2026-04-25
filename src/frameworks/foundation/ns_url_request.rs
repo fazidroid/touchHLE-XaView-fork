@@ -28,6 +28,7 @@ struct NSURLRequestHostObject {
     // Header fields
     /// `NSDictionary*`
     http_header_fields: id,
+    http_should_handle_cookies: bool,
 }
 impl HostObject for NSURLRequestHostObject {}
 
@@ -46,6 +47,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         http_method: ns_string::get_static_str(env, "GET"),
         http_body: nil,
         http_header_fields,
+        http_should_handle_cookies: true,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
@@ -125,6 +127,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 @implementation NSMutableURLRequest: NSURLRequest
+
+- (())setHTTPShouldHandleCookies:(bool)flag {
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).http_should_handle_cookies = flag;
+}
 
 // ==========================================================
 // 🏎️ EA BYPASS: Absorb the Network Timeout to Prevent Freezes
