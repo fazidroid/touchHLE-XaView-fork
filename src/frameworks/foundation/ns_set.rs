@@ -61,6 +61,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)setWithArray:(id)array {
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithArray:array];
+    autorelease(env, new)
+}
+
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
     retain(env, this)
