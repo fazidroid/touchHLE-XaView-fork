@@ -310,6 +310,10 @@ pub fn init_with_objects_and_keys(
 
 /// Helper function to share `initWithDictionary:` implementations
 fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) -> id {
+    if other_dict == nil {
+        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
+        return this;
+    }
     let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
 
     let mut host_object = <DictionaryHostObject as Default>::default();
@@ -350,6 +354,7 @@ fn init_with_objects_for_keys_common(env: &mut Environment, this: id, objects: i
 
 /// Helper function to share `allKeys` implementations
 fn all_keys_common(env: &mut Environment, this: id) -> id {
+    if this == nil { return msg_class![env; NSArray array]; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let keys: Vec<id> = host_obj
         .map
@@ -610,12 +615,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO: enumeration, more init methods, etc
 
 - (NSUInteger)count {
+    if this == nil { return 0; }
     env.objc.borrow::<DictionaryHostObject>(this).count
 }
 - (id)objectForKey:(id)key {
-    if this == nil || key == nil {
-        return nil;
-    }
+    if this == nil || key == nil { return nil; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let res = host_obj.lookup(env, key);
     *env.objc.borrow_mut(this) = host_obj;
@@ -627,6 +631,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)allValues {
+    if this == nil { return msg_class![env; NSArray array]; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let values: Vec<id> = host_obj.map.values().flatten().map(|&(_key, value)| value).collect();
     *env.objc.borrow_mut(this) = host_obj;
@@ -642,6 +647,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (NSUInteger)countByEnumeratingWithState:(MutPtr<NSFastEnumerationState>)state
                                   objects:(MutPtr<id>)stackbuf
                                     count:(NSUInteger)len {
+    if this == nil { return 0; }
     // We assume that order in which objects are reported is consistent
     // between calls!
     let objects: id = msg![env; this allKeys];
@@ -657,11 +663,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
+    if this == nil { return nil; }
     retain(env, this)
 }
 
 // NSMutableCopying implementation
 - (id)mutableCopyWithZone:(NSZonePtr)_zone {
+    if this == nil { return msg_class![env; NSMutableDictionary new]; }
     let mut_dict: id = msg_class![env; NSMutableDictionary alloc];
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     for (k, v) in host_obj.map.values().flatten() {
@@ -750,9 +758,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO: enumeration, more init methods, etc
 
 - (NSUInteger)count {
+    if this == nil { return 0; }
     env.objc.borrow::<DictionaryHostObject>(this).count
 }
 - (id)objectForKey:(id)key {
+    if this == nil || key == nil { return nil; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let res = host_obj.lookup(env, key);
     *env.objc.borrow_mut(this) = host_obj;
@@ -763,6 +773,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (NSUInteger)countByEnumeratingWithState:(MutPtr<NSFastEnumerationState>)state
                                   objects:(MutPtr<id>)stackbuf
                                     count:(NSUInteger)len {
+    if this == nil { return 0; }
     // TODO: check that dict wasn't mutated!
     // We assume that order in which objects are reported is consistent
     // between calls!
@@ -779,6 +790,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
+    if this == nil { return nil; }
     let entries: Vec<_> =
         env.objc.borrow_mut::<DictionaryHostObject>(this).map.values().flatten().copied().collect();
     dict_from_keys_and_objects(env, &entries)
@@ -786,6 +798,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // NSMutableCopying implementation
 - (id)mutableCopyWithZone:(NSZonePtr)_zone {
+    if this == nil { return msg_class![env; NSMutableDictionary new]; }
     let mut_dict: id = msg_class![env; NSMutableDictionary alloc];
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     for (k, v) in host_obj.map.values().flatten() {
@@ -817,7 +830,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())removeObjectForKey:(id)key {
-    assert!(!key.is_null());
+    if this == nil || key == nil { return; }
     let mut host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     host_obj.remove(env, key);
     *env.objc.borrow_mut(this) = host_obj;
@@ -829,6 +842,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())addEntriesFromDictionary:(id)other { // NSDictionary *
+    if other == nil || this == nil { return; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other));
     for (k, v) in host_obj.map.values().flatten() {
         () = msg![env; this setObject:(*v) forKey:(*k)];
@@ -845,6 +859,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)allValues {
+    if this == nil { return msg_class![env; NSArray array]; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let values: Vec<id> = host_obj.map.values().flatten().map(|&(_key, value)| value).collect();
     *env.objc.borrow_mut(this) = host_obj;
