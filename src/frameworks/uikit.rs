@@ -29,6 +29,7 @@ pub mod ui_screen;
 pub mod ui_touch;
 pub mod ui_view;
 pub mod ui_view_controller;
+pub mod ui_pasteboard;
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/System/Library/Frameworks/UIKit.framework/UIKit",
@@ -64,6 +65,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         ui_view::ui_window::CLASSES,
         ui_view_controller::CLASSES,
         ui_view_controller::ui_navigation_controller::CLASSES,
+        ui_pasteboard::CLASSES,
     ],
     constant_exports: &[
         ui_application::CONSTANTS,
