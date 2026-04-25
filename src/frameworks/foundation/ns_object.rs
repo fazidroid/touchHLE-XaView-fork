@@ -401,6 +401,10 @@ forUndefinedKey:(id)key { // NSString*
     log_dbg!("NSAssertionHandler class method handleFailureInFunction:... ignored");
 }
 
++ (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(i32)line description:(id)description {
+    log_dbg!("NSAssertionHandler class method handleFailureInMethod:... ignored");
+}
+
 - (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(i32)line description:(id)description {
     log_dbg!("NSAssertionHandler handleFailureInMethod:... ignored");
 }
