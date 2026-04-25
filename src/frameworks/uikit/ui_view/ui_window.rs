@@ -211,8 +211,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             log_dbg!("App requested autorotation; applying orientation transform to view {:?}.", view);
             // GT Racing 2 renders upside-down with the default landscape
             // rotation, so we flip the sign exclusively for that bundle.
-            let bundle_id = env.bundle.bundle_identifier().as_str();
-            let is_gtr2 = bundle_id == "com.gameloft.gtr2";
+            let is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
             let transform = match orientation {
                 UIInterfaceOrientationLandscapeLeft => {
                     let angle = if is_gtr2 { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 };
