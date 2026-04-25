@@ -1646,6 +1646,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
+- (NSUInteger)replaceOccurrencesOfString:(id)target
+                              withString:(id)replacement
+                                 options:(NSUInteger)options
+                                   range:(NSRange)range {
+    log!("TODO: NSMutableString replaceOccurrencesOfString:withString:options:range: returning 0");
+    0
+}
+
 - (id)initWithCoder:(id)coder {
     let class: Class = msg![env; coder class];
     let nib_archive_class: Class = msg_class![env; _touchHLE_NIBArchiveDecoder class];
