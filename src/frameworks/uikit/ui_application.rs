@@ -151,11 +151,24 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation {
+    // GT Racing 2 (com.gameloft.gtr2) renders upside-down because it requests
+    // UIInterfaceOrientationLandscapeLeft but the rotation direction is
+    // +90° when it needs -90°. Swapping Left↔Right corrects the 180° flip.
+    let orientation = if env.bundle.bundle_identifier().starts_with("com.gameloft.gtr2") {
+        match orientation {
+            UIDeviceOrientationLandscapeLeft  => UIDeviceOrientationLandscapeRight,
+            UIDeviceOrientationLandscapeRight => UIDeviceOrientationLandscapeLeft,
+            other => other,
+        }
+    } else {
+        orientation
+    };
+
     env.on_parent_stack_in_coroutine(|window, _| {window.rotate_device(match orientation {
         UIDeviceOrientationPortrait => DeviceOrientation::Portrait,
         UIDeviceOrientationLandscapeLeft => DeviceOrientation::LandscapeLeft,
         UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
-        
+
         // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASSES - Flipped to LandscapeLeft!
         0 => {
             println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 0");
@@ -165,9 +178,11 @@ pub const CLASSES: ClassExports = objc_classes! {
             println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 2");
             DeviceOrientation::LandscapeLeft
         },
-        
-        // Original code
-        _ => unimplemented!("Orientation {} not handled yet", orientation),
+
+        _ => {
+            log!("Warning: setStatusBarOrientation: unhandled orientation {}, ignoring", orientation);
+            DeviceOrientation::Portrait
+        },
     })});
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation animated:(bool)_animated {
