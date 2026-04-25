@@ -7,6 +7,7 @@
 use crate::dyld::{ConstantExports, HostConstant};
 use crate::frameworks::foundation::NSInteger;
 use crate::objc::{autorelease, id, msg, nil, release, retain, ClassExports, HostObject, NSZonePtr};
+use crate::frameworks::foundation::ns_string::get_static_str;
 use crate::objc_classes;
 
 /// `NSString*`
@@ -46,6 +47,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     let error = msg![env; this alloc];
     let error = msg![env; error initWithDomain:domain code:code userInfo:userInfo];
     autorelease(env, error)
+}
+
+- (id)localizedDescription {
+    log!("NSError localizedDescription stub called");
+    // Return a generic error description string
+    crate::frameworks::foundation::ns_string::get_static_str(env, "Error")
 }
 
 - (id)initWithDomain:(NSErrorDomain)domain
