@@ -103,6 +103,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     app_init
 }
 
+- (NSUInteger)beginBackgroundTaskWithExpirationHandler:(id)_handler {
+    log!("TODO: UIApplication beginBackgroundTaskWithExpirationHandler: returning dummy task id 1");
+    // UIBackgroundTaskInvalid is 0, so 1 is a valid identifier.
+    1
+}
+
+- (())endBackgroundTask:(NSUInteger)_task_id {
+    log!("TODO: UIApplication endBackgroundTask: {} ignored", _task_id);
+}
+
 - (id)init {
     env.framework_state.uikit.ui_application.shared_application = Some(this);
     this
