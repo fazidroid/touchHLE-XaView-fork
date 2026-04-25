@@ -5,7 +5,7 @@
  */
 //! `UIPasteboard` stub.
 
-use crate::objc::{objc_classes, ClassExports, HostObject};
+use crate::objc::{id, objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
 #[derive(Default)]
