@@ -210,8 +210,12 @@ pub const CLASSES: ClassExports = objc_classes! {
         if should {
             log_dbg!("App requested autorotation; applying orientation transform to view {:?}.", view);
             let transform = match orientation {
-                UIInterfaceOrientationLandscapeLeft => CGAffineTransform::make_rotation(-std::f32::consts::FRAC_PI_2),
-                UIInterfaceOrientationLandscapeRight => CGAffineTransform::make_rotation(std::f32::consts::FRAC_PI_2),
+                // LandscapeLeft  = device rotated counter-clockwise (home on right)
+                //   → content must rotate +90° (clockwise) to compensate
+                UIInterfaceOrientationLandscapeLeft => CGAffineTransform::make_rotation(std::f32::consts::FRAC_PI_2),
+                // LandscapeRight = device rotated clockwise (home on left)
+                //   → content must rotate -90° (counter-clockwise) to compensate
+                UIInterfaceOrientationLandscapeRight => CGAffineTransform::make_rotation(-std::f32::consts::FRAC_PI_2),
                 _ => unimplemented!(),
             };
 
