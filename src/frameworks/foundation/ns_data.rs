@@ -5,7 +5,7 @@
  */
 //! `NSData` and `NSMutableData`.
 
-use super::ns_string::to_rust_string;
+use super::ns_string::{get_static_str, to_rust_string};
 use super::{NSRange, NSUInteger};
 use crate::frameworks::foundation::ns_keyed_unarchiver::decode_current_data;
 use crate::fs::GuestPath;
@@ -81,6 +81,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithBytesNoCopy:(MutVoidPtr)bytes length:(NSUInteger)length {
     msg![env; this initWithBytesNoCopy:bytes length:length freeWhenDone:true]
+}
+
+- (id)description {
+    get_static_str(env, "<NSData>")
 }
 
 - (id)initWithBytesNoCopy:(MutVoidPtr)bytes length:(NSUInteger)length freeWhenDone:(bool)free_when_done {
