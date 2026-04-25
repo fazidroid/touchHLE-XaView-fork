@@ -825,6 +825,26 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         //);
     }
 
+    // ==========================================================
+    // 🏎️ GT RACING 2 EXCLUSIVE: The Ultimate Display Flip Hack
+    // ==========================================================
+    let mut is_gtr2 = false;
+    if !env.is_app_picker {
+        is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+    }
+
+    if is_gtr2 {
+        // Mathematically negate the entire 2x2 rotation matrix to flip the OpenGL output 180 degrees!
+        unsafe {
+            let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
+            let current = *m_ptr;
+            *m_ptr = [
+                [-current[0][0], -current[0][1]],
+                [-current[1][0], -current[1][1]]
+            ];
+        }
+    }
+
     // Draw the quad
     present_frame(gles, viewport, rotation_matrix, virtual_cursor_visible_at);
 
