@@ -98,6 +98,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<NSURLRequestHostObject>(this).http_body
 }
 
+- (id)HTTPMethod {
+    env.objc.borrow::<NSURLRequestHostObject>(this).http_method
+}
+
+- (id)allHTTPHeaderFields {
+    env.objc.borrow::<NSURLRequestHostObject>(this).http_header_fields
+}
+
 - (())dealloc {
     log_dbg!("[(NSURLRequest*){:?} dealloc]", this);
     let &NSURLRequestHostObject {
@@ -147,6 +155,14 @@ pub const CLASSES: ClassExports = objc_classes! {
         // No existing value, just set it
         () = msg![env; http_header_fields setObject:value forKey:field];
     }
+}
+
+- (())setAllHTTPHeaderFields:(id)headers { // NSDictionary *
+    if headers == nil { return; }
+    let headers_copy = msg![env; headers copy];
+    let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
+    let old_headers = std::mem::replace(&mut host_obj.http_header_fields, headers_copy);
+    release(env, old_headers);
 }
 
 - (id)mutableCopyWithZone:(NSZonePtr)_zone {
