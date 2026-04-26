@@ -80,8 +80,20 @@ fn inet_pton(env: &mut Environment, af: i32, src: ConstPtr<u8>, dst: MutVoidPtr)
     }
 }
 
+fn inet_ntoa(env: &mut Environment, addr: in_addr) -> MutPtr<u8> {
+    let ipv4_addr = Ipv4Addr::from_bits(u32::from_be(addr.s_addr));
+    let ip_str = ipv4_addr.to_string();
+    let len = ip_str.len();
+    let buf = env.mem.alloc(len as u32 + 1).cast::<u8>();
+    let slice = env.mem.bytes_at_mut(buf, len as u32 + 1);
+    slice[..len].copy_from_slice(ip_str.as_bytes());
+    slice[len] = b'\0';
+    buf
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(inet_addr(_)),
     export_c_func!(inet_ntop(_, _, _, _)),
     export_c_func!(inet_pton(_, _, _)),
+    ("_inet_ntoa", &(inet_ntoa as fn(&mut Environment, in_addr) -> MutPtr<u8>)),
 ];
