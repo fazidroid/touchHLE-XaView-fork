@@ -818,31 +818,23 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
             let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
             *m_ptr = [[1.0, 0.0], [0.0, 1.0]];
         }
-        //log!(
-        //    "DEBUG_EAGL: SmartRotationFix bypassed matrix! rb_w={}, rb_h={}",
-        //    rb_w,
-        //    rb_h
-        //);
     }
 
-    // ==========================================================
-    // 🏎️ GT RACING 2 EXCLUSIVE: The Ultimate Display Flip Hack
-    // ==========================================================
-    let mut is_gtr2 = false;
-    if !env.is_app_picker {
-        is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
-    }
-
-    if is_gtr2 {
-        // Mathematically negate the entire 2x2 rotation matrix to flip the OpenGL output 180 degrees!
+    // GT Racing 2 exclusive: the game renders in landscape but the output
+    // is 180° flipped. Apply a 180° rotation hack by negating the rotation
+    // matrix columns — this is equivalent to multiplying by [[-1,0],[0,-1]]
+    // and costs nothing since it happens at the quad-draw level, not in the
+    // game's own render pipeline.
+    if env.bundle.bundle_identifier().starts_with("com.gameloft.gtr2") {
         unsafe {
             let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
-            let current = *m_ptr;
-            *m_ptr = [
-                [-current[0][0], -current[0][1]],
-                [-current[1][0], -current[1][1]]
-            ];
+            // Negate all components to rotate 180°
+            (*m_ptr)[0][0] = -(*m_ptr)[0][0];
+            (*m_ptr)[0][1] = -(*m_ptr)[0][1];
+            (*m_ptr)[1][0] = -(*m_ptr)[1][0];
+            (*m_ptr)[1][1] = -(*m_ptr)[1][1];
         }
+        log_dbg!("GTR2 display hack: applied 180° rotation matrix flip");
     }
 
     // Draw the quad
