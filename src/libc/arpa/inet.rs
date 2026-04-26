@@ -9,6 +9,7 @@ use crate::libc::netdb::socklen_t;
 use crate::libc::sys::socket::AF_INET;
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, SafeRead};
 use crate::{export_c_func, Environment};
+use crate::abi::GuestArg;
 
 use crate::dyld::FunctionExports;
 use std::net::Ipv4Addr;
