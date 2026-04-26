@@ -510,6 +510,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
+- (id)sortedArrayUsingSelector:(SEL)comparator {
+    let new = msg![env; this mutableCopy];
+    () = msg![env; new sortUsingSelector:comparator];
+    autorelease(env, new)
+}
+
 - (())sortUsingDescriptors:(id)sortDescriptors {
     log_dbg!("NSMutableArray sortUsingDescriptors:");
     let host_object = env.objc.borrow_mut::<ArrayHostObject>(this);
