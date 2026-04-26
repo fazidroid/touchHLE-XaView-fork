@@ -564,23 +564,14 @@ pub(super) fn UIApplicationMain(
     if env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacingFreemium")
         || env.bundle.bundle_identifier().starts_with("com.gameloft.gtr")
     {
-        log!("GTRacing suspend-count fix: firing extra resign+becomeActive to reset render loop");
+        log!("GTRacing suspend-count fix: draining s_nSuspendCount with 3x becomeActive");
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
         let delegate: id = msg![env; ui_application delegate];
 
-        // Resign (s_nSuspendCount 0 → 1)
-        {
-            let pool: id = msg_class![env; NSAutoreleasePool new];
-            if env.objc.object_has_method_named(&env.mem, delegate, "applicationWillResignActive:") {
-                () = msg![env; delegate applicationWillResignActive:ui_application];
-            }
-            let n = get_static_str(env, UIApplicationWillResignActiveNotification);
-            () = msg![env; center postNotificationName:n object:ui_application userInfo:nil];
-            let _: () = msg![env; pool drain];
-        }
-
-        // Become active (s_nSuspendCount 1 → 0, render loop restarts)
-        {
+        // Fire applicationDidBecomeActive 3 times to drain s_nSuspendCount
+        // regardless of how high it got during loading. The game clamps at 0
+        // internally so extra calls are harmless.
+        for _i in 0..3u32 {
             let pool: id = msg_class![env; NSAutoreleasePool new];
             if env.objc.object_has_method_named(&env.mem, delegate, "applicationDidBecomeActive:") {
                 () = msg![env; delegate applicationDidBecomeActive:ui_application];
