@@ -91,9 +91,7 @@ pub fn pthread_cond_wait(
     );
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
-    
     env.yield_thread(ThreadBlock::Condition(cond_var));
-    
     0 // success
 }
 
@@ -147,38 +145,19 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
     0 // success
 }
 
-// ==========================================================
-// 🏎️ ASPHALT 8 BYPASS: Timed Wait Anti-Starvation Hack
-// ==========================================================
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    cond: MutPtr<pthread_cond_t>,
+    _cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    let _res = pthread_mutex_unlock(env, mutex);
-    
-    let current_thread = env.current_thread;
-    let mutex_id = env.mem.read(mutex).mutex_id;
-    let cond_var = env.mem.read(cond);
-    
-    let host_object = State::get_mut(env)
-        .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
-        
-    host_object.curr_mutex = Some(mutex_id);
-    
-    // 🛡️ THE FIX: Push directly to `waking` instead of `waiting`
-    // This forces the background thread to safely yield the CPU so the main 
-    // game thread (Thread 0) can run, but guarantees the background thread 
-    // wakes up on the very next scheduler tick without sleeping forever!
-    host_object.waking.push_back(current_thread);
-    
-    env.yield_thread(ThreadBlock::Condition(cond_var));
-    
-    // Return standard POSIX ETIMEDOUT code (60 on iOS)
-    60
+    // GAMELOFT ANTI-FREEZE HACK:
+    // touchHLE ignores abstime and sleeps forever. We bypass this by unlocking,
+    // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
+    // screen progress instead of deadlocking!
+    let _ = pthread_mutex_unlock(env, mutex);
+    let _ = pthread_mutex_lock(env, mutex);
+    60 // Return standard POSIX ETIMEDOUT code
 }
 
 pub const FUNCTIONS: FunctionExports = &[
