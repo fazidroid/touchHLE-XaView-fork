@@ -7,7 +7,7 @@
 
 use super::mutex::pthread_mutex_t;
 use crate::dyld::FunctionExports;
-use crate::libc::pthread::mutex::pthread_mutex_unlock;
+use crate::libc::pthread::mutex::{pthread_mutex_lock, pthread_mutex_unlock};
 use crate::mem::{ConstPtr, MutPtr, SafeRead};
 use crate::{export_c_func, Environment};
 use std::collections::{HashMap, VecDeque};
@@ -91,11 +91,7 @@ pub fn pthread_cond_wait(
     );
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
-    
-    // CRITICAL FIX: The thread MUST yield here so the CPU doesn't spinlock!
-    // This allows the main thread to process the loading screen.
     env.yield_thread(ThreadBlock::Condition(cond_var));
-    
     0 // success
 }
 
@@ -151,12 +147,17 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
 
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    cond: MutPtr<pthread_cond_t>,
+    _cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    // Safe fallback: Delegate to the standard wait function so the thread yields properly
-    pthread_cond_wait(env, cond, mutex)
+    // GAMELOFT ANTI-FREEZE HACK:
+    // touchHLE ignores abstime and sleeps forever. We bypass this by unlocking,
+    // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
+    // screen progress instead of deadlocking!
+    let _ = pthread_mutex_unlock(env, mutex);
+    let _ = pthread_mutex_lock(env, mutex);
+    60 // Return standard POSIX ETIMEDOUT code
 }
 
 pub const FUNCTIONS: FunctionExports = &[
