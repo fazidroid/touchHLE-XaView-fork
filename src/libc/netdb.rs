@@ -22,8 +22,20 @@ const EAI_FAIL: i32 = 4;
 pub type socklen_t = u32;
 
 // TODO: struct definition
+// ==========================================================
+// 🏎️ GAMELOFT BYPASS: Fake DNS Resolver Struct
+// ==========================================================
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
 #[allow(non_camel_case_types)]
-struct hostent {}
+pub struct hostent {
+    h_name: MutPtr<u8>,
+    h_aliases: MutPtr<MutPtr<u8>>,
+    h_addrtype: i32,
+    h_length: i32,
+    h_addr_list: MutPtr<MutPtr<u8>>,
+}
+unsafe impl SafeRead for hostent {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -100,13 +112,30 @@ fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    log!(
-        "TODO: gethostbyname({:?} \"{}\") => NULL",
-        name,
-        env.mem.cstr_at_utf8(name).unwrap()
-    );
-    // TODO: set h_errno
-    Ptr::null()
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("<invalid>");
+    println!("🎮 LOG: Caught gethostbyname for '{}'. Spoofing local IP to break infinite loop!", name_str);
+    
+    // 1. Write dummy IPv4 data (127.0.0.1) to guest memory
+    let ip_ptr = env.mem.alloc_and_write([127u8, 0, 0, 1]).cast::<u8>();
+    
+    // 2. Create the address list (null-terminated array of pointers)
+    let null_ptr: MutPtr<u8> = Ptr::null();
+    let addr_list_ptr = env.mem.alloc_and_write([ip_ptr, null_ptr]).cast::<MutPtr<u8>>();
+    
+    // 3. Create the aliases list (empty, just a null pointer)
+    let aliases_ptr = env.mem.alloc_and_write([null_ptr]).cast::<MutPtr<u8>>();
+    
+    // 4. Construct the fake hostent struct
+    let fake_hostent = hostent {
+        h_name: Ptr::from_bits(name.to_bits()), // Pass the requested name right back
+        h_aliases: aliases_ptr,
+        h_addrtype: AF_INET,                    // IPv4
+        h_length: 4,                            // 4 bytes long
+        h_addr_list: addr_list_ptr,
+    };
+    
+    // 5. Write the constructed struct to memory and hand the pointer to the game!
+    env.mem.alloc_and_write(fake_hostent).cast()
 }
 
 pub const FUNCTIONS: FunctionExports = &[
