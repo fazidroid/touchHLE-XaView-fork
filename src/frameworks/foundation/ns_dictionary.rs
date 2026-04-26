@@ -954,6 +954,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; values objectEnumerator]
 }
 
+- (id)keyEnumerator {
+    let keys: id = msg![env; this allKeys];
+    msg![env; keys objectEnumerator]
+}
+
 @end
 
 // Special variant for use by CFDictionary with NULL callbacks: objects aren't
