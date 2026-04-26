@@ -262,6 +262,8 @@ const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+};
+
 // ── CMAccelerometerData ───────────────────────────────────────────────────────
 
 @implementation CMAccelerometerData: NSObject
