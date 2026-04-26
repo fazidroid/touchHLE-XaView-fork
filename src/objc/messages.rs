@@ -158,11 +158,23 @@ fn objc_msgSend_inner(
                     return;
                 }
             };
-            let &super::ClassHostObject {
+            // Guard: orig_class might not be a real ClassHostObject if the
+            // isa pointer was corrupted (e.g. points to an NSAutoreleasePool
+            // instance after a use-after-free). Bail out safely instead of
+            // panicking with a downcast failure.
+            let Some(&super::ClassHostObject {
                 ref name,
                 is_metaclass,
                 ..
-            } = class_host_object.as_any().downcast_ref().unwrap();
+            }) = class_host_object.as_any().downcast_ref() else {
+                log!(
+                    "WARNING: objc_msgSend superclass chain exhausted but orig_class {:?}                     has unexpected host object type (not a ClassHostObject).                     Message "{}" dropped.",
+                    orig_class,
+                    selector.as_str(&env.mem),
+                );
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            };
 
             if name == "OAIAdManager" || name == "OAICachingAdManager" {
                 println!("🎮 LOG: ADWARE ASSASSIN - Safely blocked '{}' on {}!", selector.as_str(&env.mem), name);
@@ -363,6 +375,11 @@ Type mismatch when sending message {} to {:?}!
             }
             // BypassBarButtonItem
             if name == "UIBarButtonItem" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            if name == "NSHTTPCookieStorage" {
+                println!("🎮 LOG: ADWARE ASSASSIN - Blocked NSHTTPCookieStorage!");
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
