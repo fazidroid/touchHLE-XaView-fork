@@ -551,6 +551,46 @@ pub(super) fn UIApplicationMain(
         let _: () = msg![env; pool drain];
     }
 
+    // GT Racing Free+ (and similar Gameloft games) maintain an internal
+    // s_nSuspendCount. When the Android window fires app-will-terminate
+    // during loading, the game's applicationWillResignActive increments
+    // s_nSuspendCount to 1. Our bypass prevents the process from exiting
+    // but s_nSuspendCount stays at 1, so applicationDidBecomeActive above
+    // decrements it to 0 but does NOT restart the render loop (it only
+    // restarts on the 1→0 transition if it was previously rendering).
+    //
+    // Fix: fire a second resign+becomeActive pair so the game sees a clean
+    // 0→1→0 cycle and unconditionally restarts its render loop.
+    if env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacingFreemium")
+        || env.bundle.bundle_identifier().starts_with("com.gameloft.gtr")
+    {
+        log!("GTRacing suspend-count fix: firing extra resign+becomeActive to reset render loop");
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+        let delegate: id = msg![env; ui_application delegate];
+
+        // Resign (s_nSuspendCount 0 → 1)
+        {
+            let pool: id = msg_class![env; NSAutoreleasePool new];
+            if env.objc.object_has_method_named(&env.mem, delegate, "applicationWillResignActive:") {
+                () = msg![env; delegate applicationWillResignActive:ui_application];
+            }
+            let n = get_static_str(env, UIApplicationWillResignActiveNotification);
+            () = msg![env; center postNotificationName:n object:ui_application userInfo:nil];
+            let _: () = msg![env; pool drain];
+        }
+
+        // Become active (s_nSuspendCount 1 → 0, render loop restarts)
+        {
+            let pool: id = msg_class![env; NSAutoreleasePool new];
+            if env.objc.object_has_method_named(&env.mem, delegate, "applicationDidBecomeActive:") {
+                () = msg![env; delegate applicationDidBecomeActive:ui_application];
+            }
+            let n = get_static_str(env, UIApplicationDidBecomeActiveNotification);
+            () = msg![env; center postNotificationName:n object:ui_application userInfo:nil];
+            let _: () = msg![env; pool drain];
+        }
+    }
+
     let run_loop: id = msg_class![env; NSRunLoop mainRunLoop];
     let _: () = msg![env; run_loop run];
 }
