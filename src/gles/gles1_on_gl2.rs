@@ -1971,7 +1971,6 @@ impl GLES for GLES1OnGL2<'_> {
         let mut safe_matrix = [0.0; 16];
         let mut has_nan = false;
         
-        // Scan all 16 floats in the matrix for Infinity or NaN
         for i in 0..16 {
             let val = *m.add(i);
             if val.is_nan() || val.is_infinite() {
@@ -1991,18 +1990,18 @@ impl GLES for GLES1OnGL2<'_> {
     
     unsafe fn LoadMatrixx(&mut self, m: *const GLfixed) {
         let matrix = matrix_fixed_to_float(m);
-        gl21::LoadMatrixf(matrix.as_ptr());
+        // 🛡️ Route fixed-point math directly through our new float filter!
+        self.LoadMatrixf(matrix.as_ptr());
     }
     
     unsafe fn MultMatrixf(&mut self, m: *const GLfloat) {
         let mut safe_matrix = [0.0; 16];
         let mut has_nan = false;
         
-        // Scan all 16 floats in the matrix for Infinity or NaN
         for i in 0..16 {
             let val = *m.add(i);
             if val.is_nan() || val.is_infinite() {
-                safe_matrix[i] = 0.0; // Safely collapse the geometry!
+                safe_matrix[i] = 0.0;
                 has_nan = true;
             } else {
                 safe_matrix[i] = val;
@@ -2015,9 +2014,11 @@ impl GLES for GLES1OnGL2<'_> {
             gl21::MultMatrixf(m);
         }
     }
+
     unsafe fn MultMatrixx(&mut self, m: *const GLfixed) {
         let matrix = matrix_fixed_to_float(m);
-        gl21::MultMatrixf(matrix.as_ptr());
+        // 🛡️ Route fixed-point math directly through our new float filter!
+        self.MultMatrixf(matrix.as_ptr());
     }
     unsafe fn PushMatrix(&mut self) {
         gl21::PushMatrix();
@@ -2097,21 +2098,19 @@ impl GLES for GLES1OnGL2<'_> {
             fixed_to_float(far).into(),
         );
     }
-        unsafe fn Rotatef(&mut self, angle: GLfloat, x: GLfloat, y: GLfloat, z: GLfloat) {
+    unsafe fn Rotatef(&mut self, angle: GLfloat, x: GLfloat, y: GLfloat, z: GLfloat) {
         if angle.is_nan() || angle.is_infinite() || x.is_nan() || x.is_infinite() || y.is_nan() || y.is_infinite() || z.is_nan() || z.is_infinite() { 
             return; // Ignore corrupted rotation!
         }
         gl21::Rotatef(angle, x, y, z);
     }
     unsafe fn Rotatex(&mut self, angle: GLfixed, x: GLfixed, y: GLfixed, z: GLfixed) {
-        // Route the fixed-point math directly through our new safe float filter!
         self.Rotatef(fixed_to_float(angle), fixed_to_float(x), fixed_to_float(y), fixed_to_float(z));
     }
     
     unsafe fn Scalef(&mut self, x: GLfloat, y: GLfloat, z: GLfloat) {
         if x.is_nan() || x.is_infinite() || y.is_nan() || y.is_infinite() || z.is_nan() || z.is_infinite() {
-            // EA/Firemint often scales by NaN to "hide" shadow geometry. 
-            // Instead of panicking the GPU, we safely scale it to 0.0 so it vanishes properly!
+            // Collapse corrupted shadow scales to 0.0 so they safely vanish!
             gl21::Scalef(0.0, 0.0, 0.0);
             return;
         }
