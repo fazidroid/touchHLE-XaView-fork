@@ -25,6 +25,18 @@ struct in_addr {
 }
 unsafe impl SafeRead for in_addr {}
 
+impl GuestArg for in_addr {
+    const REG_COUNT: usize = 1;
+
+    fn from_regs(regs: &[u32]) -> Self {
+        in_addr { s_addr: regs[0] }
+    }
+
+    fn to_regs(self, regs: &mut [u32]) {
+        regs[0] = self.s_addr;
+    }
+}
+
 fn inet_addr(env: &mut Environment, str: ConstPtr<u8>) -> in_addr_t {
     let inet_addr_str = env.mem.cstr_at_utf8(str).unwrap_or("");
     match inet_addr_str.parse::<Ipv4Addr>() {
