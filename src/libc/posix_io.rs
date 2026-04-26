@@ -907,7 +907,7 @@ fn fsync(env: &mut Environment, fd: FileDescriptor) -> i32 {
     }
 }
 
-fn ftruncate(env: &mut Environment, fd: FileDescriptor, len: off_t) -> i32 {
+pub fn ftruncate(env: &mut Environment, fd: FileDescriptor, len: off_t) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
