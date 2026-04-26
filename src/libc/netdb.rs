@@ -22,9 +22,14 @@ const EAI_FAIL: i32 = 4;
 pub type socklen_t = u32;
 
 // TODO: struct definition
-// ==========================================================
-// 🏎️ GAMELOFT BYPASS: Fake DNS Resolver Struct
-// ==========================================================
+#[derive(Copy, Clone)]
+#[repr(C)]
+struct FakeAddrList {
+    ptr: MutPtr<u8>,
+    null: MutPtr<u8>,
+}
+unsafe impl SafeRead for FakeAddrList {}
+
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 #[allow(non_camel_case_types)]
@@ -115,15 +120,20 @@ fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
     let name_str = env.mem.cstr_at_utf8(name).unwrap_or("<invalid>");
     println!("🎮 LOG: Caught gethostbyname for '{}'. Spoofing local IP to break infinite loop!", name_str);
     
-    // 1. Write dummy IPv4 data (127.0.0.1) to guest memory
-    let ip_ptr = env.mem.alloc_and_write([127u8, 0, 0, 1]).cast::<u8>();
+    // 1. Write dummy IPv4 data (127.0.0.1) using u32 to safely satisfy the compiler trait bounds!
+    let ip_val = u32::from_le_bytes([127, 0, 0, 1]);
+    let ip_ptr = env.mem.alloc_and_write(ip_val).cast::<u8>();
     
-    // 2. Create the address list (null-terminated array of pointers)
+    // 2. Create the address list using our SafeRead struct (pointer to IP, followed by null)
+    let addr_list = FakeAddrList {
+        ptr: ip_ptr,
+        null: Ptr::null(),
+    };
+    let addr_list_ptr = env.mem.alloc_and_write(addr_list).cast::<MutPtr<u8>>();
+    
+    // 3. Create the aliases list (writing a single null pointer is natively supported)
     let null_ptr: MutPtr<u8> = Ptr::null();
-    let addr_list_ptr = env.mem.alloc_and_write([ip_ptr, null_ptr]).cast::<MutPtr<u8>>();
-    
-    // 3. Create the aliases list (empty, just a null pointer)
-    let aliases_ptr = env.mem.alloc_and_write([null_ptr]).cast::<MutPtr<u8>>();
+    let aliases_ptr = env.mem.alloc_and_write(null_ptr).cast::<MutPtr<u8>>();
     
     // 4. Construct the fake hostent struct
     let fake_hostent = hostent {
