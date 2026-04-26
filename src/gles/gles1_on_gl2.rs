@@ -1968,14 +1968,52 @@ impl GLES for GLES1OnGL2<'_> {
         gl21::LoadIdentity();
     }
     unsafe fn LoadMatrixf(&mut self, m: *const GLfloat) {
-        gl21::LoadMatrixf(m);
+        let mut safe_matrix = [0.0; 16];
+        let mut has_nan = false;
+        
+        // Scan all 16 floats in the matrix for Infinity or NaN
+        for i in 0..16 {
+            let val = *m.add(i);
+            if val.is_nan() || val.is_infinite() {
+                safe_matrix[i] = 0.0; // Safely collapse the geometry!
+                has_nan = true;
+            } else {
+                safe_matrix[i] = val;
+            }
+        }
+        
+        if has_nan {
+            gl21::LoadMatrixf(safe_matrix.as_ptr());
+        } else {
+            gl21::LoadMatrixf(m);
+        }
     }
+    
     unsafe fn LoadMatrixx(&mut self, m: *const GLfixed) {
         let matrix = matrix_fixed_to_float(m);
         gl21::LoadMatrixf(matrix.as_ptr());
     }
+    
     unsafe fn MultMatrixf(&mut self, m: *const GLfloat) {
-        gl21::MultMatrixf(m);
+        let mut safe_matrix = [0.0; 16];
+        let mut has_nan = false;
+        
+        // Scan all 16 floats in the matrix for Infinity or NaN
+        for i in 0..16 {
+            let val = *m.add(i);
+            if val.is_nan() || val.is_infinite() {
+                safe_matrix[i] = 0.0; // Safely collapse the geometry!
+                has_nan = true;
+            } else {
+                safe_matrix[i] = val;
+            }
+        }
+        
+        if has_nan {
+            gl21::MultMatrixf(safe_matrix.as_ptr());
+        } else {
+            gl21::MultMatrixf(m);
+        }
     }
     unsafe fn MultMatrixx(&mut self, m: *const GLfixed) {
         let matrix = matrix_fixed_to_float(m);
