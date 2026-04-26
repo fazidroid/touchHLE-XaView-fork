@@ -2097,28 +2097,38 @@ impl GLES for GLES1OnGL2<'_> {
             fixed_to_float(far).into(),
         );
     }
-    unsafe fn Rotatef(&mut self, angle: GLfloat, x: GLfloat, y: GLfloat, z: GLfloat) {
+        unsafe fn Rotatef(&mut self, angle: GLfloat, x: GLfloat, y: GLfloat, z: GLfloat) {
+        if angle.is_nan() || angle.is_infinite() || x.is_nan() || x.is_infinite() || y.is_nan() || y.is_infinite() || z.is_nan() || z.is_infinite() { 
+            return; // Ignore corrupted rotation!
+        }
         gl21::Rotatef(angle, x, y, z);
     }
     unsafe fn Rotatex(&mut self, angle: GLfixed, x: GLfixed, y: GLfixed, z: GLfixed) {
-        gl21::Rotatef(
-            fixed_to_float(angle),
-            fixed_to_float(x),
-            fixed_to_float(y),
-            fixed_to_float(z),
-        );
+        // Route the fixed-point math directly through our new safe float filter!
+        self.Rotatef(fixed_to_float(angle), fixed_to_float(x), fixed_to_float(y), fixed_to_float(z));
     }
+    
     unsafe fn Scalef(&mut self, x: GLfloat, y: GLfloat, z: GLfloat) {
+        if x.is_nan() || x.is_infinite() || y.is_nan() || y.is_infinite() || z.is_nan() || z.is_infinite() {
+            // EA/Firemint often scales by NaN to "hide" shadow geometry. 
+            // Instead of panicking the GPU, we safely scale it to 0.0 so it vanishes properly!
+            gl21::Scalef(0.0, 0.0, 0.0);
+            return;
+        }
         gl21::Scalef(x, y, z);
     }
     unsafe fn Scalex(&mut self, x: GLfixed, y: GLfixed, z: GLfixed) {
-        gl21::Scalef(fixed_to_float(x), fixed_to_float(y), fixed_to_float(z));
+        self.Scalef(fixed_to_float(x), fixed_to_float(y), fixed_to_float(z));
     }
+    
     unsafe fn Translatef(&mut self, x: GLfloat, y: GLfloat, z: GLfloat) {
+        if x.is_nan() || x.is_infinite() || y.is_nan() || y.is_infinite() || z.is_nan() || z.is_infinite() { 
+            return; // Ignore corrupted translation!
+        }
         gl21::Translatef(x, y, z);
     }
     unsafe fn Translatex(&mut self, x: GLfixed, y: GLfixed, z: GLfixed) {
-        gl21::Translatef(fixed_to_float(x), fixed_to_float(y), fixed_to_float(z));
+        self.Translatef(fixed_to_float(x), fixed_to_float(y), fixed_to_float(z));
     }
 
     // EsTwoCompat
