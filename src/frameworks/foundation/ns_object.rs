@@ -307,11 +307,19 @@ forUndefinedKey:(id)key { // NSString*
     // NOTE: Use sel.as_str() comparisons instead of lookup_selector().unwrap()
     // because some selectors may not be registered yet when this runs.
     let is_ferrari_or_gtracing = env.bundle.bundle_identifier().starts_with("com.gameloft.Ferrari")
-        || env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing");
+        || env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing")
+        || env.bundle.bundle_identifier().starts_with("com.gameloft.Asphalt6"); // <-- Added Asphalt 6!
+
     if is_ferrari_or_gtracing && wait {
         let sel_str = sel.as_str(&env.mem);
         if sel_str == "startMovie:" || sel_str == "stopMovie:" || sel_str == "stopMovie" {
-            log!("Applying game-specific hack for Ferrari/GTRacing: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel_str);
+            println!("🎮 LOG: GAMELOFT FIX - Bypassed {}, injecting fake video finish notification to prevent UI freeze!", sel_str);
+            
+            // Instantly tell the game the video finished playing so it unlocks the menu!
+            let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+            let notif = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+            let _: () = crate::msg![env; center postNotificationName:notif object:crate::objc::nil];
+            
             return;
         }
         if sel_str == "initTextInput:"
