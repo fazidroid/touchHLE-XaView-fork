@@ -52,16 +52,6 @@ pub const MPMoviePlayerScalingModeDidChangeNotification: &str =
     "MPMoviePlayerScalingModeDidChangeNotification";
 pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
     "MPMoviePlayerLoadStateDidChangeNotification";
-pub const MPMoviePlayerPlaybackStateDidChangeNotification: &str =
-    "MPMoviePlayerPlaybackStateDidChangeNotification";
-pub const MPMoviePlayerWillExitFullscreenNotification: &str =
-    "MPMoviePlayerWillExitFullscreenNotification";
-pub const MPMoviePlayerDidExitFullscreenNotification: &str =
-    "MPMoviePlayerDidExitFullscreenNotification";
-pub const MPMoviePlayerWillEnterFullscreenNotification: &str =
-    "MPMoviePlayerWillEnterFullscreenNotification";
-pub const MPMoviePlayerDidEnterFullscreenNotification: &str =
-    "MPMoviePlayerDidEnterFullscreenNotification";
 // TODO: More notifications?
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
@@ -87,26 +77,6 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMoviePlayerLoadStateDidChangeNotification",
         HostConstant::NSString(MPMoviePlayerLoadStateDidChangeNotification),
-    ),
-    (
-        "_MPMoviePlayerPlaybackStateDidChangeNotification",
-        HostConstant::NSString(MPMoviePlayerPlaybackStateDidChangeNotification),
-    ),
-    (
-        "_MPMoviePlayerWillExitFullscreenNotification",
-        HostConstant::NSString(MPMoviePlayerWillExitFullscreenNotification),
-    ),
-    (
-        "_MPMoviePlayerDidExitFullscreenNotification",
-        HostConstant::NSString(MPMoviePlayerDidExitFullscreenNotification),
-    ),
-    (
-        "_MPMoviePlayerWillEnterFullscreenNotification",
-        HostConstant::NSString(MPMoviePlayerWillEnterFullscreenNotification),
-    ),
-    (
-        "_MPMoviePlayerDidEnterFullscreenNotification",
-        HostConstant::NSString(MPMoviePlayerDidEnterFullscreenNotification),
     ),
     (
         "_MPMoviePlayerPlaybackDidFinishReasonUserInfoKey",
@@ -215,14 +185,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         // Safety check to prevent crashing the app picker!
         if !env.is_app_picker {
             let bundle_id = env.bundle.bundle_identifier();
-            is_ea_game = bundle_id.starts_with("com.ea")
-                || bundle_id.starts_with("com.firemint")
-                || bundle_id.starts_with("com.gameloft")
-                || bundle_id.starts_with("com.namco");
+            is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
         }
 
         if is_ea_game {
-            log_dbg!("MPMoviePlayerController play: faking instant video completion");
+            println!("🎮 LOG: EA Title Detected! Faking instant video completion for MPMoviePlayerController...");
             
             let center: id = msg_class![env; NSNotificationCenter defaultCenter];
             
@@ -268,39 +235,25 @@ pub const CLASSES: ClassExports = objc_classes! {
             return nil;
         }
 
-        // Fire notifications on BOTH the view controller AND a fake inner
-        // MPMoviePlayerController. Asphalt 6 (and similar Gameloft games)
-        // use a custom subclass (LandscapeMoviePlayerViewController) and
-        // register notification observers on the *inner player* object, not
-        // on the view controller itself.
+        // Fire notifications immediately so the game stops waiting for video.
+        // Real Racing 2 calls initWithContentURL: in a loop (66+ times) waiting
+        // for MPMoviePlayerLoadStateDidChangeNotification — it never calls play.
+
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
 
-        // Create a fake inner MPMoviePlayerController so observers that watch
-        // it receive the completion notifications.
-        let inner: id = msg_class![env; MPMoviePlayerController alloc];
-        let inner: id = msg![env; inner init];
+        // 1. Signal that the load state changed (video is "ready to play").
+        let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+        let _: () = msg![env; center postNotificationName:load_notif object:this];
 
-        // Fire on both the VC (this) and the inner player.
-        for &sender in &[this, inner] {
-            // 1. Load state changed — video is "ready to play".
-            let n = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
-            let _: () = msg![env; center postNotificationName:n object:sender];
+        // 2. Signal that duration is known.
+        let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(
+            env, "MPMovieDurationAvailableNotification".to_string());
+        let _: () = msg![env; center postNotificationName:duration_notif object:this];
 
-            // 2. Duration is known.
-            let n2 = crate::frameworks::foundation::ns_string::from_rust_string(
-                env, "MPMovieDurationAvailableNotification".to_string());
-            let _: () = msg![env; center postNotificationName:n2 object:sender];
+        // 3. Signal that playback is finished so the game moves past the intro.
+        let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+        let _: () = msg![env; center postNotificationName:finish_notif object:this];
 
-            // 3. Playback state changed to playing, then stopped.
-            let n3 = ns_string::get_static_str(env, MPMoviePlayerPlaybackStateDidChangeNotification);
-            let _: () = msg![env; center postNotificationName:n3 object:sender];
-
-            // 4. Playback finished — game advances past intro/video.
-            let n4 = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
-            let _: () = msg![env; center postNotificationName:n4 object:sender];
-        }
-
-        release(env, inner);
         this
     }
 
