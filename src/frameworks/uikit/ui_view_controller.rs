@@ -208,7 +208,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (())presentModalViewController:(id)_vc animated:(bool)_animated {
-        println!("🎮 LOG: Caught [UIViewController presentModalViewController:animated:]. Absorbing safely!");
+        println!("🎮 LOG: GAMELOFT FIX - Caught presentModalViewController! Injecting fake video finish notifications.");
+        
+        let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+        
+        // Fire the standard finish notification
+        let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
+        
+        // Gameloft specifically listens for the Fullscreen Exit notification to trigger the main menu
+        let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
     }
 
     - (())dismissModalViewControllerAnimated:(bool)animated {
@@ -217,7 +227,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // 🏎️ The exact methods Real Racing 2 is crashing on right now!
     - (())presentMoviePlayerViewControllerAnimated:(id)_vc {
-        println!("🎮 LOG: Caught [UIViewController presentMoviePlayerViewControllerAnimated:]. Absorbing safely!");
+        println!("🎮 LOG: GAMELOFT FIX - Caught presentMoviePlayerViewControllerAnimated! Injecting fake video finish notifications.");
+        
+        let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+        
+        // Fire the standard finish notification
+        let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
+        
+        // Gameloft specifically listens for the Fullscreen Exit notification to trigger the main menu
+        let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
     }
 
     - (())dismissMoviePlayerViewControllerAnimated {
