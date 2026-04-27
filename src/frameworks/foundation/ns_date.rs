@@ -28,8 +28,15 @@ impl HostObject for NSDateHostObject {}
 // Helper to check if an object is really an NSDate
 fn is_nsdate(env: &mut Environment, obj: id) -> bool {
     if obj == nil { return false; }
-    let nsdate_class: id = msg_class![env; NSDate class];
-    msg![env; obj isKindOfClass:nsdate_class]
+    // Use a direct Rust type check instead of sending isKindOfClass: via ObjC.
+    // Sending a message requires walking the isa/superclass chain which calls
+    // borrow::<ClassHostObject> — if obj is a zombie NSAutoreleasePool this
+    // panics before we can return false. Checking the host object type directly
+    // is safe and avoids any ObjC dispatch.
+    env.objc
+        .get_host_object(obj)
+        .and_then(|h| h.as_any().downcast_ref::<NSDateHostObject>())
+        .is_some()
 }
 
 pub const CLASSES: ClassExports = objc_classes! {
@@ -110,6 +117,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)initWithTimeInterval:(NSTimeInterval)secs
                  sinceDate:(id)date {
     if !is_nsdate(env, this) { return nil; }
+    if !is_nsdate(env, date) { return nil; }
     let time_interval = env.objc.borrow_mut::<NSDateHostObject>(date).time_interval + secs;
     env.objc.borrow_mut::<NSDateHostObject>(this).time_interval = time_interval;
     this
@@ -146,6 +154,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (NSTimeInterval)timeIntervalSinceDate:(id)anotherDate {
     if !is_nsdate(env, this) { return 0.0; }
+    if !is_nsdate(env, anotherDate) { return 0.0; }
     let host_object = env.objc.borrow::<NSDateHostObject>(this);
     let another_date_host_object = env.objc.borrow::<NSDateHostObject>(anotherDate);
     host_object.time_interval - another_date_host_object.time_interval
@@ -187,6 +196,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (NSComparisonResult)compare:(id)anotherDate {
     if !is_nsdate(env, this) { return 0; }
+    if !is_nsdate(env, anotherDate) { return 0; }
     let host_object = env.objc.borrow::<NSDateHostObject>(this);
     let another_date_host_object = env.objc.borrow::<NSDateHostObject>(anotherDate);
     from_rust_ordering(host_object.time_interval.total_cmp(&another_date_host_object.time_interval))
