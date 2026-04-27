@@ -66,6 +66,10 @@ pub struct Thread {
     /// Address range of this thread's stack, used to check if addresses are in
     /// range while producing a stack trace.
     pub stack: Option<std::ops::RangeInclusive<u32>>,
+    /// Set to true the first time a bad-jump is recovered by returning to LR
+    /// instead of killing the thread. On any subsequent bad jump the thread
+    /// is killed so it cannot loop or cause a null-deref crash.
+    pub bad_jump_returned: bool,
 }
 
 impl Thread {
@@ -597,6 +601,7 @@ impl Environment {
             guest_context: None,
             host_context: Some(main_thread_init_routine),
             stack: Some(mem::Mem::MAIN_THREAD_STACK_LOW_END..=0u32.wrapping_sub(1)),
+            bad_jump_returned: false,
         };
 
         let mut env = Environment {
@@ -735,6 +740,7 @@ impl Environment {
             guest_context: None,
             host_context: None,
             stack: Some(mem::Mem::MAIN_THREAD_STACK_LOW_END..=0u32.wrapping_sub(1)),
+            bad_jump_returned: false,
         };
 
         let mut env = Environment {
@@ -1045,6 +1051,7 @@ impl Environment {
             guest_context: Some(Box::new(cpu::CpuContext::new())),
             host_context: Some(thread_routine),
             stack: Some(stack_alloc.to_bits()..=(stack_high_addr - 1)),
+            bad_jump_returned: false,
         });
 
         let new_thread_id = self.threads.len() - 1;
@@ -1626,21 +1633,31 @@ impl Environment {
                             lr,
                             r12
                         );
-                        // For non-main threads with a valid LR, return to the
-                        // caller with r0=0 instead of killing the thread.
-                        // This keeps the thread alive so it can signal any
+                        // For non-main threads with a valid LR, allow ONE
+                        // return-to-LR (with r0=0) so the thread can signal
                         // condition variables / semaphores other threads wait on.
-                        // KillThreadOnAbort is reserved for the main thread or
-                        // when LR itself points into the null page.
-                        if self.current_thread != 0 && lr > 0x2000 {
+                        // On any subsequent bad jump the thread is killed cleanly
+                        // to prevent null-deref crashes from the r0=0 return value.
+                        let allow_return = self.current_thread != 0
+                            && lr > 0x2000
+                            && !self.threads[self.current_thread].bad_jump_returned;
+                        if allow_return {
                             echo!(
                                 "WARNING: Thread {} returning to LR {:#010x} (keeping alive for sync)",
-                                self.current_thread,
-                                lr
+                                self.current_thread, lr
                             );
+                            self.threads[self.current_thread].bad_jump_returned = true;
                             self.cpu.regs_mut()[0] = 0;
                             self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
                         } else {
+                            if self.current_thread != 0
+                                && self.threads[self.current_thread].bad_jump_returned
+                            {
+                                echo!(
+                                    "WARNING: Thread {} second bad jump at {:#010x}, killing cleanly.",
+                                    self.current_thread, pc
+                                );
+                            }
                             // KillThreadOnAbort
                             self.cpu.branch(self.dyld.thread_exit_routine());
                         }
