@@ -121,24 +121,29 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
 
     // MoviePlayerSkip: if this is any kind of movie/video player view controller,
-    // fire the "playback finished" notifications immediately before building the
-    // fallback view. This skips the intro regardless of whether
-    // presentModalViewController: is ever called, since some games (e.g. Asphalt 6)
-    // set up the movie player by directly accessing .view without a modal presentation.
+    // schedule a deferred notification via NSTimer so the "playback finished"
+    // signal fires AFTER loadView returns and the game has registered its observers.
+    // Firing synchronously here is too early — the observer isn't registered yet.
     let is_movie_vc = class_name_str.to_lowercase().contains("movie")
         || class_name_str.to_lowercase().contains("video")
         || class_name_str.to_lowercase().contains("splash")
         || class_name_str.to_lowercase().contains("intro")
         || class_name_str.to_lowercase().contains("preroll");
     if is_movie_vc {
-        log!("MoviePlayerSkip: firing playback-finished notifications for {} to skip intro", class_name_str);
-        let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
-        let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
-        let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
-        let notif3 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerWillExitFullscreenNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif3 object:nil];
+        log!("MoviePlayerSkip: scheduling deferred playback-finished for {}", class_name_str);
+        // Use a 0.25s one-shot timer so notifications arrive after the game
+        // finishes its setup and registers its MPMoviePlayer observer.
+        let run_loop: id = crate::msg_class![env; NSRunLoop mainRunLoop];
+        let target: id = this;
+        let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications")
+            .unwrap_or_else(|| env.objc.register_selector("_touchHLE_fireMovieSkipNotifications", &mut env.mem));
+        let timer: id = crate::msg_class![env; NSTimer timerWithTimeInterval:0.25f64
+                                                                       target:target
+                                                                     selector:sel
+                                                                     userInfo:nil
+                                                                      repeats:false];
+        let mode: id = crate::frameworks::foundation::ns_string::get_static_str(env, crate::frameworks::foundation::ns_run_loop::NSDefaultRunLoopMode);
+        let _: () = crate::msg![env; run_loop addTimer:timer forMode:mode];
     }
 
     // FixNibEaglLayer
@@ -205,6 +210,25 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (())viewDidAppear:(bool)animated {
     log_dbg!("[(UIViewController*){:?} viewDidAppear:{}]", this, animated);
+    // MoviePlayerSkip: second trigger point — by viewDidAppear the game has
+    // definitely registered its MPMoviePlayer observer, so fire here too.
+    let class: Class = msg![env; this class];
+    let class_name_str = env.objc.get_class_name(class).to_string().to_lowercase();
+    let is_movie_vc = class_name_str.contains("movie")
+        || class_name_str.contains("video")
+        || class_name_str.contains("splash")
+        || class_name_str.contains("intro")
+        || class_name_str.contains("preroll");
+    if is_movie_vc {
+        log!("MoviePlayerSkip: viewDidAppear firing playback-finished for {}", class_name_str);
+        fire_movie_skip_notifications(env);
+    }
+}
+
+// Timer callback target for the deferred MoviePlayerSkip notifications.
+- (())_touchHLE_fireMovieSkipNotifications {
+    log!("MoviePlayerSkip: deferred timer fired, posting playback-finished notifications");
+    fire_movie_skip_notifications(env);
 }
 - (())viewWillDisappear:(bool)animated {
     log_dbg!("[(UIViewController*){:?} viewWillDisappear:{}]", this, animated);
@@ -237,14 +261,18 @@ pub const CLASSES: ClassExports = objc_classes! {
             || vc_class_name.contains("intro")
             || vc_class_name.contains("preroll");
         if is_movie {
-            log!("MoviePlayerSkip: presentModalViewController firing playback-finished for {}", vc_class_name);
-            let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
-            let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
-            let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
-            let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
-            let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
-            let notif3 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerWillExitFullscreenNotification");
-            let _: () = crate::msg![env; center postNotificationName:notif3 object:nil];
+            log!("MoviePlayerSkip: presentModalViewController scheduling deferred skip for {}", vc_class_name);
+            // Defer so the presented VC finishes setting up its observer first.
+            let run_loop: id = crate::msg_class![env; NSRunLoop mainRunLoop];
+            let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications")
+                .unwrap_or_else(|| env.objc.register_selector("_touchHLE_fireMovieSkipNotifications", &mut env.mem));
+            let timer: id = crate::msg_class![env; NSTimer timerWithTimeInterval:0.25f64
+                                                                           target:vc
+                                                                         selector:sel
+                                                                         userInfo:nil
+                                                                          repeats:false];
+            let mode: id = crate::frameworks::foundation::ns_string::get_static_str(env, crate::frameworks::foundation::ns_run_loop::NSDefaultRunLoopMode);
+            let _: () = crate::msg![env; run_loop addTimer:timer forMode:mode];
         } else {
             log_dbg!("presentModalViewController: non-movie VC ({}), ignoring", vc_class_name);
         }
@@ -255,14 +283,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (())presentMoviePlayerViewControllerAnimated:(id)_vc {
-        log!("MoviePlayerSkip: presentMoviePlayerViewControllerAnimated firing playback-finished");
-        let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
-        let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
-        let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
-        let notif3 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerWillExitFullscreenNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif3 object:nil];
+        log!("MoviePlayerSkip: presentMoviePlayerViewControllerAnimated firing skip");
+        fire_movie_skip_notifications(env);
     }
 
     - (())dismissMoviePlayerViewControllerAnimated {
@@ -348,4 +370,19 @@ fn check_nib_exists(env: &mut Environment, bundle: id, nib_name: id) -> bool {
     let type_: id = get_static_str(env, "nib");
     let res: id = msg![env; bundle pathForResource:nib_name ofType:type_];
     res != nil
+}
+
+/// Fire all three MPMoviePlayer "playback finished" notifications.
+/// Called from the deferred timer callback and from viewDidAppear for movie VCs.
+fn fire_movie_skip_notifications(env: &mut Environment) {
+    use crate::frameworks::foundation::ns_string::get_static_str;
+    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+    for name in &[
+        "MPMoviePlayerPlaybackDidFinishNotification",
+        "MPMoviePlayerWillExitFullscreenNotification",
+        "MPMoviePlayerDidExitFullscreenNotification",
+    ] {
+        let notif_name = get_static_str(env, name);
+        let _: () = msg![env; center postNotificationName:notif_name object:nil];
+    }
 }
