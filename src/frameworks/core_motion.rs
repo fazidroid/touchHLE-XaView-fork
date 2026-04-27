@@ -31,6 +31,10 @@ const CLASSES: ClassExports = objc_classes! {
 + (id)allocWithZone:(NSZonePtr)_zone {
     env.objc.alloc_object(this, Box::new(CMMotionManagerHostObject), &mut env.mem)
 }
+- (())startAccelerometerUpdatesToQueue:(id)queue withHandler:(id)handler {
+    log!("CMMotionManager startAccelerometerUpdatesToQueue:withHandler: stub called");
+}
+
 - (id)init { this }
 
 - (bool)isGyroAvailable { false }
