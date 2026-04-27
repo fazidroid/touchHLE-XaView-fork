@@ -104,6 +104,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
+- (id)copyWithZone:(NSZonePtr)_zone {
+    if !is_nsdate(env, this) { return nil; }
+    retain(env, this)
+}
+
 - (id)init {
     if !is_nsdate(env, this) { return nil; }
     let time_interval = SystemTime::now()
