@@ -1626,8 +1626,24 @@ impl Environment {
                             lr,
                             r12
                         );
-                        // KillThreadOnAbort
-                        self.cpu.branch(self.dyld.thread_exit_routine());
+                        // For non-main threads with a valid LR, return to the
+                        // caller with r0=0 instead of killing the thread.
+                        // This keeps the thread alive so it can signal any
+                        // condition variables / semaphores other threads wait on.
+                        // KillThreadOnAbort is reserved for the main thread or
+                        // when LR itself points into the null page.
+                        if self.current_thread != 0 && lr > 0x2000 {
+                            echo!(
+                                "WARNING: Thread {} returning to LR {:#010x} (keeping alive for sync)",
+                                self.current_thread,
+                                lr
+                            );
+                            self.cpu.regs_mut()[0] = 0;
+                            self.cpu.branch(GuestFunction::from_addr_with_thumb_bit(lr));
+                        } else {
+                            // KillThreadOnAbort
+                            self.cpu.branch(self.dyld.thread_exit_routine());
+                        }
                         return ThreadNextAction::Continue;
                     }
 
