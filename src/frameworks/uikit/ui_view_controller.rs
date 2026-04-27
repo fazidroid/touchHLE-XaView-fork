@@ -120,6 +120,27 @@ pub const CLASSES: ClassExports = objc_classes! {
     let class_name_str = env.objc.get_class_name(class).to_string();
     log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
 
+    // MoviePlayerSkip: if this is any kind of movie/video player view controller,
+    // fire the "playback finished" notifications immediately before building the
+    // fallback view. This skips the intro regardless of whether
+    // presentModalViewController: is ever called, since some games (e.g. Asphalt 6)
+    // set up the movie player by directly accessing .view without a modal presentation.
+    let is_movie_vc = class_name_str.to_lowercase().contains("movie")
+        || class_name_str.to_lowercase().contains("video")
+        || class_name_str.to_lowercase().contains("splash")
+        || class_name_str.to_lowercase().contains("intro")
+        || class_name_str.to_lowercase().contains("preroll");
+    if is_movie_vc {
+        log!("MoviePlayerSkip: firing playback-finished notifications for {} to skip intro", class_name_str);
+        let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+        let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
+        let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
+        let notif3 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerWillExitFullscreenNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif3 object:nil];
+    }
+
     // FixNibEaglLayer
     let mut view_class: Class = msg_class![env; UIView class];
     if class_name_str.contains("EAGL") || class_name_str.contains("GL") {
@@ -207,37 +228,41 @@ pub const CLASSES: ClassExports = objc_classes! {
         crate::objc::nil
     }
 
-    - (())presentModalViewController:(id)_vc animated:(bool)_animated {
-        println!("🎮 LOG: GAMELOFT FIX - Caught presentModalViewController! Injecting fake video finish notifications.");
-        
-        let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
-        
-        // Fire the standard finish notification
-        let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
-        
-        // Gameloft specifically listens for the Fullscreen Exit notification to trigger the main menu
-        let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
-        let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
+    - (())presentModalViewController:(id)vc animated:(bool)_animated {
+        let vc_class: Class = msg![env; vc class];
+        let vc_class_name = env.objc.get_class_name(vc_class).to_lowercase();
+        let is_movie = vc_class_name.contains("movie")
+            || vc_class_name.contains("video")
+            || vc_class_name.contains("splash")
+            || vc_class_name.contains("intro")
+            || vc_class_name.contains("preroll");
+        if is_movie {
+            log!("MoviePlayerSkip: presentModalViewController firing playback-finished for {}", vc_class_name);
+            let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+            let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+            let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
+            let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
+            let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
+            let notif3 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerWillExitFullscreenNotification");
+            let _: () = crate::msg![env; center postNotificationName:notif3 object:nil];
+        } else {
+            log_dbg!("presentModalViewController: non-movie VC ({}), ignoring", vc_class_name);
+        }
     }
 
     - (())dismissModalViewControllerAnimated:(bool)animated {
         println!("🎮 LOG: Caught [UIViewController dismissModalViewControllerAnimated:{}].", animated);
     }
 
-    // 🏎️ The exact methods Real Racing 2 is crashing on right now!
     - (())presentMoviePlayerViewControllerAnimated:(id)_vc {
-        println!("🎮 LOG: GAMELOFT FIX - Caught presentMoviePlayerViewControllerAnimated! Injecting fake video finish notifications.");
-        
+        log!("MoviePlayerSkip: presentMoviePlayerViewControllerAnimated firing playback-finished");
         let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
-        
-        // Fire the standard finish notification
         let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
         let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
-        
-        // Gameloft specifically listens for the Fullscreen Exit notification to trigger the main menu
         let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
         let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
+        let notif3 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerWillExitFullscreenNotification");
+        let _: () = crate::msg![env; center postNotificationName:notif3 object:nil];
     }
 
     - (())dismissMoviePlayerViewControllerAnimated {
