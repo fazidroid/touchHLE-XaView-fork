@@ -98,21 +98,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 
-- (id)dictionaryWithValuesForKeys:(id)keys {
-        println!("🎮 LOG: Caught [NSObject dictionaryWithValuesForKeys:]. Returning nil to bypass Burstly SDK!");
-        crate::objc::nil
+    - (id)dictionaryWithValuesForKeys:(id)keys {
+        println!(" LOG: Caught [NSObject dictionaryWithValuesForKeys:]. Returning empty dictionary to safely bypass SDK!");
+        // Returning a real, empty dictionary prevents the SDK from crashing!
+        crate::msg_class![env; NSDictionary dictionary]
     }
     
-- (id)initWithDictionary:(id)dict {
-    log!("NSObject initWithDictionary: stub called (class: {})", 
-         env.objc.get_class_name(ObjC::read_isa(this, &env.mem)));
-    this
-}
+    - (id)initWithDictionary:(id)dict {
+        this
+    }
 
-- (id)toJSONAs:(id)arg0 excludingInArray:(id)arg1 withTranslations:(id)arg2 {
-    log!("NSObject toJSONAs:excludingInArray:withTranslations: stub called, returning nil");
-    nil
-}
+    - (id)toJSONAs:(id)arg0 excludingInArray:(id)arg1 withTranslations:(id)arg2 {
+        println!(" LOG: Caught [NSObject toJSONAs:...]. Faking empty JSON string to prevent C++ crash!");
+        // Returning "{}" guarantees the C++ std::string parser won't hit a null-pointer!
+        let empty_json = crate::frameworks::foundation::ns_string::from_rust_string(env, "{}".to_string());
+        crate::objc::autorelease(env, empty_json)
+    }
 
 - (())setPersistent:(bool)persistent {
     log!("NSObject setPersistent: {} stub called on class {}", persistent,
