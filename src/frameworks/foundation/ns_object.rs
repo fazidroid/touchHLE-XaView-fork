@@ -312,16 +312,18 @@ forUndefinedKey:(id)key { // NSString*
 
     if is_ferrari_or_gtracing && wait {
         let sel_str = sel.as_str(&env.mem);
-        if sel_str == "startMovie:" || sel_str == "stopMovie:" || sel_str == "stopMovie" {
+                if sel_str == "startMovie:" || sel_str == "stopMovie:" || sel_str == "stopMovie" {
             println!("🎮 LOG: GAMELOFT FIX - Bypassed {}, injecting fake video finish notification to prevent UI freeze!", sel_str);
             
             // Instantly tell the game the video finished playing so it unlocks the menu!
             let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
             let notif = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
-            let _: () = crate::msg![env; center postNotificationName:notif object:crate::objc::nil];
+            
+            // REMOVED crate::objc:: from nil here!
+            let _: () = crate::msg![env; center postNotificationName:notif object:nil]; 
             
             return;
-        }
+        }       
         if sel_str == "initTextInput:"
             || sel_str == "removeTextField:"
             || sel_str == "showTextField:"
