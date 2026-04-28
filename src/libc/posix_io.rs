@@ -696,40 +696,41 @@ pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
         return -1;
     }
 
-    let result = match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
-            Some(file) => {
-                if file.is_pipe {
-                    if file.is_pipe_read_end {
-                        env.libc_state.posix_io.pipe_buffers.remove(&fd);
-                    }
-                    0
-                } else {
-            // The actual closing of the file happens implicitly when `file`
-            // falls out of scope. The return value is about whether actions
-            // performed before closing succeed or not.
-            match file.file {
-                // Closing directories requires no other actions
-                GuestFile::Directory => 0,
-                // Socket is a special case
-                GuestFile::Socket => {
-                    close_socket(env, fd);
-                    0
+        let result = match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
+        Some(file) => {
+            if file.is_pipe {
+                if file.is_pipe_read_end {
+                    env.libc_state.posix_io.pipe_buffers.remove(&fd);
                 }
-                // Files must be synced if they require flushing
-                _ => {
-                    if !file.needs_flush {
+                0
+            } else {
+                // The actual closing of the file happens implicitly when `file`
+                // falls out of scope. The return value is about whether actions
+                // performed before closing succeed or not.
+                match file.file {
+                    // Closing directories requires no other actions
+                    GuestFile::Directory => 0,
+                    // Socket is a special case
+                    GuestFile::Socket => {
+                        crate::libc::sys::socket::close_socket(env, fd);
                         0
-                    } else {
-                        match file.file.sync_all() {
-                            Ok(()) => 0,
-                            Err(_) => {
-                                // TODO: set errno
-                                -1
+                    }
+                    // Files must be synced if they require flushing
+                    _ => {
+                        if !file.needs_flush {
+                            0
+                        } else {
+                            match file.file.sync_all() {
+                                Ok(()) => 0,
+                                Err(_) => {
+                                    // TODO: set errno
+                                    -1
+                                }
                             }
                         }
                     }
                 }
-            }
+            } // <--- THIS is the bracket that was missing!
         }
         None => {
             set_errno(env, EBADF);
