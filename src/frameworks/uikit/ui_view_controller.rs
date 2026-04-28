@@ -136,7 +136,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         let run_loop: id = crate::msg_class![env; NSRunLoop mainRunLoop];
         let target: id = this;
         let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications")
-            .unwrap_or_else(|| env.objc.register_selector("_touchHLE_fireMovieSkipNotifications", &mut env.mem));
+            .unwrap();
         let timer: id = crate::msg_class![env; NSTimer timerWithTimeInterval:0.25f64
                                                                        target:target
                                                                      selector:sel
@@ -265,7 +265,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             // Defer so the presented VC finishes setting up its observer first.
             let run_loop: id = crate::msg_class![env; NSRunLoop mainRunLoop];
             let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications")
-                .unwrap_or_else(|| env.objc.register_selector("_touchHLE_fireMovieSkipNotifications", &mut env.mem));
+                .unwrap();
             let timer: id = crate::msg_class![env; NSTimer timerWithTimeInterval:0.25f64
                                                                            target:vc
                                                                          selector:sel
