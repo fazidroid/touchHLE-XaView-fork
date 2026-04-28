@@ -118,6 +118,19 @@ impl MutexState {
             }
         })
     }
+
+    /// Force-unlock every mutex held by `thread_id` and return their IDs.
+    /// Called when a thread exits so blocked threads are not stranded forever.
+    pub fn release_all_for_thread(&mut self, thread_id: ThreadId) -> Vec<MutexId> {
+        let mut released = Vec::new();
+        for (&id, mutex) in self.mutexes.iter_mut() {
+            if mutex.locked.map_or(false, |(t, _)| t == thread_id) {
+                mutex.locked = None;
+                released.push(id);
+            }
+        }
+        released
+    }
 }
 
 impl Environment {
