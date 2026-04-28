@@ -31,6 +31,8 @@ unsafe impl SafeRead for iovec {}
 pub struct State {
     /// File descriptors _other than stdin, stdout, and stderr_
     files: Vec<Option<PosixFileHostObject>>,
+    // 🏎️ THE PIPE ASSASSIN: Shared Memory Queues for Pipes!
+    pub pipe_buffers: std::collections::HashMap<FileDescriptor, std::collections::VecDeque<u8>>,
 }
 impl State {
     fn file_for_fd(&mut self, fd: FileDescriptor) -> Option<&mut PosixFileHostObject> {
@@ -45,6 +47,10 @@ struct PosixFileHostObject {
     needs_flush: bool,
     reached_eof: bool,
     flags: i32,
+    // 🏎️ THE PIPE ASSASSIN: Pipe identity tracking
+    is_pipe: bool,
+    pipe_peer_fd: Option<FileDescriptor>,
+    is_pipe_read_end: bool,
 }
 
 // TODO: stdin/stdout/stderr handling somehow
@@ -244,6 +250,9 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
                 needs_flush,
                 reached_eof: false,
                 flags: 0,
+                is_pipe: false,
+                pipe_peer_fd: None,
+                is_pipe_read_end: false,
             };
 
             find_or_create_fd(env, host_object)
@@ -277,8 +286,42 @@ pub fn read(
     set_errno(env, 0);
 
     if buffer.is_null() {
-        // TODO: set errno to EFAULT
         return -1;
+    }
+
+    // ==========================================================
+    // 🏎️ THE PIPE ASSASSIN: Break the Infinite Read Lock!
+    // ==========================================================
+    let is_pipe = {
+        if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
+            if file.is_pipe {
+                if !file.is_pipe_read_end { Err(EBADF) } else { Ok((true, file.flags)) }
+            } else { Ok((false, 0)) }
+        } else { Err(EBADF) }
+    };
+
+    match is_pipe {
+        Err(_) => {
+            set_errno(env, EBADF);
+            return -1;
+        }
+        Ok((true, flags)) => {
+            let mut bytes_read = 0;
+            if let Some(q) = env.libc_state.posix_io.pipe_buffers.get_mut(&fd) {
+                if q.is_empty() {
+                    // RETURN EAGAIN (35) INSTEAD OF EOF! This breaks the infinite loop!
+                    set_errno(env, 35); 
+                    return -1;
+                }
+                let buffer_slice = env.mem.bytes_at_mut(buffer.cast(), size);
+                while bytes_read < size as usize && !q.is_empty() {
+                    buffer_slice[bytes_read] = q.pop_front().unwrap();
+                    bytes_read += 1;
+                }
+            }
+            return bytes_read as GuestISize;
+        }
+        Ok((false, _)) => {}
     }
 
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
@@ -417,6 +460,35 @@ pub fn write(
     set_errno(env, 0);
 
     // TODO: error handling for unknown fd?
+    let is_pipe = {
+        if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
+            if file.is_pipe {
+                if file.is_pipe_read_end { Err(EBADF) } else { Ok((true, file.pipe_peer_fd)) }
+            } else { Ok((false, None)) }
+        } else { Err(EBADF) }
+    };
+
+    match is_pipe {
+        Err(_) => {
+            set_errno(env, EBADF);
+            return -1;
+        }
+        Ok((true, peer_fd)) => {
+            if let Some(read_fd) = peer_fd {
+                let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
+                if let Some(q) = env.libc_state.posix_io.pipe_buffers.get_mut(&read_fd) {
+                    for &b in buffer_slice {
+                        q.push_back(b);
+                    }
+                    return size as GuestISize;
+                }
+            }
+            set_errno(env, 32); // EPIPE (Broken Pipe)
+            return -1;
+        }
+        Ok((false, _)) => {}
+    }
+
     let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
 
     let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
@@ -625,7 +697,13 @@ pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
     }
 
     let result = match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
-        Some(file) => {
+            Some(file) => {
+                if file.is_pipe {
+                    if file.is_pipe_read_end {
+                        env.libc_state.posix_io.pipe_buffers.remove(&fd);
+                    }
+                    0
+                } else {
             // The actual closing of the file happens implicitly when `file`
             // falls out of scope. The return value is about whether actions
             // performed before closing succeed or not.
@@ -962,6 +1040,9 @@ pub fn find_or_create_socket(env: &mut Environment) -> FileDescriptor {
         needs_flush: false,
         reached_eof: false,
         flags: 0,
+        is_pipe: false,
+        pipe_peer_fd: None,
+        is_pipe_read_end: false,
     };
     find_or_create_fd(env, host_object)
 }
@@ -979,6 +1060,33 @@ pub fn is_socket(env: &mut Environment, fd: FileDescriptor) -> bool {
         .file;
     matches!(guest_file, GuestFile::Socket)
 }
+
+pub fn sys_pipe(env: &mut Environment, fildes: MutPtr<i32>) -> i32 {
+    let read_obj = PosixFileHostObject {
+        file: GuestFile::Socket, needs_flush: false, reached_eof: false, flags: 0,
+        is_pipe: true, pipe_peer_fd: None, is_pipe_read_end: true,
+    };
+    let read_fd = find_or_create_fd(env, read_obj);
+
+    let write_obj = PosixFileHostObject {
+        file: GuestFile::Socket, needs_flush: false, reached_eof: false, flags: 0,
+        is_pipe: true, pipe_peer_fd: Some(read_fd), is_pipe_read_end: false,
+    };
+    let write_fd = find_or_create_fd(env, write_obj);
+
+    if let Some(r) = env.libc_state.posix_io.file_for_fd(read_fd) {
+        r.pipe_peer_fd = Some(write_fd);
+    }
+
+    env.libc_state.posix_io.pipe_buffers.insert(read_fd, std::collections::VecDeque::new());
+
+    env.mem.write(fildes, read_fd);
+    env.mem.write(fildes + 1, write_fd);
+
+    println!("🎮 LOG: pipe() successfully created! Read FD {}, Write FD {}", read_fd, write_fd);
+    0
+}
+
 
 /// Helper function to validate lock, not part of API. Assumes fd is a valid
 /// file descriptor
