@@ -65,17 +65,17 @@ fn _CGFontGetUnitsPerEm(_env: &mut Environment, _font: CGFontRef) -> i32 {
 }
 
 fn _CGFontGetAscent(_env: &mut Environment, _font: CGFontRef) -> i32 {
-    log!("_CGFontGetAscent stub called -> returning 800");
+    // 🏎️ NFS FIX: Silenced the log spam to prevent I/O bottleneck freezes!
     800
 }
 
 fn _CGFontGetDescent(_env: &mut Environment, _font: CGFontRef) -> i32 {
-    log!("_CGFontGetDescent stub called -> returning -200");
+    // 🏎️ NFS FIX: Silenced the log spam!
     -200
 }
 
 fn _CGFontGetLeading(_env: &mut Environment, _font: CGFontRef) -> i32 {
-    log!("_CGFontGetLeading stub called -> returning 100");
+    // 🏎️ NFS FIX: Silenced the log spam!
     100
 }
 
