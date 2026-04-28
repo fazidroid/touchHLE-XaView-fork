@@ -8,7 +8,7 @@
 //! Resources:
 //! - [View Controller Programming Guide for iOS (Legacy)](https://developer.apple.com/library/archive/documentation/WindowsViews/Conceptual/ViewControllerPGforiOSLegacy/BasicViewControllers/BasicViewControllers.html)
 
-// RemoveUnusedImport
+use crate::frameworks::core_graphics::CGRect;
 use crate::frameworks::foundation::ns_objc_runtime::NSStringFromClass;
 use crate::frameworks::foundation::ns_string::{from_rust_string, get_static_str, to_rust_string};
 use crate::frameworks::uikit::ui_application::{
@@ -117,41 +117,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     // As a last resort, use plain UIVIew for the root view
     let class: Class = msg![env; this class];
-    let class_name_str = env.objc.get_class_name(class).to_string();
-    log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
-
-    // MoviePlayerSkip: if this is any kind of movie/video player view controller,
-    // Firing synchronously here is too early — the observer isn't registered yet.
-    // MoviePlayerSkip: handled in viewDidAppear: — no timer needed here.
-
-    // FixNibEaglLayer
-    let mut view_class: Class = msg_class![env; UIView class];
-    if class_name_str.contains("EAGL") || class_name_str.contains("GL") {
-        let eagl_class = env.objc.link_class("EAGLView", false, &mut env.mem);
-        if eagl_class != nil {
-            view_class = eagl_class;
-            log!("Fallback to EAGLView class instead of UIView!");
-        }
-    }
-    let view_alloc: id = msg![env; view_class alloc];
-
-    // FixLandscapeFrame
-    let app_frame = crate::frameworks::core_graphics::CGRect {
-        origin: crate::frameworks::core_graphics::CGPoint { x: 0.0, y: 0.0 },
-        size: crate::frameworks::core_graphics::CGSize { width: 480.0, height: 320.0 },
-    };
-
-    let view: id = msg![env; view_alloc initWithFrame:app_frame];
-
-    let sel_opaque = env.objc.lookup_selector("setOpaque:").unwrap();
-    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_opaque, 1u32));
-
-    // ForceTouchInteraction
-    let sel_user = env.objc.lookup_selector("setUserInteractionEnabled:").unwrap();
-    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_user, 1u32));
-    let sel_multi = env.objc.lookup_selector("setMultipleTouchEnabled:").unwrap();
-    let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
-
+    log!("Unable to load {:?} {} view controller's view by nib, using plain UIView", this, env.objc.get_class_name(class).to_string());
+    let view: id = msg_class![env; UIView alloc];
+    // Docs are saying that "an empty UIView" is created,
+    // but testing reveals that frame matches the screen one
+    // (at least on the simulator)
+    let screen: id = msg_class![env; UIScreen mainScreen];
+    let app_frame: CGRect = msg![env; screen applicationFrame];
+    let view: id = msg![env; view initWithFrame:app_frame];
     () = msg![env; this setView:view];
 }
 
@@ -188,25 +161,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 - (())viewDidAppear:(bool)animated {
     log_dbg!("[(UIViewController*){:?} viewDidAppear:{}]", this, animated);
-    // MoviePlayerSkip: second trigger point — by viewDidAppear the game has
-    // definitely registered its MPMoviePlayer observer, so fire here too.
-    let class: Class = msg![env; this class];
-    let class_name_str = env.objc.get_class_name(class).to_string().to_lowercase();
-    let is_movie_vc = class_name_str.contains("movie")
-        || class_name_str.contains("video")
-        || class_name_str.contains("splash")
-        || class_name_str.contains("intro")
-        || class_name_str.contains("preroll");
-    if is_movie_vc {
-        log!("MoviePlayerSkip: viewDidAppear firing playback-finished for {}", class_name_str);
-        fire_movie_skip_notifications(env);
-    }
-}
-
-// Timer callback target for the deferred MoviePlayerSkip notifications.
-- (())_touchHLE_fireMovieSkipNotifications {
-    log!("MoviePlayerSkip: deferred timer fired, posting playback-finished notifications");
-    fire_movie_skip_notifications(env);
 }
 - (())viewWillDisappear:(bool)animated {
     log_dbg!("[(UIViewController*){:?} viewWillDisappear:{}]", this, animated);
@@ -225,39 +179,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     todo_objc_setter!(this, wants);
 }
 
-- (id)modalViewController {
-        println!("🎮 LOG: Caught [UIViewController modalViewController]. Returning nil.");
-        crate::objc::nil
-    }
-
-    - (())presentModalViewController:(id)vc animated:(bool)_animated {
-        let vc_class: Class = msg![env; vc class];
-        let vc_class_name = env.objc.get_class_name(vc_class).to_lowercase();
-        let is_movie = vc_class_name.contains("movie")
-            || vc_class_name.contains("video")
-            || vc_class_name.contains("splash")
-            || vc_class_name.contains("intro")
-            || vc_class_name.contains("preroll");
-        if is_movie {
-            log!("MoviePlayerSkip: presentModalViewController firing skip directly\n");
-            fire_movie_skip_notifications(env);
-        } else {
-            log_dbg!("presentModalViewController: non-movie VC ({}), ignoring", vc_class_name);
-        }
-    }
-
-    - (())dismissModalViewControllerAnimated:(bool)animated {
-        println!("🎮 LOG: Caught [UIViewController dismissModalViewControllerAnimated:{}].", animated);
-    }
-
-    - (())presentMoviePlayerViewControllerAnimated:(id)_vc {
-        log!("MoviePlayerSkip: presentMoviePlayerViewControllerAnimated firing skip");
-        fire_movie_skip_notifications(env);
-    }
-
-    - (())dismissMoviePlayerViewControllerAnimated {
-        println!("🎮 LOG: Caught [UIViewController dismissMoviePlayerViewControllerAnimated].");
-    }
+- (())dismissModalViewControllerAnimated:(bool)animated {
+    log!("TODO: [(UIViewController*){:?} dismissModalViewControllerAnimated:{}]", this, animated); // TODO
+}
+- (())dismissMoviePlayerViewControllerAnimated {
+    log!("TODO: [(UIViewController*){:?} dismissMoviePlayerViewControllerAnimated]", this); // TODO
+}
 
 // Заглушка для панели навигации
 - (id)navigationItem {
@@ -338,19 +265,4 @@ fn check_nib_exists(env: &mut Environment, bundle: id, nib_name: id) -> bool {
     let type_: id = get_static_str(env, "nib");
     let res: id = msg![env; bundle pathForResource:nib_name ofType:type_];
     res != nil
-}
-
-/// Fire all three MPMoviePlayer "playback finished" notifications.
-/// Called from the deferred timer callback and from viewDidAppear for movie VCs.
-fn fire_movie_skip_notifications(env: &mut Environment) {
-    use crate::frameworks::foundation::ns_string::get_static_str;
-    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-    for name in &[
-        "MPMoviePlayerPlaybackDidFinishNotification",
-        "MPMoviePlayerWillExitFullscreenNotification",
-        "MPMoviePlayerDidExitFullscreenNotification",
-    ] {
-        let notif_name = get_static_str(env, name);
-        let _: () = msg![env; center postNotificationName:notif_name object:nil];
-    }
 }
