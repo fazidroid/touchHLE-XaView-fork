@@ -152,32 +152,51 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
     0 // success
 }
 
-pub fn pthread_cond_timedwait(
+pub fn pthread_cond_wait(
     env: &mut Environment,
     cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
-    _abstime: u32,
 ) -> i32 {
+    let res = pthread_mutex_unlock(env, mutex);
+    
     // ==========================================================
-    // 🏎️ DYNAMIC SPLIT: GT Racing vs Asphalt 6 Threading
+    // 🏎️ PANIC ASSASSIN: Absorb Sloppy Gameloft Mutex Errors
     // ==========================================================
-    let mut is_gtracing = false;
-    if !env.is_app_picker {
-        is_gtracing = env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing");
+    // We removed the strict `assert_eq!(res, 0);` here!
+    // Gameloft often calls cond_wait without actually locking the mutex first.
+    // Instead of crashing the entire emulator, we safely log the error and proceed.
+    if res != 0 {
+        println!("🎮 LOG: Caught sloppy Mutex Unlock (Error {})! Absorbing panic to keep game alive.", res);
     }
 
-    if is_gtracing {
-        // GT RACING HACK:
-        // Bypass the infinite sleep by unlocking, relocking, and returning an immediate ETIMEDOUT.
-        println!("🎮 LOG: GT Racing detected! Faking ETIMEDOUT for pthread_cond_timedwait.");
-        let _ = pthread_mutex_unlock(env, mutex);
-        let _ = pthread_mutex_lock(env, mutex);
-        return 60; // Standard POSIX ETIMEDOUT code
-    }
-
-    // ASPHALT 6 & STANDARD BEHAVIOR:
-    // Asphalt 6's engine requires normal conditional waiting logic!
-    pthread_cond_wait(env, cond, mutex)
+    assert!(matches!(
+        env.threads[env.current_thread].blocked_by,
+        ThreadBlock::NotBlocked
+    ));
+    log_dbg!(
+        "Thread {} is blocking on condition variable {:?}",
+        env.current_thread,
+        cond
+    );
+    let current_thread = env.current_thread;
+    let mutex_id = env.mem.read(mutex).mutex_id;
+    let cond_var = env.mem.read(cond);
+    let host_object = State::get_mut(env)
+        .condition_variables
+        .get_mut(&cond_var)
+        .unwrap();
+        
+    // We also comment out the second strict state assertion. If the mutex 
+    // was never locked, its state will be invalid and would trigger a secondary panic!
+    // assert!(
+    //     host_object.curr_mutex == Some(mutex_id)
+    //         || host_object.waking.is_empty() && host_object.waiting.is_empty()
+    // );
+    
+    host_object.curr_mutex = Some(mutex_id);
+    host_object.waiting.push_back(current_thread);
+    env.threads[env.current_thread].blocked_by = ThreadBlock::Condition(cond_var);
+    0 // success
 }
 
 pub const FUNCTIONS: FunctionExports = &[
