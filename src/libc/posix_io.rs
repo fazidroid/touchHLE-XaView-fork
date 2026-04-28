@@ -339,6 +339,16 @@ pub fn read(
     match file.file.read(buffer_slice) {
         Ok(bytes_read) => {
             if bytes_read == 0 && size != 0 {
+                // ==========================================================
+                // 🏎️ SOCKET EOF ASSASSIN: Prevent Network Deadlocks
+                // ==========================================================
+                if matches!(file.file, GuestFile::Socket) {
+                    println!("🎮 LOG: Caught 0-byte read on socket FD {}! Injecting EAGAIN to break deadlock.", fd);
+                    // Gameloft spins infinitely if an empty socket returns 0!
+                    set_errno(env, 35); // EAGAIN
+                    return -1;
+                }
+                
                 // need to set EOF
                 file.reached_eof = true;
             }
@@ -365,8 +375,8 @@ pub fn read(
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
                     set_errno(env, EISDIR);
-                    // the returned value was validated on iOS
-                    0
+                    // touchHLE originally returned 0 here. We MUST return -1 to stop the game from looping!
+                    -1
                 }
                 _ => {
                     // TODO: set errno
