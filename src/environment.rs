@@ -1031,6 +1031,18 @@ impl Environment {
                     );
                     let return_value: mem::MutVoidPtr =
                         start_routine.call_from_host(env, (user_data,));
+
+                    // ReleaseThreadMutexes: force-unlock any mutexes this thread
+                    // still holds so that blocked threads are not stranded forever.
+                    let dying_thread = env.current_thread;
+                    let released = env.mutex_state.release_all_for_thread(dying_thread);
+                    for mutex_id in released {
+                        echo!(
+                            "WARNING: Thread {} exiting while holding mutex #{}, force-unlocked.",
+                            dying_thread, mutex_id
+                        );
+                    }
+
                     let curr_thread = &mut env.threads[env.current_thread];
                     curr_thread.return_value = Some(return_value);
                     curr_thread.active = false;
