@@ -266,8 +266,11 @@ pub const CLASSES: ClassExports = objc_classes! {
             let run_loop: id = crate::msg_class![env; NSRunLoop mainRunLoop];
             let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications")
                 .unwrap();
+            // UseThisAsTarget: target must be 'this' (a real UIViewController with
+            // UIViewControllerHostObject), NOT 'vc' (game subclass with unknown host
+            // object type), otherwise messages.rs panics on type mismatch.
             let timer: id = crate::msg_class![env; NSTimer timerWithTimeInterval:0.25f64
-                                                                           target:vc
+                                                                           target:this
                                                                          selector:sel
                                                                          userInfo:nil
                                                                           repeats:false];
