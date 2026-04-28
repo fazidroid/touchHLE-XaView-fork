@@ -7,7 +7,8 @@
 
 use super::mutex::pthread_mutex_t;
 use crate::dyld::FunctionExports;
-use crate::libc::pthread::mutex::pthread_mutex_unlock;
+// 🏎️ Added pthread_mutex_lock import here for the GT Racing hack!
+use crate::libc::pthread::mutex::{pthread_mutex_lock, pthread_mutex_unlock};
 use crate::mem::{ConstPtr, MutPtr, SafeRead};
 use crate::{export_c_func, Environment};
 use std::collections::{HashMap, VecDeque};
@@ -83,7 +84,7 @@ pub fn pthread_cond_wait(
         cond
     );
     let current_thread = env.current_thread;
-    let mutex = env.mem.read(mutex).mutex_id;
+    let mutex_id = env.mem.read(mutex).mutex_id;
     let cond_var = env.mem.read(cond);
     let host_object = State::get_mut(env)
         .condition_variables
@@ -92,10 +93,10 @@ pub fn pthread_cond_wait(
     // The mutex used must be the same as the currently waiting mutex, or there
     // must be no other waiters.
     assert!(
-        host_object.curr_mutex == Some(mutex)
+        host_object.curr_mutex == Some(mutex_id)
             || host_object.waking.is_empty() && host_object.waiting.is_empty()
     );
-    host_object.curr_mutex = Some(mutex);
+    host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
     env.threads[env.current_thread].blocked_by = ThreadBlock::Condition(cond_var);
     0 // success
@@ -157,6 +158,25 @@ pub fn pthread_cond_timedwait(
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
+    // ==========================================================
+    // 🏎️ DYNAMIC SPLIT: GT Racing vs Asphalt 6 Threading
+    // ==========================================================
+    let mut is_gtracing = false;
+    if !env.is_app_picker {
+        is_gtracing = env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing");
+    }
+
+    if is_gtracing {
+        // GT RACING HACK:
+        // Bypass the infinite sleep by unlocking, relocking, and returning an immediate ETIMEDOUT.
+        println!("🎮 LOG: GT Racing detected! Faking ETIMEDOUT for pthread_cond_timedwait.");
+        let _ = pthread_mutex_unlock(env, mutex);
+        let _ = pthread_mutex_lock(env, mutex);
+        return 60; // Standard POSIX ETIMEDOUT code
+    }
+
+    // ASPHALT 6 & STANDARD BEHAVIOR:
+    // Asphalt 6's engine requires normal conditional waiting logic!
     pthread_cond_wait(env, cond, mutex)
 }
 
