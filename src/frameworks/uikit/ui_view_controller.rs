@@ -121,30 +121,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
 
     // MoviePlayerSkip: if this is any kind of movie/video player view controller,
-    // schedule a deferred notification via NSTimer so the "playback finished"
-    // signal fires AFTER loadView returns and the game has registered its observers.
     // Firing synchronously here is too early — the observer isn't registered yet.
-    let is_movie_vc = class_name_str.to_lowercase().contains("movie")
-        || class_name_str.to_lowercase().contains("video")
-        || class_name_str.to_lowercase().contains("splash")
-        || class_name_str.to_lowercase().contains("intro")
-        || class_name_str.to_lowercase().contains("preroll");
-    if is_movie_vc {
-        log!("MoviePlayerSkip: scheduling deferred playback-finished for {}", class_name_str);
-        // Use a 0.25s one-shot timer so notifications arrive after the game
-        // finishes its setup and registers its MPMoviePlayer observer.
-        let run_loop: id = crate::msg_class![env; NSRunLoop mainRunLoop];
-        let target: id = this;
-        let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications")
-            .unwrap();
-        let timer: id = crate::msg_class![env; NSTimer timerWithTimeInterval:0.25f64
-                                                                       target:target
-                                                                     selector:sel
-                                                                     userInfo:nil
-                                                                      repeats:false];
-        let mode: id = crate::frameworks::foundation::ns_string::get_static_str(env, crate::frameworks::foundation::ns_run_loop::NSDefaultRunLoopMode);
-        let _: () = crate::msg![env; run_loop addTimer:timer forMode:mode];
-    }
+    // MoviePlayerSkip: handled in viewDidAppear: — no timer needed here.
 
     // FixNibEaglLayer
     let mut view_class: Class = msg_class![env; UIView class];
@@ -261,21 +239,8 @@ pub const CLASSES: ClassExports = objc_classes! {
             || vc_class_name.contains("intro")
             || vc_class_name.contains("preroll");
         if is_movie {
-            log!("MoviePlayerSkip: presentModalViewController scheduling deferred skip for {}", vc_class_name);
-            // Defer so the presented VC finishes setting up its observer first.
-            let run_loop: id = crate::msg_class![env; NSRunLoop mainRunLoop];
-            let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications")
-                .unwrap();
-            // UseThisAsTarget: target must be 'this' (a real UIViewController with
-            // UIViewControllerHostObject), NOT 'vc' (game subclass with unknown host
-            // object type), otherwise messages.rs panics on type mismatch.
-            let timer: id = crate::msg_class![env; NSTimer timerWithTimeInterval:0.25f64
-                                                                           target:this
-                                                                         selector:sel
-                                                                         userInfo:nil
-                                                                          repeats:false];
-            let mode: id = crate::frameworks::foundation::ns_string::get_static_str(env, crate::frameworks::foundation::ns_run_loop::NSDefaultRunLoopMode);
-            let _: () = crate::msg![env; run_loop addTimer:timer forMode:mode];
+            log!("MoviePlayerSkip: presentModalViewController firing skip directly\n");
+            fire_movie_skip_notifications(env);
         } else {
             log_dbg!("presentModalViewController: non-movie VC ({}), ignoring", vc_class_name);
         }
