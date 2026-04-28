@@ -252,16 +252,40 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     env.objc.borrow_mut::<EAGLContextHostObject>(this).retina_scale = scale as f32; // SyncRetinaScale
 
-    let (width, height) = {
+        let (width, height) = {
         let bounds: CGRect = msg![env; drawable bounds];
-        let CGSize { width, height } = bounds.size;
+        let mut width = bounds.size.width;
+        let mut height = bounds.size.height;
+
+        // ==========================================================
+        // 🏎️ IPHONE 5 EXCLUSIVE: Dynamic 3D Renderbuffer Scaler
+        // ==========================================================
+        let screen: id = crate::msg_class![env; UIScreen mainScreen];
+        let screen_bounds: CGRect = crate::msg![env; screen bounds];
+        
+        let mut screen_w = screen_bounds.size.width;
+        let mut screen_h = screen_bounds.size.height;
+        
+        // Ensure we are calculating for landscape orientation
+        if screen_h > screen_w {
+            let temp = screen_w;
+            screen_w = screen_h;
+            screen_h = temp;
+        }
+        
+        // ONLY apply the widescreen stretch if the emulator is explicitly running the iPhone 5 preset!
+        if screen_w == 568.0 && screen_h == 320.0 {
+            // Override the tiny UI bounds with the full iPhone 5 widescreen resolution
+            width = screen_w;
+            height = screen_h;
+            println!("🎮 LOG: IPHONE 5 PRESET DETECTED - Expanding 3D Renderbuffer to 16:9!");
+        }
+
         assert!((0.0..(u32::MAX as f32)).contains(&width));
         assert!((0.0..(u32::MAX as f32)).contains(&height));
         let scale_hack = env.options.scale_hack.get() as f32;
         let final_w = (width * scale * scale_hack).round() as u32;
         let final_h = (height * scale * scale_hack).round() as u32;
-        //DebugRenderSize
-        //log!("DEBUG_EAGL: renderbufferStorage:fromDrawable: {:?} Bounds: w={}, h={} | scale={}, scale_hack={} | Final FBO: {}x{}", drawable, width, height, scale, scale_hack, final_w, final_h);
         (final_w, final_h)
     };
 
