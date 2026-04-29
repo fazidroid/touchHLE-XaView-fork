@@ -1429,6 +1429,10 @@ impl Environment {
 
                 stepping = false;
 
+                // Tick the condvar watchdog to auto-wake threads stuck
+                // waiting for network responses in offline mode.
+                crate::libc::pthread::cond::tick_cond_watchdog(&mut self);
+
                 let next_thread = self.schedule_next_thread();
                 if next_thread != self.current_thread {
                     self.switch_thread(&mut old_context, next_thread);
