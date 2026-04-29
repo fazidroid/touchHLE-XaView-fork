@@ -210,10 +210,6 @@ fn sysconf(_env: &mut Environment, name: i32) -> i32 {
     }
 }
 
-fn pipe(env: &mut Environment, fildes: MutPtr<i32>) -> i32 {
-    crate::libc::posix_io::sys_pipe(env, fildes)
-}
-
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(sleep(_)),
     export_c_func!(usleep(_)),
@@ -228,5 +224,4 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(readlink(_, _, _)),
     export_c_func!(getdtablesize()),
     export_c_func!(sysconf(_)),
-    export_c_func!(pipe(_)),
 ];
