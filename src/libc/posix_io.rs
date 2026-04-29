@@ -11,7 +11,7 @@ pub mod statvfs;
 use crate::abi::DotDotDot;
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::fs::{GuestFile, GuestOpenOptions, GuestPath};
-use crate::libc::errno::{set_errno, EBADF, EINTR, EINVAL, EIO, EISDIR, EOVERFLOW, ESPIPE};
+use crate::libc::errno::{set_errno, EAGAIN, EBADF, EINTR, EINVAL, EIO, EISDIR, EOVERFLOW, ESPIPE};
 use crate::libc::sys::socket::close_socket;
 use crate::libc::unistd::pid_t;
 use crate::mem::{
@@ -27,12 +27,28 @@ pub struct iovec {
 }
 unsafe impl SafeRead for iovec {}
 
-#[derive(Default)]
+/// Shared ring-buffer for a pipe pair. Both the read-end and write-end FDs
+/// hold an Arc to the same buffer. When the write end is closed the buffer
+/// stays accessible for draining; when empty it signals EOF.
+type PipeBuffer = std::sync::Arc<std::sync::Mutex<std::collections::VecDeque<u8>>>;
+
+/// Which end of a pipe this FD represents.
+#[derive(Clone)]
+enum PipeEnd {
+    Read(PipeBuffer),
+    Write(PipeBuffer),
+}
+
 pub struct State {
     /// File descriptors _other than stdin, stdout, and stderr_
     files: Vec<Option<PosixFileHostObject>>,
-    // 🏎️ THE PIPE ASSASSIN: Shared Memory Queues for Pipes!
-    pub pipe_buffers: std::collections::HashMap<FileDescriptor, std::collections::VecDeque<u8>>,
+    /// Pipe ends. Keyed by fd index; Some(PipeEnd) for pipe FDs, None otherwise.
+    pipe_ends: std::collections::HashMap<FileDescriptor, PipeEnd>,
+}
+impl Default for State {
+    fn default() -> Self {
+        State { files: Vec::new(), pipe_ends: std::collections::HashMap::new() }
+    }
 }
 impl State {
     fn file_for_fd(&mut self, fd: FileDescriptor) -> Option<&mut PosixFileHostObject> {
@@ -47,10 +63,6 @@ struct PosixFileHostObject {
     needs_flush: bool,
     reached_eof: bool,
     flags: i32,
-    // 🏎️ THE PIPE ASSASSIN: Pipe identity tracking
-    is_pipe: bool,
-    pipe_peer_fd: Option<FileDescriptor>,
-    is_pipe_read_end: bool,
 }
 
 // TODO: stdin/stdout/stderr handling somehow
@@ -250,9 +262,6 @@ pub fn open_direct(env: &mut Environment, path: ConstPtr<u8>, flags: i32) -> Fil
                 needs_flush,
                 reached_eof: false,
                 flags: 0,
-                is_pipe: false,
-                pipe_peer_fd: None,
-                is_pipe_read_end: false,
             };
 
             find_or_create_fd(env, host_object)
@@ -286,42 +295,31 @@ pub fn read(
     set_errno(env, 0);
 
     if buffer.is_null() {
+        // TODO: set errno to EFAULT
         return -1;
     }
 
-    // ==========================================================
-    // 🏎️ THE PIPE ASSASSIN: Break the Infinite Read Lock!
-    // ==========================================================
-    let is_pipe = {
-        if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
-            if file.is_pipe {
-                if !file.is_pipe_read_end { Err(EBADF) } else { Ok((true, file.flags)) }
-            } else { Ok((false, 0)) }
-        } else { Err(EBADF) }
-    };
-
-    match is_pipe {
-        Err(_) => {
-            set_errno(env, EBADF);
+    // PipeRead: if this is the read end of a pipe, drain bytes from the shared
+    // buffer. If empty, yield to the cooperative scheduler (sleep 1ms) and
+    // return EAGAIN so the caller retries after other threads get CPU time.
+    // This replaces the old busy-spin (return 0 immediately) that starved
+    // all loading threads and caused the boot hang.
+    if let Some(PipeEnd::Read(buf)) = env.libc_state.posix_io.pipe_ends.get(&fd).cloned() {
+        let mut locked = buf.lock().unwrap();
+        let available = locked.len().min(size as usize);
+        if available == 0 {
+            drop(locked);
+            // Yield cooperatively — let loading threads run.
+            env.sleep(std::time::Duration::from_millis(1));
+            set_errno(env, EAGAIN);
             return -1;
         }
-        Ok((true, flags)) => {
-            let mut bytes_read = 0;
-            if let Some(q) = env.libc_state.posix_io.pipe_buffers.get_mut(&fd) {
-                if q.is_empty() {
-                    // RETURN EAGAIN (35) INSTEAD OF EOF! This breaks the infinite loop!
-                    set_errno(env, 35); 
-                    return -1;
-                }
-                let buffer_slice = env.mem.bytes_at_mut(buffer.cast(), size);
-                while bytes_read < size as usize && !q.is_empty() {
-                    buffer_slice[bytes_read] = q.pop_front().unwrap();
-                    bytes_read += 1;
-                }
-            }
-            return bytes_read as GuestISize;
+        let buf_slice = env.mem.bytes_at_mut(buffer.cast(), available as u32);
+        for (i, byte) in locked.drain(..available).enumerate() {
+            buf_slice[i] = byte;
         }
-        Ok((false, _)) => {}
+        log_dbg!("pipe read({}, {:?}, {:#x}) => {} bytes", fd, buffer, size, available);
+        return available as GuestISize;
     }
 
     let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
@@ -339,16 +337,6 @@ pub fn read(
     match file.file.read(buffer_slice) {
         Ok(bytes_read) => {
             if bytes_read == 0 && size != 0 {
-                // ==========================================================
-                // 🏎️ SOCKET EOF ASSASSIN: Prevent Network Deadlocks
-                // ==========================================================
-                if matches!(file.file, GuestFile::Socket) {
-                    println!("🎮 LOG: Caught 0-byte read on socket FD {}! Injecting EAGAIN to break deadlock.", fd);
-                    // Gameloft spins infinitely if an empty socket returns 0!
-                    set_errno(env, 35); // EAGAIN
-                    return -1;
-                }
-                
                 // need to set EOF
                 file.reached_eof = true;
             }
@@ -375,8 +363,8 @@ pub fn read(
             let res = match e.kind() {
                 std::io::ErrorKind::IsADirectory => {
                     set_errno(env, EISDIR);
-                    // touchHLE originally returned 0 here. We MUST return -1 to stop the game from looping!
-                    -1
+                    // the returned value was validated on iOS
+                    0
                 }
                 _ => {
                     // TODO: set errno
@@ -469,36 +457,17 @@ pub fn write(
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    // TODO: error handling for unknown fd?
-    let is_pipe = {
-        if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
-            if file.is_pipe {
-                if file.is_pipe_read_end { Err(EBADF) } else { Ok((true, file.pipe_peer_fd)) }
-            } else { Ok((false, None)) }
-        } else { Err(EBADF) }
-    };
-
-    match is_pipe {
-        Err(_) => {
-            set_errno(env, EBADF);
-            return -1;
-        }
-        Ok((true, peer_fd)) => {
-            if let Some(read_fd) = peer_fd {
-                let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
-                if let Some(q) = env.libc_state.posix_io.pipe_buffers.get_mut(&read_fd) {
-                    for &b in buffer_slice {
-                        q.push_back(b);
-                    }
-                    return size as GuestISize;
-                }
-            }
-            set_errno(env, 32); // EPIPE (Broken Pipe)
-            return -1;
-        }
-        Ok((false, _)) => {}
+    // PipeWrite: if this is the write end of a pipe, push bytes into the
+    // shared buffer so the corresponding read end can drain them.
+    if let Some(PipeEnd::Write(buf)) = env.libc_state.posix_io.pipe_ends.get(&fd).cloned() {
+        let data = env.mem.bytes_at(buffer.cast(), size);
+        let mut locked = buf.lock().unwrap();
+        locked.extend(data.iter().copied());
+        log_dbg!("pipe write({}, {:?}, {:#x}) => {} bytes queued", fd, buffer, size, size);
+        return size as GuestISize;
     }
 
+    // TODO: error handling for unknown fd?
     let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
 
     let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
@@ -685,6 +654,8 @@ pub fn lseek(env: &mut Environment, fd: FileDescriptor, offset: off_t, whence: i
 }
 
 pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
+    // PipeClose: remove pipe end so the buffer can be freed when both ends close.
+    env.libc_state.posix_io.pipe_ends.remove(&fd);
     // TODO: handle errno properly
     set_errno(env, 0);
 
@@ -706,41 +677,34 @@ pub fn close(env: &mut Environment, fd: FileDescriptor) -> i32 {
         return -1;
     }
 
-        let result = match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
+    let result = match env.libc_state.posix_io.files[fd_to_file_idx(fd)].take() {
         Some(file) => {
-            if file.is_pipe {
-                if file.is_pipe_read_end {
-                    env.libc_state.posix_io.pipe_buffers.remove(&fd);
+            // The actual closing of the file happens implicitly when `file`
+            // falls out of scope. The return value is about whether actions
+            // performed before closing succeed or not.
+            match file.file {
+                // Closing directories requires no other actions
+                GuestFile::Directory => 0,
+                // Socket is a special case
+                GuestFile::Socket => {
+                    close_socket(env, fd);
+                    0
                 }
-                0
-            } else {
-                // The actual closing of the file happens implicitly when `file`
-                // falls out of scope. The return value is about whether actions
-                // performed before closing succeed or not.
-                match file.file {
-                    // Closing directories requires no other actions
-                    GuestFile::Directory => 0,
-                    // Socket is a special case
-                    GuestFile::Socket => {
-                        crate::libc::sys::socket::close_socket(env, fd);
+                // Files must be synced if they require flushing
+                _ => {
+                    if !file.needs_flush {
                         0
-                    }
-                    // Files must be synced if they require flushing
-                    _ => {
-                        if !file.needs_flush {
-                            0
-                        } else {
-                            match file.file.sync_all() {
-                                Ok(()) => 0,
-                                Err(_) => {
-                                    // TODO: set errno
-                                    -1
-                                }
+                    } else {
+                        match file.file.sync_all() {
+                            Ok(()) => 0,
+                            Err(_) => {
+                                // TODO: set errno
+                                -1
                             }
                         }
                     }
                 }
-            } // <--- THIS is the bracket that was missing!
+            }
         }
         None => {
             set_errno(env, EBADF);
@@ -1007,6 +971,27 @@ pub fn ftruncate(env: &mut Environment, fd: FileDescriptor, len: off_t) -> i32 {
     }
 }
 
+
+fn pipe(env: &mut Environment, fds: MutPtr<[FileDescriptor; 2]>) -> i32 {
+    // PipeImpl: create a pair of FDs sharing an in-memory ring buffer.
+    // Asphalt 6 / Gameloft engine uses pipe() for cross-thread wake-up:
+    //   Thread A: blocks on read(read_fd, &v, 4) waiting for work
+    //   Thread B: unblocks A via write(write_fd, &v, 4)
+    // Previously pipe() was absent — fd 9 was a socket whose read() always
+    // returned 0, creating a busy-spin that starved all loading threads.
+    set_errno(env, 0);
+    let buf: PipeBuffer = std::sync::Arc::new(
+        std::sync::Mutex::new(std::collections::VecDeque::new())
+    );
+    let read_fd  = find_or_create_socket(env);
+    let write_fd = find_or_create_socket(env);
+    env.libc_state.posix_io.pipe_ends.insert(read_fd,  PipeEnd::Read(buf.clone()));
+    env.libc_state.posix_io.pipe_ends.insert(write_fd, PipeEnd::Write(buf));
+    log!("pipe() => read_fd={}, write_fd={}", read_fd, write_fd);
+    env.mem.write(fds, [read_fd, write_fd]);
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(open(_, _, _)),
     export_c_func!(read(_, _, _)),
@@ -1023,6 +1008,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(fsync(_)),
     export_c_func!(ftruncate(_, _)),
     export_c_func!(writev(_, _, _)),
+    export_c_func!(pipe(_)),
 ];
 
 /// Helper function, not part of API
@@ -1051,9 +1037,6 @@ pub fn find_or_create_socket(env: &mut Environment) -> FileDescriptor {
         needs_flush: false,
         reached_eof: false,
         flags: 0,
-        is_pipe: false,
-        pipe_peer_fd: None,
-        is_pipe_read_end: false,
     };
     find_or_create_fd(env, host_object)
 }
@@ -1071,33 +1054,6 @@ pub fn is_socket(env: &mut Environment, fd: FileDescriptor) -> bool {
         .file;
     matches!(guest_file, GuestFile::Socket)
 }
-
-pub fn sys_pipe(env: &mut Environment, fildes: MutPtr<i32>) -> i32 {
-    let read_obj = PosixFileHostObject {
-        file: GuestFile::Socket, needs_flush: false, reached_eof: false, flags: 0,
-        is_pipe: true, pipe_peer_fd: None, is_pipe_read_end: true,
-    };
-    let read_fd = find_or_create_fd(env, read_obj);
-
-    let write_obj = PosixFileHostObject {
-        file: GuestFile::Socket, needs_flush: false, reached_eof: false, flags: 0,
-        is_pipe: true, pipe_peer_fd: Some(read_fd), is_pipe_read_end: false,
-    };
-    let write_fd = find_or_create_fd(env, write_obj);
-
-    if let Some(r) = env.libc_state.posix_io.file_for_fd(read_fd) {
-        r.pipe_peer_fd = Some(write_fd);
-    }
-
-    env.libc_state.posix_io.pipe_buffers.insert(read_fd, std::collections::VecDeque::new());
-
-    env.mem.write(fildes, read_fd);
-    env.mem.write(fildes + 1, write_fd);
-
-    println!("🎮 LOG: pipe() successfully created! Read FD {}, Write FD {}", read_fd, write_fd);
-    0
-}
-
 
 /// Helper function to validate lock, not part of API. Assumes fd is a valid
 /// file descriptor
