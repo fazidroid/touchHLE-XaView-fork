@@ -55,6 +55,38 @@ fn objc_msgSend_inner(
     }
     
     let message_type_info = env.objc.message_type_info.take();
+    
+    if sel_name == "viewDidLoad" || sel_name == "viewDidAppear:" || sel_name == "play" {
+        if !receiver.is_null() {
+            let receiver_class = crate::objc::ObjC::read_isa(receiver, &env.mem);
+            let class_name = env.objc.get_class_name(receiver_class);
+            
+            // If any Gameloft class containing "Movie" or "Video" tries to load or play...
+            if class_name.contains("Movie") || class_name.contains("Video") || class_name == "MPMoviePlayerController" {
+                println!("🎮 LOG: GAMELOFT FIX - Caught {} on {}! Firing video finish notifications!", sel_name, class_name);
+                
+                let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+                
+                // Fire the standard finish notification (targeting both the specific player and nil)
+                let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+                let _: () = crate::msg![env; center postNotificationName:notif1 object:receiver];
+                let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
+                
+                // Fire the fullscreen exit notification
+                let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
+                let _: () = crate::msg![env; center postNotificationName:notif2 object:receiver];
+                let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
+
+                // If it was trying to play, safely absorb the call so it doesn't crash!
+                if sel_name == "play" {
+                    env.cpu.regs_mut()[0..2].fill(0); 
+                    let lr = env.cpu.regs()[14]; 
+                    env.cpu.regs_mut()[15] = lr; 
+                    return;
+                }
+            }
+        }
+    }
 
     if sel_name == "orientation" || sel_name == "statusBarOrientation" {
         let mut is_gtr2 = false;
@@ -396,21 +428,54 @@ Type mismatch when sending message {} to {:?}!
             // UnexpectedHostObjectBypass: class has a host object type that is
             // none of ClassHostObject / UnimplementedClass / FakeClass.
             // This happens when a game registers a dynamic ObjC class at runtime
-            // via objc_allocateClassPair / objc_registerClassPair; the resulting
-            // class pair gets a different internal host object tag.
-            // Previously this was a hard panic. Now we log and return nil so
-            // the game can continue — same behaviour as an unimplemented class.
-            log!(
-                "Warning: Item {:?} in superclass chain of object {:?}'s class {:?} \
-                has an unexpected host object type (likely a runtime-registered dynamic class). \
-                Treating message \"{}\" as sent to nil.",
-                class,
-                receiver,
-                orig_class,
-                selector.as_str(&env.mem),
-            );
-            env.cpu.regs_mut()[0..2].fill(0);
-            return;
+            // via objc_allocateClassPair / objc_registerClassPair.
+            //
+            // CRITICAL: memory-management selectors MUST NOT return nil.
+            // Returning nil from `retain` causes the caller to store nil as the
+            // retained pointer. Every subsequent message then dispatches to 0x0
+            // (a dyld trampoline), creating an infinite spin that hangs the game.
+            // (Seen in NFS Shift 2: retain->nil->PC:0x0001fc0c busy-loop.)
+            let sel_str = selector.as_str(&env.mem);
+            match sel_str {
+                // Retain-family: return receiver so the object stays alive.
+                "retain" | "autorelease" | "init" | "self" | "copy" | "mutableCopy" => {
+                    log_dbg!(
+                        "UnexpectedHostObject: '{}' on {:?} -> returning self",
+                        sel_str, receiver
+                    );
+                    // R0 already holds receiver address; just return.
+                    return;
+                }
+                // Release-family: void no-op.
+                "release" | "dealloc" | "finalize" => {
+                    log_dbg!(
+                        "UnexpectedHostObject: '{}' on {:?} -> no-op",
+                        sel_str, receiver
+                    );
+                    return;
+                }
+                // retainCount: return 1 so nothing thinks the object is freed.
+                "retainCount" => {
+                    log_dbg!("UnexpectedHostObject: retainCount -> 1");
+                    env.cpu.regs_mut()[0] = 1;
+                    env.cpu.regs_mut()[1] = 0;
+                    return;
+                }
+                // All other selectors: log and return nil (original behaviour).
+                _ => {
+                    log!(
+                        "Warning: Item {:?} in superclass chain of object {:?}'s class {:?} \
+                        has an unexpected host object type (likely a runtime-registered dynamic class). \
+                        Treating message \"{}\" as sent to nil.",
+                        class,
+                        receiver,
+                        orig_class,
+                        sel_str,
+                    );
+                    env.cpu.regs_mut()[0..2].fill(0);
+                    return;
+                }
+            }
         }
     }
 }
