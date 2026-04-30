@@ -8,7 +8,7 @@
 use crate::dyld::FunctionExports;
 use crate::export_c_func;
 use crate::libc::sys::socket::{sockaddr, AF_INET, SOCK_DGRAM, SOCK_STREAM};
-use crate::mem::{guest_size_of, ConstPtr, MutPtr, Ptr, SafeRead};
+use crate::mem::{guest_size_of, ConstPtr, MutPtr, SafeRead};
 use crate::Environment;
 
 const AI_PASSIVE: i32 = 0x1;
@@ -21,26 +21,42 @@ const EAI_FAIL: i32 = 4;
 #[allow(non_camel_case_types)]
 pub type socklen_t = u32;
 
-// TODO: struct definition
-#[derive(Copy, Clone)]
-#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+#[allow(non_camel_case_types)]
+pub struct hostent {
+    h_name: MutPtr<u8>,
+    h_aliases: MutPtr<u32>,
+    h_addrtype: i32,
+    h_length: i32,
+    h_addr_list: MutPtr<u32>,
+}
+unsafe impl SafeRead for hostent {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+struct FakeIP {
+    b1: u8,
+    b2: u8,
+    b3: u8,
+    b4: u8,
+}
+unsafe impl SafeRead for FakeIP {}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
 struct FakeAddrList {
-    ptr: MutPtr<u8>,
-    null: MutPtr<u8>,
+    ptr: u32,
+    null_term: u32,
 }
 unsafe impl SafeRead for FakeAddrList {}
 
 #[derive(Copy, Clone, Debug)]
-#[repr(C)]
-#[allow(non_camel_case_types)]
-pub struct hostent {
-    h_name: MutPtr<u8>,
-    h_aliases: MutPtr<MutPtr<u8>>,
-    h_addrtype: i32,
-    h_length: i32,
-    h_addr_list: MutPtr<MutPtr<u8>>,
+#[repr(C, packed)]
+struct FakeAliasList {
+    null_term: u32,
 }
-unsafe impl SafeRead for hostent {}
+unsafe impl SafeRead for FakeAliasList {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -65,41 +81,40 @@ fn getaddrinfo(
     res: MutPtr<MutPtr<addrinfo>>,
 ) -> i32 {
     if !env.options.network_access {
-        log_dbg!(
-            "Network access is disabled, getaddrinfo({:?}, {:?}, {:?}, {:?}) -> EAI_FAIL",
-            node_name,
-            serv_name,
-            hints,
-            res
-        );
         return EAI_FAIL;
     }
 
-    assert!(node_name.is_null()); // TODO
-
-    let hint = env.mem.read(hints);
-    let ai_flags = hint.ai_flags;
-    assert_eq!(ai_flags, AI_PASSIVE);
-    let ai_family = hint.ai_family;
-    assert_eq!(ai_family, AF_INET);
-    assert!(hint.ai_socktype == SOCK_STREAM || hint.ai_socktype == SOCK_DGRAM);
-    assert!(
-        hint.ai_protocol == IPPROTO_TCP || hint.ai_protocol == IPPROTO_UDP || hint.ai_protocol == 0
-    );
-    let ai_addrlen = hint.ai_addrlen;
-    assert_eq!(ai_addrlen, 0);
-    assert!(hint.ai_canonname.is_null());
-    assert!(hint.ai_addr.is_null());
-    assert!(hint.ai_next.is_null());
+    let hint = if !hints.is_null() {
+        env.mem.read(hints)
+    } else {
+        addrinfo {
+            ai_flags: 0,
+            ai_family: AF_INET,
+            ai_socktype: SOCK_STREAM,
+            ai_protocol: IPPROTO_TCP,
+            ai_addrlen: 0,
+            ai_canonname: MutPtr::null(),
+            ai_addr: MutPtr::null(),
+            ai_next: MutPtr::null(),
+        }
+    };
 
     let mut addr_info = hint;
-    let port: u16 = env.mem.cstr_at_utf8(serv_name).unwrap().parse().unwrap();
-    log_dbg!("getaddrinfo: port {}", port);
-    let addr = sockaddr::from_ipv4_parts([0; 4], port);
+    
+    let port_str = if !serv_name.is_null() {
+        env.mem.cstr_at_utf8(serv_name.cast_const()).unwrap_or("80")
+    } else {
+        "80"
+    };
+    let port: u16 = port_str.parse().unwrap_or(80);
+    
+    // SPOOF TO 127.0.0.1 - Triggers instant ECONNREFUSED to break retry loops
+    let addr = sockaddr::from_ipv4_parts([127, 0, 0, 1], port);
 
     let tmp_addr = env.mem.alloc_and_write(addr);
     addr_info.ai_addr = tmp_addr;
     addr_info.ai_addrlen = guest_size_of::<sockaddr>();
+    addr_info.ai_next = MutPtr::null();
 
     let tmp_addr_info = env.mem.alloc_and_write(addr_info);
     env.mem.write(res, tmp_addr_info);
@@ -108,44 +123,45 @@ fn getaddrinfo(
 }
 
 fn freeaddrinfo(env: &mut Environment, addrinfo: MutPtr<addrinfo>) {
+    if addrinfo.is_null() {
+        return;
+    }
     let addrinfo_val = env.mem.read(addrinfo);
-    assert!(addrinfo_val.ai_next.is_null()); // TODO
+    
     let ai_addrlen = addrinfo_val.ai_addrlen;
-    assert_eq!(ai_addrlen, guest_size_of::<sockaddr>());
-    env.mem.free(addrinfo_val.ai_addr.cast());
-    env.mem.free(addrinfo.cast());
+    if ai_addrlen == guest_size_of::<sockaddr>() {
+        let _ = env.mem.free(addrinfo_val.ai_addr.cast());
+    }
+    let _ = env.mem.free(addrinfo.cast());
 }
 
 fn gethostbyname(env: &mut Environment, name: ConstPtr<u8>) -> MutPtr<hostent> {
-    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("<invalid>");
-    println!("🎮 LOG: Caught gethostbyname for '{}'. Spoofing local IP to break infinite loop!", name_str);
-    
-    // 1. Write dummy IPv4 data (127.0.0.1) using u32 to safely satisfy the compiler trait bounds!
-    let ip_val = u32::from_le_bytes([127, 0, 0, 1]);
-    let ip_ptr = env.mem.alloc_and_write(ip_val).cast::<u8>();
-    
-    // 2. Create the address list using our SafeRead struct (pointer to IP, followed by null)
-    let addr_list = FakeAddrList {
-        ptr: ip_ptr,
-        null: Ptr::null(),
+    let name_str = env.mem.cstr_at_utf8(name).unwrap_or("unknown");
+
+    log!(
+        "Spoofing DNS request for gethostbyname({:?} \"{}\") => 127.0.0.1 to force TCP failure",
+        name,
+        name_str
+    );
+
+    let ip_addr = FakeIP { b1: 127, b2: 0, b3: 0, b4: 1 };
+    let ip_ptr = env.mem.alloc_and_write(ip_addr);
+
+    let addr_list = FakeAddrList { ptr: ip_ptr.to_bits(), null_term: 0 };
+    let addr_list_ptr = env.mem.alloc_and_write(addr_list);
+
+    let aliases = FakeAliasList { null_term: 0 };
+    let aliases_ptr = env.mem.alloc_and_write(aliases);
+
+    let hostent_data = hostent {
+        h_name: name.cast_mut(),
+        h_aliases: aliases_ptr.cast(),
+        h_addrtype: AF_INET,
+        h_length: 4, 
+        h_addr_list: addr_list_ptr.cast(),
     };
-    let addr_list_ptr = env.mem.alloc_and_write(addr_list).cast::<MutPtr<u8>>();
-    
-    // 3. Create the aliases list (writing a single null pointer is natively supported)
-    let null_ptr: MutPtr<u8> = Ptr::null();
-    let aliases_ptr = env.mem.alloc_and_write(null_ptr).cast::<MutPtr<u8>>();
-    
-    // 4. Construct the fake hostent struct
-    let fake_hostent = hostent {
-        h_name: Ptr::from_bits(name.to_bits()), // Pass the requested name right back
-        h_aliases: aliases_ptr,
-        h_addrtype: AF_INET,                    // IPv4
-        h_length: 4,                            // 4 bytes long
-        h_addr_list: addr_list_ptr,
-    };
-    
-    // 5. Write the constructed struct to memory and hand the pointer to the game!
-    env.mem.alloc_and_write(fake_hostent).cast()
+
+    env.mem.alloc_and_write(hostent_data)
 }
 
 pub const FUNCTIONS: FunctionExports = &[
