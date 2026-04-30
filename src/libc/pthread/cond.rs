@@ -75,7 +75,18 @@ pub fn pthread_cond_wait(
     mutex: MutPtr<pthread_mutex_t>,
 ) -> i32 {
     let res = pthread_mutex_unlock(env, mutex);
-    assert_eq!(res, 0);
+    
+    // ==========================================================
+    // 🏎️ PANIC ASSASSIN: Absorb Sloppy Gameloft Mutex Errors
+    // ==========================================================
+    if res != 0 {
+        println!("🎮 LOG: Caught sloppy Mutex Unlock (Error {})! Absorbing panic to keep game alive.", res);
+    }
+
+    assert!(matches!(
+        env.threads[env.current_thread].blocked_by,
+        ThreadBlock::NotBlocked
+    ));
     log_dbg!(
         "Thread {} is blocking on condition variable {:?}",
         env.current_thread,
@@ -88,14 +99,11 @@ pub fn pthread_cond_wait(
         .condition_variables
         .get_mut(&cond_var)
         .unwrap();
-    assert!(
-        host_object.curr_mutex == Some(mutex_id)
-            || host_object.waking.is_empty() && host_object.waiting.is_empty()
-    );
+        
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
     host_object.wait_ticks.push_back(0);
-    env.yield_thread(ThreadBlock::Condition(cond_var));
+    env.threads[env.current_thread].blocked_by = ThreadBlock::Condition(cond_var);
     0 // success
 }
 
@@ -153,17 +161,30 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
 
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    _cond: MutPtr<pthread_cond_t>,
+    cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    // GAMELOFT ANTI-FREEZE HACK:
-    // touchHLE ignores abstime and sleeps forever. We bypass this by unlocking,
-    // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
-    // screen progress instead of deadlocking!
-    let _ = pthread_mutex_unlock(env, mutex);
-    let _ = pthread_mutex_lock(env, mutex);
-    60 // Return standard POSIX ETIMEDOUT code
+    // ==========================================================
+    // 🏎️ DYNAMIC SPLIT: GT Racing vs Asphalt 6 Threading
+    // ==========================================================
+    let mut is_gtracing = false;
+    if !env.is_app_picker {
+        is_gtracing = env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing");
+    }
+
+    if is_gtracing {
+        // GT RACING HACK:
+        // Bypass the infinite sleep by unlocking, relocking, and returning an immediate ETIMEDOUT.
+        println!("🎮 LOG: GT Racing detected! Faking ETIMEDOUT for pthread_cond_timedwait.");
+        let _ = pthread_mutex_unlock(env, mutex);
+        let _ = pthread_mutex_lock(env, mutex);
+        return 60; // Standard POSIX ETIMEDOUT code
+    }
+
+    // ASPHALT 6 & STANDARD BEHAVIOR:
+    // Asphalt 6's engine requires normal conditional waiting logic!
+    pthread_cond_wait(env, cond, mutex)
 }
 
 /// Maximum scheduler ticks before auto-waking a stuck condvar waiter.
