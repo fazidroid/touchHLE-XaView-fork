@@ -47,7 +47,7 @@ fn objc_msgSend_inner(
     );
 
     // 1. Define sel_name FIRST so all of our hacks can use it!
-    let sel_name = selector.as_str(&env.mem);
+    let sel_name = selector.as_str(&env.mem).to_string(); // OwnedSelName: end borrow so env can be mutably borrowed later
     
     // TraceAudioCalls
     if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
