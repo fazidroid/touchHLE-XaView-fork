@@ -74,19 +74,39 @@ pub fn pthread_cond_wait(
     cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
 ) -> i32 {
-    let res = pthread_mutex_unlock(env, mutex);
-    
     // ==========================================================
-    // 🏎️ PANIC ASSASSIN: Absorb Sloppy Gameloft Mutex Errors
+    // 🏎️ DYNAMIC SPLIT: Asphalt 6 Ghost Thread & Panic Assassin
     // ==========================================================
-    if res != 0 {
-        println!("🎮 LOG: Caught sloppy Mutex Unlock (Error {})! Absorbing panic to keep game alive.", res);
+    let mut is_asphalt6 = false;
+    if !env.is_app_picker {
+        is_asphalt6 = env.bundle.bundle_identifier().starts_with("com.gameloft.Asphalt6");
     }
+
+    if is_asphalt6 {
+        println!("🎮 LOG: Asphalt 6 detected! Faking wakeup signal for pthread_cond_wait.");
+        let res = pthread_mutex_unlock(env, mutex);
+        
+        // PANIC ASSASSIN: Absorb sloppy Gameloft threading errors!
+        if res != 0 {
+            println!("🎮 LOG: Caught sloppy Mutex Unlock (Error {})! Absorbing panic to keep game alive.", res);
+        }
+
+        // GHOST THREAD BYPASS: Skip the NotBlocked assertion and instantly return!
+        let _ = pthread_mutex_lock(env, mutex);
+        return 0; // Fake successful signal!
+    }
+
+    // ==========================================================
+    // STANDARD BEHAVIOR: For all other games
+    // ==========================================================
+    let res = pthread_mutex_unlock(env, mutex);
+    assert_eq!(res, 0);
 
     assert!(matches!(
         env.threads[env.current_thread].blocked_by,
         ThreadBlock::NotBlocked
     ));
+    
     log_dbg!(
         "Thread {} is blocking on condition variable {:?}",
         env.current_thread,
@@ -100,10 +120,16 @@ pub fn pthread_cond_wait(
         .get_mut(&cond_var)
         .unwrap();
         
+    assert!(
+        host_object.curr_mutex == Some(mutex_id)
+            || host_object.waking.is_empty() && host_object.waiting.is_empty()
+    );
+    
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
     host_object.wait_ticks.push_back(0);
     env.threads[env.current_thread].blocked_by = ThreadBlock::Condition(cond_var);
+    
     0 // success
 }
 
