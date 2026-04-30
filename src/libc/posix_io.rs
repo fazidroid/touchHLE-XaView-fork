@@ -988,7 +988,16 @@ fn pipe(env: &mut Environment, fds: MutPtr<[FileDescriptor; 2]>) -> i32 {
     env.libc_state.posix_io.pipe_ends.insert(read_fd,  PipeEnd::Read(buf.clone()));
     env.libc_state.posix_io.pipe_ends.insert(write_fd, PipeEnd::Write(buf));
     log!("pipe() => read_fd={}, write_fd={}", read_fd, write_fd);
-    env.mem.write(fds, [read_fd, write_fd]);
+    
+    // ==========================================================
+    // 🏎️ MEMORY FIX: Sequential FD Writing
+    // ==========================================================
+    // We cast the array pointer into a standard integer pointer 
+    // and safely write the read and write FDs side-by-side!
+    let fds_ptr = fds.cast::<FileDescriptor>();
+    env.mem.write(fds_ptr, read_fd);
+    env.mem.write(fds_ptr + 1, write_fd);
+    
     0
 }
 
