@@ -143,14 +143,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated { }
 
 - (())play {
-    let mut is_ea_game = false;
+    let mut is_rr2 = false;
     if !env.is_app_picker {
         let bundle_id = env.bundle.bundle_identifier();
-        is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
+        // 🏎️ STRICT MATCH: Only trigger for Real Racing 2
+        is_rr2 = bundle_id == "com.firemint.realracing2";
     }
 
-    if is_ea_game {
-        println!("🎮 LOG: EA Title Detected! Faking instant video completion for MPMoviePlayerController...");
+    if is_rr2 {
+        println!("🎮 LOG: Real Racing 2 Detected! Faking instant video completion for MPMoviePlayerController...");
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
         
         let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
@@ -190,15 +191,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation MPMoviePlayerViewController: UIViewController
 
 - (id)initWithContentURL:(id)url {
-    let mut is_ea_game = false;
+    let mut is_rr2 = false;
     if !env.is_app_picker {
         let bundle_id = env.bundle.bundle_identifier();
-        is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
+        // 🏎️ STRICT MATCH: Only trigger for Real Racing 2
+        is_rr2 = bundle_id == "com.firemint.realracing2";
     }
 
-    // 🏎️ DYNAMIC SPLIT: Real Racing 2 uses this, Gameloft gets nil!
-    if is_ea_game {
-        log_dbg!("MPMoviePlayerViewController initWithContentURL: EA/Firemint faking instant completion");
+    // 🏎️ DYNAMIC SPLIT: Real Racing 2 uses this, everything else gets nil!
+    if is_rr2 {
+        log_dbg!("MPMoviePlayerViewController initWithContentURL: Real Racing 2 faking instant completion");
         let this: id = crate::msg_super![env; this init];
         if this == nil { return nil; }
 
