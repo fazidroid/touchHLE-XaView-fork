@@ -183,12 +183,28 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
 
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    _cond: MutPtr<pthread_cond_t>,
+    cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
     // ==========================================================
-    // 🏎️ UNIVERSAL TIMEDWAIT BYPASS: Spurious Wakeup Polling
+    // 🏎️ DYNAMIC SPLIT: Asphalt 6 vs Majority of Other Games
+    // ==========================================================
+    let mut is_asphalt = false;
+    if !env.is_app_picker {
+        let bundle = env.bundle.bundle_identifier();
+        is_asphalt = bundle.starts_with("com.gameloft.Asphalt6") 
+                  || bundle.starts_with("com.gameloft.Asphalt6ipad");
+    }
+
+    if is_asphalt {
+        // Asphalt 6 & 8 ABSOLUTELY REQUIRE standard blocking!
+        println!("🎮 LOG: Asphalt detected! Routing timedwait to standard blocking.");
+        return pthread_cond_wait(env, cond, mutex);
+    }
+
+    // ==========================================================
+    // 🏎️ UNIVERSAL TIMEDWAIT BYPASS: For Majority of Other Games
     // ==========================================================
     let res = pthread_mutex_unlock(env, mutex);
     if res != 0 {
