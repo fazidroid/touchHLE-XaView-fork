@@ -43,8 +43,6 @@ pub struct CondHostObject {
     waiting: VecDeque<ThreadId>,
     pub(crate) waking: VecDeque<ThreadId>,
     pub(crate) curr_mutex: Option<MutexId>,
-    /// Scheduler ticks each waiter has been blocked.
-    wait_ticks: VecDeque<u32>,
 }
 
 pub fn pthread_cond_init(
@@ -63,7 +61,6 @@ pub fn pthread_cond_init(
             waiting: VecDeque::new(),
             waking: VecDeque::new(),
             curr_mutex: None,
-            wait_ticks: VecDeque::new(),
         },
     );
     0 // success
@@ -74,35 +71,8 @@ pub fn pthread_cond_wait(
     cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
 ) -> i32 {
-    // ==========================================================
-    // 🏎️ DYNAMIC SPLIT: Gameloft Ghost Thread & Panic Assassin
-    // ==========================================================
-    let mut is_sloppy_gameloft = false;
-    if !env.is_app_picker {
-        let bundle = env.bundle.bundle_identifier();
-        is_sloppy_gameloft = bundle.starts_with("com.gameloft.Asphalt6")
-                          || bundle.starts_with("com.gameloft.Asphalt8")
-                          || bundle.starts_with("com.gameloft.asphalt8");
-    }
-
-    if is_sloppy_gameloft {
-        println!("🎮 LOG: Gameloft Asphalt game detected! Faking wakeup signal for pthread_cond_wait.");
-        let res = pthread_mutex_unlock(env, mutex);
-        
-        if res != 0 {
-            println!("🎮 LOG: Caught sloppy Mutex Unlock (Error {})! Absorbing panic to keep game alive.", res);
-        }
-
-        let _ = pthread_mutex_lock(env, mutex);
-        return 0; // Fake successful signal!
-    }
-
-    // ==========================================================
-    // STANDARD BEHAVIOR: For all other games
-    // ==========================================================
     let res = pthread_mutex_unlock(env, mutex);
     assert_eq!(res, 0);
-    
     log_dbg!(
         "Thread {} is blocking on condition variable {:?}",
         env.current_thread,
@@ -115,17 +85,13 @@ pub fn pthread_cond_wait(
         .condition_variables
         .get_mut(&cond_var)
         .unwrap();
-        
     assert!(
         host_object.curr_mutex == Some(mutex_id)
             || host_object.waking.is_empty() && host_object.waiting.is_empty()
     );
-    
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
-    host_object.wait_ticks.push_back(0);
     env.yield_thread(ThreadBlock::Condition(cond_var));
-    
     0 // success
 }
 
@@ -136,7 +102,6 @@ pub fn pthread_cond_signal(env: &mut Environment, cond: MutPtr<pthread_cond_t>) 
         .get_mut(&cond_var)
         .unwrap();
     if let Some(tid) = host_object.waiting.pop_front() {
-        host_object.wait_ticks.pop_front();
         host_object.waking.push_back(tid);
         log_dbg!(
             "Thread {} unblocks one thread ({}) waiting on condition variable {:?}",
@@ -166,7 +131,6 @@ pub fn pthread_cond_broadcast(env: &mut Environment, cond: MutPtr<pthread_cond_t
         .get_mut(&cond_var)
         .unwrap();
     host_object.waking.extend(host_object.waiting.drain(..));
-    host_object.wait_ticks.clear();
     0 // success
 }
 
@@ -183,70 +147,17 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
 
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    cond: MutPtr<pthread_cond_t>,
+    _cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    // ==========================================================
-    // 🏎️ DYNAMIC SPLIT: Asphalt 6 vs Majority of Other Games
-    // ==========================================================
-    let mut is_asphalt = false;
-    if !env.is_app_picker {
-        let bundle = env.bundle.bundle_identifier();
-        is_asphalt = bundle.starts_with("com.gameloft.Asphalt6") 
-                  || bundle.starts_with("com.gameloft.Asphalt6ipad");
-    }
-
-    if is_asphalt {
-        // Asphalt 6 & 8 ABSOLUTELY REQUIRE standard blocking!
-        println!("🎮 LOG: Asphalt detected! Routing timedwait to standard blocking.");
-        return pthread_cond_wait(env, cond, mutex);
-    }
-
-    // ==========================================================
-    // 🏎️ UNIVERSAL TIMEDWAIT BYPASS: For Majority of Other Games
-    // ==========================================================
-    let res = pthread_mutex_unlock(env, mutex);
-    if res != 0 {
-        println!("🎮 LOG: Caught sloppy Mutex Unlock in timedwait! Absorbing panic.");
-    }
-    
-    env.sleep(std::time::Duration::from_millis(1));
-    
+    // GAMELOFT ANTI-FREEZE HACK:
+    // touchHLE ignores abstime and sleeps forever. We bypass this by unlocking,
+    // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
+    // screen progress instead of deadlocking!
+    let _ = pthread_mutex_unlock(env, mutex);
     let _ = pthread_mutex_lock(env, mutex);
-    0 
-}
-
-/// Maximum scheduler ticks before auto-waking a stuck condvar waiter.
-/// Prevents offline-mode deadlocks where a network/store thread waits
-/// forever for a server response that never comes.
-const MAX_COND_WAIT_TICKS: u32 = 2000;
-
-pub fn tick_cond_watchdog(env: &mut Environment) {
-    let mut to_wake: Vec<(pthread_cond_t, ThreadId)> = Vec::new();
-
-    for (cond_var, host_obj) in env.libc_state.pthread.cond.condition_variables.iter_mut() {
-        for (idx, ticks) in host_obj.wait_ticks.iter_mut().enumerate() {
-            *ticks += 1;
-            if *ticks >= MAX_COND_WAIT_TICKS {
-                if let Some(&tid) = host_obj.waiting.get(idx) {
-                    to_wake.push((*cond_var, tid));
-                }
-            }
-        }
-    }
-
-    for (cond_var, tid) in to_wake {
-        let host_obj = env.libc_state.pthread.cond
-            .condition_variables.get_mut(&cond_var).unwrap();
-        if let Some(pos) = host_obj.waiting.iter().position(|&t| t == tid) {
-            host_obj.waiting.remove(pos);
-            host_obj.wait_ticks.remove(pos);
-            host_obj.waking.push_back(tid);
-            log!("cond watchdog: auto-waking thread {} on condvar {:?} (no signal after {} ticks)",
-                tid, cond_var, MAX_COND_WAIT_TICKS);
-        }
-    }
+    60 // Return standard POSIX ETIMEDOUT code
 }
 
 pub const FUNCTIONS: FunctionExports = &[
