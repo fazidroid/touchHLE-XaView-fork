@@ -43,8 +43,6 @@ pub struct CondHostObject {
     waiting: VecDeque<ThreadId>,
     pub(crate) waking: VecDeque<ThreadId>,
     pub(crate) curr_mutex: Option<MutexId>,
-    /// Scheduler ticks each waiter has been blocked.
-    wait_ticks: VecDeque<u32>,
 }
 
 pub fn pthread_cond_init(
@@ -63,7 +61,6 @@ pub fn pthread_cond_init(
             waiting: VecDeque::new(),
             waking: VecDeque::new(),
             curr_mutex: None,
-            wait_ticks: VecDeque::new(),
         },
     );
     0 // success
@@ -74,39 +71,8 @@ pub fn pthread_cond_wait(
     cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
 ) -> i32 {
-    // ==========================================================
-    // 🏎️ DYNAMIC SPLIT: Asphalt 6 Ghost Thread & Panic Assassin
-    // ==========================================================
-    let mut is_asphalt6 = false;
-    if !env.is_app_picker {
-        is_asphalt6 = env.bundle.bundle_identifier().starts_with("com.gameloft.Asphalt6");
-    }
-
-    if is_asphalt6 {
-        println!("🎮 LOG: Asphalt 6 detected! Faking wakeup signal for pthread_cond_wait.");
-        let res = pthread_mutex_unlock(env, mutex);
-        
-        // PANIC ASSASSIN: Absorb sloppy Gameloft threading errors!
-        if res != 0 {
-            println!("🎮 LOG: Caught sloppy Mutex Unlock (Error {})! Absorbing panic to keep game alive.", res);
-        }
-
-        // GHOST THREAD BYPASS: Skip the NotBlocked assertion and instantly return!
-        let _ = pthread_mutex_lock(env, mutex);
-        return 0; // Fake successful signal!
-    }
-
-    // ==========================================================
-    // STANDARD BEHAVIOR: For all other games
-    // ==========================================================
     let res = pthread_mutex_unlock(env, mutex);
     assert_eq!(res, 0);
-
-    assert!(matches!(
-        env.threads[env.current_thread].blocked_by,
-        ThreadBlock::NotBlocked
-    ));
-    
     log_dbg!(
         "Thread {} is blocking on condition variable {:?}",
         env.current_thread,
@@ -119,17 +85,13 @@ pub fn pthread_cond_wait(
         .condition_variables
         .get_mut(&cond_var)
         .unwrap();
-        
     assert!(
         host_object.curr_mutex == Some(mutex_id)
             || host_object.waking.is_empty() && host_object.waiting.is_empty()
     );
-    
     host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
-    host_object.wait_ticks.push_back(0);
-    env.threads[env.current_thread].blocked_by = ThreadBlock::Condition(cond_var);
-    
+    env.yield_thread(ThreadBlock::Condition(cond_var));
     0 // success
 }
 
@@ -140,7 +102,6 @@ pub fn pthread_cond_signal(env: &mut Environment, cond: MutPtr<pthread_cond_t>) 
         .get_mut(&cond_var)
         .unwrap();
     if let Some(tid) = host_object.waiting.pop_front() {
-        host_object.wait_ticks.pop_front();
         host_object.waking.push_back(tid);
         log_dbg!(
             "Thread {} unblocks one thread ({}) waiting on condition variable {:?}",
@@ -170,7 +131,6 @@ pub fn pthread_cond_broadcast(env: &mut Environment, cond: MutPtr<pthread_cond_t
         .get_mut(&cond_var)
         .unwrap();
     host_object.waking.extend(host_object.waiting.drain(..));
-    host_object.wait_ticks.clear();
     0 // success
 }
 
@@ -187,62 +147,17 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
 
 pub fn pthread_cond_timedwait(
     env: &mut Environment,
-    cond: MutPtr<pthread_cond_t>,
+    _cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    // ==========================================================
-    // 🏎️ DYNAMIC SPLIT: GT Racing vs Asphalt 6 Threading
-    // ==========================================================
-    let mut is_gtracing = false;
-    if !env.is_app_picker {
-        is_gtracing = env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing");
-    }
-
-    if is_gtracing {
-        // GT RACING HACK:
-        // Bypass the infinite sleep by unlocking, relocking, and returning an immediate ETIMEDOUT.
-        println!("🎮 LOG: GT Racing detected! Faking ETIMEDOUT for pthread_cond_timedwait.");
-        let _ = pthread_mutex_unlock(env, mutex);
-        let _ = pthread_mutex_lock(env, mutex);
-        return 60; // Standard POSIX ETIMEDOUT code
-    }
-
-    // ASPHALT 6 & STANDARD BEHAVIOR:
-    // Asphalt 6's engine requires normal conditional waiting logic!
-    pthread_cond_wait(env, cond, mutex)
-}
-
-/// Maximum scheduler ticks before auto-waking a stuck condvar waiter.
-/// Prevents offline-mode deadlocks where a network/store thread waits
-/// forever for a server response that never comes.
-const MAX_COND_WAIT_TICKS: u32 = 2000;
-
-pub fn tick_cond_watchdog(env: &mut Environment) {
-    let mut to_wake: Vec<(pthread_cond_t, ThreadId)> = Vec::new();
-
-    for (cond_var, host_obj) in env.libc_state.pthread.cond.condition_variables.iter_mut() {
-        for (idx, ticks) in host_obj.wait_ticks.iter_mut().enumerate() {
-            *ticks += 1;
-            if *ticks >= MAX_COND_WAIT_TICKS {
-                if let Some(&tid) = host_obj.waiting.get(idx) {
-                    to_wake.push((*cond_var, tid));
-                }
-            }
-        }
-    }
-
-    for (cond_var, tid) in to_wake {
-        let host_obj = env.libc_state.pthread.cond
-            .condition_variables.get_mut(&cond_var).unwrap();
-        if let Some(pos) = host_obj.waiting.iter().position(|&t| t == tid) {
-            host_obj.waiting.remove(pos);
-            host_obj.wait_ticks.remove(pos);
-            host_obj.waking.push_back(tid);
-            log!("cond watchdog: auto-waking thread {} on condvar {:?} (no signal after {} ticks)",
-                tid, cond_var, MAX_COND_WAIT_TICKS);
-        }
-    }
+    // GAMELOFT ANTI-FREEZE HACK:
+    // touchHLE ignores abstime and sleeps forever. We bypass this by unlocking,
+    // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
+    // screen progress instead of deadlocking!
+    let _ = pthread_mutex_unlock(env, mutex);
+    let _ = pthread_mutex_lock(env, mutex);
+    60 // Return standard POSIX ETIMEDOUT code
 }
 
 pub const FUNCTIONS: FunctionExports = &[
