@@ -149,31 +149,14 @@ pub fn pthread_cond_timedwait(
     env: &mut Environment,
     cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
-    _abstime: u32,   // timeout is ignored – we block unconditionally
+    _abstime: u32,
 ) -> i32 {
-    // Use the same blocking behaviour as pthread_cond_wait.
-    let res = pthread_mutex_unlock(env, mutex);
-    assert_eq!(res, 0);
-    log_dbg!(
-        "Thread {} is blocking on condition variable {:?} (timed wait, timeout ignored)",
-        env.current_thread,
-        cond
-    );
-    let current_thread = env.current_thread;
-    let mutex_id = env.mem.read(mutex).mutex_id;
-    let cond_var = env.mem.read(cond);
-    let host_object = State::get_mut(env)
-        .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
-    assert!(
-        host_object.curr_mutex == Some(mutex_id)
-            || host_object.waking.is_empty() && host_object.waiting.is_empty()
-    );
-    host_object.curr_mutex = Some(mutex_id);
-    host_object.waiting.push_back(current_thread);
-    env.yield_thread(ThreadBlock::Condition(cond_var));
-    0 // success
+    // Unlock the mutex, sleep briefly, re-lock, and report timeout.
+    // This avoids both a busy-loop and an infinite hang.
+    let _ = pthread_mutex_unlock(env, mutex);
+    env.sleep(std::time::Duration::from_millis(50));  // wait 50 ms
+    let _ = pthread_mutex_lock(env, mutex);
+    60 // ETIMEDOUT
 }
 
 pub const FUNCTIONS: FunctionExports = &[
