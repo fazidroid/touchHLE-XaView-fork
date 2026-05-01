@@ -152,10 +152,16 @@ pub fn pthread_cond_timedwait(
     _abstime: u32,
 ) -> i32 {
     let _ = pthread_mutex_unlock(env, mutex);
-    // Sleep a bit to avoid busy‑loop, then report timeout.
-    env.sleep(std::time::Duration::from_millis(50));
+    
+    // 🏎️ PERFORMANCE FIX: Dropped from 50ms to 1ms! 
+    // This allows background threads to poll at 1000Hz instead of 20Hz.
+    env.sleep(std::time::Duration::from_millis(1));
+    
     let _ = pthread_mutex_lock(env, mutex);
-    60 // ETIMEDOUT
+    
+    // Return ETIMEDOUT (60) or 0 depending on game engine preference. 
+    // Usually, 0 (Spurious Wakeup) keeps Gameloft games moving the fastest.
+    0 
 }
 
 pub const FUNCTIONS: FunctionExports = &[
