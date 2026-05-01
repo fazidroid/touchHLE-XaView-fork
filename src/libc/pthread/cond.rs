@@ -151,19 +151,12 @@ pub fn pthread_cond_timedwait(
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
-    // GAMELOFT ANTI-FREEZE HACK:
-    // touchHLE ignores abstime and sleeps forever. We bypass this by unlocking,
-    // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
-    // screen progress instead of deadlocking!
     let _ = pthread_mutex_unlock(env, mutex);
-    
-    // Yield the CPU so the car model can actually load!
-    env.sleep(std::time::Duration::from_millis(1));
-    
+    // Sleep a bit to avoid busy‑loop, then report timeout.
+    env.sleep(std::time::Duration::from_millis(50));
     let _ = pthread_mutex_lock(env, mutex);
-    
-    0 // Return 0 instead of 60 to prevent the crash!
-}
+    60 // ETIMEDOUT
+}}
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_cond_init(_, _)),
