@@ -143,15 +143,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated { }
 
 - (())play {
-    let mut is_rr2 = false;
+    let mut is_ea_game = false;
     if !env.is_app_picker {
         let bundle_id = env.bundle.bundle_identifier();
-        // 🏎️ STRICT MATCH: Only trigger for Real Racing 2
-        is_rr2 = bundle_id == "com.firemint.realracing2";
+        is_ea_game = bundle_id.starts_with("com.ea")
+            || bundle_id.starts_with("com.firemint")
+            || bundle_id.starts_with("com.gameloft")
+            || bundle_id.starts_with("com.namco");
     }
 
-    if is_rr2 {
-        println!("🎮 LOG: Real Racing 2 Detected! Faking instant video completion for MPMoviePlayerController...");
+    if is_ea_game {
+        println!("🎮 LOG: EA Title Detected! Faking instant video completion for MPMoviePlayerController...");
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
         
         let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
@@ -191,35 +193,46 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation MPMoviePlayerViewController: UIViewController
 
 - (id)initWithContentURL:(id)url {
-    let mut is_rr2 = false;
+    let mut is_ea_game = false;
     if !env.is_app_picker {
         let bundle_id = env.bundle.bundle_identifier();
-        // 🏎️ STRICT MATCH: Only trigger for Real Racing 2
-        is_rr2 = bundle_id == "com.firemint.realracing2";
+        is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
     }
 
-    // 🏎️ DYNAMIC SPLIT: Real Racing 2 uses this, everything else gets nil!
-    if is_rr2 {
-        log_dbg!("MPMoviePlayerViewController initWithContentURL: Real Racing 2 faking instant completion");
+    if is_ea_game {
+        log_dbg!("MPMoviePlayerViewController initWithContentURL: EA/Firemint/Gameloft faking instant completion");
         let this: id = crate::msg_super![env; this init];
         if this == nil { return nil; }
 
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-        
-        let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
-        let _: () = msg![env; center postNotificationName:load_notif object:this];
 
-        let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
-        let _: () = msg![env; center postNotificationName:duration_notif object:this];
+        // Post notifications on BOTH the VC object AND nil (object:nil matches
+        // ALL observers regardless of which object they registered for).
+        // Real Racing 2 creates LandscapeMPMoviePlayerViewController directly
+        // without going through presentModalViewController, so viewDidAppear
+        // never fires. Posting with object:nil is the only reliable way to
+        // reach observers that watch a specific inner player object.
+        let senders: [id; 2] = [this, crate::objc::nil];
+        for &sender in &senders {
+            let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+            let _: () = msg![env; center postNotificationName:load_notif object:sender];
 
-        let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
-        let _: () = msg![env; center postNotificationName:finish_notif object:this];
+            let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(
+                env, "MPMovieDurationAvailableNotification".to_string());
+            let _: () = msg![env; center postNotificationName:duration_notif object:sender];
+
+            let playback_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackStateDidChangeNotification);
+            let _: () = msg![env; center postNotificationName:playback_notif object:sender];
+
+            let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+            let _: () = msg![env; center postNotificationName:finish_notif object:sender];
+        }
 
         return this;
     } else {
-        log!(
-            "TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?} ({:?})] -> nil (Gameloft Bypass)",
-            this, url, ns_url::to_rust_path(env, url),
+        log_dbg!(
+            "MPMoviePlayerViewController initWithContentURL: returning nil for non-EA game {:?}",
+            ns_url::to_rust_path(env, url),
         );
         release(env, this);
         return nil;
