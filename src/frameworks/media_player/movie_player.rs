@@ -50,6 +50,8 @@ pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
     "MPMoviePlayerLoadStateDidChangeNotification";
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
+pub const MPMoviePlayerPlaybackStateDidChangeNotification: &str =
+    "MPMoviePlayerPlaybackStateDidChangeNotification";
 
 pub const CONSTANTS: ConstantExports = &[
     (
