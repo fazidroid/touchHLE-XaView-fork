@@ -46,6 +46,7 @@ pub struct MachO {
     pub last_segment_end: GuestUSize,
 }
 
+#[derive(Debug)]
 pub struct Section {
     pub name: String,
     pub addr: GuestUSize, // Change to GuestUSize
