@@ -32,7 +32,7 @@ fn touchHLE_cpu_read_impl<T: SafeRead + Default>(
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mem = unsafe { &mut *mem.cast::<Mem>() };
         // Ptr::from_bits will need to handle 64-bit sizes when AArch64 is active
-        let ptr: ConstPtr<T> = Ptr::from_bits(addr as u32); // TODO: AArch64 pointer cast update
+        let ptr: ConstPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
         mem.read(ptr)
     }));
     unsafe {
@@ -44,7 +44,7 @@ fn touchHLE_cpu_read_impl<T: SafeRead + Default>(
 fn touchHLE_cpu_write_impl<T: SafeWrite>(mem: *mut touchHLE_Mem, addr: VAddr, value: T) -> bool {
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mem = unsafe { &mut *mem.cast::<Mem>() };
-        let ptr: MutPtr<T> = Ptr::from_bits(addr as u32); // TODO: AArch64 pointer cast update
+        let ptr: MutPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
         mem.write(ptr, value)
     }));
     res.is_err()
@@ -242,14 +242,16 @@ impl Cpu {
 
     pub fn regs(&self) -> &[u64; 33] {
         unsafe {
-            let ptr = touchHLE_DynarmicWrapper_regs_const(self.dynarmic_wrapper);
+            // 🏎️ Use the A64 specific FFI call
+            let ptr = touchHLE_DynarmicWrapper_regs_const_a64(self.dynarmic_wrapper);
             &*(ptr as *const [u64; 33])
         }
     }
     
     pub fn regs_mut(&mut self) -> &mut [u64; 33] {
         unsafe {
-            let ptr = touchHLE_DynarmicWrapper_regs_mut(self.dynarmic_wrapper);
+            // 🏎️ Use the A64 specific FFI call
+            let ptr = touchHLE_DynarmicWrapper_regs_mut_a64(self.dynarmic_wrapper);
             &mut *(ptr as *mut [u64; 33])
         }
     }
