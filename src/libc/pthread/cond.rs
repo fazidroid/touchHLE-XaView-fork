@@ -156,8 +156,13 @@ pub fn pthread_cond_timedwait(
     // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
     // screen progress instead of deadlocking!
     let _ = pthread_mutex_unlock(env, mutex);
+    
+    // Yield the CPU so the car model can actually load!
+    env.sleep(std::time::Duration::from_millis(1));
+    
     let _ = pthread_mutex_lock(env, mutex);
-    60 // Return standard POSIX ETIMEDOUT code
+    
+    0 // Return 0 instead of 60 to prevent the crash!
 }
 
 pub const FUNCTIONS: FunctionExports = &[
