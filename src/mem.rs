@@ -473,8 +473,9 @@ impl Mem {
         let guest_mem_range = self.bytes().as_ptr_range();
         assert!(guest_mem_range.contains(&host_ptr));
         let guest_addr = host_ptr as usize - guest_mem_range.start as usize;
-        // BypassGuestAddrOverflow
-        Ptr::from_bits(guest_addr as u32)
+        
+        // 🏎️ FIX: Use VAddr (which is u64 in AArch64) instead of a hardcoded u32
+        Ptr::from_bits(guest_addr as VAddr) 
     }
 
     /// Read a value for memory. This is the preferred way to read memory in
