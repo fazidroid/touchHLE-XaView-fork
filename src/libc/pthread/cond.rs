@@ -151,17 +151,13 @@ pub fn pthread_cond_timedwait(
     mutex: MutPtr<pthread_mutex_t>,
     _abstime: u32,
 ) -> i32 {
+    // GAMELOFT ANTI-FREEZE HACK:
+    // touchHLE ignores abstime and sleeps forever. We bypass this by unlocking,
+    // relocking, and returning an immediate ETIMEDOUT. This lets the loading 
+    // screen progress instead of deadlocking!
     let _ = pthread_mutex_unlock(env, mutex);
-    
-    // 🏎️ PERFORMANCE FIX: Dropped from 50ms to 1ms! 
-    // This allows background threads to poll at 1000Hz instead of 20Hz.
-    env.sleep(std::time::Duration::from_millis(1));
-    
     let _ = pthread_mutex_lock(env, mutex);
-    
-    // Return ETIMEDOUT (60) or 0 depending on game engine preference. 
-    // Usually, 0 (Spurious Wakeup) keeps Gameloft games moving the fastest.
-    0 
+    60 // Return standard POSIX ETIMEDOUT code
 }
 
 pub const FUNCTIONS: FunctionExports = &[
