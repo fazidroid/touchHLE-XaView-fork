@@ -156,7 +156,7 @@ pub fn pthread_cond_timedwait(
     env.sleep(std::time::Duration::from_millis(50));
     let _ = pthread_mutex_lock(env, mutex);
     60 // ETIMEDOUT
-}}
+}
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_cond_init(_, _)),
