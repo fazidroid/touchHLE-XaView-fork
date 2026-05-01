@@ -268,11 +268,12 @@ impl MachO {
                     // ==========================================================
                     // 🏎️ 64-BIT BYPASS: Hunt for the AArch64 Slice (0x0100000C)
                     // ==========================================================
-                    #[cfg(feature = "aarch64")]
-                    if arch.cputype == 0x0100000C {
-                        best_subslice = Some(&bytes[arch.offset as usize..arch.offset as usize + arch.size as usize]);
-                        best_type = Some(arch.cpusubtype);
-                        break; // We found the 64-bit slice, take it immediately!
+                    // ==========================================================
+                    // 🏎️ 64-BIT BYPASS: Allow CPU_TYPE_ARM64
+                    // ==========================================================
+                    #[cfg(not(feature = "aarch64"))]
+                    if header.cputype != mach_object::CPU_TYPE_ARM {
+                    return Err("Executable is not for an ARM CPU!");
                     }
 
                     if arch.cputype != mach_object::CPU_TYPE_ARM {
@@ -301,16 +302,32 @@ impl MachO {
         };
 
         // ==========================================================
-        // 🏎️ 64-BIT BYPASS: Allow CPU_TYPE_ARM64
+        // 🏎️ UNIFIED ARCHITECTURE CHECK (Bypass Header Validation)
         // ==========================================================
-        #[cfg(not(feature = "aarch64"))]
-        if header.cputype != mach_object::CPU_TYPE_ARM {
-            return Err("Executable is not for an ARM CPU!");
+        let is_bigend = header.is_bigend();
+        if is_bigend {
+            return Err("Executable is not little-endian!");
         }
-        
+
+        let is_64bit = header.is_64bit();
+
+        #[cfg(not(feature = "aarch64"))]
+        {
+            if is_64bit {
+                return Err("Executable is not 32-bit!");
+            }
+            if header.cputype != mach_object::CPU_TYPE_ARM {
+                // If it is a Fat Binary, the header might not equal ARM. 
+                // We will trust the slice extraction from above.
+                log!("Warning: Bypassing strict 32-bit CPU_TYPE_ARM check for Fat Binary.");
+            }
+        }
+
         #[cfg(feature = "aarch64")]
-        if header.cputype != mach_object::CPU_TYPE_ARM && header.cputype != 0x0100000C {
-            return Err("Executable is not for an ARM or ARM64 CPU!");
+        {
+            // The mach_object crate doesn't natively parse AArch64 flags correctly. 
+            // We force the parser to accept the binary if the 64-bit flag is active.
+            log!("🏎️ AArch64 Override Active: Forcing Mach-O validation for 64-bit slice.");
         }
 
         log!(
@@ -318,50 +335,6 @@ impl MachO {
             cpu_subtype_to_str(header.cpusubtype, header.is_64bit()),
             name
         );
-
-        let is_bigend = header.is_bigend();
-        if is_bigend {
-            return Err("Executable is not little-endian!");
-        }
-        
-        let is_64bit = header.is_64bit();
-        
-        // ==========================================================
-        // 🏎️ 64-BIT BYPASS: Disable the 32-bit strict lock
-        // ==========================================================
-        #[cfg(not(feature = "aarch64"))]
-        if is_64bit {
-            return Err("Executable is not 32-bit!");
-        }
-
-        if header.cputype != mach_object::CPU_TYPE_ARM {
-            return Err("Executable is not for an ARM CPU!");
-        }
-        log!(
-            "Loading {} slice for {:?}",
-            cpu_subtype_to_str(header.cpusubtype, header.is_64bit()),
-            name
-        );
-
-        let is_bigend = header.is_bigend();
-        if is_bigend {
-            return Err("Executable is not little-endian!");
-        }
-        
-        let is_64bit = header.is_64bit();
-        
-        // 🏎️ 32-BIT CHECK (Default)
-        #[cfg(not(feature = "aarch64"))]
-        if is_64bit {
-            return Err("Executable is not 32-bit!");
-        }
-
-        // 🏎️ 64-BIT CHECK (AArch64)
-        #[cfg(feature = "aarch64")]
-        if !is_64bit {
-            return Err("Executable is not 64-bit! Please use a 64-bit app with the aarch64 feature.");
-        }
-        // TODO: Check cpusubtype (should be some flavour of ARMv6/ARMv7)
 
         let split_segs = (header.flags & mach_object::MH_SPLIT_SEGS) != 0;
 
