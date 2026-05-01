@@ -347,9 +347,19 @@ impl MachO {
         if is_bigend {
             return Err("Executable is not little-endian!");
         }
+        
         let is_64bit = header.is_64bit();
+        
+        // 🏎️ 32-BIT CHECK (Default)
+        #[cfg(not(feature = "aarch64"))]
         if is_64bit {
             return Err("Executable is not 32-bit!");
+        }
+
+        // 🏎️ 64-BIT CHECK (AArch64)
+        #[cfg(feature = "aarch64")]
+        if !is_64bit {
+            return Err("Executable is not 64-bit! Please use a 64-bit app with the aarch64 feature.");
         }
         // TODO: Check cpusubtype (should be some flavour of ARMv6/ARMv7)
 
