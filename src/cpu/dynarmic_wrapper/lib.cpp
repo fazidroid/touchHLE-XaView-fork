@@ -388,60 +388,83 @@ std::int32_t touchHLE_DynarmicWrapper_run_or_step(DynarmicWrapper *cpu,
 // ==========================================================
 // 🏎️ 64-BIT (AArch64) ENVIRONMENT & CALLBACKS
 // ==========================================================
+// ==========================================================
+// 🏎️ 64-BIT (AArch64) ENVIRONMENT & CALLBACKS
+// ==========================================================
 class EnvironmentA64 final : public Dynarmic::A64::UserCallbacks {
 public:
   Dynarmic::A64::Jit *cpu = nullptr;
-  touchHLE_Mem *mem = nullptr;
+  struct touchHLE_Mem *mem = nullptr;
   std::uint64_t ticks_remaining;
   uint32_t halting_svc;
 
 private:
   std::uint8_t MemoryRead8(std::uint64_t vaddr) override {
     bool error = false;
-    auto value = touchHLE_cpu_read_u8(mem, (VAddr)vaddr, &error);
+    auto value = touchHLE_cpu_read_u8(mem, vaddr, &error);
     if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
     return value;
   }
   std::uint16_t MemoryRead16(std::uint64_t vaddr) override {
     bool error = false;
-    auto value = touchHLE_cpu_read_u16(mem, (VAddr)vaddr, &error);
+    auto value = touchHLE_cpu_read_u16(mem, vaddr, &error);
     if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
     return value;
   }
   std::uint32_t MemoryRead32(std::uint64_t vaddr) override {
     bool error = false;
-    auto value = touchHLE_cpu_read_u32(mem, (VAddr)vaddr, &error);
+    auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
     if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
     return value;
   }
   std::uint64_t MemoryRead64(std::uint64_t vaddr) override {
     bool error = false;
-    auto value = touchHLE_cpu_read_u64(mem, (VAddr)vaddr, &error);
+    auto value = touchHLE_cpu_read_u64(mem, vaddr, &error);
     if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
     return value;
   }
+  
+  // 🏎️ NEON 128-bit memory reads (split into two 64-bit reads for Rust)
+  Dynarmic::A64::Vector MemoryRead128(std::uint64_t vaddr) override {
+    bool err1 = false, err2 = false;
+    std::uint64_t lo = touchHLE_cpu_read_u64(mem, vaddr, &err1);
+    std::uint64_t hi = touchHLE_cpu_read_u64(mem, vaddr + 8, &err2);
+    if (err1 || err2) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
+    return {lo, hi};
+  }
+
   std::optional<std::uint32_t> MemoryReadCode(std::uint64_t vaddr) override {
     bool error = false;
-    auto value = touchHLE_cpu_read_u32(mem, (VAddr)vaddr, &error);
+    auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
     if (error) return std::nullopt;
     return value;
   }
+  
   void MemoryWrite8(std::uint64_t vaddr, std::uint8_t value) override {
-    if (touchHLE_cpu_write_u8(mem, (VAddr)vaddr, value))
+    if (touchHLE_cpu_write_u8(mem, vaddr, value))
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
   void MemoryWrite16(std::uint64_t vaddr, std::uint16_t value) override {
-    if (touchHLE_cpu_write_u16(mem, (VAddr)vaddr, value))
+    if (touchHLE_cpu_write_u16(mem, vaddr, value))
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
   void MemoryWrite32(std::uint64_t vaddr, std::uint32_t value) override {
-    if (touchHLE_cpu_write_u32(mem, (VAddr)vaddr, value))
+    if (touchHLE_cpu_write_u32(mem, vaddr, value))
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
   void MemoryWrite64(std::uint64_t vaddr, std::uint64_t value) override {
-    if (touchHLE_cpu_write_u64(mem, (VAddr)vaddr, value))
+    if (touchHLE_cpu_write_u64(mem, vaddr, value))
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
+  
+  // 🏎️ NEON 128-bit memory writes
+  void MemoryWrite128(std::uint64_t vaddr, Dynarmic::A64::Vector value) override {
+    if (touchHLE_cpu_write_u64(mem, vaddr, value[0]) || 
+        touchHLE_cpu_write_u64(mem, vaddr + 8, value[1])) {
+      cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
+    }
+  }
+
   bool MemoryWriteExclusive8(std::uint64_t vaddr, std::uint8_t value, std::uint8_t expected) override {
     if (MemoryRead8(vaddr) != expected) return false;
     MemoryWrite8(vaddr, value);
@@ -462,6 +485,13 @@ private:
     MemoryWrite64(vaddr, value);
     return true;
   }
+  bool MemoryWriteExclusive128(std::uint64_t vaddr, Dynarmic::A64::Vector value, Dynarmic::A64::Vector expected) override {
+    auto current = MemoryRead128(vaddr);
+    if (current[0] != expected[0] || current[1] != expected[1]) return false;
+    MemoryWrite128(vaddr, value);
+    return true;
+  }
+
   void InterpreterFallback(std::uint64_t, size_t) override { abort(); }
   void CallSVC(std::uint32_t svc) override {
     halting_svc = svc;
@@ -478,6 +508,7 @@ private:
       cpu->HaltExecution(HaltReasonUndefinedInstruction);
     }
   }
+  
   void AddTicks(std::uint64_t ticks) override {
     if (ticks > ticks_remaining) {
       ticks_remaining = 0;
@@ -486,6 +517,9 @@ private:
     ticks_remaining -= ticks;
   }
   std::uint64_t GetTicksRemaining() override { return ticks_remaining; }
+  
+  // 🏎️ Dummy Hardware Timer for A64
+  std::uint64_t GetCNTPCT() override { return 0; }
 };
 
 // ==========================================================
@@ -496,7 +530,6 @@ class DynarmicWrapperA64 {
   std::unique_ptr<Dynarmic::A64::Jit> cpu;
   std::unique_ptr<Dynarmic::ExclusiveMonitor> mon;
   
-  // Flat array to sync registers back to Rust (X0-X30, SP, PC)
   std::array<std::uint64_t, 33> flat_regs;
 
 public:
@@ -511,18 +544,14 @@ public:
     flat_regs.fill(0);
   }
 
-  // Sync Dynarmic -> Flat Array
   void sync_to_flat() {
-    auto& regs = cpu->Regs();
-    for (int i = 0; i < 31; ++i) flat_regs[i] = regs[i];
-    flat_regs[31] = cpu->SP();
-    flat_regs[32] = cpu->PC();
+    for (int i = 0; i < 31; ++i) flat_regs[i] = cpu->GetRegister(i);
+    flat_regs[31] = cpu->GetSP();
+    flat_regs[32] = cpu->GetPC();
   }
 
-  // Sync Flat Array -> Dynarmic
   void sync_from_flat() {
-    auto& regs = cpu->Regs();
-    for (int i = 0; i < 31; ++i) regs[i] = flat_regs[i];
+    for (int i = 0; i < 31; ++i) cpu->SetRegister(i, flat_regs[i]);
     cpu->SetSP(flat_regs[31]);
     cpu->SetPC(flat_regs[32]);
   }
@@ -534,10 +563,10 @@ public:
   
   std::uint64_t *regs_mut() {
     sync_to_flat();
-    return flat_regs.data(); // Note: changes made by Rust must be synced back before next run
+    return flat_regs.data(); 
   }
 
-  std::uint32_t pstate() const { return cpu->Pstate(); }
+  std::uint32_t pstate() const { return cpu->GetPstate(); }
   void set_pstate(std::uint32_t pstate) { cpu->SetPstate(pstate); }
 };
 
