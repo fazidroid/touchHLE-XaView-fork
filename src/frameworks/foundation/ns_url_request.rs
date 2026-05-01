@@ -76,7 +76,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     if !error.is_null() {
         let domain = get_static_str(env, "NSURLErrorDomain");
-        let err = msg_class![env; NSError errorWithDomain:domain code:-1009 userInfo:nil];
+        let code: i32 = -1009; // store the code in a variable
+        let err = msg_class![env; NSError errorWithDomain:domain code:code userInfo:nil];
         env.mem.write(error, err);
     }
     autorelease(env, data)
