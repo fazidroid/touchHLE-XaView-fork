@@ -27,13 +27,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setDelegate:(id)_delegate {
     // TODO
 }
-- (())loadRequest:(id)request {
-    log!("UIWebView loadRequest: simulating immediate load finish");
-    // Notify the delegate that loading finished.
-    let delegate: id = msg![env; this delegate];
-    if delegate != nil && env.objc.object_has_method_named(&env.mem, delegate, "webViewDidFinishLoad:") {
-        let _: () = msg![env; delegate webViewDidFinishLoad:this];
-    }
+- (())loadRequest:(id)request { // NSURLRequest*
+    let url_string = if request != nil {
+        let url = msg![env; request URL];
+        let url_desc = msg![env; url description];
+        to_rust_string(env, url_desc)
+    } else {
+        Cow::default()
+    };
+    log!("TODO: [(UIWebView*) {:?} loadRequest:{:?} ({})]", this, request, url_string);
 }
 
 - (())loadHTMLString:(id)_string baseURL:(id)_baseURL {
