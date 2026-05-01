@@ -152,9 +152,9 @@ pub fn pthread_cond_timedwait(
     _abstime: u32,
 ) -> i32 {
     // Unlock the mutex, sleep briefly, re-lock, and report timeout.
-    // This avoids both a busy-loop and an infinite hang.
+    // A 10 ms sleep gives the CPU a break while keeping latency low.
     let _ = pthread_mutex_unlock(env, mutex);
-    env.sleep(std::time::Duration::from_millis(50));  // wait 50 ms
+    env.sleep(std::time::Duration::from_millis(10));   // ← 50 ms → 10 ms
     let _ = pthread_mutex_lock(env, mutex);
     60 // ETIMEDOUT
 }
