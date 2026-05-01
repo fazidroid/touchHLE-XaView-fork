@@ -7,8 +7,6 @@
 
 use super::{ns_string, NSTimeInterval, NSUInteger};
 use crate::frameworks::foundation::ns_string::to_rust_string;
-use crate::mem::MutPtr;
-use crate::frameworks::foundation::ns_string::get_static_str;
 use crate::objc::{
     autorelease, id, nil, objc_classes, release, ClassExports, HostObject, NSZonePtr,
 };
@@ -68,21 +66,6 @@ pub const CLASSES: ClassExports = objc_classes! {
                                 cachePolicy:cache_policy
                             timeoutInterval:timeout_interval];
     autorelease(env, new)
-}
-
-+ (id)sendSynchronousRequest:(id)request returningResponse:(MutPtr<id>)response error:(MutPtr<id>)error {
-    log!("sendSynchronousRequest: returning empty data immediately (network disabled)");
-    let data = msg_class![env; NSMutableData data];
-    if !response.is_null() {
-        env.mem.write(response, nil);
-    }
-    if !error.is_null() {
-        let domain = get_static_str(env, "NSURLErrorDomain");
-        let code: i32 = -1009; // store the code in a variable
-        let err = msg_class![env; NSError errorWithDomain:domain code:code userInfo:nil];
-        env.mem.write(error, err);
-    }
-    autorelease(env, data)
 }
 
 // Добавляем базовый init
