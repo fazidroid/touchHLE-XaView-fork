@@ -256,7 +256,6 @@ impl MachO {
         log_dbg!("Reading {:?}", name);
 
         let mut cursor = Cursor::new(bytes);
-
         let file = OFile::parse(&mut cursor).map_err(|_| "Could not parse Mach-O file")?;
 
         let (header, commands) = match file {
@@ -265,15 +264,12 @@ impl MachO {
                 let mut best_subslice = None;
                 let mut best_type = None;
                 for (arch, _) in files {
-                    // ==========================================================
                     // 🏎️ 64-BIT BYPASS: Hunt for the AArch64 Slice (0x0100000C)
-                    // ==========================================================
-                    // ==========================================================
-                    // 🏎️ 64-BIT BYPASS: Allow CPU_TYPE_ARM64
-                    // ==========================================================
-                    #[cfg(not(feature = "aarch64"))]
-                    if header.cputype != mach_object::CPU_TYPE_ARM {
-                    return Err("Executable is not for an ARM CPU!");
+                    #[cfg(feature = "aarch64")]
+                    if arch.cputype == 0x0100000C {
+                        best_subslice = Some(&bytes[arch.offset as usize..arch.offset as usize + arch.size as usize]);
+                        best_type = Some(arch.cpusubtype);
+                        break; 
                     }
 
                     if arch.cputype != mach_object::CPU_TYPE_ARM {
@@ -296,14 +292,10 @@ impl MachO {
                     Err("No supported architecture in the fat binary")
                 };
             }
-            OFile::ArFile { .. } | OFile::SymDef { .. } => {
-                return Err("Unexpected Mach-O file kind: not an executable");
-            }
+            _ => return Err("Unexpected Mach-O file kind: not an executable"),
         };
 
-        // ==========================================================
-        // 🏎️ UNIFIED ARCHITECTURE CHECK (Bypass Header Validation)
-        // ==========================================================
+        // 🏎️ UNIFIED ARCHITECTURE & ENDIANNESS CHECK
         let is_bigend = header.is_bigend();
         if is_bigend {
             return Err("Executable is not little-endian!");
@@ -313,21 +305,23 @@ impl MachO {
 
         #[cfg(not(feature = "aarch64"))]
         {
-            if is_64bit {
-                return Err("Executable is not 32-bit!");
+            if is_64bit { 
+                return Err("Executable is not 32-bit!"); 
             }
-            if header.cputype != mach_object::CPU_TYPE_ARM {
-                // If it is a Fat Binary, the header might not equal ARM. 
-                // We will trust the slice extraction from above.
-                log!("Warning: Bypassing strict 32-bit CPU_TYPE_ARM check for Fat Binary.");
+            if header.cputype != mach_object::CPU_TYPE_ARM { 
+                return Err("Executable is not for an ARM CPU!"); 
             }
         }
 
         #[cfg(feature = "aarch64")]
         {
-            // The mach_object crate doesn't natively parse AArch64 flags correctly. 
-            // We force the parser to accept the binary if the 64-bit flag is active.
-            log!("🏎️ AArch64 Override Active: Forcing Mach-O validation for 64-bit slice.");
+            if !is_64bit { 
+                return Err("Executable is not 64-bit! Please use a 64-bit app."); 
+            }
+            // 0x0100000C is CPU_TYPE_ARM64
+            if header.cputype != 0x0100000C && header.cputype != mach_object::CPU_TYPE_ARM { 
+                return Err("Executable is not for an ARM64 CPU!"); 
+            }
         }
 
         log!(
