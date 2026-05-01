@@ -24,7 +24,6 @@
 namespace touchHLE::cpu {
 
 // 🏎️ RUST FFI IMPORTS
-// We force 64-bit addresses here so it perfectly matches Rust's aarch64 feature!
 extern "C" {
   struct touchHLE_Mem;
   std::uint8_t touchHLE_cpu_read_u8(touchHLE_Mem *mem, std::uint64_t addr, bool *error);
@@ -59,93 +58,72 @@ public:
   uint32_t halting_svc;
 
 private:
-  std::uint8_t MemoryRead8(std::uint32_t vaddr) override {
-    bool error;
-    auto value = touchHLE_cpu_read_u8(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint8_t MemoryRead8(Dynarmic::A32::VAddr vaddr) override {
+    bool error; auto value = touchHLE_cpu_read_u8(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
-  std::uint16_t MemoryRead16(std::uint32_t vaddr) override {
-    bool error;
-    auto value = touchHLE_cpu_read_u16(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint16_t MemoryRead16(Dynarmic::A32::VAddr vaddr) override {
+    bool error; auto value = touchHLE_cpu_read_u16(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
-  std::uint32_t MemoryRead32(std::uint32_t vaddr) override {
-    bool error;
-    auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint32_t MemoryRead32(Dynarmic::A32::VAddr vaddr) override {
+    bool error; auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
-  std::uint64_t MemoryRead64(std::uint32_t vaddr) override {
-    bool error;
-    auto value = touchHLE_cpu_read_u64(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint64_t MemoryRead64(Dynarmic::A32::VAddr vaddr) override {
+    bool error; auto value = touchHLE_cpu_read_u64(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
 
-  std::optional<std::uint32_t> MemoryReadCode(std::uint32_t vaddr) override {
-    bool error;
-    auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
-    if (error) return std::nullopt;
-    return value;
+  std::optional<std::uint32_t> MemoryReadCode(Dynarmic::A32::VAddr vaddr) override {
+    bool error; auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
+    if (error) return std::nullopt; return value;
   }
 
-  void MemoryWrite8(std::uint32_t vaddr, std::uint8_t value) override {
+  void MemoryWrite8(Dynarmic::A32::VAddr vaddr, std::uint8_t value) override {
     if (touchHLE_cpu_write_u8(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
-  void MemoryWrite16(std::uint32_t vaddr, std::uint16_t value) override {
+  void MemoryWrite16(Dynarmic::A32::VAddr vaddr, std::uint16_t value) override {
     if (touchHLE_cpu_write_u16(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
-  void MemoryWrite32(std::uint32_t vaddr, std::uint32_t value) override {
+  void MemoryWrite32(Dynarmic::A32::VAddr vaddr, std::uint32_t value) override {
     if (touchHLE_cpu_write_u32(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
-  void MemoryWrite64(std::uint32_t vaddr, std::uint64_t value) override {
+  void MemoryWrite64(Dynarmic::A32::VAddr vaddr, std::uint64_t value) override {
     if (touchHLE_cpu_write_u64(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
 
-  bool MemoryWriteExclusive8(std::uint32_t addr, std::uint8_t value, std::uint8_t expected) override {
-    if (MemoryRead8(addr) != expected) return false;
-    MemoryWrite8(addr, value);
-    return true;
+  bool MemoryWriteExclusive8(Dynarmic::A32::VAddr addr, std::uint8_t value, std::uint8_t expected) override {
+    if (MemoryRead8(addr) != expected) return false; MemoryWrite8(addr, value); return true;
   }
-  bool MemoryWriteExclusive16(std::uint32_t addr, std::uint16_t value, std::uint16_t expected) override {
-    if (MemoryRead16(addr) != expected) return false;
-    MemoryWrite16(addr, value);
-    return true;
+  bool MemoryWriteExclusive16(Dynarmic::A32::VAddr addr, std::uint16_t value, std::uint16_t expected) override {
+    if (MemoryRead16(addr) != expected) return false; MemoryWrite16(addr, value); return true;
   }
-  bool MemoryWriteExclusive32(std::uint32_t addr, std::uint32_t value, std::uint32_t expected) override {
-    if (MemoryRead32(addr) != expected) return false;
-    MemoryWrite32(addr, value);
-    return true;
+  bool MemoryWriteExclusive32(Dynarmic::A32::VAddr addr, std::uint32_t value, std::uint32_t expected) override {
+    if (MemoryRead32(addr) != expected) return false; MemoryWrite32(addr, value); return true;
   }
-  bool MemoryWriteExclusive64(std::uint32_t addr, std::uint64_t value, std::uint64_t expected) override {
-    if (MemoryRead64(addr) != expected) return false;
-    MemoryWrite64(addr, value);
-    return true;
+  bool MemoryWriteExclusive64(Dynarmic::A32::VAddr addr, std::uint64_t value, std::uint64_t expected) override {
+    if (MemoryRead64(addr) != expected) return false; MemoryWrite64(addr, value); return true;
   }
 
-  void InterpreterFallback(std::uint32_t, size_t) override { abort(); }
+  void InterpreterFallback(Dynarmic::A32::VAddr, size_t) override { abort(); }
   void CallSVC(std::uint32_t svc) override {
-    halting_svc = svc;
-    cpu->HaltExecution(HaltReasonSvc);
+    halting_svc = svc; cpu->HaltExecution(HaltReasonSvc);
   }
-  void ExceptionRaised(std::uint64_t pc, Dynarmic::A64::Exception exception) override {
-    if (exception == Dynarmic::A64::Exception::NoExecuteFault) {
+  void ExceptionRaised(Dynarmic::A32::VAddr pc, Dynarmic::A32::Exception exception) override {
+    if (exception == Dynarmic::A32::Exception::NoExecuteFault) {
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    } else if (exception == Dynarmic::A64::Exception::UnallocatedEncoding) { // 🏎️ Fixed A64 naming!
+    } else if (exception == Dynarmic::A32::Exception::UndefinedInstruction) {
+      if ((cpu->Cpsr() & 0x20) == 0) { cpu->SetCpsr(cpu->Cpsr() | 0x20); return; }
       cpu->HaltExecution(HaltReasonUndefinedInstruction);
-    } else if (exception == Dynarmic::A64::Exception::Breakpoint) {
+    } else if (exception == Dynarmic::A32::Exception::Breakpoint) {
       cpu->HaltExecution(HaltReasonBreakpoint);
     } else {
       cpu->HaltExecution(HaltReasonUndefinedInstruction);
     }
   }
   void AddTicks(std::uint64_t ticks) override {
-    if (ticks > ticks_remaining) {
-      ticks_remaining = 0;
-      return;
-    }
+    if (ticks > ticks_remaining) { ticks_remaining = 0; return; }
     ticks_remaining -= ticks;
   }
   std::uint64_t GetTicksRemaining() override { return ticks_remaining; }
@@ -174,8 +152,7 @@ class DynarmicWrapper {
   std::array<std::uint8_t *, Dynarmic::A32::UserConfig::NUM_PAGE_TABLE_ENTRIES> page_table;
 public:
   DynarmicWrapper(void *direct_memory_access_ptr, size_t null_page_count) {
-    setvbuf(stdout, nullptr, _IONBF, 0);
-    setvbuf(stderr, nullptr, _IONBF, 0);
+    setvbuf(stdout, nullptr, _IONBF, 0); setvbuf(stderr, nullptr, _IONBF, 0);
     Dynarmic::A32::UserConfig user_config;
     user_config.callbacks = &env;
     user_config.coprocessors[15] = std::make_shared<ArmDynarmicCP15>();
@@ -199,19 +176,12 @@ public:
   void invalidate_cache_range(std::uint32_t start, std::uint32_t size) { cpu->InvalidateCacheRange(start, size); }
   void swap_context(touchHLE_DynarmicContext *context) {
     touchHLE_DynarmicContext tmp = {cpu->Regs(), cpu->ExtRegs(), cpu->Cpsr(), cpu->Fpscr()};
-    cpu->Regs() = context->regs;
-    cpu->ExtRegs() = context->extregs;
-    cpu->SetCpsr(context->cpsr);
-    cpu->SetFpscr(context->fpscr);
+    cpu->Regs() = context->regs; cpu->ExtRegs() = context->extregs; cpu->SetCpsr(context->cpsr); cpu->SetFpscr(context->fpscr);
     *context = tmp;
   }
   std::int32_t run_or_step(touchHLE_Mem *mem, std::uint64_t *ticks) {
-    env.mem = mem;
-    Dynarmic::HaltReason hr;
-    if (ticks) {
-      env.ticks_remaining = *ticks;
-      hr = cpu->Run();
-    } else hr = cpu->Step();
+    env.mem = mem; Dynarmic::HaltReason hr;
+    if (ticks) { env.ticks_remaining = *ticks; hr = cpu->Run(); } else hr = cpu->Step();
     std::int32_t res;
     if ((!hr && ticks) || (hr == Dynarmic::HaltReason::Step && !ticks)) res = -1;
     else if (Dynarmic::Has(hr, Dynarmic::HaltReason::MemoryAbort)) res = -2;
@@ -219,8 +189,7 @@ public:
     else if (Dynarmic::Has(hr, HaltReasonBreakpoint)) res = -4;
     else if (Dynarmic::Has(hr, HaltReasonSvc)) res = std::int32_t(env.halting_svc);
     else abort();
-    env.mem = nullptr;
-    if (ticks) *ticks = env.ticks_remaining;
+    env.mem = nullptr; if (ticks) *ticks = env.ticks_remaining;
     return res;
   }
 };
@@ -236,31 +205,23 @@ public:
   uint32_t halting_svc;
 
 private:
-  std::uint8_t MemoryRead8(std::uint64_t vaddr) override {
-    bool error = false;
-    auto value = touchHLE_cpu_read_u8(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint8_t MemoryRead8(Dynarmic::A64::VAddr vaddr) override {
+    bool error = false; auto value = touchHLE_cpu_read_u8(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
-  std::uint16_t MemoryRead16(std::uint64_t vaddr) override {
-    bool error = false;
-    auto value = touchHLE_cpu_read_u16(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint16_t MemoryRead16(Dynarmic::A64::VAddr vaddr) override {
+    bool error = false; auto value = touchHLE_cpu_read_u16(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
-  std::uint32_t MemoryRead32(std::uint64_t vaddr) override {
-    bool error = false;
-    auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint32_t MemoryRead32(Dynarmic::A64::VAddr vaddr) override {
+    bool error = false; auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
-  std::uint64_t MemoryRead64(std::uint64_t vaddr) override {
-    bool error = false;
-    auto value = touchHLE_cpu_read_u64(mem, vaddr, &error);
-    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    return value;
+  std::uint64_t MemoryRead64(Dynarmic::A64::VAddr vaddr) override {
+    bool error = false; auto value = touchHLE_cpu_read_u64(mem, vaddr, &error);
+    if (error) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort); return value;
   }
-  Dynarmic::A64::Vector MemoryRead128(std::uint64_t vaddr) override {
+  Dynarmic::A64::Vector MemoryRead128(Dynarmic::A64::VAddr vaddr) override {
     bool err1 = false, err2 = false;
     std::uint64_t lo = touchHLE_cpu_read_u64(mem, vaddr, &err1);
     std::uint64_t hi = touchHLE_cpu_read_u64(mem, vaddr + 8, &err2);
@@ -268,67 +229,55 @@ private:
     return {lo, hi};
   }
 
-  std::optional<std::uint32_t> MemoryReadCode(std::uint64_t vaddr) override {
-    bool error = false;
-    auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
-    if (error) return std::nullopt;
-    return value;
+  std::optional<std::uint32_t> MemoryReadCode(Dynarmic::A64::VAddr vaddr) override {
+    bool error = false; auto value = touchHLE_cpu_read_u32(mem, vaddr, &error);
+    if (error) return std::nullopt; return value;
   }
 
-  void MemoryWrite8(std::uint64_t vaddr, std::uint8_t value) override {
+  void MemoryWrite8(Dynarmic::A64::VAddr vaddr, std::uint8_t value) override {
     if (touchHLE_cpu_write_u8(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
-  void MemoryWrite16(std::uint64_t vaddr, std::uint16_t value) override {
+  void MemoryWrite16(Dynarmic::A64::VAddr vaddr, std::uint16_t value) override {
     if (touchHLE_cpu_write_u16(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
-  void MemoryWrite32(std::uint64_t vaddr, std::uint32_t value) override {
+  void MemoryWrite32(Dynarmic::A64::VAddr vaddr, std::uint32_t value) override {
     if (touchHLE_cpu_write_u32(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
-  void MemoryWrite64(std::uint64_t vaddr, std::uint64_t value) override {
+  void MemoryWrite64(Dynarmic::A64::VAddr vaddr, std::uint64_t value) override {
     if (touchHLE_cpu_write_u64(mem, vaddr, value)) cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
   }
-  void MemoryWrite128(std::uint64_t vaddr, Dynarmic::A64::Vector value) override {
+  void MemoryWrite128(Dynarmic::A64::VAddr vaddr, Dynarmic::A64::Vector value) override {
     if (touchHLE_cpu_write_u64(mem, vaddr, value[0]) || touchHLE_cpu_write_u64(mem, vaddr + 8, value[1])) {
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
     }
   }
 
-  bool MemoryWriteExclusive8(std::uint64_t vaddr, std::uint8_t value, std::uint8_t expected) override {
-    if (MemoryRead8(vaddr) != expected) return false;
-    MemoryWrite8(vaddr, value);
-    return true;
+  bool MemoryWriteExclusive8(Dynarmic::A64::VAddr vaddr, std::uint8_t value, std::uint8_t expected) override {
+    if (MemoryRead8(vaddr) != expected) return false; MemoryWrite8(vaddr, value); return true;
   }
-  bool MemoryWriteExclusive16(std::uint64_t vaddr, std::uint16_t value, std::uint16_t expected) override {
-    if (MemoryRead16(vaddr) != expected) return false;
-    MemoryWrite16(vaddr, value);
-    return true;
+  bool MemoryWriteExclusive16(Dynarmic::A64::VAddr vaddr, std::uint16_t value, std::uint16_t expected) override {
+    if (MemoryRead16(vaddr) != expected) return false; MemoryWrite16(vaddr, value); return true;
   }
-  bool MemoryWriteExclusive32(std::uint64_t vaddr, std::uint32_t value, std::uint32_t expected) override {
-    if (MemoryRead32(vaddr) != expected) return false;
-    MemoryWrite32(vaddr, value);
-    return true;
+  bool MemoryWriteExclusive32(Dynarmic::A64::VAddr vaddr, std::uint32_t value, std::uint32_t expected) override {
+    if (MemoryRead32(vaddr) != expected) return false; MemoryWrite32(vaddr, value); return true;
   }
-  bool MemoryWriteExclusive64(std::uint64_t vaddr, std::uint64_t value, std::uint64_t expected) override {
-    if (MemoryRead64(vaddr) != expected) return false;
-    MemoryWrite64(vaddr, value);
-    return true;
+  bool MemoryWriteExclusive64(Dynarmic::A64::VAddr vaddr, std::uint64_t value, std::uint64_t expected) override {
+    if (MemoryRead64(vaddr) != expected) return false; MemoryWrite64(vaddr, value); return true;
   }
-  bool MemoryWriteExclusive128(std::uint64_t vaddr, Dynarmic::A64::Vector value, Dynarmic::A64::Vector expected) override {
+  bool MemoryWriteExclusive128(Dynarmic::A64::VAddr vaddr, Dynarmic::A64::Vector value, Dynarmic::A64::Vector expected) override {
     auto current = MemoryRead128(vaddr);
     if (current[0] != expected[0] || current[1] != expected[1]) return false;
-    MemoryWrite128(vaddr, value);
-    return true;
+    MemoryWrite128(vaddr, value); return true;
   }
 
-  void InterpreterFallback(std::uint64_t, size_t) override { abort(); }
+  void InterpreterFallback(Dynarmic::A64::VAddr, size_t) override { abort(); }
   void CallSVC(std::uint32_t svc) override {
-    halting_svc = svc;
-    cpu->HaltExecution(HaltReasonSvc);
+    halting_svc = svc; cpu->HaltExecution(HaltReasonSvc);
   }
-  void ExceptionRaised(std::uint64_t pc, Dynarmic::A64::Exception exception) override {
+  void ExceptionRaised(Dynarmic::A64::VAddr pc, Dynarmic::A64::Exception exception) override {
     if (exception == Dynarmic::A64::Exception::NoExecuteFault) {
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    } else if (exception == Dynarmic::A64::Exception::UndefinedInstruction) {
+    } else if (exception == Dynarmic::A64::Exception::UnallocatedEncoding) {
       cpu->HaltExecution(HaltReasonUndefinedInstruction);
     } else if (exception == Dynarmic::A64::Exception::Breakpoint) {
       cpu->HaltExecution(HaltReasonBreakpoint);
@@ -337,10 +286,7 @@ private:
     }
   }
   void AddTicks(std::uint64_t ticks) override {
-    if (ticks > ticks_remaining) {
-      ticks_remaining = 0;
-      return;
-    }
+    if (ticks > ticks_remaining) { ticks_remaining = 0; return; }
     ticks_remaining -= ticks;
   }
   std::uint64_t GetTicksRemaining() override { return ticks_remaining; }
