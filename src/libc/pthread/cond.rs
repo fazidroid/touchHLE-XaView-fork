@@ -173,12 +173,13 @@ pub fn pthread_cond_timedwait(
 
     // Fast path: signal was already queued for this thread before we even
     // started waiting — consume it and return immediately (no blocking).
+    let current_thread = env.current_thread; // copy before mutable borrow
     {
         let ho = State::get_mut(env)
             .condition_variables
             .get_mut(&cond_var)
             .unwrap();
-        let pos = ho.waking.iter().position(|&t| t == env.current_thread);
+        let pos = ho.waking.iter().position(|&t| t == current_thread);
         if let Some(idx) = pos {
             ho.waking.remove(idx);
             return 0;
