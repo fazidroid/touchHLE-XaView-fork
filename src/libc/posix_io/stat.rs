@@ -156,13 +156,26 @@ fn write_dir_stat(env: &mut Environment, buf: MutPtr<stat>) {
 }
 
 fn fstat(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
-
-    log!("Warning: fstat() call, this function is mostly unimplemented");
     let result = fstat_inner(env, fd, buf);
     log_dbg!("fstat({:?}, {:?}) -> {}", fd, buf, result);
     result
+}
+
+/// fstat64: same as fstat on iOS — the stat struct already uses 64-bit fields.
+/// NFS Shift 2 (and other EA titles) call fstat64 instead of fstat.
+fn fstat64(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
+    fstat(env, fd, buf)
+}
+
+/// stat64: same as stat on iOS — the stat struct already uses 64-bit fields.
+fn stat64(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
+    stat(env, path, buf)
+}
+
+/// lstat64: same as lstat on iOS.
+fn lstat64(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
+    lstat(env, path, buf)
 }
 
 fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
@@ -290,6 +303,9 @@ fn lstat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(mkdir(_, _)),
     export_c_func!(fstat(_, _)),
+    export_c_func!(fstat64(_, _)),
     export_c_func!(stat(_, _)),
+    export_c_func!(stat64(_, _)),
     export_c_func!(lstat(_, _)),
+    export_c_func!(lstat64(_, _)),
 ];
