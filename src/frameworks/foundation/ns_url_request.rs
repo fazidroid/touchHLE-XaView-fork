@@ -68,6 +68,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)sendSynchronousRequest:(id)request returningResponse:(MutPtr<id>)response error:(MutPtr<id>)error {
+    log!("sendSynchronousRequest: returning empty data immediately (network disabled)");
+    // Return an empty NSData to avoid hanging the game.
+    let data = msg_class![env; NSMutableData data];
+    // If the game expects a response/error, fill them in:
+    if !response.is_null() {
+        env.mem.write(response, nil); // no response
+    }
+    if !error.is_null() {
+        // Create a generic NSError
+        let err = msg_class![env; NSError errorWithDomain:(get_static_str(env, "NSURLErrorDomain")) code:-1009 userInfo:nil];
+        env.mem.write(error, err);
+    }
+    autorelease(env, data)
+}
+
 // Добавляем базовый init
 - (id)initWithURL:(id)url {
     msg![env; this initWithURL:url
