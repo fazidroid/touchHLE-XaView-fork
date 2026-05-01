@@ -20,10 +20,15 @@ mod allocator;
 mod host;
 
 /// Equivalent of `usize` for guest memory.
+#[cfg(not(feature = "aarch64"))]
 pub type GuestUSize = u32;
-
-/// Equivalent of `isize` for guest memory.
+#[cfg(not(feature = "aarch64"))]
 pub type GuestISize = i32;
+
+#[cfg(feature = "aarch64")]
+pub type GuestUSize = u64;
+#[cfg(feature = "aarch64")]
+pub type GuestISize = i64;
 
 /// [std::mem::size_of], but returning a [GuestUSize].
 pub const fn guest_size_of<T: Sized>() -> GuestUSize {
