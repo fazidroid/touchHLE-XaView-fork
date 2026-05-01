@@ -130,16 +130,12 @@ private:
     halting_svc = svc;
     cpu->HaltExecution(HaltReasonSvc);
   }
-  void ExceptionRaised(std::uint32_t pc, Dynarmic::A32::Exception exception) override {
-    if (exception == Dynarmic::A32::Exception::NoExecuteFault) {
+  void ExceptionRaised(std::uint64_t pc, Dynarmic::A64::Exception exception) override {
+    if (exception == Dynarmic::A64::Exception::NoExecuteFault) {
       cpu->HaltExecution(Dynarmic::HaltReason::MemoryAbort);
-    } else if (exception == Dynarmic::A32::Exception::UndefinedInstruction) {
-      if ((cpu->Cpsr() & 0x20) == 0) {
-        cpu->SetCpsr(cpu->Cpsr() | 0x20);
-        return;
-      }
+    } else if (exception == Dynarmic::A64::Exception::UnallocatedEncoding) { // 🏎️ Fixed A64 naming!
       cpu->HaltExecution(HaltReasonUndefinedInstruction);
-    } else if (exception == Dynarmic::A32::Exception::Breakpoint) {
+    } else if (exception == Dynarmic::A64::Exception::Breakpoint) {
       cpu->HaltExecution(HaltReasonBreakpoint);
     } else {
       cpu->HaltExecution(HaltReasonUndefinedInstruction);
