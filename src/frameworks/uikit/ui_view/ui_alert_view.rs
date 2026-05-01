@@ -34,11 +34,12 @@ pub const CLASSES: ClassExports = objc_classes! {
             otherButtonTitles:(id)otherButtonTitles {
 
     log!("UIAlertView init: title={:?}, msg={:?}", title, message);
-    // Store the delegate passed to init in the host object
-    let host = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
+    // Retain delegate first, before borrowing the host object
     if delegate != nil {
         retain(env, delegate);
     }
+    // Now borrow and store the delegate
+    let host = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
     host.delegate = delegate;
 
     msg_super![env; this init]
