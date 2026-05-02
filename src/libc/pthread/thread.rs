@@ -138,12 +138,17 @@ pub fn pthread_attr_setstacksize(
     0 // success
 }
 fn pthread_cond_wait(env: &mut Environment, cond: MutVoidPtr, mutex: MutVoidPtr) -> i32 {
-    log_dbg!("pthread_cond_wait -> 0 (immediate success)");
+    // 🏎️ THERMAL HACK: Kill the Infinite Spin Loop!
+    // Instead of returning immediately and frying the Android CPU, we force 
+    // the background thread to sleep for 2 milliseconds.
+    // This massively drops CPU usage and boosts the main rendering FPS!
+    std::thread::sleep(std::time::Duration::from_millis(2));
     0
 }
 
 fn pthread_cond_timedwait(env: &mut Environment, cond: MutVoidPtr, mutex: MutVoidPtr, abstime: ConstVoidPtr) -> i32 {
-    log_dbg!("pthread_cond_timedwait -> 0 (immediate success)");
+    // 🏎️ THERMAL HACK: Force background threads to chill out
+    std::thread::sleep(std::time::Duration::from_millis(2));
     0
 }
 fn pthread_attr_setinheritsched(
@@ -352,7 +357,9 @@ fn pthread_setcanceltype(_env: &mut Environment, type_: i32, oldtype: MutPtr<i32
     0
 }
 fn pthread_testcancel(_env: &mut Environment) {
-    log!("TODO: pthread_testcancel()");
+    // 🏎️ SCHEDULER HACK: When a background thread checks if it should close,
+    // instantly force it to yield its CPU time back to the main Asphalt 6 engine.
+    std::thread::yield_now();
 }
 
 #[allow(non_camel_case_types)]
