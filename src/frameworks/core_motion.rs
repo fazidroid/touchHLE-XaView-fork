@@ -93,6 +93,10 @@ const CLASSES: ClassExports = objc_classes! {
     log!("CMMotionManager setDeviceMotionUpdateInterval: {} stub called", interval);
 }
 
+- (())setGyroUpdateInterval:(f64)interval {
+    log!("CMMotionManager setGyroUpdateInterval: {} stub called", interval);
+}
+
 - (())stopAccelerometerUpdates {
     // Take the timer and clear the handler/queue while holding the mutable borrow.
     let timer = {
