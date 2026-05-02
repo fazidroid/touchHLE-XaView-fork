@@ -35,11 +35,14 @@ const CLASSES: ClassExports = objc_classes! {
     log!("CMMotionManager startAccelerometerUpdatesToQueue:withHandler: stub called");
 }
 
-- (id)init { this }
+- (id)init { 
+    println!("🎮 LOG: Sabotaging CMMotionManager to force UIAccelerometer fallback!");
+    nil 
+}
 
 - (bool)isGyroAvailable { false }
 - (bool)isDeviceMotionAvailable { false }
-- (bool)isAccelerometerAvailable { true }
+- (bool)isAccelerometerAvailable { false }
 
 - (())setAccelerometerUpdateInterval:(f64)_interval {}
 - (())startAccelerometerUpdates {}
