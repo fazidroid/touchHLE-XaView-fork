@@ -50,8 +50,6 @@ pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
     "MPMoviePlayerLoadStateDidChangeNotification";
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
-pub const MPMoviePlayerPlaybackStateDidChangeNotification: &str =
-    "MPMoviePlayerPlaybackStateDidChangeNotification";
 
 pub const CONSTANTS: ConstantExports = &[
     (
@@ -122,6 +120,36 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).content_url
 }
 
+// Real Racing 2 sets contentURL via property setter (alloc/init, then setContentURL:)
+// rather than using initWithContentURL:. We fire all skip notifications here so
+// the game's observers receive them regardless of which path was used.
+- (())setContentURL:(id)url {
+    env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
+    log_dbg!("MPMoviePlayerController setContentURL: firing instant-completion notifications");
+    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+    // Post with both object:this and object:nil to catch all observer registrations.
+    let senders: [id; 2] = [this, nil];
+    for &sender in &senders {
+        let n = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+        let _: () = msg![env; center postNotificationName:n object:sender];
+        let n = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+        let _: () = msg![env; center postNotificationName:n object:sender];
+    }
+}
+
+// Some games call prepareToPlay before play — treat as no-op but fire notifications.
+- (())prepareToPlay {
+    log_dbg!("MPMoviePlayerController prepareToPlay: firing instant-completion notifications");
+    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+    let senders: [id; 2] = [this, nil];
+    for &sender in &senders {
+        let n = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+        let _: () = msg![env; center postNotificationName:n object:sender];
+        let n = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+        let _: () = msg![env; center postNotificationName:n object:sender];
+    }
+}
+
 - (id)backgroundColor { msg_class![env; UIColor blackColor] }
 - (())setBackgroundColor:(id)color { todo_objc_setter!(this, color); }
 - (())setScalingMode:(MPMovieScalingMode)mode { todo_objc_setter!(this, mode); }
@@ -148,10 +176,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let mut is_ea_game = false;
     if !env.is_app_picker {
         let bundle_id = env.bundle.bundle_identifier();
-        is_ea_game = bundle_id.starts_with("com.ea")
-            || bundle_id.starts_with("com.firemint")
-            || bundle_id.starts_with("com.gameloft")
-            || bundle_id.starts_with("com.namco");
+        is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
     }
 
     if is_ea_game {
@@ -201,40 +226,28 @@ pub const CLASSES: ClassExports = objc_classes! {
         is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
     }
 
+    // 🏎️ DYNAMIC SPLIT: Real Racing 2 uses this, Gameloft gets nil!
     if is_ea_game {
-        log_dbg!("MPMoviePlayerViewController initWithContentURL: EA/Firemint/Gameloft faking instant completion");
+        log_dbg!("MPMoviePlayerViewController initWithContentURL: EA/Firemint faking instant completion");
         let this: id = crate::msg_super![env; this init];
         if this == nil { return nil; }
 
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+        
+        let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+        let _: () = msg![env; center postNotificationName:load_notif object:this];
 
-        // Post notifications on BOTH the VC object AND nil (object:nil matches
-        // ALL observers regardless of which object they registered for).
-        // Real Racing 2 creates LandscapeMPMoviePlayerViewController directly
-        // without going through presentModalViewController, so viewDidAppear
-        // never fires. Posting with object:nil is the only reliable way to
-        // reach observers that watch a specific inner player object.
-        let senders: [id; 2] = [this, crate::objc::nil];
-        for &sender in &senders {
-            let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
-            let _: () = msg![env; center postNotificationName:load_notif object:sender];
+        let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
+        let _: () = msg![env; center postNotificationName:duration_notif object:this];
 
-            let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(
-                env, "MPMovieDurationAvailableNotification".to_string());
-            let _: () = msg![env; center postNotificationName:duration_notif object:sender];
-
-            let playback_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackStateDidChangeNotification);
-            let _: () = msg![env; center postNotificationName:playback_notif object:sender];
-
-            let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
-            let _: () = msg![env; center postNotificationName:finish_notif object:sender];
-        }
+        let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+        let _: () = msg![env; center postNotificationName:finish_notif object:this];
 
         return this;
     } else {
-        log_dbg!(
-            "MPMoviePlayerViewController initWithContentURL: returning nil for non-EA game {:?}",
-            ns_url::to_rust_path(env, url),
+        log!(
+            "TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?} ({:?})] -> nil (Gameloft Bypass)",
+            this, url, ns_url::to_rust_path(env, url),
         );
         release(env, this);
         return nil;
