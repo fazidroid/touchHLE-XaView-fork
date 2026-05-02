@@ -501,6 +501,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+@implementation NSDecimalNumber: NSNumber
+
+    + (id)decimalNumberWithString:(id)string {
+        println!("🎮 LOG: Stubbed [NSDecimalNumber decimalNumberWithString:]");
+        // We return a dummy NSNumber (0) so the game doesn't crash 
+        // trying to read a null pointer later on.
+        let dummy: id = crate::msg_class![env; NSNumber numberWithInt:0];
+        return dummy;
+    }
+
+    @end
+
 };
 
 pub fn is_conversion_lossless(env: &mut Environment, this: id, type_: CFNumberType) -> bool {
