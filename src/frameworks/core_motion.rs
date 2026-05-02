@@ -85,6 +85,14 @@ const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow_mut::<CMMotionManagerHostObject>(this).timer = Some(timer);
 }
 
+- (())startAccelerometerUpdates {
+    log!("CMMotionManager startAccelerometerUpdates stub called");
+}
+
+- (())setDeviceMotionUpdateInterval:(f64)interval {
+    log!("CMMotionManager setDeviceMotionUpdateInterval: {} stub called", interval);
+}
+
 - (())stopAccelerometerUpdates {
     // Take the timer and clear the handler/queue while holding the mutable borrow.
     let timer = {
