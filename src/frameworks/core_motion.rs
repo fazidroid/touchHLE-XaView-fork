@@ -31,18 +31,11 @@ const CLASSES: ClassExports = objc_classes! {
 + (id)allocWithZone:(NSZonePtr)_zone {
     env.objc.alloc_object(this, Box::new(CMMotionManagerHostObject), &mut env.mem)
 }
-- (())startAccelerometerUpdatesToQueue:(id)queue withHandler:(id)handler {
-    log!("CMMotionManager startAccelerometerUpdatesToQueue:withHandler: stub called");
-}
-
-- (id)init { 
-    println!("🎮 LOG: Sabotaging CMMotionManager to force UIAccelerometer fallback!");
-    nil 
-}
+- (id)init { this }
 
 - (bool)isGyroAvailable { false }
 - (bool)isDeviceMotionAvailable { false }
-- (bool)isAccelerometerAvailable { false }
+- (bool)isAccelerometerAvailable { true }
 
 - (())setAccelerometerUpdateInterval:(f64)_interval {}
 - (())startAccelerometerUpdates {}
