@@ -89,6 +89,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.framework_state.uikit.ui_accelerometer.update_interval = Some(interval);
 }
 
+- (id)acceleration {
+    let (x, y, z) = env.window().get_acceleration(&env.options);
+    let timestamp: NSTimeInterval = {
+        let process_info = msg_class![env; NSProcessInfo processInfo];
+        msg![env; process_info systemUptime]
+    };
+    let acceleration: id = msg_class![env; UIAcceleration alloc];
+    *env.objc.borrow_mut(acceleration) = UIAccelerationHostObject {
+        x: x.into(),
+        y: y.into(),
+        z: z.into(),
+        timestamp,
+    };
+    autorelease(env, acceleration)
+}
+
 @end
 
 @implementation UIAcceleration: NSObject
