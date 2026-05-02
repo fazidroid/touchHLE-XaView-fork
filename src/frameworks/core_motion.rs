@@ -114,9 +114,24 @@ const CLASSES: ClassExports = objc_classes! {
 
 // Internal timer callback – reads UIAccelerometer and calls the handler block.
 - (())_touchHLE_accelTimerFired:(id)_timer {
-    // The game will obtain acceleration data by polling `accelerometerData`.
-    // No need to call the handler here.
-    log_dbg!("CMMotionManager: timer fired");
+    log!("CMMotionManager timer fired");
+    let host = env.objc.borrow::<CMMotionManagerHostObject>(this);
+    if let Some(handler) = host.accelerometer_handler {
+        // Read current acceleration from UIAccelerometer (hardware sensor).
+        let accel: id = msg_class![env; UIAccelerometer sharedAccelerometer];
+        let acceleration: id = msg![env; accel acceleration];
+        let x: f64 = msg![env; acceleration x];
+        let y: f64 = msg![env; acceleration y];
+        let z: f64 = msg![env; acceleration z];
+
+        // Create CMAccelerometerData with those values.
+        let data: id = msg_class![env; CMAccelerometerData alloc];
+        data = msg![env; data initWithX:x y:y z:z];
+
+        // Call the handler block. Blocks that accept one object respond to
+        // `invokeWithObject:` in Apple's runtime.
+        let _: () = msg![env; handler invokeWithObject:data];
+    }
 }
 
 - (bool)isDeviceMotionActive { false }
