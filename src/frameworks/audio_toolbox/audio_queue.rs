@@ -1155,7 +1155,7 @@ fn _AudioQueueSetOfflineRenderFormat(
     // Mark this queue as an offline-render queue so prime_audio_queue
     // skips OpenAL source creation entirely. Offline queues are used for
     // audio extraction (e.g. from movie files) and don't need an AL source.
-    if let Some(host_obj) = State::get_mut(&mut env.framework_state)
+    if let Some(host_obj) = State::get(&mut env.framework_state)
         .audio_queues.get_mut(&in_aq)
     {
         host_obj.is_offline_render = true;
