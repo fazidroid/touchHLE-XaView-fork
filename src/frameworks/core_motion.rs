@@ -68,9 +68,7 @@ const CLASSES: ClassExports = objc_classes! {
     host.accelerometer_queue = Some(queue);
 
     let sel = env.objc.lookup_selector("_touchHLE_accelTimerFired:").unwrap();
-
-    // Extract the interval to a local variable to avoid macro parsing issues.
-    let interval = host.update_interval;
+    let interval = host.update_interval; // local variable to avoid dot in macro
 
     let timer: id = msg_class![env; NSTimer scheduledTimerWithTimeInterval:interval
                                                                     target:this
@@ -83,7 +81,7 @@ const CLASSES: ClassExports = objc_classes! {
 - (())stopAccelerometerUpdates {
     let host = env.objc.borrow_mut::<CMMotionManagerHostObject>(this);
     if let Some(timer) = host.timer {
-        msg![env; timer invalidate];
+        let _: () = msg![env; timer invalidate]; // add type annotation
         host.timer = None;
     }
     host.accelerometer_handler = None;
@@ -93,25 +91,10 @@ const CLASSES: ClassExports = objc_classes! {
 // Internal timer callback – reads UIAccelerometer and calls the handler block.
 - (())_touchHLE_accelTimerFired:(id)_timer {
     let host = env.objc.borrow::<CMMotionManagerHostObject>(this);
-    if let Some(handler) = host.accelerometer_handler {
-        // Read current acceleration from UIAccelerometer (hardware sensor).
-        let accel: id = msg_class![env; UIAccelerometer sharedAccelerometer];
-        let acceleration: id = msg![env; accel acceleration];
-        let x: f64 = msg![env; acceleration x];
-        let y: f64 = msg![env; acceleration y];
-        let z: f64 = msg![env; acceleration z];
-
-        // Create CMAccelerometerData with those values.
-        let data: id = msg_class![env; CMAccelerometerData alloc];
-        data = msg![env; data initWithX:x y:y z:z];
-
-        // Call the handler block. Blocks are Objective‑C objects that respond
-        // to `invoke` when they take no arguments, but this block expects one
-        // argument. The correct way is to use `msg_send` with the block as
-        // receiver and the extra argument. This relies on the block’s runtime
-        // calling convention.
-        let _: () = msg![env; handler invokeWithObject:data];
-    }
+    // Currently we don't call the handler block because TouchHLE doesn't
+    // support direct block invocation with arguments. The game can obtain
+    // acceleration data by reading `accelerometerData` instead.
+    log_dbg!("CMMotionManager: timer fired, handler ignored (game should poll accelerometerData)");
 }
 
 - (bool)isDeviceMotionActive { false }
