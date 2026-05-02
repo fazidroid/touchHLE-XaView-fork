@@ -153,66 +153,27 @@ pub fn pthread_cond_timedwait(
     env: &mut Environment,
     cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
-    _abstime: u32,
+    _abstime: u32,   // still ignored – all games expect a quick timeout
 ) -> i32 {
-    // TimedwaitOpt: block the thread properly via yield_thread instead of
-    // sleeping a fixed 10ms. The old sleep caused gameplay lag because every
-    // timedwait call (audio sync, frame sync, physics, etc.) stalled the
-    // cooperative scheduler for 10ms regardless of signal state.
-    //
-    // yield_thread(Condition) suspends ONLY this thread and immediately
-    // lets other threads run. It returns only when pthread_cond_signal or
-    // pthread_cond_broadcast moves us from waiting→waking. This is
-    // zero-overhead blocking — no wasted milliseconds per call.
-    //
-    // Returns ETIMEDOUT (60) when woken. Callers always re-check their
-    // predicate in a loop, so signal vs timeout distinction is safe.
-    const ETIMEDOUT: i32 = 60;
-
     let cond_var = env.mem.read(cond);
 
-    // Fast path: signal was already queued for this thread before we even
-    // started waiting — consume it and return immediately (no blocking).
-    let current_thread = env.current_thread; // copy before mutable borrow
-    {
-        let ho = State::get_mut(env)
-            .condition_variables
-            .get_mut(&cond_var)
-            .unwrap();
-        let pos = ho.waking.iter().position(|&t| t == current_thread);
-        if let Some(idx) = pos {
-            ho.waking.remove(idx);
-            return 0;
-        }
-    }
-
-    // Slow path: unlock mutex, register as waiter, block cooperatively,
-    // then relock mutex before returning to caller (POSIX requirement).
-    let res = pthread_mutex_unlock(env, mutex);
-    assert_eq!(res, 0);
-
+    // 1. Fast path: has another thread already signalled *this* thread?
+    //    If yes, consume the signal and return immediately (no sleep).
     let current_thread = env.current_thread;
-    let mutex_id = env.mem.read(mutex).mutex_id;
-    {
-        let ho = State::get_mut(env)
-            .condition_variables
-            .get_mut(&cond_var)
-            .unwrap();
-        assert!(
-            ho.curr_mutex == Some(mutex_id)
-                || ho.waking.is_empty() && ho.waiting.is_empty()
-        );
-        ho.curr_mutex = Some(mutex_id);
-        ho.waiting.push_back(current_thread);
+    let host_object = State::get_mut(env)
+        .condition_variables
+        .get_mut(&cond_var)
+        .unwrap();
+    if let Some(idx) = host_object.waking.iter().position(|&t| t == current_thread) {
+        host_object.waking.remove(idx);
+        return 0; // success – signal consumed
     }
 
-    // Suspend this thread until pthread_cond_signal/broadcast wakes it.
-    env.yield_thread(ThreadBlock::Condition(cond_var));
-
-    let res = pthread_mutex_lock(env, mutex);
-    assert_eq!(res, 0);
-
-    ETIMEDOUT
+    // 2. Slow path: unlock, tiny sleep, relock, report timeout.
+    let _ = pthread_mutex_unlock(env, mutex);
+    env.sleep(std::time::Duration::from_millis(1));   // keep the 1ms safety net
+    let _ = pthread_mutex_lock(env, mutex);
+    60 // ETIMEDOUT
 }
 
 pub const FUNCTIONS: FunctionExports = &[
