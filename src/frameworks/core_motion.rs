@@ -63,38 +63,48 @@ const CLASSES: ClassExports = objc_classes! {
 
 - (())startAccelerometerUpdatesToQueue:(id)queue withHandler:(id)handler {
     log!("CMMotionManager startAccelerometerUpdatesToQueue:withHandler:");
-    let host = env.objc.borrow_mut::<CMMotionManagerHostObject>(this);
-    host.accelerometer_handler = Some(handler);
-    host.accelerometer_queue = Some(queue);
 
-    let sel = env.objc.lookup_selector("_touchHLE_accelTimerFired:").unwrap();
-    let interval = host.update_interval; // local variable to avoid dot in macro
+    // Extract values we need while holding the mutable borrow, then drop it.
+    let (interval, sel) = {
+        let host = env.objc.borrow_mut::<CMMotionManagerHostObject>(this);
+        host.accelerometer_handler = Some(handler);
+        host.accelerometer_queue = Some(queue);
+        let iv = host.update_interval;
+        drop(host);
+        let sel = env.objc.lookup_selector("_touchHLE_accelTimerFired:").unwrap();
+        (iv, sel)
+    };
 
+    // Now we can create the timer without the mutable borrow.
     let timer: id = msg_class![env; NSTimer scheduledTimerWithTimeInterval:interval
                                                                     target:this
                                                                   selector:sel
                                                                   userInfo:nil
                                                                    repeats:true];
-    host.timer = Some(timer);
+    // Re-borrow to store the timer.
+    env.objc.borrow_mut::<CMMotionManagerHostObject>(this).timer = Some(timer);
 }
 
 - (())stopAccelerometerUpdates {
-    let host = env.objc.borrow_mut::<CMMotionManagerHostObject>(this);
-    if let Some(timer) = host.timer {
-        let _: () = msg![env; timer invalidate]; // add type annotation
-        host.timer = None;
+    // Take the timer and clear the handler/queue while holding the mutable borrow.
+    let timer = {
+        let host = env.objc.borrow_mut::<CMMotionManagerHostObject>(this);
+        host.accelerometer_handler = None;
+        host.accelerometer_queue = None;
+        host.timer.take()
+    };
+
+    // Invalidate the timer without holding the mutable borrow.
+    if let Some(t) = timer {
+        let _: () = msg![env; t invalidate];
     }
-    host.accelerometer_handler = None;
-    host.accelerometer_queue = None;
 }
 
 // Internal timer callback – reads UIAccelerometer and calls the handler block.
 - (())_touchHLE_accelTimerFired:(id)_timer {
-    let host = env.objc.borrow::<CMMotionManagerHostObject>(this);
-    // Currently we don't call the handler block because TouchHLE doesn't
-    // support direct block invocation with arguments. The game can obtain
-    // acceleration data by reading `accelerometerData` instead.
-    log_dbg!("CMMotionManager: timer fired, handler ignored (game should poll accelerometerData)");
+    // The game will obtain acceleration data by polling `accelerometerData`.
+    // No need to call the handler here.
+    log_dbg!("CMMotionManager: timer fired");
 }
 
 - (bool)isDeviceMotionActive { false }
