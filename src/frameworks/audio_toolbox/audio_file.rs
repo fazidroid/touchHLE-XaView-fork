@@ -250,7 +250,7 @@ fn AudioFileGetPropertyInfo(
 ) -> OSStatus {
     return_if_null!(in_audio_file);
 
-    if required_size == 0
+    if property_size(in_property_id) == 0
         || in_property_id == kAudioFilePropertyMagicCookieData
         || in_property_id == kAudioFilePropertyChannelLayout
     {
