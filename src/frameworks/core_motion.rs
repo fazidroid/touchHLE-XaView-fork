@@ -68,12 +68,15 @@ const CLASSES: ClassExports = objc_classes! {
     host.accelerometer_queue = Some(queue);
 
     let sel = env.objc.lookup_selector("_touchHLE_accelTimerFired:").unwrap();
-    let timer: id = msg_class![env; NSTimer scheduledTimerWithTimeInterval:host.update_interval
+
+    // Extract the interval to a local variable to avoid macro parsing issues.
+    let interval = host.update_interval;
+
+    let timer: id = msg_class![env; NSTimer scheduledTimerWithTimeInterval:interval
                                                                     target:this
                                                                   selector:sel
                                                                   userInfo:nil
                                                                    repeats:true];
-    // Store the timer so it stays alive and can be invalidated later.
     host.timer = Some(timer);
 }
 
