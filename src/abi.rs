@@ -487,12 +487,12 @@ impl GuestArg for f32 {
 }
 
 impl<T, const MUT: bool> GuestArg for Ptr<T, MUT> {
-    const REG_COUNT: usize = <u32 as GuestArg>::REG_COUNT;
-    fn from_regs(regs: &[u32]) -> Self {
-        Self::from_bits(<u32 as GuestArg>::from_regs(regs))
+    const REG_COUNT: usize = 1;
+    fn from_regs(regs: &[u64]) -> Self {
+        Self::from_bits(regs[0])
     }
-    fn to_regs(self, regs: &mut [u32]) {
-        <u32 as GuestArg>::to_regs(self.to_bits(), regs)
+    fn to_regs(self, regs: &mut [u64]) {
+        regs[0] = self.to_bits();
     }
 }
 
@@ -540,13 +540,13 @@ impl GuestArg for u64 {
 
 impl_GuestArg_with!(i64, u64);
 
-impl GuestArg for f64 {
-    const REG_COUNT: usize = <u64 as GuestArg>::REG_COUNT;
-    fn from_regs(regs: &[u32]) -> Self {
-        Self::from_bits(<u64 as GuestArg>::from_regs(regs))
+impl GuestArg for u64 {
+    const REG_COUNT: usize = 1;
+    fn from_regs(regs: &[u64]) -> Self {
+        regs[0]
     }
-    fn to_regs(self, regs: &mut [u32]) {
-        <u64 as GuestArg>::to_regs(self.to_bits(), regs)
+    fn to_regs(self, regs: &mut [u64]) {
+        regs[0] = self;
     }
 }
 
@@ -667,11 +667,11 @@ impl GuestRet for f32 {
 }
 
 impl<T, const MUT: bool> GuestRet for Ptr<T, MUT> {
-    fn from_regs(regs: &[u32]) -> Self {
-        Self::from_bits(<u32 as GuestRet>::from_regs(regs))
+    fn from_regs(regs: &[u64]) -> Self {
+        Self::from_bits(regs[0])
     }
-    fn to_regs(self, regs: &mut [u32]) {
-        <u32 as GuestRet>::to_regs(self.to_bits(), regs)
+    fn to_regs(self, regs: &mut [u64]) {
+        regs[0] = self.to_bits();
     }
 }
 
@@ -693,11 +693,11 @@ impl GuestRet for u64 {
 
 impl_GuestRet_with!(i64, u64);
 
-impl GuestRet for f64 {
-    fn from_regs(regs: &[u32]) -> Self {
-        Self::from_bits(<u64 as GuestRet>::from_regs(regs))
+impl GuestRet for u64 {
+    fn from_regs(regs: &[u64]) -> Self {
+        regs[0]
     }
-    fn to_regs(self, regs: &mut [u32]) {
-        <u64 as GuestRet>::to_regs(self.to_bits(), regs)
+    fn to_regs(self, regs: &mut [u64]) {
+        regs[0] = self;
     }
 }
