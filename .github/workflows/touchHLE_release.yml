@@ -3,6 +3,7 @@ name: Build touchHLE
 on:
   push:
     branches: 
+      - "aarch64"
       - "master"
       - "Shift2"
       - "GTRacing134"
