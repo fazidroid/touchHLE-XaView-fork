@@ -924,7 +924,7 @@ pub fn AudioQueueStart(
 
     host_object.is_running = AudioQueueIsRunning::Running;
 
-    if is_supported_audio_format(&host_object.format) {
+    if is_supported_audio_format(&host_object.format) && !host_object.is_offline_render {
         let al_source = host_object.al_source.unwrap();
         unsafe { context.SourcePlay(al_source) };
         let al_err = unsafe { context.GetError() };
