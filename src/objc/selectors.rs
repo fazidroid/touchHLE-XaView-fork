@@ -43,18 +43,18 @@ pub struct SEL(ConstPtr<u8>);
 
 impl GuestArg for SEL {
     const REG_COUNT: usize = <ConstPtr<u8> as GuestArg>::REG_COUNT;
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         SEL(<ConstPtr<u8> as GuestArg>::from_regs(regs))
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         <ConstPtr<u8> as GuestArg>::to_regs(self.0, regs)
     }
 }
 impl GuestRet for SEL {
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         SEL(<ConstPtr<u8> as GuestRet>::from_regs(regs))
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         <ConstPtr<u8> as GuestRet>::to_regs(self.0, regs)
     }
 }
