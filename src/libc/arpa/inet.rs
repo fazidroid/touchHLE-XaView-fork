@@ -15,7 +15,7 @@ use crate::dyld::FunctionExports;
 use std::net::Ipv4Addr;
 
 #[allow(non_camel_case_types)]
-type in_addr_t = u32;
+type in_addr_t = u64;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -28,11 +28,11 @@ unsafe impl SafeRead for in_addr {}
 impl GuestArg for in_addr {
     const REG_COUNT: usize = 1;
 
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         in_addr { s_addr: regs[0] }
     }
 
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         regs[0] = self.s_addr;
     }
 }
@@ -41,7 +41,7 @@ fn inet_addr(env: &mut Environment, str: ConstPtr<u8>) -> in_addr_t {
     let inet_addr_str = env.mem.cstr_at_utf8(str).unwrap_or("");
     match inet_addr_str.parse::<Ipv4Addr>() {
         Ok(address) => {
-            let res = u32::from_le_bytes(address.octets());
+            let res = u64::from_le_bytes(address.octets());
             log_dbg!("inet_addr({:?}) => {}", inet_addr_str, res);
             res
         }
@@ -62,7 +62,7 @@ fn inet_ntop(
     assert_eq!(af, AF_INET);
     let addr_ptr: ConstPtr<in_addr> = src.cast();
     let addr = env.mem.read(addr_ptr);
-    let ipv4_addr = Ipv4Addr::from_bits(u32::from_be(addr.s_addr));
+    let ipv4_addr = Ipv4Addr::from_bits(u64::from_be(addr.s_addr));
     log_dbg!("inet_ntop: addr = {:?}", ipv4_addr);
     let binding = ipv4_addr.to_string();
     let addr_bytes = binding.as_bytes();
@@ -80,7 +80,7 @@ fn inet_pton(env: &mut Environment, af: i32, src: ConstPtr<u8>, dst: MutVoidPtr)
     match str.parse::<Ipv4Addr>() {
         Ok(address) => {
             let addr = in_addr {
-                s_addr: u32::from_le_bytes(address.octets()),
+                s_addr: u64::from_le_bytes(address.octets()),
             };
             let addr_ptr: MutPtr<in_addr> = dst.cast();
             env.mem.write(addr_ptr, addr);
@@ -94,11 +94,11 @@ fn inet_pton(env: &mut Environment, af: i32, src: ConstPtr<u8>, dst: MutVoidPtr)
 }
 
 fn inet_ntoa(env: &mut Environment, addr: in_addr) -> MutPtr<u8> {
-    let ipv4_addr = Ipv4Addr::from_bits(u32::from_be(addr.s_addr));
+    let ipv4_addr = Ipv4Addr::from_bits(u64::from_be(addr.s_addr));
     let ip_str = ipv4_addr.to_string();
     let len = ip_str.len();
-    let buf = env.mem.alloc(len as u32 + 1).cast::<u8>();
-    let slice = env.mem.bytes_at_mut(buf, len as u32 + 1);
+    let buf = env.mem.alloc(len as u64 + 1).cast::<u8>();
+    let slice = env.mem.bytes_at_mut(buf, len as u64 + 1);
     slice[..len].copy_from_slice(ip_str.as_bytes());
     slice[len] = b'\0';
     buf
