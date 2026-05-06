@@ -30,7 +30,7 @@ unsafe impl SafeRead for CGAffineTransform {}
 impl GuestArg for CGAffineTransform {
     const REG_COUNT: usize = 6;
 
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         CGAffineTransform {
             a: GuestArg::from_regs(&regs[0..1]),
             b: GuestArg::from_regs(&regs[1..2]),
@@ -40,7 +40,7 @@ impl GuestArg for CGAffineTransform {
             ty: GuestArg::from_regs(&regs[5..6]),
         }
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         self.a.to_regs(&mut regs[0..1]);
         self.b.to_regs(&mut regs[1..2]);
         self.c.to_regs(&mut regs[2..3]);
