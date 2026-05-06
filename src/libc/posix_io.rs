@@ -841,11 +841,12 @@ fn fcntl(
             // ==========================================================
             // ❌ DELETED: assert!(matches!(flags, FD_CLOEXEC | 0));
             
-            if flags & FD_CLOEXEC == FD_CLOEXEC {
-                log!("TODO: fcntl({}, F_SETFD, {}) called. CLOEXEC currently not supported.", fd, flags);
+            // FD_CLOEXEC is a no-op in touchHLE (no fork/exec).
+            // Silently accept rather than logging a warning per-call.
+            log_dbg!("fcntl({}, F_SETFD, {}) -> 0 (CLOEXEC no-op)", fd, flags);
+            if let Some(file) = env.libc_state.posix_io.file_for_fd(fd) {
+                file.flags = flags;
             }
-            let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
-            file.flags = flags;
         }
         F_GETLK => {
             let lock_ptr: MutPtr<flock> = args.start().next(env);
