@@ -65,7 +65,7 @@ pub struct Thread {
     host_context: Option<HostContext>,
     /// Address range of this thread's stack, used to check if addresses are in
     /// range while producing a stack trace.
-    pub stack: Option<std::ops::RangeInclusive<u32>>,
+    pub stack: Option<std::ops::RangeInclusive<u64>>,
     /// Set to true the first time a bad-jump is recovered by returning to LR
     /// instead of killing the thread. On any subsequent bad jump the thread
     /// is killed so it cannot loop or cause a null-deref crash.
@@ -641,7 +641,7 @@ impl Environment {
         // FixEnvInitThumb
         env.cpu.set_cpsr(
             cpu::Cpu::CPSR_USER_MODE
-                | ((entry_point_addr.is_thumb() as u32) * cpu::Cpu::CPSR_THUMB),
+                | ((entry_point_addr.is_thumb() as u64) * cpu::Cpu::CPSR_THUMB),
         );
 
         if let Some(addrs) = env.options.gdb_listen_addrs.take() {
@@ -888,7 +888,7 @@ impl Environment {
         )
     }
 
-    pub fn stack_for_longjmp(&self, mut lr: u32, fp: u32) -> Vec<u32> {
+    pub fn stack_for_longjmp(&self, mut lr: u64, fp: u64) -> Vec<u64> {
         let stack_range = self.threads[self.current_thread].stack.clone().unwrap();
         let mut frames = Vec::new();
         let mut fp: mem::ConstPtr<u8> = mem::Ptr::from_bits(fp);
@@ -1027,7 +1027,7 @@ impl Environment {
 
                     env.cpu.set_cpsr(
                         cpu::Cpu::CPSR_USER_MODE
-                            | ((start_routine.is_thumb() as u32) * cpu::Cpu::CPSR_THUMB),
+                            | ((start_routine.is_thumb() as u64) * cpu::Cpu::CPSR_THUMB),
                     );
                     let return_value: mem::MutVoidPtr =
                         start_routine.call_from_host(env, (user_data,));
@@ -1694,7 +1694,7 @@ impl Environment {
                             self.cpu.regs_mut()[cpu::Cpu::PC] += 2;
                         }
                     } else {
-                        let next_w: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(next_pc));
+                        let next_w: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(next_pc));
                         if next_w == 0xeafffffe {
                             self.cpu.regs_mut()[cpu::Cpu::PC] += 4;
                         }
@@ -1729,9 +1729,9 @@ impl Environment {
                 if pc == 0x00600ac4 {
                     echo!("WARNING: Bypassing Asphalt DRM via Deep Stack Unwind!");
                     let fp0 = self.cpu.regs()[7];
-                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let fp2: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp2 + 4));
+                    let fp1: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp0));
+                    let fp2: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp1));
+                    let target_lr: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp2 + 4));
                     echo!("Recovered Deep Return Address: {:#010x}", target_lr);
                     self.cpu.regs_mut()[7] = fp2;
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp1 + 8;
@@ -1743,8 +1743,8 @@ impl Environment {
                 // RestoreConditionalUnwinds
                 if (pc == 0x00c3296c || pc == 0x00c32bfc) && self.current_thread != 0 {
                     let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    let prev_fp: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp0));
+                    let target_lr: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp0 + 4));
                     let current_lr = self.cpu.regs()[14];
                     // CheckNetworkModule
                     if (current_lr & 0xFFFF0000) == 0x005b0000
@@ -1763,9 +1763,9 @@ impl Environment {
                     }
                 } else if (pc == 0x00c3375c || pc == 0x00c3376c) && self.current_thread != 0 {
                     let fp0 = self.cpu.regs()[7];
-                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
+                    let fp1: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp0));
+                    let prev_fp: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp1));
+                    let target_lr: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp1 + 4));
                     // FilterAudioThreads
                     if (target_lr & 0xFFFF0000) == 0x005b0000 {
                         echo!(
@@ -1787,20 +1787,20 @@ impl Environment {
                     );
                     let fp0 = self.cpu.regs()[7];
 
-                    let fp1: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
+                    let fp1: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp0));
 
                     if fp1 > fp0 && fp1.wrapping_sub(fp0) < 0x1000 {
-                        let saved_r4: u32 = self
+                        let saved_r4: u64 = self
                             .mem
-                            .read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(12)));
-                        let saved_r5: u32 = self
+                            .read(mem::ConstPtr::<u64>::from_bits(fp1.wrapping_sub(12)));
+                        let saved_r5: u64 = self
                             .mem
-                            .read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(8)));
-                        let saved_r6: u32 = self
+                            .read(mem::ConstPtr::<u64>::from_bits(fp1.wrapping_sub(8)));
+                        let saved_r6: u64 = self
                             .mem
-                            .read(mem::ConstPtr::<u32>::from_bits(fp1.wrapping_sub(4)));
-                        let saved_r7: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1));
-                        let saved_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp1 + 4));
+                            .read(mem::ConstPtr::<u64>::from_bits(fp1.wrapping_sub(4)));
+                        let saved_r7: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp1));
+                        let saved_lr: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp1 + 4));
 
                         self.cpu.regs_mut()[4] = saved_r4;
                         self.cpu.regs_mut()[5] = saved_r5;
@@ -1826,8 +1826,8 @@ impl Environment {
                 {
                     echo!("WARNING: Unwinding Asphalt Overdrive Deadlock at PC: {:#010x}, LR: {:#010x}", pc, lr);
                     let fp0 = self.cpu.regs()[7];
-                    let prev_fp: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0));
-                    let target_lr: u32 = self.mem.read(mem::ConstPtr::<u32>::from_bits(fp0 + 4));
+                    let prev_fp: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp0));
+                    let target_lr: u64 = self.mem.read(mem::ConstPtr::<u64>::from_bits(fp0 + 4));
                     self.cpu.regs_mut()[7] = prev_fp;
                     self.cpu.regs_mut()[cpu::Cpu::SP] = fp0 + 8;
                     self.cpu.regs_mut()[0] = 0;
