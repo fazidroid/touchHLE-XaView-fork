@@ -32,6 +32,10 @@ static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u32, u32
 /// Similarly, the return value of `objc_msgSend` is whatever value is returned
 /// by the method implementation. We are relying on CallFromGuest not
 /// overwriting it.
+fn dummy_accelerometer_bypass(_env: &mut crate::Environment, _this: crate::objc::id, _cmd: crate::objc::SEL, _queue: crate::objc::id, _handler: crate::objc::id) {
+    // Do absolutely nothing. The game will think it successfully started the accelerometer!
+}
+
 #[allow(non_snake_case)]
 fn objc_msgSend_inner(
     env: &mut Environment,
@@ -274,6 +278,12 @@ fn objc_msgSend_inner(
             }
             // BypassDictCreate
             if selector.as_str(&env.mem) == "dictionaryWithObjects:forKeys:count:" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            if selector.as_str(&env.mem) == "startAccelerometerUpdatesToQueue:withHandler:" {
+                println!("🏎️ GT RACING BYPASS: Ignored CoreMotion Accelerometer request!");
+                // Fills the return registers with 0 and safely exits the function
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
