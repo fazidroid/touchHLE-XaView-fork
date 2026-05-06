@@ -81,10 +81,13 @@ pub fn pthread_cond_wait(
     let current_thread = env.current_thread;
     let mutex_id = env.mem.read(mutex).mutex_id;
     let cond_var = env.mem.read(cond);
-    let host_object = State::get_mut(env)
+    let Some(host_object) = State::get_mut(env)
         .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
+        .get_mut(&cond_var) else {
+        log!("pthread_cond_wait: unknown condvar {:?}, re-locking and returning", cond_var);
+        pthread_mutex_lock(env, mutex);
+        return 0;
+    };
     assert!(
         host_object.curr_mutex == Some(mutex_id)
             || host_object.waking.is_empty() && host_object.waiting.is_empty()
@@ -136,11 +139,12 @@ pub fn pthread_cond_broadcast(env: &mut Environment, cond: MutPtr<pthread_cond_t
 
 pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>) -> i32 {
     let cond_var = env.mem.read(cond);
-    let old_object = State::get_mut(env)
+    let Some(old_object) = State::get_mut(env)
         .condition_variables
-        .remove(&cond_var)
-        .unwrap();
-    // SoftAssertDestroy: warn instead of panic if threads still in queue.
+        .remove(&cond_var) else {
+        log!("pthread_cond_destroy: unknown condvar {:?}, ignoring", cond_var);
+        return 0;
+    };
     if !old_object.waiting.is_empty() || !old_object.waking.is_empty() {
         log!("Warning: pthread_cond_destroy: {} waiting, {} waking threads remain",
             old_object.waiting.len(), old_object.waking.len());
