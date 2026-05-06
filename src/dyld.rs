@@ -1154,6 +1154,15 @@ if symbol == "_pthread_setname_np" {
             );
         }
 
+        if symbol == "__dyld_register_func_for_add_image" {
+            fn fake_dyld_register(_env: &mut crate::Environment, _func: u32) {
+                println!("🎮 LOG: Bypassing __dyld_register_func_for_add_image (Crashlytics/Analytics disabled)!");
+            }
+            return Some(&(fake_dyld_register as fn(&mut crate::Environment, u32) -> ()));
+        }
+
+        panic!("Call to unimplemented function {symbol}");
+
         panic!("Call to unimplemented function {symbol}");
         log!("WARNING: unimplemented function {symbol}, using stub");
 
