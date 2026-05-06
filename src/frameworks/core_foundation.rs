@@ -68,9 +68,9 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
 
 pub use cf_type::{CFRelease, CFRetain, CFTypeRef};
 
-pub type CFHashCode = u32;
+pub type CFHashCode = u64;
 pub type CFIndex = i32;
-pub type CFOptionFlags = u32;
+pub type CFOptionFlags = u64;
 pub type CFComparisonResult = CFIndex;
 
 use crate::abi::GuestArg;
@@ -95,13 +95,13 @@ impl_GuestRet_for_large_struct!(CFRange);
 impl GuestArg for CFRange {
     const REG_COUNT: usize = 2;
 
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         CFRange {
             location: GuestArg::from_regs(&regs[0..1]),
             length: GuestArg::from_regs(&regs[1..2]),
         }
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         self.location.to_regs(&mut regs[0..1]);
         self.length.to_regs(&mut regs[1..2]);
     }
