@@ -1171,12 +1171,14 @@ impl GLES for GLES1OnGL2<'_> {
         )
     }
     unsafe fn Materialf(&mut self, face: GLenum, pname: GLenum, param: GLfloat) {
-        assert!(face == gl21::FRONT_AND_BACK);
+        let face = if face == gl21::FRONT || face == gl21::BACK { gl21::FRONT_AND_BACK } else { face };
+        if face != gl21::FRONT_AND_BACK { return; }
         MATERIAL_PARAMS.assert_component_count(pname, 1);
         gl21::Materialf(face, pname, param);
     }
     unsafe fn Materialx(&mut self, face: GLenum, pname: GLenum, param: GLfixed) {
-        assert!(face == gl21::FRONT_AND_BACK);
+        let face = if face == gl21::FRONT || face == gl21::BACK { gl21::FRONT_AND_BACK } else { face };
+        if face != gl21::FRONT_AND_BACK { return; }
         MATERIAL_PARAMS.setx(
             |param| gl21::Materialf(face, pname, param),
             |_| unreachable!(), // no integer parameters exist
@@ -1199,7 +1201,8 @@ impl GLES for GLES1OnGL2<'_> {
         gl21::Materialfv(face, pname, params);
     }
     unsafe fn Materialxv(&mut self, face: GLenum, pname: GLenum, params: *const GLfixed) {
-        assert!(face == gl21::FRONT_AND_BACK);
+        let face = if face == gl21::FRONT || face == gl21::BACK { gl21::FRONT_AND_BACK } else { face };
+        if face != gl21::FRONT_AND_BACK { return; }
         MATERIAL_PARAMS.setxv(
             |params| gl21::Materialfv(face, pname, params),
             |_| unreachable!(), // no integer parameters exist
