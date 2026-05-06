@@ -37,23 +37,14 @@ fn sleep(env: &mut Environment, seconds: u32) -> u32 {
 
 fn usleep(env: &mut Environment, useconds: useconds_t) -> i32 {
     set_errno(env, 0);
-
-    let bundle_id = env.bundle.bundle_identifier().to_lowercase();
     
+    // 🏎️ UNIVERSAL FAST YIELD:
+    // If a game asks for a micro-sleep (<= 1000 microseconds), 
+    // DO NOT invoke the Android OS sleep timer. Just yield the thread slice!
     if useconds <= 1000 {
-        if bundle_id.contains("asphalt") {
-            // 🛡️ ASPHALT SPINLOCK HACK:
-            // Asphalt hammers usleep(0) and usleep(1) in its thread locks.
-            // yield_now() is ignored by Android's scheduler, causing deadlocks.
-            // env.sleep() is too heavy and destroys the framerate.
-            // A raw 1-nanosecond thread sleep forces a perfect OS context switch!
-            std::thread::sleep(std::time::Duration::from_nanos(1));
-        } else {
-            // 🏎️ Standard fast yield for other games
-            std::thread::yield_now(); 
-        }
+        std::thread::yield_now(); 
     } else {
-        // Standard sleep for long durations
+        // Only use the heavy OS sleep for actual long delays
         env.sleep(std::time::Duration::from_micros(useconds.into()));
     }
     
@@ -222,7 +213,16 @@ fn sysconf(env: &mut Environment, name: i32) -> i32 {
     match name {
         _SC_CLK_TCK => 100, 
         _SC_PAGESIZE => PAGE_SIZE.try_into().unwrap(),
-        _SC_NPROCESSORS_ONLN => 2, // 🏎️ MULTICORE UNLOCK: 2 cores for ALL games!
+        _SC_NPROCESSORS_ONLN => {
+            let bundle_id = env.bundle.bundle_identifier().to_lowercase();
+            if bundle_id.contains("asphalt") {
+                // 🛡️ QUARANTINE: Force Asphalt into single-core mode to prevent deadlocks
+                1 
+            } else {
+                // 🏎️ MULTICORE: Keep 2 cores unlocked for GT Racing and other games!
+                2 
+            }
+        },
         _ => unimplemented!("TODO: sysconf(name: {})", name),
     }
 }
