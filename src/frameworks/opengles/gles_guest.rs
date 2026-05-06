@@ -1233,10 +1233,19 @@ fn glTexImage2D(
             let size = image_size_estimate(pixel_count, format, type_);
             mem.ptr_at(pixels.cast::<u8>(), size).cast::<GLvoid>()
         };
+
+        // 🏎️ GLES 2.0 WHITE SCREEN FIX (The BGRA Hack):
+        // ANGLE strictly rejects textures if format = BGRA but internalformat = RGBA.
+        // We forcefully sync the internal format to satisfy the Android driver!
+        let mut patched_internalformat = internalformat;
+        if format == gles11::BGRA_EXT {
+            patched_internalformat = gles11::BGRA_EXT as GLint;
+        }
+
         gles.TexImage2D(
             target,
             level,
-            internalformat,
+            patched_internalformat,
             width,
             height,
             border,
@@ -1445,9 +1454,16 @@ fn glRenderbufferStorageOES(
         (width as f32 * scale_total).round() as GLsizei,
         (height as f32 * scale_total).round() as GLsizei,
     ); // ApplyScaleHack
-       // RestoreCleanDepth
+    
+    // 🛡️ ANGLE GLES 2.0 FBO FIX:
+    // Downgrade 24-bit depth requests to 16-bit to guarantee Android compatibility
+    let mut patched_format = internalformat;
+    if internalformat == 0x81A6 { // GL_DEPTH_COMPONENT24_OES
+        patched_format = 0x81A5;  // GL_DEPTH_COMPONENT16
+    }
+
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.RenderbufferStorageOES(target, internalformat, width, height)
+        gles.RenderbufferStorageOES(target, patched_format, width, height)
     })
 }
 
