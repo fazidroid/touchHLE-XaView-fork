@@ -38,11 +38,13 @@ fn sleep(env: &mut Environment, seconds: u32) -> u32 {
 fn usleep(env: &mut Environment, useconds: useconds_t) -> i32 {
     set_errno(env, 0);
 
-    // 🏎️ YIELD OPTIMIZATION: Prevent Android from over-sleeping on tiny yields
-    if useconds <= 1000 {
-        // Just yield the CPU slice immediately instead of invoking the OS timer
+    let bundle_id = env.bundle.bundle_identifier().to_lowercase();
+    
+    // 🏎️ YIELD OPTIMIZATION for safe games
+    if useconds <= 1000 && !bundle_id.contains("asphalt") {
         std::thread::yield_now(); 
     } else {
+        // 🛡️ Force Gameloft games to actually sleep so they don't deadlock
         env.sleep(Duration::from_micros(useconds.into()));
     }
     
@@ -207,11 +209,20 @@ fn getdtablesize(_env: &mut Environment) -> i32 {
     256
 }
 
-fn sysconf(_env: &mut Environment, name: i32) -> i32 {
+fn sysconf(env: &mut Environment, name: i32) -> i32 {
     match name {
         _SC_CLK_TCK => 100, 
         _SC_PAGESIZE => PAGE_SIZE.try_into().unwrap(),
-        _SC_NPROCESSORS_ONLN => 2, // 🏎️ MULTICORE UNLOCK: Tell the game we have multiple cores!
+        _SC_NPROCESSORS_ONLN => {
+            // 🛡️ GAMELOFT DEADLOCK FIX: Force Asphalt to run single-core!
+            let bundle_id = env.bundle.bundle_identifier().to_lowercase();
+            if bundle_id.contains("asphalt") {
+                1 
+            } else {
+                // 🏎️ MULTICORE UNLOCK: 2 cores for everything else!
+                2 
+            }
+        },
         _ => unimplemented!("TODO: sysconf(name: {})", name),
     }
 }
