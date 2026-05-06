@@ -19,13 +19,13 @@ use std::str::FromStr;
 pub mod qsort;
 
 // GlobalHackWindow
-pub static HACK_MAIN_WINDOW: std::sync::Mutex<u32> = std::sync::Mutex::new(0);
+pub static HACK_MAIN_WINDOW: std::sync::Mutex<u64> = std::sync::Mutex::new(0);
 
 #[derive(Default)]
 pub struct State {
-    rand: u32,
-    random: u32,
-    arc4random: u32,
+    rand: u64,
+    random: u64,
+    arc4random: u64,
 }
 
 // Sizes of zero are implementation-defined. macOS will happily give you back
@@ -182,10 +182,10 @@ fn strtod(env: &mut Environment, nptr: ConstPtr<u8>, endptr: MutPtr<MutPtr<u8>>)
     res
 }
 
-fn prng(state: u32) -> u32 {
+fn prng(state: u64) -> u64 {
     // The state must not be zero for this algorithm to work. This also makes
     // the default seed be 1, which matches the C standard.
-    let mut state: u32 = state.max(1);
+    let mut state: u64 = state.max(1);
     // https://en.wikipedia.org/wiki/Xorshift#Example_implementation
     // xorshift32 is not a good random number generator, but it is cute one!
     // It's not like anyone expects the C stdlib `rand()` to be good.
@@ -197,7 +197,7 @@ fn prng(state: u32) -> u32 {
 
 const RAND_MAX: i32 = i32::MAX;
 
-fn srand(env: &mut Environment, seed: u32) {
+fn srand(env: &mut Environment, seed: u64) {
     env.libc_state.stdlib.rand = seed;
 }
 fn rand(env: &mut Environment) -> i32 {
@@ -207,7 +207,7 @@ fn rand(env: &mut Environment) -> i32 {
 
 // BSD's "better" random number generator, with an implementation that is not
 // actually better.
-fn srandom(env: &mut Environment, seed: u32) {
+fn srandom(env: &mut Environment, seed: u64) {
     // TODO: handle errno properly
     set_errno(env, 0);
 
@@ -221,7 +221,7 @@ fn random(env: &mut Environment) -> i32 {
     (env.libc_state.stdlib.random as i32) & RAND_MAX
 }
 
-fn arc4random(env: &mut Environment) -> u32 {
+fn arc4random(env: &mut Environment) -> u64 {
     env.libc_state.stdlib.arc4random = prng(env.libc_state.stdlib.arc4random);
     env.libc_state.stdlib.arc4random
 }
@@ -341,7 +341,7 @@ pub fn strtoul(
     str: ConstPtr<u8>,
     endptr: MutPtr<MutPtr<u8>>,
     base: i32,
-) -> u32 {
+) -> u64 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
@@ -352,8 +352,8 @@ pub fn strtoul(
         str.cast_mut(),
         0, // starting offset
         base.try_into().unwrap(),
-        u32::MAX, // max_length
-        |s, base| u32::from_str_radix(s, base).unwrap_or(u32::MAX),
+        u64::MAX, // max_length
+        |s, base| u64::from_str_radix(s, base).unwrap_or(u64::MAX),
         |num| num.wrapping_neg(),
     );
     match parse_res {
@@ -388,7 +388,7 @@ fn strtoull(
         str.cast_mut(),
         0, // starting offset
         base.try_into().unwrap(),
-        u32::MAX, // max_length
+        u64::MAX, // max_length
         |s, base| u64::from_str_radix(s, base).unwrap_or(u64::MAX),
         |num| num.wrapping_neg(),
     );
@@ -412,7 +412,7 @@ fn strtol(env: &mut Environment, str: ConstPtr<u8>, endptr: MutPtr<MutPtr<u8>>, 
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    match strtol_inner(env, str, base as u32) {
+    match strtol_inner(env, str, base as u64) {
         Ok((res, len)) => {
             if !endptr.is_null() {
                 env.mem.write(endptr, (str + len).cast_mut());
@@ -530,7 +530,7 @@ fn div(_env: &mut Environment, numer: i32, denom: i32) -> u64 {
     }
     let quot = numer.wrapping_div(denom);
     let rem = numer.wrapping_rem(denom);
-    (quot as u32 as u64) | ((rem as u32 as u64) << 32)
+    (quot as u64 as u64) | ((rem as u64 as u64) << 32)
 }
 
 fn _Block_copy(_env: &mut Environment, block: ConstVoidPtr) -> ConstVoidPtr {
@@ -546,15 +546,15 @@ fn dispatch_once(env: &mut Environment, predicate: MutPtr<i32>, block: ConstVoid
     // RunDispatchOnceBlock
     if env.mem.read(predicate) == 0 {
         env.mem.write(predicate, -1);
-        let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
+        let func_addr: u64 = env.mem.read((block.cast::<u8>() + 12).cast());
         let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
-        let _: u32 = func.call_from_host(env, (block,));
+        let _: u64 = func.call_from_host(env, (block,));
     }
 }
 
 fn dispatch_async(env: &mut Environment, _queue: ConstVoidPtr, block: ConstVoidPtr) {
     // ImplDispatchAsync
-    let func_addr: u32 = env.mem.read((block.cast::<u8>() + 12).cast());
+    let func_addr: u64 = env.mem.read((block.cast::<u8>() + 12).cast());
     let func = GuestFunction::from_addr_with_thumb_bit(func_addr);
     env.new_thread(func, block.cast_mut(), 1024 * 1024);
 }
@@ -592,7 +592,7 @@ fn OSMemoryBarrier(_env: &mut Environment) {
     // BypassMemoryBarrier
 }
 
-fn __umodsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
+fn __umodsi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
     // ImplUmodsi3
     if b == 0 {
         0
@@ -601,7 +601,7 @@ fn __umodsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
     }
 }
 
-fn __udivsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
+fn __udivsi3(_env: &mut Environment, a: u64, b: u64) -> u64 {
     // ImplUdivsi3
     if b == 0 {
         0
@@ -610,7 +610,7 @@ fn __udivsi3(_env: &mut Environment, a: u32, b: u32) -> u32 {
     }
 }
 
-fn __udivmodsi4(env: &mut Environment, a: u32, b: u32, rem: MutPtr<u32>) -> u32 {
+fn __udivmodsi4(env: &mut Environment, a: u64, b: u64, rem: MutPtr<u64>) -> u64 {
     // ImplUdivmodsi4
     if b == 0 {
         if !rem.is_null() {
@@ -813,8 +813,8 @@ fn _Unwind_SjLj_RaiseException(env: &mut Environment, _ex: ConstVoidPtr) -> i32 
         if fp == 0 {
             break;
         }
-        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
-        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        let prev_fp: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp));
+        let lr: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
             env.cpu.regs_mut()[7] = prev_fp;
             env.cpu.regs_mut()[13] = fp + 8;
@@ -834,8 +834,8 @@ fn _Unwind_SjLj_Resume(env: &mut Environment, _ex: ConstVoidPtr) {
         if fp == 0 {
             break;
         }
-        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
-        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        let prev_fp: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp));
+        let lr: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
             env.cpu.regs_mut()[7] = prev_fp;
             env.cpu.regs_mut()[13] = fp + 8;
@@ -854,8 +854,8 @@ fn _Unwind_SjLj_Resume_or_Rethrow(env: &mut Environment, _ex: ConstVoidPtr) -> i
         if fp == 0 {
             break;
         }
-        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
-        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        let prev_fp: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp));
+        let lr: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
             env.cpu.regs_mut()[7] = prev_fp;
             env.cpu.regs_mut()[13] = fp + 8;
@@ -875,8 +875,8 @@ fn abort(env: &mut Environment) {
         if fp == 0 {
             break;
         }
-        let prev_fp: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp));
-        let lr: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(fp + 4));
+        let prev_fp: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp));
+        let lr: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(fp + 4));
         if lr > 0 && lr < 0x10000000 {
             env.cpu.regs_mut()[7] = prev_fp;
             env.cpu.regs_mut()[13] = fp + 8;
@@ -896,7 +896,7 @@ fn __stack_chk_fail(env: &mut Environment) {
     let mut dump = format!("\n[DEBUG] ___stack_chk_fail triggered!\n[DEBUG] LR: {:#010x}, FP: {:#010x}, SP: {:#010x}\n[DEBUG] Stack dump:\n", lr, fp, sp);
     let mut curr = sp;
     while curr <= fp + 32 {
-        let val: u32 = env.mem.read(crate::mem::ConstPtr::<u32>::from_bits(curr));
+        let val: u64 = env.mem.read(crate::mem::ConstPtr::<u64>::from_bits(curr));
         let b = val.to_le_bytes();
         let c0 = if b[0] >= 32 && b[0] <= 126 {
             b[0] as char
@@ -927,7 +927,7 @@ fn __stack_chk_fail(env: &mut Environment) {
     panic!("{}", dump);
 }
 
-fn syscall(env: &mut Environment, number: i32, arg1: u32, arg2: u32, arg3: u32) -> i32 {
+fn syscall(env: &mut Environment, number: i32, arg1: u64, arg2: u64, arg3: u64) -> i32 {
     // FakeSyscall
     log!("Warning: syscall({}) called with args ({:#x}, {:#x}, {:#x}). Returning -1 (ENOENT) for anti-jailbreak checks.", number, arg1, arg2, arg3);
     crate::libc::errno::set_errno(env, 2); // ENOENT
@@ -943,7 +943,7 @@ fn objc_setProperty_nonatomic(
 ) {
     // ImplSetPropertyNonatomic
     if !self_ptr.is_null() {
-        let addr = (self_ptr.to_bits() as i32 + offset) as u32;
+        let addr = (self_ptr.to_bits() as i32 + offset) as u64;
         let addr_ptr = crate::mem::MutPtr::<MutVoidPtr>::from_bits(addr);
         env.mem.write(addr_ptr, val);
     }
@@ -1025,7 +1025,7 @@ fn dladdr(_env: &mut Environment, _addr: ConstVoidPtr, _info: MutVoidPtr) -> i32
 fn times(env: &mut Environment, buf: MutVoidPtr) -> i32 {
     // FakeTimes
     if !buf.is_null() {
-        let ptr: crate::mem::MutPtr<u32> = buf.cast();
+        let ptr: crate::mem::MutPtr<u64> = buf.cast();
         env.mem.write(ptr, 0);
         env.mem.write(ptr + 1, 0);
         env.mem.write(ptr + 2, 0);
@@ -1146,7 +1146,7 @@ pub const FUNCTIONS: FunctionExports = &[
 pub fn atof_inner(
     env: &mut Environment,
     s: ConstPtr<u8>,
-) -> Result<(f64, u32), <f64 as FromStr>::Err> {
+) -> Result<(f64, u64), <f64 as FromStr>::Err> {
     atof_inner_generic(
         env,
         |env, s, idx| Ok(env.mem.read(s + idx)),
@@ -1189,7 +1189,7 @@ pub fn atof_inner_generic<
     ungetc_fn: F2,
     subject: MutPtr<U>,
     offset: GuestUSize,
-) -> Result<(f64, u32), <f64 as FromStr>::Err>
+) -> Result<(f64, u64), <f64 as FromStr>::Err>
 where
     u8: From<T>,
 {
@@ -1262,7 +1262,7 @@ where
         }
         ungetc_fn(env, subject, curr);
 
-        assert_eq!(chars.len() as u32, len);
+        assert_eq!(chars.len() as u64, len);
         Ok(())
     }();
 
@@ -1273,7 +1273,7 @@ where
 
 /// A simple wrapper around [str_to_int_inner_generic]
 /// for the case of C string and i32.
-fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(i32, u32), ()> {
+fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u64) -> Result<(i32, u64), ()> {
     str_to_int_inner_generic(
         env,
         |env, s, idx| Ok(env.mem.read(s + idx)),
@@ -1281,7 +1281,7 @@ fn strtol_inner(env: &mut Environment, str: ConstPtr<u8>, base: u32) -> Result<(
         str.cast_mut(),
         0, // starting offset
         base,
-        u32::MAX, // max_length
+        u64::MAX, // max_length
         |s, base| i32::from_str_radix(s, base).unwrap_or(i32::MAX),
         |num| num.checked_mul(-1).unwrap_or(i32::MIN),
     )
@@ -1331,7 +1331,7 @@ pub fn str_to_int_inner_generic<
     Q,
     F1: Fn(&mut Environment, MutPtr<U>, GuestUSize) -> Result<T, ()>,
     F2: Fn(&mut Environment, MutPtr<U>, u8), // TODO: make last param generic too?
-    F3: Fn(&str, u32) -> Q,
+    F3: Fn(&str, u64) -> Q,
     F4: Fn(Q) -> Q,
 >(
     env: &mut Environment,
@@ -1339,11 +1339,11 @@ pub fn str_to_int_inner_generic<
     ungetc_fn: F2,
     subject: MutPtr<U>,
     offset: GuestUSize,
-    mut base: u32,
+    mut base: u64,
     max_length: GuestUSize,
     from_str_radix_fn: F3,
     negation_fn: F4,
-) -> Result<(Q, u32), ()>
+) -> Result<(Q, u64), ()>
 where
     u8: From<T>,
     Q: Default,
@@ -1439,7 +1439,7 @@ where
             curr = getc_fn(env, subject, offset + whitespace_len + len)?.into();
         }
         ungetc_fn(env, subject, curr);
-        assert_eq!(chars.len() as u32, len - prefix_length);
+        assert_eq!(chars.len() as u64, len - prefix_length);
         Ok(())
     }();
 
