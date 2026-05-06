@@ -36,10 +36,16 @@ fn sleep(env: &mut Environment, seconds: u32) -> u32 {
 }
 
 fn usleep(env: &mut Environment, useconds: useconds_t) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
 
-    env.sleep(Duration::from_micros(useconds.into()));
+    // 🏎️ YIELD OPTIMIZATION: Prevent Android from over-sleeping on tiny yields
+    if useconds <= 1000 {
+        // Just yield the CPU slice immediately instead of invoking the OS timer
+        std::thread::yield_now(); 
+    } else {
+        env.sleep(Duration::from_micros(useconds.into()));
+    }
+    
     0 // success
 }
 
@@ -203,9 +209,9 @@ fn getdtablesize(_env: &mut Environment) -> i32 {
 
 fn sysconf(_env: &mut Environment, name: i32) -> i32 {
     match name {
-        _SC_CLK_TCK => 100, // ImplSysconfClock
+        _SC_CLK_TCK => 100, 
         _SC_PAGESIZE => PAGE_SIZE.try_into().unwrap(),
-        _SC_NPROCESSORS_ONLN => 1,
+        _SC_NPROCESSORS_ONLN => 2, // 🏎️ MULTICORE UNLOCK: Tell the game we have multiple cores!
         _ => unimplemented!("TODO: sysconf(name: {})", name),
     }
 }
