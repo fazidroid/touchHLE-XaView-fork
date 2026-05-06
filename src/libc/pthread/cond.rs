@@ -84,7 +84,7 @@ pub fn pthread_cond_wait(
     let Some(host_object) = State::get_mut(env)
         .condition_variables
         .get_mut(&cond_var) else {
-        log!("pthread_cond_wait: unknown condvar {:?}, re-locking and returning", cond_var);
+        log!("pthread_cond_wait: unknown condvar {:?} (PTHREAD_COND_INITIALIZER?), re-locking", cond_var);
         pthread_mutex_lock(env, mutex);
         return 0;
     };
@@ -100,10 +100,12 @@ pub fn pthread_cond_wait(
 
 pub fn pthread_cond_signal(env: &mut Environment, cond: MutPtr<pthread_cond_t>) -> i32 {
     let cond_var = env.mem.read(cond);
-    let host_object = State::get_mut(env)
+    let Some(host_object) = State::get_mut(env)
         .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
+        .get_mut(&cond_var) else {
+        log!("pthread_cond_signal: unknown condvar {:?} (PTHREAD_COND_INITIALIZER?), ignoring", cond_var);
+        return 0;
+    };
     if let Some(tid) = host_object.waiting.pop_front() {
         host_object.waking.push_back(tid);
         log_dbg!(
@@ -129,10 +131,12 @@ pub fn pthread_cond_broadcast(env: &mut Environment, cond: MutPtr<pthread_cond_t
         env.current_thread,
         cond
     );
-    let host_object = State::get_mut(env)
+    let Some(host_object) = State::get_mut(env)
         .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
+        .get_mut(&cond_var) else {
+        log!("pthread_cond_broadcast: unknown condvar {:?} (PTHREAD_COND_INITIALIZER?), ignoring", cond_var);
+        return 0;
+    };
     host_object.waking.extend(host_object.waiting.drain(..));
     0 // success
 }
@@ -145,6 +149,7 @@ pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>)
         log!("pthread_cond_destroy: unknown condvar {:?}, ignoring", cond_var);
         return 0;
     };
+    // SoftAssertDestroy: warn instead of panic if threads still in queue.
     if !old_object.waiting.is_empty() || !old_object.waking.is_empty() {
         log!("Warning: pthread_cond_destroy: {} waiting, {} waking threads remain",
             old_object.waiting.len(), old_object.waking.len());
@@ -164,10 +169,11 @@ pub fn pthread_cond_timedwait(
     // 1. Fast path: has another thread already signalled *this* thread?
     //    If yes, consume the signal and return immediately (no sleep).
     let current_thread = env.current_thread;
-    let host_object = State::get_mut(env)
+    let Some(host_object) = State::get_mut(env)
         .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
+        .get_mut(&cond_var) else {
+        return 0;
+    };
     if let Some(idx) = host_object.waking.iter().position(|&t| t == current_thread) {
         host_object.waking.remove(idx);
         return 0; // success – signal consumed
