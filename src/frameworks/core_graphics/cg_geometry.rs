@@ -31,13 +31,13 @@ impl_GuestRet_for_large_struct!(CGPoint);
 impl GuestArg for CGPoint {
     const REG_COUNT: usize = 2;
 
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         CGPoint {
             x: GuestArg::from_regs(&regs[0..1]),
             y: GuestArg::from_regs(&regs[1..2]),
         }
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         self.x.to_regs(&mut regs[0..1]);
         self.y.to_regs(&mut regs[1..2]);
     }
@@ -106,13 +106,13 @@ impl_GuestRet_for_large_struct!(CGSize);
 impl GuestArg for CGSize {
     const REG_COUNT: usize = 2;
 
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         CGSize {
             width: GuestArg::from_regs(&regs[0..1]),
             height: GuestArg::from_regs(&regs[1..2]),
         }
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         self.width.to_regs(&mut regs[0..1]);
         self.height.to_regs(&mut regs[1..2]);
     }
@@ -187,13 +187,13 @@ impl_GuestRet_for_large_struct!(CGRect);
 impl GuestArg for CGRect {
     const REG_COUNT: usize = 4;
 
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         CGRect {
             origin: GuestArg::from_regs(&regs[0..2]),
             size: GuestArg::from_regs(&regs[2..4]),
         }
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         self.origin.to_regs(&mut regs[0..2]);
         self.size.to_regs(&mut regs[2..4]);
     }
