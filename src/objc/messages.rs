@@ -18,7 +18,7 @@ use crate::Environment;
 use std::any::TypeId;
 
 // StoreRootViewControllers
-static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u32, u32>>> = std::sync::Mutex::new(None);
+static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u64, u64>>> = std::sync::Mutex::new(None);
 
 /// The core implementation of `objc_msgSend`, the main function of Objective-C.
 ///
