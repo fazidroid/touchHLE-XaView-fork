@@ -133,7 +133,7 @@ pub struct State {
 }
 
 pub type NSInteger = i32;
-pub type NSUInteger = u32;
+pub type NSUInteger = u64;
 
 pub const NSNotFound: i32 = 0x7fffffff;
 
@@ -148,13 +148,13 @@ crate::abi::impl_GuestRet_for_large_struct!(NSRange);
 
 impl crate::abi::GuestArg for NSRange {
     const REG_COUNT: usize = 2;
-    fn from_regs(regs: &[u32]) -> Self {
+    fn from_regs(regs: &[u64]) -> Self {
         NSRange {
             location: crate::abi::GuestArg::from_regs(&regs[0..1]),
             length: crate::abi::GuestArg::from_regs(&regs[1..2]),
         }
     }
-    fn to_regs(self, regs: &mut [u32]) {
+    fn to_regs(self, regs: &mut [u64]) {
         self.location.to_regs(&mut regs[0..1]);
         self.length.to_regs(&mut regs[1..2]);
     }
@@ -182,7 +182,7 @@ fn hash_helper<T: std::hash::Hash>(hashable: &T) -> NSUInteger {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     hashable.hash(&mut hasher);
     let hash_u64: u64 = hasher.finish();
-    (hash_u64 as u32) ^ ((hash_u64 >> 32) as u32)
+    (hash_u64 as u64) ^ ((hash_u64 >> 32) as u64)
 }
 
 const FUNCTIONS: FunctionExports = &[export_c_func!(NSStringFromRange(_))];
