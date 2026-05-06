@@ -30,15 +30,15 @@ const ALLOWED_FOR_LONGJMP_BYPASS: [&str; 5] = [
 #[repr(C, packed)]
 #[derive(Debug)]
 struct JmpBuf {
-    r4: u32,
-    r5: u32,
-    r6: u32,
-    fp: u32,
-    r8: u32,
-    r10: u32,
-    r11: u32,
-    sp: u32,
-    lr: u32,
+    r4: u64,
+    r5: u64,
+    r6: u64,
+    fp: u64,
+    r8: u64,
+    r10: u64,
+    r11: u64,
+    sp: u64,
+    lr: u64,
 }
 
 unsafe impl SafeRead for JmpBuf {}
@@ -62,7 +62,7 @@ fn setjmp(env: &mut Environment, jmp_buf: MutPtr<JmpBuf>) -> i32 {
     0 // no longjmp() was performed
 }
 
-fn longjmp(env: &mut Environment, jmp_buf: MutPtr<JmpBuf>, status: u32) {
+fn longjmp(env: &mut Environment, jmp_buf: MutPtr<JmpBuf>, status: u64) {
     let lr = env.cpu.regs()[crate::cpu::Cpu::LR];
     let fp = env.cpu.regs()[abi::FRAME_POINTER];
 
