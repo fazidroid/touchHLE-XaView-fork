@@ -185,7 +185,7 @@ impl GdbServer {
                     for reg in cpu.regs() {
                         // Rust always prints in big-endian, but GDB expects
                         // little-endian.
-                        let reg = u32::from_be_bytes(reg.to_le_bytes());
+                        let reg = u64::from_be_bytes(reg.to_le_bytes());
                         write!(packet, "{reg:08x}").unwrap();
                     }
                     self.send_packet(&packet);
@@ -197,10 +197,10 @@ impl GdbServer {
                     assert!(data.len() == regs.len() * 4 * 2);
                     for (i, reg) in regs.iter_mut().enumerate() {
                         let word = &data[i * 4 * 2..][..4 * 2];
-                        let word = u32::from_str_radix(word, 16).unwrap();
+                        let word = u64::from_str_radix(word, 16).unwrap();
                         // Rust decodes in big-endian, but GDB supplies
                         // little-endian.
-                        let word = u32::from_le_bytes(word.to_be_bytes());
+                        let word = u64::from_le_bytes(word.to_be_bytes());
                         *reg = word;
                     }
                     self.send_packet("OK");
@@ -219,7 +219,7 @@ impl GdbServer {
                     if let Some(reg) = reg {
                         // Rust always prints in big-endian, but GDB expects
                         // little-endian.
-                        let reg = u32::from_be_bytes(reg.to_le_bytes());
+                        let reg = u64::from_be_bytes(reg.to_le_bytes());
                         self.send_packet(&format!("{reg:08x}"));
                     } else {
                         // Error 0
@@ -230,10 +230,10 @@ impl GdbServer {
                 b'P' => {
                     let (num, word) = p[1..].split_once('=').unwrap();
                     let num = usize::from_str_radix(num, 16).unwrap();
-                    let word = u32::from_str_radix(word, 16).unwrap();
+                    let word = u64::from_str_radix(word, 16).unwrap();
                     // Rust decodes in big-endian, but GDB supplies
                     // little-endian.
-                    let word = u32::from_le_bytes(word.to_be_bytes());
+                    let word = u64::from_le_bytes(word.to_be_bytes());
                     if num < 16 {
                         cpu.regs_mut()[num] = word;
                         self.send_packet("OK");
