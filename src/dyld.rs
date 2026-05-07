@@ -1217,6 +1217,22 @@ if symbol == "_pthread_setname_np" {
             }
             return Some(&(fake_pool_pop as fn(&mut crate::Environment, u32) -> ()));
         }
+        if symbol == "__setjmp" || symbol == "_setjmp" {
+            fn fake_setjmp(_env: &mut crate::Environment, _jmp_buf: u32) -> u32 {
+                println!("🎮 LOG: Stubbed setjmp exception handler! Returning 0.");
+                // Returning 0 tells the C++ engine we are executing the try-block normally.
+                0 
+            }
+            return Some(&(fake_setjmp as fn(&mut crate::Environment, u32) -> u32));
+        }
+
+        if symbol == "_longjmp" || symbol == "__longjmp" || symbol == "longjmp" {
+            fn fake_longjmp(_env: &mut crate::Environment, _jmp_buf: u32, _val: u32) {
+                // If the game actually tries to throw an exception, we will catch it here.
+                println!("🎮 LOG: Game attempted to longjmp (throw an exception)! Ignoring.");
+            }
+            return Some(&(fake_longjmp as fn(&mut crate::Environment, u32, u32) -> ()));
+        }
 
         panic!("Call to unimplemented function {symbol}");
         log!("WARNING: unimplemented function {symbol}, using stub");
