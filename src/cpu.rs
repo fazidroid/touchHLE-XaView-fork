@@ -29,25 +29,25 @@ fn touchHLE_cpu_read_impl<T: SafeRead + Default>(
     addr: VAddr,
     error: *mut bool,
 ) -> T {
-    // 🏎️ UNSAFE FAST-PATH:
-    // We completely stripped out `catch_unwind` to eliminate memory access overhead!
-    // We assume the game won't segfault and skip the safety checks for pure speed.
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mem = unsafe { &mut *mem.cast::<Mem>() };
+        // Ptr::from_bits will need to handle 64-bit sizes when AArch64 is active
+        let ptr: ConstPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
+        mem.read(ptr)
+    }));
     unsafe {
-        error.write(false); // Instantly assume success to bypass branching
-        let mem_ref = &mut *mem.cast::<Mem>();
-        let ptr: ConstPtr<T> = Ptr::from_bits(addr); 
-        mem_ref.read(ptr)
+        error.write(res.is_err());
     }
+    res.unwrap_or_default()
 }
 
 fn touchHLE_cpu_write_impl<T: SafeWrite>(mem: *mut touchHLE_Mem, addr: VAddr, value: T) -> bool {
-    // 🏎️ UNSAFE FAST-PATH:
-    unsafe {
-        let mem_ref = &mut *mem.cast::<Mem>();
-        let ptr: MutPtr<T> = Ptr::from_bits(addr); 
-        mem_ref.write(ptr, value);
-        false // Return false (no error) instantly
-    }
+    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mem = unsafe { &mut *mem.cast::<Mem>() };
+        let ptr: MutPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
+        mem.write(ptr, value)
+    }));
+    res.is_err()
 }
 
 // Export functions for use by C++
@@ -307,69 +307,25 @@ impl Cpu {
     }
 
     #[must_use]
-    pub fn run_or_step(&mut self, mem: &mut Mem, mut ticks: Option<&mut u64>) -> CpuState {
+    pub fn run_or_step(&mut self, mem: &mut Mem, ticks: Option<&mut u64>) -> CpuState {
         if !self.direct_memory_access_ptr.is_null() {
             assert!(self.direct_memory_access_ptr == unsafe { mem.direct_memory_access_ptr() });
         }
 
-        // ==========================================================
-        // 🏎️ ANDROID THERMAL THROTTLER (CPU SLICER)
-        // ==========================================================
-        // Dynarmic normally runs unbounded, which causes Android's kernel to violently
-        // thermal-throttle the app. We slice the execution into 50,000-instruction chunks!
-        let slice_size: u64 = 10_000;
-
-        loop {
-            // Determine how many ticks to run in this specific batch
-            let mut current_slice = match &mut ticks {
-                Some(t) => {
-                    if **t == 0 {
-                        return CpuState::Normal;
-                    }
-                    if **t > slice_size {
-                        slice_size
-                    } else {
-                        **t
-                    }
-                }
-                None => slice_size,
-            };
-
-            let res = unsafe {
-                // Force Dynarmic to use our sliced limit instead of running forever
-                touchHLE_DynarmicWrapper_run_or_step(
-                    self.dynarmic_wrapper,
-                    mem as *mut Mem as *mut touchHLE_Mem,
-                    Some(&mut current_slice),
-                )
-            };
-
-            // Deduct the instructions that were actually executed
-            let ticks_executed = slice_size - current_slice;
-            if let Some(ref mut t) = ticks {
-                **t = t.saturating_sub(ticks_executed);
-            }
-
-            match res {
-                -1 => {
-                    // Normal return (we hit the end of our 50,000 slice).
-                    // Inject a microscopic hardware yield so the Android Kernel can breathe!
-                    std::thread::sleep(std::time::Duration::from_nanos(1));
-                    
-                    // If we were given a specific master tick limit and hit 0, exit properly.
-                    if let Some(ref t) = ticks {
-                        if **t == 0 {
-                            return CpuState::Normal;
-                        }
-                    }
-                    // Otherwise, loop seamlessly and execute the next 50,000 slice!
-                }
-                -2 => return CpuState::Error(CpuError::MemoryError),
-                -3 => return CpuState::Error(CpuError::UndefinedInstruction),
-                -4 => return CpuState::Error(CpuError::Breakpoint),
-                _ if res < -4 => panic!("Unexpected CPU execution result"),
-                svc => return CpuState::Svc(svc as u32),
-            }
+        let res = unsafe {
+            touchHLE_DynarmicWrapper_run_or_step(
+                self.dynarmic_wrapper,
+                mem as *mut Mem as *mut touchHLE_Mem,
+                ticks,
+            )
+        };
+        match res {
+            -1 => CpuState::Normal,
+            -2 => CpuState::Error(CpuError::MemoryError),
+            -3 => CpuState::Error(CpuError::UndefinedInstruction),
+            -4 => CpuState::Error(CpuError::Breakpoint),
+            _ if res < -4 => panic!("Unexpected CPU execution result"),
+            svc => CpuState::Svc(svc as u32),
         }
     }
 }
