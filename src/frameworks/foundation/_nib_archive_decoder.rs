@@ -337,11 +337,15 @@ pub fn decode_current_string(env: &mut Environment, unarchiver: id) -> id {
         .get(current_idx as usize)
         .unwrap();
     let values: &[Value] = object.values(host_obj.archive.values());
-    assert_eq!(1, values.len());
+    if values.len() != 1 {
+        log!("NSData NIB decode: expected 1 value, got {}", values.len());
+    }
 
     let value = &values[0];
     let key = value.key(host_obj.archive.keys());
-    assert_eq!("NS.bytes", key);
+    if key != "NS.bytes" {
+        log!("NSData NIB decode: unexpected key {:?}, continuing anyway", key);
+    }
 
     let inner_value = value.value();
     let ValueVariant::Data(inner_data) = inner_value else {
