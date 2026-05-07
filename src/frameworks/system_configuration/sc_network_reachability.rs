@@ -116,10 +116,24 @@ fn SCNetworkReachabilityScheduleWithRunLoop(
     _run_loop_mode: MutVoidPtr,
 ) -> bool {
     let host_object = env.objc.borrow::<SCNetworkReachabilityHostObject>(target);
-    if let Some(callback) = host_object.callback {
-        let flags = kSCNetworkReachabilityFlagsReachable | kSCNetworkReachabilityFlagsIsDirect | kSCNetworkReachabilityFlagsIsWWAN;
-        let context = host_object.callback_context;
-               log_dbg!("SCNetworkReachabilityScheduleWithRunLoop: firing callback with flags {:#x}", flags);
+    let callback = host_object.callback;
+    let context = host_object.callback_context;
+    drop(host_object); // release borrow before sleep/callback
+
+    if let Some(callback) = callback {
+        let flags = kSCNetworkReachabilityFlagsReachable
+            | kSCNetworkReachabilityFlagsIsDirect
+            | kSCNetworkReachabilityFlagsIsWWAN;
+
+        // DeferredCallback: yield briefly before firing the reachability
+        // callback. Without this, the callback fires synchronously before
+        // the app's network thread has entered its pthread_cond_wait, so
+        // the "network is reachable" signal is lost and loading hangs
+        // (observed in Asphalt 8).
+        // A single cooperative sleep tick lets other threads settle first.
+        env.sleep(std::time::Duration::from_millis(16));
+
+        log_dbg!("SCNetworkReachabilityScheduleWithRunLoop: firing callback with flags {:#x}", flags);
         let _: u32 = callback.call_from_host(env, (target, flags, context));
     }
     true
