@@ -1124,54 +1124,6 @@ if symbol == "_pthread_setname_np" {
             );
         }
 
-        // ==========================================================
-        // 🏎️ MODERN C++ BYPASS: std::string::__init (libc++)
-        // ==========================================================
-        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6__initEPKcm" {
-            fn fake_libcxx_string_init(
-                env: &mut crate::Environment,
-                this_ptr: crate::mem::MutPtr<u8>,
-                _str_src: crate::mem::ConstPtr<u8>,
-                _size: u32,
-            ) -> crate::mem::MutPtr<u8> {
-                println!("🎮 LOG: Caught C++ std::string::__init! Faking safe string memory.");
-                env.mem.write(this_ptr, 0u8);
-                this_ptr
-            }
-            return Some(
-                &(fake_libcxx_string_init
-                    as fn(
-                        &mut crate::Environment,
-                        crate::mem::MutPtr<u8>,
-                        crate::mem::ConstPtr<u8>,
-                        u32,
-                    ) -> crate::mem::MutPtr<u8>),
-            );
-        }
-
-        // ==========================================================
-        // 🏎️ MODERN C++ BYPASS: std::string Copy Constructor
-        // ==========================================================
-        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEC1ERKS5_" {
-            fn fake_libcxx_string_copy(
-                env: &mut crate::Environment,
-                this_ptr: crate::mem::MutPtr<u8>,
-                _other_ptr: crate::mem::ConstPtr<u8>,
-            ) -> crate::mem::MutPtr<u8> {
-                println!("🎮 LOG: Caught C++ std::string copy constructor! Faking safe string memory.");
-                env.mem.write(this_ptr, 0u8);
-                this_ptr
-            }
-            return Some(
-                &(fake_libcxx_string_copy
-                    as fn(
-                        &mut crate::Environment,
-                        crate::mem::MutPtr<u8>,
-                        crate::mem::ConstPtr<u8>,
-                    ) -> crate::mem::MutPtr<u8>),
-            );
-        }
-
         if symbol == "__dyld_register_func_for_add_image" {
             fn fake_dyld_register(_env: &mut crate::Environment, _func: u32) {
                 println!("🎮 LOG: Bypassing __dyld_register_func_for_add_image (Crashlytics/Analytics disabled)!");
@@ -1250,6 +1202,50 @@ if symbol == "_pthread_setname_np" {
                 println!("🎮 LOG: Game attempted to longjmp (throw an exception)! Ignoring.");
             }
             return Some(&(fake_longjmp as fn(&mut crate::Environment, u32, u32) -> ()));
+        }
+        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6__initEPKcm" {
+            fn fake_libcxx_string_init(
+                env: &mut crate::Environment,
+                this_ptr: crate::mem::MutPtr<u8>,
+                _str_src: crate::mem::ConstPtr<u8>,
+                _size: u32,
+            ) -> crate::mem::MutPtr<u8> {
+                println!("🎮 LOG: Caught C++ std::string::__init! Faking safe string memory.");
+                env.mem.write(this_ptr, 0u8);
+                this_ptr
+            }
+            return Some(
+                &(fake_libcxx_string_init
+                    as fn(
+                        &mut crate::Environment,
+                        crate::mem::MutPtr<u8>,
+                        crate::mem::ConstPtr<u8>,
+                        u32,
+                    ) -> crate::mem::MutPtr<u8>),
+            );
+        }
+
+        // ==========================================================
+        // 🏎️ MODERN C++ BYPASS: std::string Copy Constructor
+        // ==========================================================
+        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEC1ERKS5_" {
+            fn fake_libcxx_string_copy(
+                env: &mut crate::Environment,
+                this_ptr: crate::mem::MutPtr<u8>,
+                _other_ptr: crate::mem::ConstPtr<u8>,
+            ) -> crate::mem::MutPtr<u8> {
+                println!("🎮 LOG: Caught C++ std::string copy constructor! Faking safe string memory.");
+                env.mem.write(this_ptr, 0u8);
+                this_ptr
+            }
+            return Some(
+                &(fake_libcxx_string_copy
+                    as fn(
+                        &mut crate::Environment,
+                        crate::mem::MutPtr<u8>,
+                        crate::mem::ConstPtr<u8>,
+                    ) -> crate::mem::MutPtr<u8>),
+            );
         }
 
         panic!("Call to unimplemented function {symbol}");
