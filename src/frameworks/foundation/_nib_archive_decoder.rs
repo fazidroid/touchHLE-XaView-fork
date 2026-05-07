@@ -181,18 +181,25 @@ pub const CLASSES: ClassExports = objc_classes! {
     let ValueVariant::Data(data) = val.value() else {
         unreachable!()
     };
-    assert_eq!(6, data[0]);
+    
+    // 🏎️ NIB ARCHIVE BYPASS: Accept both tag 6 (older iOS) and tag 7 (newer iOS / Real Racing 2)
+    assert!(data[0] == 6 || data[0] == 7, "Unexpected NIB geometry tag: {}", data[0]);
+    
     let x = f32::from_le_bytes(data[1..5].try_into().unwrap());
     let y = f32::from_le_bytes(data[5..9].try_into().unwrap());
     log_dbg!("decoded CGPoint {} {}", x, y);
     CGPoint { x, y }
 }
+
 - (CGRect)decodeCGRectForKey:(id)key { // NSString*
     let val = get_value_to_decode_for_key(env, this, key).unwrap();
     let ValueVariant::Data(data) = val.value() else {
         unreachable!()
     };
-    assert_eq!(6, data[0]);
+    
+    // 🏎️ NIB ARCHIVE BYPASS: Accept both tag 6 and tag 7
+    assert!(data[0] == 6 || data[0] == 7, "Unexpected NIB geometry tag: {}", data[0]);
+    
     let x = f32::from_le_bytes(data[1..5].try_into().unwrap());
     let y = f32::from_le_bytes(data[5..9].try_into().unwrap());
     let width = f32::from_le_bytes(data[9..13].try_into().unwrap());
