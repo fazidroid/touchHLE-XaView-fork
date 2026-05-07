@@ -179,37 +179,25 @@ pub fn pthread_cond_timedwait(
         return 0; // success – signal consumed
     }
 
-    // 2. Slow path: register as waiter, unlock, adaptive sleep, relock.
+    // 2. Slow path: unlock, adaptive sleep, relock, return ETIMEDOUT.
     //
-    // AdaptiveSleep: sleep duration scales with number of concurrent waiters
-    // on this condvar to prevent scheduler thrashing. With 12 worker threads
-    // all calling timedwait every 1ms = 12,000 wakeups/sec, Thread 0 (loading)
-    // gets starved. Scaling up the sleep caps total scheduler load while still
-    // returning ETIMEDOUT quickly enough for the predicate-check loop pattern.
-    //   1 waiter  → 2ms   5–8 waiters → 6ms
-    //   2–4       → 4ms   9+          → 8ms
-    let mutex_id = env.mem.read(mutex).mutex_id;
-    {
-        let Some(ho) = State::get_mut(env)
-            .condition_variables
-            .get_mut(&cond_var) else { return 60; };
-        // Reset curr_mutex if condvar was idle (all queues empty).
-        if ho.waiting.is_empty() && ho.waking.is_empty() {
-            ho.curr_mutex = None;
-        }
-        if let Some(existing) = ho.curr_mutex {
-            if existing != mutex_id {
-                log!("Warning: pthread_cond_timedwait: mutex mismatch on condvar {:?}", cond_var);
-            }
-        }
-        ho.curr_mutex = Some(mutex_id);
-        ho.waiting.push_back(current_thread);
-    }
-
+    // NoWaiterRegistration: timedwait does NOT register in the waiting queue.
+    // Registering caused corruption: multiple threads could end up with the
+    // same ID in waiting (due to cooperative interleaving), then retain()
+    // would loop forever producing infinite "Can't free" errors.
+    //
+    // timedwait doesn't need to be woken by signal — it just needs to yield
+    // the CPU briefly and return ETIMEDOUT so the caller can re-check its
+    // predicate. The fast path above already handles any pre-queued signal.
+    //
+    // AdaptiveSleep: scale sleep time with number of active waiters on this
+    // condvar to prevent scheduler thrashing from many concurrent timedwait
+    // threads (e.g. Asphalt 8's 12-thread pool).
     let sleep_ms = {
         let Some(ho) = State::get_mut(env)
             .condition_variables
             .get_mut(&cond_var) else { return 60; };
+        // Count only threads registered via pthread_cond_wait (not timedwait).
         match ho.waiting.len() {
             0..=1 => 2u64,
             2..=4 => 4,
@@ -222,22 +210,7 @@ pub fn pthread_cond_timedwait(
     env.sleep(std::time::Duration::from_millis(sleep_ms));
     let _ = pthread_mutex_lock(env, mutex);
 
-    // Check if a signal arrived while we slept.
-    let was_signaled = {
-        let Some(ho) = State::get_mut(env)
-            .condition_variables
-            .get_mut(&cond_var) else { return 60; };
-        if let Some(idx) = ho.waking.iter().position(|&t| t == current_thread) {
-            ho.waking.remove(idx);
-            ho.waiting.retain(|&t| t != current_thread);
-            true
-        } else {
-            ho.waiting.retain(|&t| t != current_thread);
-            false
-        }
-    };
-
-    if was_signaled { 0 } else { 60 } // 60 = ETIMEDOUT
+    60 // ETIMEDOUT — caller re-checks its predicate and loops
 }
 
 pub const FUNCTIONS: FunctionExports = &[
