@@ -1161,7 +1161,20 @@ if symbol == "_pthread_setname_np" {
             return Some(&(fake_dyld_register as fn(&mut crate::Environment, u32) -> ()));
         }
 
-        panic!("Call to unimplemented function {symbol}");
+        if symbol == "__Znwm" || symbol == "__Znwj" {
+            fn fake_cpp_new(env: &mut crate::Environment, size: u32) -> u32 {
+                println!("🎮 LOG: Intercepted C++ new({}), allocating guest memory!", size);
+                env.mem.alloc(size).to_bits()
+            }
+            return Some(&(fake_cpp_new as fn(&mut crate::Environment, u32) -> u32));
+        }
+
+        if symbol == "__ZdlPv" || symbol == "__ZdaPv" {
+            fn fake_cpp_delete(_env: &mut crate::Environment, _ptr: u32) {
+                // Ignore delete to prevent crashes on unmapped memory
+            }
+            return Some(&(fake_cpp_delete as fn(&mut crate::Environment, u32) -> ()));
+        }
 
         panic!("Call to unimplemented function {symbol}");
         log!("WARNING: unimplemented function {symbol}, using stub");
@@ -1173,23 +1186,6 @@ if symbol == "_pthread_setname_np" {
         let f: HostFunction = &(dummy as fn(&mut crate::Environment) -> ());
         Some(f)
     }
-    if symbol == "__Znwm" || symbol == "__Znwj" {
-            fn fake_cpp_new(env: &mut crate::Environment, size: u32) -> u32 {
-                println!("🎮 LOG: Intercepted C++ new({}), allocating guest memory!", size);
-                // Route the C++ allocation request directly to the emulator's memory manager
-                env.mem.alloc(size).to_bits()
-            }
-            return Some(&(fake_cpp_new as fn(&mut crate::Environment, u32) -> u32));
-        }
-
-        if symbol == "__ZdlPv" || symbol == "__ZdaPv" {
-            fn fake_cpp_delete(_env: &mut crate::Environment, _ptr: u32) {
-                // We intentionally ignore C++ delete requests here. 
-                // It causes a minor memory leak, but prevents the game from 
-                // crashing if it tries to free unmapped memory!
-            }
-            return Some(&(fake_cpp_delete as fn(&mut crate::Environment, u32) -> ()));
-        }
 
     /// Creates a guest function that will call a host function with the name
     /// `symbol`. This can be used to implement "get proc address" functions.
