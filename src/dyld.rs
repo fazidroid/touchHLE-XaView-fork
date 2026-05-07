@@ -1203,6 +1203,20 @@ if symbol == "_pthread_setname_np" {
                     as fn(&mut crate::Environment, u32, i32, i32, u32) -> u32),
             );
         }
+        if symbol == "_objc_autoreleasePoolPush" {
+            fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
+                // Return a dummy pool token so the game thinks it created a memory pool
+                0xDEADBEEF
+            }
+            return Some(&(fake_pool_push as fn(&mut crate::Environment) -> u32));
+        }
+
+        if symbol == "_objc_autoreleasePoolPop" {
+            fn fake_pool_pop(_env: &mut crate::Environment, _token: u32) {
+                // Safely ignore the pop request so it doesn't crash trying to free the dummy token!
+            }
+            return Some(&(fake_pool_pop as fn(&mut crate::Environment, u32) -> ()));
+        }
 
         panic!("Call to unimplemented function {symbol}");
         log!("WARNING: unimplemented function {symbol}, using stub");
