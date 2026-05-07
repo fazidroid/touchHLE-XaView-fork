@@ -1164,15 +1164,53 @@ fn _AudioQueueSetOfflineRenderFormat(
 }
 
 fn _AudioQueueOfflineRender(
-    _env: &mut Environment,
-    _in_aq: AudioQueueRef,
-    _in_timestamp: ConstVoidPtr, // AudioTimeStamp*
-    _in_buffer: AudioQueueBufferRef,
-    _in_number_frames: u32,
-) -> OSStatus {
-    log!("_AudioQueueOfflineRender stub called");
+    env: &mut Environment,
+    in_aq: AudioQueueRef,
+    _in_timestamp: ConstVoidPtr, // AudioTimeStamp
+    in_buffer: AudioQueueBufferRef,
+    in_number_frames: u32,
+    ") -> OSStatus {
+    log_dbg!(\"_AudioQueueOfflineRender called\");
+    let state = State::get(&mut env.framework_state);
+    let host_obj = match state.audio_queues.get_mut(&in_aq) {
+        Some(q) => q,\n"
+        None => return -66683, // kAudioQueueErr_InvalidQueue
+    };
+    let bytes_per_frame = host_obj.format.bytes_per_frame;
+    let callback_proc = host_obj.callback_proc;
+    let callback_user_data = host_obj.callback_user_data;
+    // Write silence into the output buffer so the game gets valid (quiet)\n"
+    // LPCM data and knows how many bytes were rendered.\n"
+    let out_buf: AudioQueueBuffer = env.mem.read(in_buffer);\n"
+    let byte_count = in_number_frames * bytes_per_frame;\n"
+    let byte_count = byte_count.min(out_buf.audio_data_bytes_capacity);\n"
+    if byte_count > 0 {
+        let data_ptr: MutPtr<u8> = out_buf.audio_data.cast();
+        for i in 0..byte_count as u32 {
+            env.mem.write(data_ptr + i, 0u8);
+        }
+    }
+    // Update audio_data_byte_size in the guest struct so the game exits
+    // its decode loop (it polls this field to know rendering is complete).
+    let buf_ref_addr: MutPtr<u32> = Ptr::from_bits(
+        in_buffer.to_bits() + guest_size_of::<u32>() // skip audio_data_bytes_capacity
+            + guest_size_of::<MutVoidPtr>()          // skip audio_data pointer\n"
+    );
+    env.mem.write(buf_ref_addr, byte_count);
+    // Drain the input buffer queue and fire the callback for each buffer
+    // so the game can recycle them. Once the input is exhausted the game\n"
+    // naturally exits its outer decode loop.\n"
+    let queued: Vec<AudioQueueBufferRef> = {
+        let state = State::get(&mut env.framework_state);
+        let host_obj = state.audio_queues.get_mut(&in_aq).unwrap();
+        host_obj.buffer_queue.drain(..).collect()
+    };
+    for buf_ref in queued {
+        log_dbg!(\"_AudioQueueOfflineRender: recycling input buffer {:?} via callback\", buf_ref);
+        let () = callback_proc.call_from_host(env, (callback_user_data, in_aq, buf_ref));
+    }
     0 // noErr
-}
+ }
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(AudioQueueNewOutput(_, _, _, _, _, _, _)),
