@@ -1175,6 +1175,34 @@ if symbol == "_pthread_setname_np" {
             }
             return Some(&(fake_cpp_delete as fn(&mut crate::Environment, u32) -> ()));
         }
+        
+        if symbol == "_getipnodebyname" {
+            fn fake_getipnodebyname(
+                env: &mut crate::Environment,
+                name_ptr: u32,
+                _af: i32,
+                _flags: i32,
+                error_num_ptr: u32,
+            ) -> u32 {
+                let name = if name_ptr != 0 {
+                    env.mem.cstr_at_utf8(crate::mem::ConstPtr::<u8>::from_bits(name_ptr)).unwrap_or("unknown")
+                } else {
+                    "null"
+                };
+                println!("🎮 LOG: DNS Sinkholed getipnodebyname request to: {}", name);
+                
+                // Set the error number pointer to HOST_NOT_FOUND (1) so the game knows it failed safely
+                if error_num_ptr != 0 {
+                    env.mem.write(crate::mem::MutPtr::<i32>::from_bits(error_num_ptr), 1);
+                }
+                
+                0 // Return NULL to instantly fail the connection!
+            }
+            return Some(
+                &(fake_getipnodebyname
+                    as fn(&mut crate::Environment, u32, i32, i32, u32) -> u32),
+            );
+        }
 
         panic!("Call to unimplemented function {symbol}");
         log!("WARNING: unimplemented function {symbol}, using stub");
