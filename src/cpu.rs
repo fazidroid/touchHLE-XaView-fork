@@ -307,25 +307,68 @@ impl Cpu {
     }
 
     #[must_use]
-    pub fn run_or_step(&mut self, mem: &mut Mem, ticks: Option<&mut u64>) -> CpuState {
+    pub fn run_or_step(&mut self, mem: &mut Mem, mut ticks: Option<&mut u64>) -> CpuState {
         if !self.direct_memory_access_ptr.is_null() {
             assert!(self.direct_memory_access_ptr == unsafe { mem.direct_memory_access_ptr() });
         }
 
-        let res = unsafe {
-            touchHLE_DynarmicWrapper_run_or_step(
-                self.dynarmic_wrapper,
-                mem as *mut Mem as *mut touchHLE_Mem,
-                ticks,
-            )
-        };
-        match res {
-            -1 => CpuState::Normal,
-            -2 => CpuState::Error(CpuError::MemoryError),
-            -3 => CpuState::Error(CpuError::UndefinedInstruction),
-            -4 => CpuState::Error(CpuError::Breakpoint),
-            _ if res < -4 => panic!("Unexpected CPU execution result"),
-            svc => CpuState::Svc(svc as u32),
+        // ==========================================================
+        // 🏎️ ANDROID THERMAL THROTTLER (CPU SLICER)
+        // ==========================================================
+        // Dynarmic normally runs unbounded, which causes Android's kernel to violently
+        // thermal-throttle the app. We slice the execution into 50,000-instruction chunks!
+        let slice_size: u64 = 50_000;
+
+        loop {
+            // Determine how many ticks to run in this specific batch
+            let mut current_slice = match &mut ticks {
+                Some(t) => {
+                    if **t == 0 {
+                        return CpuState::Normal;
+                    }
+                    if **t > slice_size {
+                        slice_size
+                    } else {
+                        **t
+                    }
+                }
+                None => slice_size,
+            };
+
+            let res = unsafe {
+                // Force Dynarmic to use our sliced limit instead of running forever
+                touchHLE_DynarmicWrapper_run_or_step(
+                    self.dynarmic_wrapper,
+                    mem as *mut Mem as *mut touchHLE_Mem,
+                    Some(&mut current_slice),
+                )
+            };
+
+            // Deduct the instructions that were actually executed
+            let ticks_executed = slice_size - current_slice;
+            if let Some(ref mut t) = ticks {
+                **t = t.saturating_sub(ticks_executed);
+            }
+
+            match res {
+                -1 => {
+                    // Normal return (we hit the end of our 50,000 slice).
+                    // Inject a microscopic hardware yield so the Android Kernel can breathe!
+                    std::thread::sleep(std::time::Duration::from_nanos(1));
+                    
+                    // If we were given a specific master tick limit and hit 0, exit properly.
+                    if let Some(ref t) = ticks {
+                        if **t == 0 {
+                            return CpuState::Normal;
+                        }
+                    }
+                    // Otherwise, loop seamlessly and execute the next 50,000 slice!
+                }
+                -2 => return CpuState::Error(CpuError::MemoryError),
+                -3 => return CpuState::Error(CpuError::UndefinedInstruction),
+                -4 => return CpuState::Error(CpuError::Breakpoint),
+                _ if res < -4 => panic!("Unexpected CPU execution result"),
+                svc => return CpuState::Svc(svc as u32),
+            }
         }
     }
-}
