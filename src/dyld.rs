@@ -1127,29 +1127,26 @@ if symbol == "_pthread_setname_np" {
         // ==========================================================
         // 🏎️ MODERN C++ BYPASS: std::string::__init (libc++)
         // ==========================================================
-        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEE6__initEPKcm" {
-            fn fake_libcxx_string_init(
+        if symbol == "__ZNSt3__112basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEC1ERKS5_" {
+            fn fake_libcxx_string_copy(
                 env: &mut crate::Environment,
                 this_ptr: crate::mem::MutPtr<u8>,
-                str_src: crate::mem::ConstPtr<u8>,
-                size: u32,
+                _other_ptr: crate::mem::ConstPtr<u8>,
             ) -> crate::mem::MutPtr<u8> {
-                println!("🎮 LOG: Caught C++ std::string::__init! Faking safe string memory.");
+                println!("🎮 LOG: Caught C++ std::string copy constructor! Faking safe string memory.");
                 
-                // We'll write an empty null terminator to the start of the 'this' object
-                // to trick the C++ engine into thinking it's a valid empty string!
+                // Write a null terminator to the start of the 'this' object
+                // so the C++ engine safely reads it as an empty string!
                 env.mem.write(this_ptr, 0u8);
                 
-                // Return the pointer back to the C++ runtime
                 this_ptr
             }
             return Some(
-                &(fake_libcxx_string_init
+                &(fake_libcxx_string_copy
                     as fn(
                         &mut crate::Environment,
                         crate::mem::MutPtr<u8>,
                         crate::mem::ConstPtr<u8>,
-                        u32,
                     ) -> crate::mem::MutPtr<u8>),
             );
         }
