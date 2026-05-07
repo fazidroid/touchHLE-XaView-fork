@@ -196,9 +196,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         || class_name_str.contains("video")
         || class_name_str.contains("splash")
         || class_name_str.contains("intro")
-        || class_name_str.contains("preroll")
-        || class_name_str.contains("cutscene")
-        || class_name_str.contains("cinematic");
+        || class_name_str.contains("preroll");
     if is_movie_vc {
         log!("MoviePlayerSkip: viewDidAppear firing playback-finished for {}", class_name_str);
         fire_movie_skip_notifications(env);
