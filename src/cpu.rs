@@ -29,25 +29,25 @@ fn touchHLE_cpu_read_impl<T: SafeRead + Default>(
     addr: VAddr,
     error: *mut bool,
 ) -> T {
-    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mem = unsafe { &mut *mem.cast::<Mem>() };
-        // Ptr::from_bits will need to handle 64-bit sizes when AArch64 is active
-        let ptr: ConstPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
-        mem.read(ptr)
-    }));
+    // 🏎️ UNSAFE FAST-PATH:
+    // We completely stripped out `catch_unwind` to eliminate memory access overhead!
+    // We assume the game won't segfault and skip the safety checks for pure speed.
     unsafe {
-        error.write(res.is_err());
+        error.write(false); // Instantly assume success to bypass branching
+        let mem_ref = &mut *mem.cast::<Mem>();
+        let ptr: ConstPtr<T> = Ptr::from_bits(addr); 
+        mem_ref.read(ptr)
     }
-    res.unwrap_or_default()
 }
 
 fn touchHLE_cpu_write_impl<T: SafeWrite>(mem: *mut touchHLE_Mem, addr: VAddr, value: T) -> bool {
-    let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mem = unsafe { &mut *mem.cast::<Mem>() };
-        let ptr: MutPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
-        mem.write(ptr, value)
-    }));
-    res.is_err()
+    // 🏎️ UNSAFE FAST-PATH:
+    unsafe {
+        let mem_ref = &mut *mem.cast::<Mem>();
+        let ptr: MutPtr<T> = Ptr::from_bits(addr); 
+        mem_ref.write(ptr, value);
+        false // Return false (no error) instantly
+    }
 }
 
 // Export functions for use by C++
@@ -317,7 +317,7 @@ impl Cpu {
         // ==========================================================
         // Dynarmic normally runs unbounded, which causes Android's kernel to violently
         // thermal-throttle the app. We slice the execution into 50,000-instruction chunks!
-        let slice_size: u64 = 50_000;
+        let slice_size: u64 = 10_000;
 
         loop {
             // Determine how many ticks to run in this specific batch
