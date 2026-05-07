@@ -235,9 +235,8 @@ fn property_size(property_id: AudioFilePropertyID) -> GuestUSize {
         kAudioFilePropertyPacketSizeUpperBound => guest_size_of::<u32>(),
         kAudioFilePropertyEstimatedDuration => guest_size_of::<f64>(),
         kAudioFilePropertyInfoDictionary => guest_size_of::<CFTypeRef>(),
-        kAudioFilePropertyFirstPacketOffset => guest_size_of::<i64>(),
-        // Unknown property — return 0 so the size check doesn't panic.
-        _ => 0,
+        kAudioFilePropertyFirstPacketOffset => guest_size_of::<i64>(), // <-- NEW
+        _ => unimplemented!("Unimplemented property ID: {}", debug_fourcc(property_id)),
     }
 }
 
@@ -250,8 +249,7 @@ fn AudioFileGetPropertyInfo(
 ) -> OSStatus {
     return_if_null!(in_audio_file);
 
-    if property_size(in_property_id) == 0
-        || in_property_id == kAudioFilePropertyMagicCookieData
+    if in_property_id == kAudioFilePropertyMagicCookieData
         || in_property_id == kAudioFilePropertyChannelLayout
     {
         // Our currently supported formats probably don't use these properties.
@@ -284,22 +282,10 @@ pub fn AudioFileGetProperty(
     return_if_null!(in_audio_file);
 
     let required_size = property_size(in_property_id);
-
-    // Return early for completely unknown properties — don't panic.
-    if required_size == 0 {
-        log!("Warning: AudioFileGetProperty() unhandled property {} — returning error",
-            debug_fourcc(in_property_id));
+    if env.mem.read(io_data_size) != required_size {
+        log!("Warning: AudioFileGetProperty() failed");
         return kAudioFileBadPropertySizeError;
     }
-
-    // Accept buffers that are >= required size (some callers over-allocate).
-    if env.mem.read(io_data_size) < required_size {
-        log!("Warning: AudioFileGetProperty() buffer too small: got {} need {}",
-            env.mem.read(io_data_size), required_size);
-        return kAudioFileBadPropertySizeError;
-    }
-    // Write back the actual size we will fill.
-    env.mem.write(io_data_size, required_size);
 
     let host_object = State::get(&mut env.framework_state)
         .audio_files
@@ -390,12 +376,7 @@ pub fn AudioFileGetProperty(
     let offset: i64 = 0;
     env.mem.write(out_property_data.cast(), offset);
         }
-        _ => {
-            // Unknown property — already handled by the required_size == 0
-            // check above, but the compiler needs this arm.
-            log_dbg!("AudioFileGetProperty: unexpected property {} reached match arm",
-                debug_fourcc(in_property_id));
-        }
+        _ => unreachable!(),
     }
 
     0 // success
