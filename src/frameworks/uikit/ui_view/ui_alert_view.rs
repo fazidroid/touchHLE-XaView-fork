@@ -6,14 +6,13 @@
 //! `UIAlertView`.
 
 use crate::frameworks::foundation::ns_string;
-use crate::frameworks::uikit::ui_view::UIViewHostObject;
-use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, ClassExports, NSZonePtr};
+use crate::objc::{id, msg, msg_super, nil, objc_classes, release, retain, ClassExports, HostObject, NSZonePtr};
+use std::borrow::Cow;
 
 struct UIAlertViewHostObject {
-    superclass: UIViewHostObject,
     delegate: id,
 }
-impl_HostObject_with_superclass!(UIAlertViewHostObject);
+impl HostObject for UIAlertViewHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -23,7 +22,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)allocWithZone:(NSZonePtr)_zone {
     let host_object = Box::new(UIAlertViewHostObject {
-        superclass: Default::default(),
         delegate: nil,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
@@ -36,11 +34,14 @@ pub const CLASSES: ClassExports = objc_classes! {
             otherButtonTitles:(id)otherButtonTitles {
 
     log!("UIAlertView init: title={:?}, msg={:?}", title, message);
+    // Retain delegate first, before borrowing the host object
     if delegate != nil {
         retain(env, delegate);
     }
+    // Now borrow and store the delegate
     let host = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
     host.delegate = delegate;
+
     msg_super![env; this init]
 }
 
@@ -63,14 +64,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())show {
     log!("UIAlertView: AUTO-DISMISS (storage alert bypass)");
-}
 
-@end
+    // Retrieve the delegate that was set during init (or later)
+    let delegate: id = msg![env; this delegate];
+    if delegate != nil {
+        let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
+        let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
+    }
 
-@implementation PlatformAlertViewDelegate: NSObject
-
-- (void)alertView:(id)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
-    log!("PlatformAlertViewDelegate - clicked button {}", buttonIndex);
+    // Do NOT call msg_super to prevent actual display.
 }
 
 @end
