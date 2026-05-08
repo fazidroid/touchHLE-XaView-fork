@@ -149,12 +149,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithContentsOfFile:(id)path
                      options:(NSUInteger)options
-                       error:(usize)error {
-    log_dbg!("[(NSData*){:?} initWithContentsOfFile:{:?} options:{} error:{:?}]",
-             this,
-             if path == nil { "(nil)" } else { to_rust_string(env, path) },
-             options,
-             error);
+                       error:(id)error {
+    let path_str = if path == nil {
+        "(nil)".to_string()
+    } else {
+        to_rust_string(env, path).to_string()
+    };
+    log_dbg!("[(NSData*){:?} initWithContentsOfFile:{} options:{} error:{:?}]",
+             this, path_str, options, error);
+    // Delegate to the single-argument version
     msg![env; this initWithContentsOfFile:path]
 }
 
