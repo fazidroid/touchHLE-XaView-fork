@@ -7,7 +7,7 @@
 
 use crate::frameworks::foundation::ns_string;
 use crate::frameworks::uikit::ui_view::UIViewHostObject;
-use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, ClassExports, NSZonePtr};
+use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, sel, ClassExports, NSZonePtr};
 
 struct UIAlertViewHostObject {
     superclass: UIViewHostObject,
@@ -64,17 +64,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("UIAlertView addButton: {}", ns_string::to_rust_string(env, title));
 }
 
-- (())show {
+- (void)show {
     log!("UIAlertView: AUTO-DISMISS (storage alert bypass)");
 
-    // Retrieve the delegate that was set during init (or later)
     let delegate: id = msg![env; this delegate];
     if delegate != nil {
-        let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
-        let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
-    }
+        let sel_clicked = sel!(alertView:clickedButtonAtIndex:);
+        if msg![env; delegate respondsToSelector:sel_clicked] {
+            let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
+        }
 
-    // Do NOT call msg_super to prevent actual display.
+        let sel_dismissed = sel!(alertView:didDismissWithButtonIndex:);
+        if msg![env; delegate respondsToSelector:sel_dismissed] {
+            let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
+        }
+    }
 }
 
 @end
