@@ -1094,13 +1094,17 @@ pub fn AudioQueueDispose(
 }
 
 fn _AudioQueueSetOfflineRenderFormat(
-    _env: &mut Environment,
+    env: &mut Environment,
     _in_aq: AudioQueueRef,
     _in_format: ConstPtr<AudioStreamBasicDescription>,
     _in_layout: ConstVoidPtr,
 ) -> OSStatus {
-    log!("_AudioQueueSetOfflineRenderFormat stub called");
-    0 // noErr
+    println!("🎮 LOG: 🏎️ Forced _AudioQueueSetOfflineRenderFormat to fail to prevent RR2 deadlock!");
+    
+    // Return paramErr (-50) to forcefully reject offline rendering.
+    // This cleanly aborts the broken audio extraction and forces the game 
+    // to fall back to the normal video presentation layer!
+    -50 
 }
 
 pub const FUNCTIONS: FunctionExports = &[
