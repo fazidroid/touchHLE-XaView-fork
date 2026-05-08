@@ -149,6 +149,28 @@ pub const CLASSES: ClassExports = objc_classes! {
     let _: () = crate::objc::msg_send_no_type_checking(env, (view, sel_multi, 1u32));
 
     () = msg![env; this setView:view];
+
+    // MoviePlayerSkipPostSetView: fire playback-finished notifications AFTER
+    // the fallback view is created and set. This is the correct timing for
+    // Real Racing 2 / Firemint games that use LandscapeMPMoviePlayerViewController:
+    //
+    //   - The game calls .view → loadView runs → view is created and set
+    //   - viewDidAppear is NEVER called (VC is never UIKit-presented)
+    //   - So we must fire HERE, after setView, not in viewDidAppear
+    //
+    // The observer is registered by the game code that calls .view, right
+    // before or right after loadView. A tiny sleep lets the scheduler run
+    // that registration code before we fire.
+    let lower = class_name_str.to_lowercase();
+    if lower.contains("movie") || lower.contains("video")
+        || lower.contains("splash") || lower.contains("intro")
+        || lower.contains("preroll")
+    {
+        log!("MoviePlayerSkip: loadView firing skip for {}", class_name_str);
+        // Yield briefly so the game's observer registration runs first.
+        env.sleep(std::time::Duration::from_millis(50));
+        fire_movie_skip_notifications(env);
+    }
 }
 
 - (())setView:(id)new_view { // UIView*
