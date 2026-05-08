@@ -115,14 +115,26 @@ pub const CLASSES: ClassExports = objc_classes! {
         return;
     };
 
-    // As a last resort, use plain UIVIew for the root view
+   // As a last resort, use plain UIVIew for the root view
     let class: Class = msg![env; this class];
     let class_name_str = env.objc.get_class_name(class).to_string();
     log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
 
-    // MoviePlayerSkip: if this is any kind of movie/video player view controller,
-    // Firing synchronously here is too early — the observer isn't registered yet.
-    // MoviePlayerSkip: handled in viewDidAppear: — no timer needed here.
+    // 🏎️ MOVIE PLAYER SINKHOLE: Deferred Notification Timer
+    let class_name_lower = class_name_str.to_lowercase();
+    let is_movie_vc = class_name_lower.contains("movie")
+        || class_name_lower.contains("video")
+        || class_name_lower.contains("splash")
+        || class_name_lower.contains("intro")
+        || class_name_lower.contains("preroll");
+
+    if is_movie_vc {
+        log!("MoviePlayerSkip: scheduling deferred skip timer for {}", class_name_str);
+        let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications").unwrap();
+        // Fire the skip notification exactly 0.1 seconds after the view loads.
+        // This guarantees the game has time to set up its NSNotificationCenter observers!
+        let _: id = msg_class![env; NSTimer scheduledTimerWithTimeInterval:0.1f64 target:this selector:sel userInfo:nil repeats:false];
+    }
 
     // FixNibEaglLayer
     let mut view_class: Class = msg_class![env; UIView class];
