@@ -149,14 +149,12 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)initWithContentsOfFile:(id)path
                      options:(NSUInteger)options
-                       error:(id)error { // Use 'id' (the pointer value itself), not 'id*'
-    // For now, ignore options and error.
+                       error:(usize)error {
     log_dbg!("[(NSData*){:?} initWithContentsOfFile:{:?} options:{} error:{:?}]",
              this,
              if path == nil { "(nil)" } else { to_rust_string(env, path) },
              options,
              error);
-    // Delegate to the single-argument version
     msg![env; this initWithContentsOfFile:path]
 }
 
