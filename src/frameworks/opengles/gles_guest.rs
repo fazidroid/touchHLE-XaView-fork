@@ -2332,6 +2332,43 @@ fn glBlendColor(
     })
 } // BlendColorReal
 
+fn glReleaseShaderCompiler(_env: &mut Environment) {
+    // 🏎️ GLES 2.0 SINKHOLE
+}
+
+fn glShaderBinary(
+    _env: &mut Environment,
+    _n: GLsizei,
+    _shaders: ConstVoidPtr,
+    _binaryformat: GLenum,
+    _binary: ConstVoidPtr,
+    _length: GLsizei,
+) {
+    // 🏎️ GLES 2.0 SINKHOLE
+}
+
+fn glGetShaderPrecisionFormat(
+    env: &mut Environment,
+    _shadertype: GLenum,
+    _precisiontype: GLenum,
+    range: MutPtr<GLint>,
+    precision: MutPtr<GLint>,
+) {
+    // 🏎️ HIGH PRECISION SPOOF
+    with_ctx_and_mem(env, |_, mem| unsafe {
+        if !range.is_null() {
+            let range_ptr = mem.ptr_at_mut(range, 2);
+            *range_ptr = 127;
+            *range_ptr.add(1) = 127;
+        }
+        if !precision.is_null() {
+            let precision_ptr = mem.ptr_at_mut(precision, 1);
+            *precision_ptr = 23;
+        }
+    })
+}
+
+
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
     export_c_func!(glGetError()),
@@ -2571,6 +2608,9 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetActiveUniform(_, _, _, _, _, _, _)),
     export_c_func!(glGetActiveAttrib(_, _, _, _, _, _, _)),
     export_c_func!(glGetVertexAttribiv(_, _, _)),
+    export_c_func!(glReleaseShaderCompiler()),
+    export_c_func!(glShaderBinary(_, _, _, _, _, _)),
+    export_c_func!(glGetShaderPrecisionFormat(_, _, _, _, _)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {
