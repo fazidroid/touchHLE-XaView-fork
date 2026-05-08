@@ -120,23 +120,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let class_name_str = env.objc.get_class_name(class).to_string();
     log!("Unable to load {:?} {} view controller's view by nib, using fallback", this, class_name_str);
 
-    // 🏎️ MOVIE PLAYER SINKHOLE: Deferred Notification Timer
-    let class_name_lower = class_name_str.to_lowercase();
-    let is_movie_vc = class_name_lower.contains("movie")
-        || class_name_lower.contains("video")
-        || class_name_lower.contains("splash")
-        || class_name_lower.contains("intro")
-        || class_name_lower.contains("preroll");
-
-   if is_movie_vc {
-        log!("MoviePlayerSkip: scheduling deferred skip timer for {}", class_name_str);
-        let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications:").unwrap();
-        // Fire the skip notification exactly 0.1 seconds after the view loads.
-        // This guarantees the game has time to set up its NSNotificationCenter observers!
-        let _: id = msg_class![env; NSTimer scheduledTimerWithTimeInterval:0.1f64 target:this selector:sel userInfo:nil repeats:false];
-    }
-
-
     // FixNibEaglLayer
     let mut view_class: Class = msg_class![env; UIView class];
     if class_name_str.contains("EAGL") || class_name_str.contains("GL") {
