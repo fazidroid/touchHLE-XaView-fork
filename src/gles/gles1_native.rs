@@ -1206,7 +1206,50 @@ impl GLES for GLES1Native<'_> {
         string: *const *const std::ffi::c_char,
         length: *const GLint,
     ) {
-        touchHLE_gl_bindings::gles20::ShaderSource(shader, count, string, length)
+        if !self.is_gles2 { return; }
+
+        // 🏎️ ANDROID GLSL HOT-PATCHER
+        let mut full_source = String::new();
+        for i in 0..(count as isize) {
+            let str_ptr = *string.offset(i);
+            if str_ptr.is_null() { continue; }
+            
+            let len = if !length.is_null() && *length.offset(i) >= 0 {
+                *length.offset(i) as usize
+            } else {
+                std::ffi::CStr::from_ptr(str_ptr).to_bytes().len()
+            };
+            
+            let slice = std::slice::from_raw_parts(str_ptr as *const u8, len);
+            if let Ok(s) = std::str::from_utf8(slice) {
+                full_source.push_str(s);
+            }
+        }
+
+        // Force Android's strict precision requirements into the legacy iOS shader
+        let injection = "\nprecision highp float;\nprecision highp int;\n";
+        let mut final_source = String::new();
+        
+        if full_source.contains("#version") {
+            let mut parts = full_source.splitn(2, '\n');
+            final_source.push_str(parts.next().unwrap_or(""));
+            final_source.push_str(injection);
+            final_source.push_str(parts.next().unwrap_or(""));
+        } else {
+            final_source.push_str(injection);
+            final_source.push_str(&full_source);
+        }
+
+        let clean_source = final_source.replace('\0', "");
+
+        // Send the patched GLES 2.0 shader to the Android driver
+        if let Ok(c_str) = std::ffi::CString::new(clean_source) {
+            let ptrs = [c_str.as_ptr()];
+            let lengths = [c_str.as_bytes().len() as GLint];
+            touchHLE_gl_bindings::gles20::ShaderSource(shader, 1, ptrs.as_ptr(), lengths.as_ptr());
+        } else {
+            touchHLE_gl_bindings::gles20::ShaderSource(shader, count, string, length);
+        }
     }
     unsafe fn CompileShader(&mut self, shader: GLuint) {
         touchHLE_gl_bindings::gles20::CompileShader(shader)
