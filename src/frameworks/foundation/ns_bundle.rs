@@ -77,6 +77,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, preferredLocalizations)
 }
 
++ (id)allBundles {
+    // Get the main bundle (creates it if needed)
+    let main = msg_class![env; NSBundle mainBundle];
+    // Create an NSArray containing just the main bundle
+    let array = msg_class![env; NSArray arrayWithObject:main];
+    // 'arrayWithObject:' returns an autoreleased object, so we return it directly
+    array
+}
+
 - (())dealloc {
     let &NSBundleHostObject {
         bundle: _,
