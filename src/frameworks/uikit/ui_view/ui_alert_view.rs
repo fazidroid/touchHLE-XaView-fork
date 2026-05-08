@@ -63,17 +63,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())show {
     log!("UIAlertView: AUTO-DISMISS (storage alert bypass)");
+}
 
-    let delegate: id = msg![env; this delegate];
-    if delegate != nil {
-        if msg![env; delegate respondsToSelector:sel!(alertView:clickedButtonAtIndex:)] {
-            let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
-        }
+@end
 
-        if msg![env; delegate respondsToSelector:sel!(alertView:didDismissWithButtonIndex:)] {
-            let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
-        }
-    }
+@implementation PlatformAlertViewDelegate: NSObject
+
+- (void)alertView:(id)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+    log!("PlatformAlertViewDelegate - clicked button {}", buttonIndex);
 }
 
 @end
