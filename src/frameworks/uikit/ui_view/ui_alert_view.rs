@@ -8,6 +8,7 @@
 use crate::frameworks::foundation::ns_string;
 use crate::frameworks::uikit::ui_view::UIViewHostObject;
 use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, ClassExports, NSZonePtr};
+use crate::sel;  // Import the sel! macro
 
 struct UIAlertViewHostObject {
     superclass: UIViewHostObject,
