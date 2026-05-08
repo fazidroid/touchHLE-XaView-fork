@@ -147,6 +147,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)initWithContentsOfFile:(id)path
+                     options:(NSUInteger)options
+                       error:(id*)error { // NSError** (pointer to an id)
+    // For now, ignore options and the error pointer.
+    // Just call the existing single-argument version.
+    log_dbg!("[(NSData*){:?} initWithContentsOfFile:{:?} options:{} error:{:?}]",
+             this, if path == nil { "(nil)" } else { to_rust_string(env, path) }, options, error);
+    // Delegate to the simpler version
+    msg![env; this initWithContentsOfFile:path]
+}
+
 - (id)initWithContentsOfMappedFile:(id)path {
     log_dbg!("[NSData initWithContentsOfMappedFile:] not using memory mapping");
     msg![env; this initWithContentsOfFile:path]
