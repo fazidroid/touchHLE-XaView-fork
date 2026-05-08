@@ -373,33 +373,16 @@ pub const CLASSES: ClassExports = objc_classes! {
             present_renderbuffer(env);
         }
     } else {
-        if fullscreen_layer != nil {
-            //log!("DEBUG_EAGL: Layer {:?} is NOT fullscreen layer {:?}. Rendering to RAM (SLOW PATH) or skipped!", drawable, fullscreen_layer);
-            // If there's a single layer that covers the screen, and this isn't
-            // it, there's no point in presenting the output because it won't be
-            // seen. Using a noisy log because it's a weird scenario and might
-            // indicate a bug.
-            //log!(
-            //    "Layer {:?} is not the fullscreen layer {:?}, skipping presentation of renderbuffer {:?}!",
-            //    drawable,
-            //    fullscreen_layer,
-            //    renderbuffer,
-            //);
-            if let Some(sleep_for) = sleep_for {
-                env.sleep(sleep_for);
-            }
-            return true;
-        }
-
-        // The very slow and inefficient path: not only does glReadPixels()
-        // block the thread until rendering finishes, but the result has to be
-        // copied back to system RAM, and then will have to be copied to VRAM
-        // again during composition. find_fullscreen_eagl_layer() exists to
-        // avoid this.
+        // The drawable is not the detected fullscreen layer (or there is none).
+        // Previously we silently skipped here when fullscreen_layer != nil,
+        // but that caused blank screens for games like Nova 3 whose deepest
+        // sublayer is an overlay/HUD rather than the EAGL layer itself.
+        // Always fall through to the slow path so the frame is actually shown.
         log_dbg!(
-            "There is no fullscreen layer, presenting renderbuffer {:?} to layer {:?} by copying to RAM (slow path).",
-            renderbuffer,
+            "Drawable {:?} is not fullscreen layer {:?}; presenting renderbuffer {:?} via slow path.",
             drawable,
+            fullscreen_layer,
+            renderbuffer,
         );
         let pixels_vec = get_pixels_vec_for_presenting(env, drawable);
         // re-borrow
