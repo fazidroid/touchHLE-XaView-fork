@@ -7,7 +7,7 @@
 
 use crate::frameworks::foundation::ns_string;
 use crate::frameworks::uikit::ui_view::UIViewHostObject;
-use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, sel, ClassExports, NSZonePtr};
+use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, ClassExports, NSZonePtr};
 
 struct UIAlertViewHostObject {
     superclass: UIViewHostObject,
@@ -64,7 +64,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("UIAlertView addButton: {}", ns_string::to_rust_string(env, title));
 }
 
-- (void)show {
+- (())show {
     log!("UIAlertView: AUTO-DISMISS (storage alert bypass)");
 
     let delegate: id = msg![env; this delegate];
