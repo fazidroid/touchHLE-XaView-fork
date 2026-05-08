@@ -2609,8 +2609,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glGetActiveAttrib(_, _, _, _, _, _, _)),
     export_c_func!(glGetVertexAttribiv(_, _, _)),
     export_c_func!(glReleaseShaderCompiler()),
-    export_c_func!(glShaderBinary(_, _, _, _, _, _)),
-    export_c_func!(glGetShaderPrecisionFormat(_, _, _, _, _)),
+    export_c_func!(glShaderBinary(_, _, _, _, _)),
+    export_c_func!(glGetShaderPrecisionFormat(_, _, _, _)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {
