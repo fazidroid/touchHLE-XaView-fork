@@ -2381,6 +2381,24 @@ fn glGetShaderPrecisionFormat(
     })
 }
 
+fn glCompressedTexSubImage2D(
+    _env: &mut Environment,
+    _target: GLenum,
+    _level: GLint,
+    _xoffset: GLint,
+    _yoffset: GLint,
+    _width: GLsizei,
+    _height: GLsizei,
+    _format: GLenum,
+    _image_size: GLsizei,
+    _data: ConstVoidPtr,
+) {
+    // 🏎️ ASPHALT 6 SINKHOLE
+    // Absorb the partial compressed texture update to prevent a missing symbol crash!
+    println!("🎮 LOG: Absorbed glCompressedTexSubImage2D to prevent crash!");
+}
+
+
 
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
@@ -2624,6 +2642,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glReleaseShaderCompiler()),
     export_c_func!(glShaderBinary(_, _, _, _, _)),
     export_c_func!(glGetShaderPrecisionFormat(_, _, _, _)),
+    export_c_func!(glCompressedTexSubImage2D(_, _, _, _, _, _, _, _, _)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {
