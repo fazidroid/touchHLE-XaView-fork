@@ -128,13 +128,14 @@ pub const CLASSES: ClassExports = objc_classes! {
         || class_name_lower.contains("intro")
         || class_name_lower.contains("preroll");
 
-    if is_movie_vc {
+   if is_movie_vc {
         log!("MoviePlayerSkip: scheduling deferred skip timer for {}", class_name_str);
-        let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications").unwrap();
+        let sel = env.objc.lookup_selector("_touchHLE_fireMovieSkipNotifications:").unwrap();
         // Fire the skip notification exactly 0.1 seconds after the view loads.
         // This guarantees the game has time to set up its NSNotificationCenter observers!
         let _: id = msg_class![env; NSTimer scheduledTimerWithTimeInterval:0.1f64 target:this selector:sel userInfo:nil repeats:false];
     }
+
 
     // FixNibEaglLayer
     let mut view_class: Class = msg_class![env; UIView class];
@@ -216,7 +217,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 // Timer callback target for the deferred MoviePlayerSkip notifications.
-- (())_touchHLE_fireMovieSkipNotifications {
+- (())_touchHLE_fireMovieSkipNotifications:(id)_timer {
     log!("MoviePlayerSkip: deferred timer fired, posting playback-finished notifications");
     fire_movie_skip_notifications(env);
 }
