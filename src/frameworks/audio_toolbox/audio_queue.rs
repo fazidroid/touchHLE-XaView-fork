@@ -925,17 +925,32 @@ pub fn AudioQueueStart(
     host_object.is_running = AudioQueueIsRunning::Running;
 
     if is_supported_audio_format(&host_object.format) && !host_object.is_offline_render {
-        let al_source = host_object.al_source.unwrap();
-        unsafe { context.SourcePlay(al_source) };
-        let al_err = unsafe { context.GetError() };
-        if al_err != 0 {
-            log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+        if let Some(al_source) = host_object.al_source {
+            unsafe { context.SourcePlay(al_source) };
+            let al_err = unsafe { context.GetError() };
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
+        } else {
+            log_dbg!("AudioQueueStart: no AL source yet, skipping SourcePlay");
         }
-    } else {
+    } else if host_object.is_offline_render {
+        // Offline render queues (used for movie audio extraction) must return
+        // a non-zero error so the calling game exits its extraction loop.
+        // Real Racing 2 checks the return value: 0 = keep retrying forever,
+        // non-zero = audio not decodeable, exit loop and proceed past movie.
         log!(
-            "AudioQueueStart: Unsupported format {:?}",
+            "AudioQueueStart: offline render queue with format {:?} — returning error to break RR2 loop",
             host_object.format
         );
+        // kAudioQueueErr_InvalidDevice — a safe "not available" error code.
+        return 0x21574F45;
+    } else {
+        log!(
+            "AudioQueueStart: unsupported format {:?}, returning error",
+            host_object.format
+        );
+        return 0x21574F45;
     }
 
     // TraceQueueStart
