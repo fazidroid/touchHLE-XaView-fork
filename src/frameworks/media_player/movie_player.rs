@@ -104,9 +104,20 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
+    // Fire ContentPreloadDidFinish immediately so the game knows content is ready.
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now())
     );
+    // For EA/Firemint games also queue PlaybackDidFinish — RR2 sometimes calls
+    // initWithContentURL without ever calling play, expecting auto-completion.
+    if !env.is_app_picker {
+        let bundle_id = env.bundle.bundle_identifier().to_string();
+        if bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint") {
+            State::get(env).pending_notifications.push_back(
+                (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now())
+            );
+        }
+    }
     this
 }
 
@@ -150,13 +161,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     if is_ea_game {
-        println!("🎮 LOG: EA Title Detected! Faking instant video completion for MPMoviePlayerController...");
+        log!("MPMoviePlayerController play: EA/Firemint — faking instant video completion");
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-        
-        let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
+
+        // Fire the full sequence that RR2/Firemint games expect:
+        // LoadStateDidChange → DurationAvailable → PlaybackDidFinish
+        let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+        let _: () = msg![env; center postNotificationName:load_notif object:this];
+
+        let duration_notif = ns_string::get_static_str(env, "MPMovieDurationAvailableNotification");
         let _: () = msg![env; center postNotificationName:duration_notif object:this];
 
-        let finish_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
+        let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
         let _: () = msg![env; center postNotificationName:finish_notif object:this];
     } else {
         println!("🎮 LOG: Standard MPMoviePlayerController play called.");
