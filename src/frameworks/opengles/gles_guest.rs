@@ -1803,16 +1803,29 @@ fn glShaderSource(
         }
 
         if is_gles2 {
-            // SmartPrecisionInject
+            // 🏎️ EXTENSION-SAFE PRECISION INJECTOR
             let mut s = full_source.clone();
+            
+            // Only inject if the game engine forgot to define precision!
             if !s.contains("precision ") {
                 let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
-                if let Some(pos) = s.find("#version") {
-                    let nl = s[pos..].find('\n').unwrap_or(0);
-                    s.insert_str(pos + nl + 1, inject);
-                } else {
-                    s.insert_str(0, inject);
+                
+                let mut insert_pos = 0;
+                let mut current_pos = 0;
+                
+                // GLSL strictly requires that all #version and #extension directives 
+                // remain at the absolute top of the file. We safely skip past them!
+                for line in s.split_inclusive('\n') {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("#version") || trimmed.starts_with("#extension") || trimmed.is_empty() {
+                        current_pos += line.len();
+                        insert_pos = current_pos;
+                    } else {
+                        break;
+                    }
                 }
+                
+                s.insert_str(insert_pos, inject);
             }
             full_source = s;
         }
