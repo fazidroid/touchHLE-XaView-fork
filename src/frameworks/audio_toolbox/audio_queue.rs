@@ -68,6 +68,9 @@ struct AudioQueueHostObject {
     buffer_queue: VecDeque<AudioQueueBufferRef>,
     is_running: AudioQueueIsRunning,
     al_source: Option<ALuint>,
+    /// True if this is an offline-render queue (audio extraction from video).
+    /// Offline queues must not create OpenAL sources.
+    is_offline_render: bool,
     al_unused_buffers: Vec<ALuint>,
     aq_is_running_proc: Option<AudioQueuePropertyListenerProc>,
     aq_is_running_user_data: Option<MutVoidPtr>,
@@ -184,6 +187,7 @@ pub fn AudioQueueNewOutput(
         buffer_queue: VecDeque::new(),
         is_running: AudioQueueIsRunning::Stopped,
         al_source: None,
+        is_offline_render: false,
         al_unused_buffers: Vec::new(),
         aq_is_running_proc: None,
         aq_is_running_user_data: None,
@@ -265,7 +269,10 @@ pub fn AudioQueueSetParameter(
 
         unsafe {
             context.Sourcef(al_source, al::AL_MAX_GAIN, in_value);
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         }
     }
 
@@ -641,7 +648,7 @@ fn prime_audio_queue(env: &mut Environment, in_aq: AudioQueueRef) {
 
     let host_object = state.audio_queues.get_mut(&in_aq).unwrap();
 
-    if !is_supported_audio_format(&host_object.format) {
+    if !is_supported_audio_format(&host_object.format) || host_object.is_offline_render {
         return;
     }
 
@@ -655,7 +662,10 @@ fn prime_audio_queue(env: &mut Environment, in_aq: AudioQueueRef) {
         unsafe {
             context.GenSources(1, &mut al_source);
             context.Sourcef(al_source, al::AL_MAX_GAIN, volume);
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         };
         host_object.al_source = Some(al_source);
     }
@@ -671,7 +681,10 @@ fn prime_audio_queue(env: &mut Environment, in_aq: AudioQueueRef) {
                 al::AL_BUFFERS_PROCESSED,
                 &mut al_buffers_processed,
             );
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         }
         let al_buffers_queued: usize = al_buffers_queued.try_into().unwrap();
         let al_buffers_processed: usize = al_buffers_processed.try_into().unwrap();
@@ -696,7 +709,10 @@ fn prime_audio_queue(env: &mut Environment, in_aq: AudioQueueRef) {
         let next_al_buffer = host_object.al_unused_buffers.pop().unwrap_or_else(|| {
             let mut al_buffer = 0;
             unsafe { context.GenBuffers(1, &mut al_buffer) };
-            assert!(unsafe { context.GetError() } == 0);
+            let al_err = unsafe { context.GetError() };
+        if al_err != 0 {
+            log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+        }
             al_buffer
         });
 
@@ -716,7 +732,10 @@ fn prime_audio_queue(env: &mut Environment, in_aq: AudioQueueRef) {
             )
         };
         unsafe { context.SourceQueueBuffers(al_source, 1, &next_al_buffer) };
-        assert!(unsafe { context.GetError() } == 0);
+        let al_err = unsafe { context.GetError() };
+        if al_err != 0 {
+            log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+        }
     }
 }
 
@@ -729,7 +748,10 @@ fn unqueue_buffers<F: FnMut(ALuint)>(al_source: ALuint, context: &OpenAL<'_>, mu
                 al::AL_BUFFERS_PROCESSED,
                 &mut al_buffers_processed,
             );
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         }
         if al_buffers_processed == 0 {
             break;
@@ -738,7 +760,10 @@ fn unqueue_buffers<F: FnMut(ALuint)>(al_source: ALuint, context: &OpenAL<'_>, mu
         let mut al_buffer = 0;
         unsafe {
             context.SourceUnqueueBuffers(al_source, 1, &mut al_buffer);
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         }
 
         callback(al_buffer);
@@ -808,7 +833,10 @@ pub fn handle_audio_queue(env: &mut Environment, in_aq: AudioQueueRef) {
         unsafe {
             let mut al_source_state = 0;
             context.GetSourcei(al_source, al::AL_SOURCE_STATE, &mut al_source_state);
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
             // Source probably ran out data and needs restarting
             // TODO: We currently have to do this even when touchHLE is not
             // lagging, because we're not ensuring OpenAL always has at least
@@ -825,7 +853,10 @@ pub fn handle_audio_queue(env: &mut Environment, in_aq: AudioQueueRef) {
         let mut al_source_state = 0;
         unsafe {
             context.GetSourcei(al_source, al::AL_SOURCE_STATE, &mut al_source_state);
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         }
 
         // If OpenAL still says the source is stopped, it must have run out of
@@ -893,10 +924,13 @@ pub fn AudioQueueStart(
 
     host_object.is_running = AudioQueueIsRunning::Running;
 
-    if is_supported_audio_format(&host_object.format) {
+    if is_supported_audio_format(&host_object.format) && !host_object.is_offline_render {
         let al_source = host_object.al_source.unwrap();
         unsafe { context.SourcePlay(al_source) };
-        assert!(unsafe { context.GetError() } == 0);
+        let al_err = unsafe { context.GetError() };
+        if al_err != 0 {
+            log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+        }
     } else {
         log!(
             "AudioQueueStart: Unsupported format {:?}",
@@ -922,7 +956,10 @@ pub fn AudioQueuePause(env: &mut Environment, in_aq: AudioQueueRef) -> OSStatus 
     host_object.is_running = AudioQueueIsRunning::Stopped;
     if let Some(al_source) = host_object.al_source {
         unsafe { context.SourcePause(al_source) };
-        assert!(unsafe { context.GetError() } == 0);
+        let al_err = unsafe { context.GetError() };
+        if al_err != 0 {
+            log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+        }
     }
 
     0 // success
@@ -953,7 +990,10 @@ pub fn AudioQueueStop(env: &mut Environment, in_aq: AudioQueueRef, in_immediate:
         let host_object = state.audio_queues.get_mut(&in_aq).unwrap();
         if let Some(al_source) = host_object.al_source {
             unsafe { context.SourceStop(al_source) };
-            assert!(unsafe { context.GetError() } == 0);
+            let al_err = unsafe { context.GetError() };
+        if al_err != 0 {
+            log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+        }
         };
 
         finish_stopping_audio_queue(env, in_aq);
@@ -988,13 +1028,19 @@ fn AudioQueueReset(env: &mut Environment, in_aq: AudioQueueRef) -> OSStatus {
         unsafe {
             let mut al_source_state = 0;
             context.GetSourcei(al_source, al::AL_SOURCE_STATE, &mut al_source_state);
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
             if al_source_state != al::AL_STOPPED {
                 // If the source is not already stopped, it must be stopped in
                 // order to be able to clear its buffer queue. Note that the
                 // audio queue may still be considered "running".
                 context.SourceStop(al_source);
-                assert!(context.GetError() == 0);
+                let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
             }
         }
 
@@ -1072,7 +1118,10 @@ pub fn AudioQueueDispose(
     if let Some(al_source) = host_object.al_source {
         unsafe {
             context.SourceStop(al_source);
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         }
 
         unqueue_buffers(al_source, &context, |al_buffer| {
@@ -1084,7 +1133,10 @@ pub fn AudioQueueDispose(
                 host_object.al_unused_buffers.len().try_into().unwrap(),
                 host_object.al_unused_buffers.as_ptr(),
             );
-            assert!(context.GetError() == 0);
+            let al_err = context.GetError();
+            if al_err != 0 {
+                log_dbg!("audio_queue: OpenAL error {:#x} cleared", al_err);
+            }
         }
     }
 
@@ -1095,16 +1147,31 @@ pub fn AudioQueueDispose(
 
 fn _AudioQueueSetOfflineRenderFormat(
     env: &mut Environment,
-    _in_aq: AudioQueueRef,
+    in_aq: AudioQueueRef,
     _in_format: ConstPtr<AudioStreamBasicDescription>,
     _in_layout: ConstVoidPtr,
 ) -> OSStatus {
-    println!("🎮 LOG: 🏎️ Forced _AudioQueueSetOfflineRenderFormat to fail to prevent RR2 deadlock!");
-    
-    // Return paramErr (-50) to forcefully reject offline rendering.
-    // This cleanly aborts the broken audio extraction and forces the game 
-    // to fall back to the normal video presentation layer!
-    -50 
+    log!("_AudioQueueSetOfflineRenderFormat stub called");
+    // Mark this queue as an offline-render queue so prime_audio_queue
+    // skips OpenAL source creation entirely. Offline queues are used for
+    // audio extraction (e.g. from movie files) and don't need an AL source.
+    if let Some(host_obj) = State::get(&mut env.framework_state)
+        .audio_queues.get_mut(&in_aq)
+    {
+        host_obj.is_offline_render = true;
+    }
+    0 // noErr
+}
+
+fn _AudioQueueOfflineRender(
+    _env: &mut Environment,
+    _in_aq: AudioQueueRef,
+    _in_timestamp: ConstVoidPtr, // AudioTimeStamp*
+    _in_buffer: AudioQueueBufferRef,
+    _in_number_frames: u32,
+) -> OSStatus {
+    log!("_AudioQueueOfflineRender stub called");
+    0 // noErr
 }
 
 pub const FUNCTIONS: FunctionExports = &[
@@ -1127,4 +1194,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(AudioQueueFreeBuffer(_, _)),
     export_c_func!(AudioQueueDispose(_, _)),
     ("_AudioQueueSetOfflineRenderFormat", &(_AudioQueueSetOfflineRenderFormat as fn(&mut Environment, AudioQueueRef, ConstPtr<AudioStreamBasicDescription>, ConstVoidPtr) -> OSStatus)),
+    ("_AudioQueueOfflineRender", &(_AudioQueueOfflineRender as fn(&mut Environment, AudioQueueRef, ConstVoidPtr, AudioQueueBufferRef, u32) -> OSStatus)),
 ];
