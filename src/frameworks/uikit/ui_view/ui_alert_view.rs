@@ -8,7 +8,6 @@
 use crate::frameworks::foundation::ns_string;
 use crate::frameworks::uikit::ui_view::UIViewHostObject;
 use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, ClassExports, NSZonePtr};
-use crate::objc::sel;  // <-- Correct import for the sel! macro
 
 struct UIAlertViewHostObject {
     superclass: UIViewHostObject,
@@ -67,13 +66,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     let delegate: id = msg![env; this delegate];
     if delegate != nil {
-        let sel_clicked = sel!(alertView:clickedButtonAtIndex:);
-        if msg![env; delegate respondsToSelector:sel_clicked] {
+        if msg![env; delegate respondsToSelector:sel!(alertView:clickedButtonAtIndex:)] {
             let _: () = msg![env; delegate alertView:this clickedButtonAtIndex:0];
         }
 
-        let sel_dismissed = sel!(alertView:didDismissWithButtonIndex:);
-        if msg![env; delegate respondsToSelector:sel_dismissed] {
+        if msg![env; delegate respondsToSelector:sel!(alertView:didDismissWithButtonIndex:)] {
             let _: () = msg![env; delegate alertView:this didDismissWithButtonIndex:0];
         }
     }
