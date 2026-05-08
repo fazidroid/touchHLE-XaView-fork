@@ -6,13 +6,14 @@
 //! `UIAlertView`.
 
 use crate::frameworks::foundation::ns_string;
-use crate::objc::{id, msg, msg_super, nil, objc_classes, release, retain, ClassExports, HostObject, NSZonePtr};
-use std::borrow::Cow;
+use crate::frameworks::uikit::ui_view::UIViewHostObject;
+use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, ClassExports, NSZonePtr};
 
 struct UIAlertViewHostObject {
+    superclass: UIViewHostObject,
     delegate: id,
 }
-impl HostObject for UIAlertViewHostObject {}
+impl_HostObject_with_superclass!(UIAlertViewHostObject);
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -22,6 +23,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)allocWithZone:(NSZonePtr)_zone {
     let host_object = Box::new(UIAlertViewHostObject {
+        superclass: Default::default(),
         delegate: nil,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
