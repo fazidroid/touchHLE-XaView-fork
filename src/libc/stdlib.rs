@@ -15,16 +15,6 @@ use crate::libc::wchar::wchar_t;
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, Ptr};
 use crate::Environment;
 use std::str::FromStr;
-use std::collections::HashMap;
-use std::sync::Mutex;
-lazy_static::lazy_static! {
-    static ref QUEUES: Mutex<HashMap<*mut (), String>> = Mutex::new(HashMap::new());
-    static ref MAIN_QUEUE: *mut () = 1 as *mut ();
-    static ref GLOBAL_QUEUE: *mut () = 2 as *mut ();
-}
-use lazy_static::lazy_static;
-use std::collections::HashMap;
-use std::sync::Mutex;
 
 pub mod qsort;
 
@@ -36,45 +26,6 @@ pub struct State {
     rand: u32,
     random: u32,
     arc4random: u32,
-}
-
-// --- Missing Grand Central Dispatch stubs ---
-lazy_static! {
-    static ref QUEUES: Mutex<HashMap<*mut (), String>> = Mutex::new(HashMap::new());
-    static ref MAIN_QUEUE: *mut () = 1 as *mut ();
-    static ref GLOBAL_QUEUE: *mut () = 2 as *mut ();
-}
-
-#[no_mangle]
-pub fn dispatch_queue_create(_env: &mut Environment, label: *const i8, _attr: *mut ()) -> *mut () {
-    let name = if label.is_null() {
-        "unknown".to_string()
-    } else {
-        unsafe { std::ffi::CStr::from_ptr(label) }.to_string_lossy().to_string()
-    };
-    let queue = (QUEUES.lock().unwrap().len() + 3) as *mut ();
-    QUEUES.lock().unwrap().insert(queue, name);
-    queue
-}
-
-#[no_mangle]
-pub fn dispatch_release(_env: &mut Environment, queue: *mut ()) {
-    QUEUES.lock().unwrap().remove(&queue);
-}
-
-#[no_mangle]
-pub fn dispatch_get_main_queue(_env: &mut Environment) -> *mut () {
-    *MAIN_QUEUE
-}
-
-#[no_mangle]
-pub fn dispatch_get_global_queue(_env: &mut Environment, _priority: u64, _flags: u64) -> *mut () {
-    *GLOBAL_QUEUE
-}
-
-#[no_mangle]
-pub fn dispatch_sync(_env: &mut Environment, _queue: *mut (), block: GuestFunction) {
-    block.call_from_host(block);
 }
 
 // Sizes of zero are implementation-defined. macOS will happily give you back
@@ -1189,11 +1140,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(system(_)),
     export_c_func!(div(_, _)),
     export_c_func!(times(_)),
-    export_c_func!(dispatch_queue_create(_, _)),
-    export_c_func!(dispatch_release(_)),
-    export_c_func!(dispatch_get_main_queue()),
-    export_c_func!(dispatch_get_global_queue(_, _)),
-    export_c_func!(dispatch_sync(_, _)),
 ];
 
 /// A simple wrapper around [atof_inner_generic] for the case of C string.
