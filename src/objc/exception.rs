@@ -16,14 +16,14 @@ thread_local! {
 /// Called when an Objective‑C exception is thrown.
 /// In real iOS, this unwinds the stack. We panic, which is better than crashing later.
 #[no_mangle]
-pub extern "C" fn objc_exception_throw(exception: id) -> ! {
+pub extern "C" fn objc_exception_throw(_env: &mut Environment, exception: id) {
     log!("Objective‑C exception thrown: {:?}", exception);
     panic!("uncaught Objective‑C exception");
 }
 
 /// Called at the start of a `@catch` block. Returns the exception object.
 #[no_mangle]
-pub extern "C" fn objc_begin_catch(exception: id) -> id {
+pub extern "C" fn objc_begin_catch(_env: &mut Environment, exception: id) -> id {
     log_dbg!("objc_begin_catch({:?})", exception);
     CATCH_ACTIVE.with(|active| {
         assert!(!active.replace(true), "nested @catch not supported");
@@ -33,7 +33,7 @@ pub extern "C" fn objc_begin_catch(exception: id) -> id {
 
 /// Called at the end of a `@catch` block.
 #[no_mangle]
-pub extern "C" fn objc_end_catch() {
+pub extern "C" fn objc_end_catch(_env: &mut Environment) {
     log_dbg!("objc_end_catch");
     CATCH_ACTIVE.with(|active| {
         assert!(active.replace(false), "objc_end_catch without active catch");
