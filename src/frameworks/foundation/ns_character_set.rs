@@ -10,6 +10,7 @@ use crate::objc::{
     autorelease, id, msg, msg_class, objc_classes, retain, ClassExports, HostObject, NSZonePtr,
 };
 use std::collections::HashSet;
+use crate::frameworks::foundation::NSRange;
 
 // Unicode General Category Zs and CHARACTER TABULATION (U+0009).
 const WHITESPACE_CHARACTERS: [char; 18] = [
@@ -139,6 +140,47 @@ pub const CLASSES: ClassExports = objc_classes! {
     });
     let class = env.objc.get_known_class("_touchHLE_NSCharacterSet", &mut env.mem);
     env.objc.alloc_object(class, host_object, &mut env.mem)
+}
+
+@end
+
+// ==========================================================
+// NSMutableCharacterSet implementation
+// ==========================================================
+@implementation NSMutableCharacterSet: NSCharacterSet
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::new(CharacterSetHostObject {
+        set: HashSet::new(),
+        inverted: false,
+    });
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
++ (id)characterSetWithRange:(NSRange)range {
+    let mut set = HashSet::new();
+    for i in 0..range.length {
+        let code = range.location + i;
+        // Safety: Ensure code fits in unichar (0..65535). If range exceeds, clamp or skip.
+        if code <= 0xFFFF {
+            set.insert(code as unichar);
+        }
+    }
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
+    autorelease(env, new)
+}
+
+// Optional: other mutating methods like addCharactersInRange:, removeCharactersInRange:, etc.
+// For now, stub them if needed later.
+- (())addCharactersInRange:(NSRange)range {
+    log_dbg!("NSMutableCharacterSet addCharactersInRange: {:?}", range);
+    // TODO: implement mutation
+}
+
+- (())removeCharactersInRange:(NSRange)range {
+    log_dbg!("NSMutableCharacterSet removeCharactersInRange: {:?}", range);
+    // TODO: implement mutation
 }
 
 @end
