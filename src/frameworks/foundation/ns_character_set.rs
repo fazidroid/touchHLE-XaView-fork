@@ -172,26 +172,83 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())addCharactersInString:(id)string {
     log_dbg!("NSMutableCharacterSet addCharactersInString: {:?}", string);
-    let host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
-    if host_obj.inverted {
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
         log!("Warning: addCharactersInString called on inverted character set");
     }
+    let mut chars = Vec::new();
     ns_string::for_each_code_unit(env, string, |_idx, c| {
-        host_obj.set.insert(c);
+        chars.push(c);
     });
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.insert(c);
+    }
+}
+
+- (())removeCharactersInString:(id)string {
+    log_dbg!("NSMutableCharacterSet removeCharactersInString: {:?}", string);
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
+        log!("Warning: removeCharactersInString called on inverted character set");
+    }
+    let mut chars = Vec::new();
+    ns_string::for_each_code_unit(env, string, |_idx, c| {
+        chars.push(c);
+    });
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.remove(&c);
+    }
 }
 
 - (())addCharactersInRange:(NSRange)range {
     log_dbg!("NSMutableCharacterSet addCharactersInRange: {:?}", range);
-    let host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
-    if host_obj.inverted {
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
         log!("Warning: addCharactersInRange called on inverted character set");
     }
+    let mut chars = Vec::new();
     for i in 0..range.length {
         let code = range.location + i;
         if code <= 0xFFFF {
-            host_obj.set.insert(code as unichar);
+            chars.push(code as unichar);
         }
+    }
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.insert(c);
+    }
+}
+
+- (())removeCharactersInRange:(NSRange)range {
+    log_dbg!("NSMutableCharacterSet removeCharactersInRange: {:?}", range);
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
+        log!("Warning: removeCharactersInRange called on inverted character set");
+    }
+    let mut chars = Vec::new();
+    for i in 0..range.length {
+        let code = range.location + i;
+        if code <= 0xFFFF {
+            chars.push(code as unichar);
+        }
+    }
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.remove(&c);
     }
 }
 
