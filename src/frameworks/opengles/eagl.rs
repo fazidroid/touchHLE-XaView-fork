@@ -364,13 +364,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
     if drawable == fullscreen_layer {
         log!(
-           "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
-           drawable,
-           renderbuffer,
-        );
-         re-borrow
-        unsafe {
-            present_renderbuffer(env);
+   "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
+         drawable,
+         renderbuffer,
+         );
+         unsafe {
+         present_renderbuffer(env);
         }
     } else {
         // The drawable is not the detected fullscreen layer (or there is none).
