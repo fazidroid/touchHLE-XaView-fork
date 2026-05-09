@@ -1788,19 +1788,19 @@ fn glShaderSource(
 
         let mut full_source = String::new();
         for i in 0..count_usize {
-            let guest_str_ptr = *string_arr.add(i);
-            let host_str_ptr = mem
-                .unchecked_ptr_at(guest_str_ptr.cast::<u8>(), 0)
-                .cast::<std::ffi::c_char>();
-            let str_len = if !length_arr.is_null() && *length_arr.add(i) >= 0 {
-                *length_arr.add(i) as usize
-            } else {
-                std::ffi::CStr::from_ptr(host_str_ptr).to_bytes().len()
-            };
-            // UnnecessaryCastFix
+            // ... [existing string extraction logic] ...
             let slice = std::slice::from_raw_parts(host_str_ptr.cast::<u8>(), str_len);
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
+
+        // ==========================================================
+        // 🏎️ GLSL LOGGER: DUMP THE RAW SHADER TO THE TERMINAL
+        // ==========================================================
+        println!(" ");
+        println!("================ SHADER INTERCEPT (ID: {}) ================", shader);
+        println!("{}", full_source);
+        println!("==========================================================");
+        println!(" ");
 
         if is_gles2 {
             // 🏎️ EXTENSION-SAFE PRECISION INJECTOR
@@ -2357,7 +2357,12 @@ fn glShaderBinary(
     _binary: ConstVoidPtr,
     _length: GLsizei,
 ) {
-    // 🏎️ GLES 2.0 SINKHOLE
+    // 🏎️ BINARY LOGGER
+    println!("🎮 WARNING: Game attempted to load a BINARY shader!");
+    println!("   -> Format ID: {:#x}", _binaryformat);
+    println!("   -> Binary Size: {} bytes", _length);
+    
+    // We intentionally do nothing here to sinkhole it.
 }
 
 fn glGetShaderPrecisionFormat(
