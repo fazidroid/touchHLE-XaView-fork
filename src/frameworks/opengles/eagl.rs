@@ -108,6 +108,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     if context != nil {
         *current_ctx = Some(context);
+        // NFS Most Wanted and similar games call setCurrentContext: on background
+        // threads (e.g. thread 2) for the Firemonkey animation. If those threads
+        // later make GL calls but the context lookup uses env.current_thread which
+        // changed, the calls are silently ignored ("No EAGLContext for thread N").
+        // Store the context on thread 0 (main) as a shared fallback so any thread
+        // without its own context can use the main one for basic GL operations.
+        if env.current_thread != 0 {
+            let main_ctx = env.framework_state.opengles.current_ctx_for_thread(0);
+            if main_ctx.is_none() {
+                *main_ctx = Some(context);
+                retain(env, context);
+                log_dbg!("EAGLContext setCurrentContext: propagated context from thread {} to main thread as fallback", env.current_thread);
+            }
+        }
     }
 
     true
