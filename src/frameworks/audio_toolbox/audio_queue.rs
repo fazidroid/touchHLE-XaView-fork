@@ -935,22 +935,31 @@ pub fn AudioQueueStart(
             log_dbg!("AudioQueueStart: no AL source yet, skipping SourcePlay");
         }
     } else if host_object.is_offline_render {
-        // Offline render queues (used for movie audio extraction) must return
-        // a non-zero error so the calling game exits its extraction loop.
-        // Real Racing 2 checks the return value: 0 = keep retrying forever,
-        // non-zero = audio not decodeable, exit loop and proceed past movie.
-        log!(
-            "AudioQueueStart: offline render queue with format {:?} — returning error to break RR2 loop",
+        // Offline render queues are used for movie audio extraction.
+        // Only return an error for Real Racing 2 (com.firemint.realracing2) —
+        // that game uses the error as its signal to exit the extraction loop.
+        // Other games (NFS Most Wanted, etc.) may use offline render for
+        // legitimate audio work and must receive success + notify_aq_is_running.
+        let is_rr2 = env.bundle.bundle_identifier().starts_with("com.firemint.realracing2");
+        if is_rr2 {
+            log!(
+                "AudioQueueStart: offline render queue (RR2 bypass) format {:?} — returning error",
+                host_object.format
+            );
+            return 0x21574F45; // kAudioQueueErr_InvalidDevice
+        }
+        log_dbg!(
+            "AudioQueueStart: offline render queue format {:?} — allowing (non-RR2 game)",
             host_object.format
         );
-        // kAudioQueueErr_InvalidDevice — a safe "not available" error code.
-        return 0x21574F45;
+        // Fall through to notify_aq_is_running below.
     } else {
         log!(
-            "AudioQueueStart: unsupported format {:?}, returning error",
+            "AudioQueueStart: unsupported format {:?}, allowing with notification",
             host_object.format
         );
-        return 0x21574F45;
+        // Fall through — fire notify_aq_is_running so the game's callback
+        // fires and it can detect the failure through its own logic.
     }
 
     // TraceQueueStart
