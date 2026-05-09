@@ -152,7 +152,7 @@ const FUNCTIONS: FunctionExports = &[
     export_c_func!(sel_registerName(_)),
     export_c_func!(_Block_object_dispose(_, _)),
     export_c_func!(class_copyPropertyList(_, _)), 
-    export_c_func!(objc_exception_throw(_, _)),
-    export_c_func!(objc_begin_catch(_, _)),
-    export_c_func!(objc_end_catch(_)),
+    export_c_func!(objc_exception_throw(_)),
+    export_c_func!(objc_begin_catch(_)),
+    export_c_func!(objc_end_catch()),
 ];
