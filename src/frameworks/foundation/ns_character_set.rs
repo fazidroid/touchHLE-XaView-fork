@@ -170,21 +170,43 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-- (())addCharactersInString:(id)string {
-    // as above
+- (void)addCharactersInString:(id)string {
+    log_dbg!("NSMutableCharacterSet addCharactersInString: {:?}", string);
+    let host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    if host_obj.inverted {
+        log!("Warning: addCharactersInString called on inverted character set");
+    }
+    ns_string::for_each_code_unit(env, string, |_idx, c| {
+        host_obj.set.insert(c);
+    });
 }
-- (())removeCharactersInString:(id)string {
-    // as above
+
+- (void)addCharactersInRange:(NSRange)range {
+    log_dbg!("NSMutableCharacterSet addCharactersInRange: {:?}", range);
+    let host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    if host_obj.inverted {
+        log!("Warning: addCharactersInRange called on inverted character set");
+    }
+    for i in 0..range.length {
+        let code = range.location + i;
+        if code <= 0xFFFF {
+            host_obj.set.insert(code as unichar);
+        }
+    }
 }
-- (())addCharactersInRange:(NSRange)range {
-    // as above
-}
-- (())removeCharactersInRange:(NSRange)range {
-    // as above
-}
+
 - (id)invertedSet {
-    // as above
+    let old_host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+    let new_set = old_host_obj.set.clone();
+    let new_inverted = !old_host_obj.inverted;
+    let host_object = Box::new(CharacterSetHostObject {
+        set: new_set,
+        inverted: new_inverted,
+    });
+    let class = env.objc.get_known_class("_touchHLE_NSCharacterSet", &mut env.mem);
+    env.objc.alloc_object(class, host_object, &mut env.mem)
 }
+
 @end
 
 };
