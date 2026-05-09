@@ -170,7 +170,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-- (void)addCharactersInString:(id)string {
+- (())addCharactersInString:(id)string {
     log_dbg!("NSMutableCharacterSet addCharactersInString: {:?}", string);
     let host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
     if host_obj.inverted {
@@ -181,7 +181,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     });
 }
 
-- (void)addCharactersInRange:(NSRange)range {
+- (())addCharactersInRange:(NSRange)range {
     log_dbg!("NSMutableCharacterSet addCharactersInRange: {:?}", range);
     let host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
     if host_obj.inverted {
