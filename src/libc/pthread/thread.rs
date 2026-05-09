@@ -65,7 +65,7 @@ unsafe impl SafeRead for OpaqueThread {}
 pub type pthread_t = MutPtr<OpaqueThread>;
 
 #[no_mangle]
-pub fn pthread_setname_np(_env: &mut Environment, _name: *const i8) -> i32 {
+pub fn pthread_setname_np(_env: &mut Environment, _name: crate::mem::ConstPtr<u8>) -> i32 {
     0
 }
 
