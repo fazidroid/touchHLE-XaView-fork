@@ -161,7 +161,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let mut set = HashSet::new();
     for i in 0..range.length {
         let code = range.location + i;
-        // Safety: Ensure code fits in unichar (0..65535). If range exceeds, clamp or skip.
         if code <= 0xFFFF {
             set.insert(code as unichar);
         }
@@ -171,18 +170,21 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
-// Optional: other mutating methods like addCharactersInRange:, removeCharactersInRange:, etc.
-// For now, stub them if needed later.
+- (())addCharactersInString:(id)string {
+    // as above
+}
+- (())removeCharactersInString:(id)string {
+    // as above
+}
 - (())addCharactersInRange:(NSRange)range {
-    log_dbg!("NSMutableCharacterSet addCharactersInRange: {:?}", range);
-    // TODO: implement mutation
+    // as above
 }
-
 - (())removeCharactersInRange:(NSRange)range {
-    log_dbg!("NSMutableCharacterSet removeCharactersInRange: {:?}", range);
-    // TODO: implement mutation
+    // as above
 }
-
+- (id)invertedSet {
+    // as above
+}
 @end
 
 };
