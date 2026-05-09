@@ -361,14 +361,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     // We're presenting to the opaque CAEAGLLayer that covers the screen.
     // We can use the fast path where we skip composition and present directly.
     //DebugPresentPath
-    //log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
+    log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
     if drawable == fullscreen_layer {
-        //log!(
-        //    "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
-        //    drawable,
-        //    renderbuffer,
-        //);
-        // re-borrow
+        log!(
+           "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
+           drawable,
+           renderbuffer,
+        );
+         re-borrow
         unsafe {
             present_renderbuffer(env);
         }
