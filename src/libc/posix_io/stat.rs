@@ -216,6 +216,29 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
             return result;
         }
 
+        // ── Fast-path: known file extensions are always files, never dirs ──
+        // This avoids the create_dir probe for common bundle assets.
+        // The probe itself can create spurious directories (fixed below) but
+        // the fast-path is both safer and faster.
+        let last_component = path_str.rsplit('/').next().unwrap_or(&path_str);
+        let file_extensions = [
+            ".nib", ".png", ".jpg", ".jpeg", ".plist", ".sb", ".xml",
+            ".json", ".mp3", ".m4a", ".caf", ".wav", ".mp4", ".m4v",
+            ".pvr", ".atlasc", ".ttf", ".otf", ".ghost", ".dat", ".bin",
+            ".lua", ".pak", ".cfg", ".ini", ".txt", ".csv", ".svg",
+            ".prefabs", ".scene", ".mat", ".atlas",
+        ];
+        if file_extensions.iter().any(|ext| {
+            last_component.to_ascii_lowercase().ends_with(ext)
+        }) {
+            log_dbg!("stat: '{}' fast-path as bundle file (known extension)", path_str);
+            let mut s = stat::default();
+            s.st_mode  = S_IFREG;
+            s.st_nlink = 1;
+            env.mem.write(buf, s);
+            return 0;
+        }
+
         // ── Step 2: open_direct failed — probe whether it is a directory ─────
         // NonDestructiveProbe: use create_dir ONLY to distinguish "existing dir"
         // from "does not exist". If create_dir SUCCEEDS it means the path did
