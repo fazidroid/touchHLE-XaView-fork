@@ -64,6 +64,11 @@ unsafe impl SafeRead for OpaqueThread {}
 #[allow(non_camel_case_types)]
 pub type pthread_t = MutPtr<OpaqueThread>;
 
+#[no_mangle]
+pub fn pthread_setname_np(_env: &mut Environment, _name: *const i8) -> i32 {
+    0
+}
+
 struct ThreadHostObject {
     thread_id: ThreadId,
     joined_by: Option<ThreadId>,
@@ -449,4 +454,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_get_stacksize_np(_)),
     export_c_func!(pthread_getschedparam(_, _, _)),
     export_c_func!(pthread_setschedparam(_, _, _)),
+    export_c_func!(pthread_setname_np(_)),
 ];
