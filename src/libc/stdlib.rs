@@ -22,6 +22,9 @@ lazy_static::lazy_static! {
     static ref MAIN_QUEUE: *mut () = 1 as *mut ();
     static ref GLOBAL_QUEUE: *mut () = 2 as *mut ();
 }
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 pub mod qsort;
 
@@ -35,8 +38,15 @@ pub struct State {
     arc4random: u32,
 }
 
+// --- Missing Grand Central Dispatch stubs ---
+lazy_static! {
+    static ref QUEUES: Mutex<HashMap<*mut (), String>> = Mutex::new(HashMap::new());
+    static ref MAIN_QUEUE: *mut () = 1 as *mut ();
+    static ref GLOBAL_QUEUE: *mut () = 2 as *mut ();
+}
+
 #[no_mangle]
-pub fn dispatch_queue_create(label: *const i8, _attr: *mut ()) -> *mut () {
+pub fn dispatch_queue_create(_env: &mut Environment, label: *const i8, _attr: *mut ()) -> *mut () {
     let name = if label.is_null() {
         "unknown".to_string()
     } else {
@@ -48,23 +58,22 @@ pub fn dispatch_queue_create(label: *const i8, _attr: *mut ()) -> *mut () {
 }
 
 #[no_mangle]
-pub fn dispatch_release(queue: *mut ()) {
+pub fn dispatch_release(_env: &mut Environment, queue: *mut ()) {
     QUEUES.lock().unwrap().remove(&queue);
 }
 
 #[no_mangle]
-pub fn dispatch_get_main_queue() -> *mut () {
+pub fn dispatch_get_main_queue(_env: &mut Environment) -> *mut () {
     *MAIN_QUEUE
 }
 
 #[no_mangle]
-pub fn dispatch_get_global_queue(_priority: u64, _flags: u64) -> *mut () {
+pub fn dispatch_get_global_queue(_env: &mut Environment, _priority: u64, _flags: u64) -> *mut () {
     *GLOBAL_QUEUE
 }
 
 #[no_mangle]
-pub fn dispatch_sync(queue: *mut (), block: GuestFunction) {
-    // For simplicity, execute block synchronously on current thread.
+pub fn dispatch_sync(_env: &mut Environment, _queue: *mut (), block: GuestFunction) {
     block.call_from_host(block);
 }
 
