@@ -668,6 +668,18 @@ impl Dyld {
                         as usize,
                 );
                 let Some(&(symbol, f)) = f else {
+                    // NullPageSvcBypass: the game jumped to a null/invalid
+                    // pointer and hit garbage bytes that decoded as an SVC.
+                    // Redirect to thread_exit_routine so the thread dies
+                    // cleanly rather than panicking the whole emulator.
+                    if svc_pc < 0x2000 {
+                        echo!(
+                            "WARNING: SVC #{} at null-page {:#x}, redirecting to thread_exit_routine.",
+                            svc, svc_pc
+                        );
+                        cpu.branch(self.thread_exit_routine());
+                        return None;
+                    }
                     panic!("Unexpected SVC #{svc} at {svc_pc:#x}");
                 };
                 log_dbg!("Call to host function, already linked: {}", symbol);
