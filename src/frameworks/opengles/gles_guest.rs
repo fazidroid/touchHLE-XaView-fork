@@ -2402,6 +2402,34 @@ fn glCompressedTexSubImage2D(
     // Absorb the partial compressed texture update to prevent a missing symbol crash!
     println!("🎮 LOG: Absorbed glCompressedTexSubImage2D to prevent crash!");
 }
+fn glCurrentPaletteMatrixOES(_env: &mut Environment, _matrixpaletteindex: GLuint) {
+    // 🏎️ SINKHOLE: Matrix Palette Skinning
+}
+
+fn glMatrixIndexPointerOES(_env: &mut Environment, _size: GLint, _type: GLenum, _stride: GLsizei, _pointer: ConstVoidPtr) {
+    // 🏎️ SINKHOLE: Matrix Palette Skinning
+}
+
+fn glWeightPointerOES(_env: &mut Environment, _size: GLint, _type: GLenum, _stride: GLsizei, _pointer: ConstVoidPtr) {
+    // 🏎️ SINKHOLE: Matrix Palette Skinning
+}
+
+fn glValidateProgram(_env: &mut Environment, _program: GLuint) {
+    // 🏎️ SINKHOLE: NFS Shift 2 pipeline diagnostic check
+}
+
+fn glGetShaderSource(
+    env: &mut Environment,
+    _shader: GLuint,
+    _bufSize: GLsizei,
+    length: MutPtr<GLsizei>,
+    _source: MutVoidPtr,
+) {
+    // 🏎️ SINKHOLE: Safely report a source length of 0 to prevent memory panics
+    if !length.is_null() {
+        env.mem.write(length, 0);
+    }
+}
 
 
 
@@ -2648,6 +2676,11 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glShaderBinary(_, _, _, _, _)),
     export_c_func!(glGetShaderPrecisionFormat(_, _, _, _)),
     export_c_func!(glCompressedTexSubImage2D(_, _, _, _, _, _, _, _, _)),
+    export_c_func!(glCurrentPaletteMatrixOES(_)),
+    export_c_func!(glMatrixIndexPointerOES(_, _, _, _)),
+    export_c_func!(glWeightPointerOES(_, _, _, _)),
+    export_c_func!(glValidateProgram(_)),
+    export_c_func!(glGetShaderSource(_, _, _, _)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {
