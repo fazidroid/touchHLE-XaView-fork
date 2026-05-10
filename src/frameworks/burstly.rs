@@ -6,12 +6,18 @@
 //! Stubs for the Burstly ad framework.
 
 use crate::dyld::HostDylib;
-use crate::objc::{id, msg_class, objc_classes, ClassExports, HostObject, NSZonePtr};
+use crate::objc::{
+    autorelease, id, msg_class, objc_classes, ClassExports, HostObject, NSZonePtr, retain,
+};
 use crate::Environment;
 
 #[derive(Default)]
 struct BurstlyCurrencyProcessRequestDataHostObject;
 impl HostObject for BurstlyCurrencyProcessRequestDataHostObject {}
+
+#[derive(Default)]
+struct BurstlyBannerAdViewHostObject;
+impl HostObject for BurstlyBannerAdViewHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -27,7 +33,20 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; NSObject class]
 }
 
-// If the game calls any other class methods, add stubs here.
+@end
+
+@implementation BurstlyBannerAdView: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    env.objc.alloc_object(this, Box::new(BurstlyBannerAdViewHostObject), &mut env.mem)
+}
+
+- (id)copyWithZone:(NSZonePtr)zone {
+    log_dbg!("BurstlyBannerAdView copyWithZone:");
+    // Return a shallow copy: retain and autorelease
+    retain(env, this);
+    autorelease(env, this)
+}
 
 @end
 
