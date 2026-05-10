@@ -316,8 +316,23 @@ impl Allocator {
             let size = size.max(MIN_CHUNK_SIZE);
             Self::align(size, MIN_CHUNK_SIZE)
         } else {
-            Self::align(size, PAGE_SIZE)
+            // Use checked alignment — if the size is so large that aligning
+            // to PAGE_SIZE would overflow GuestUSize (u32), we cannot satisfy
+            // the request. Return 0 (NULL) so the caller can handle it.
+            match Self::checked_align(size, PAGE_SIZE) {
+                Some(s) if s >= MIN_CHUNK_SIZE => s,
+                _ => {
+                    log!("alloc({:#x}): requested size would overflow after alignment, returning NULL", size);
+                    return 0;
+                }
+            }
         };
+
+        // Final sanity guard — should never be needed after the checks above.
+        if size < MIN_CHUNK_SIZE {
+            log!("alloc: size {:#x} < MIN_CHUNK_SIZE after alignment, returning NULL", size);
+            return 0;
+        }
 
         let Some(alloc) = self.unused_chunks.allocate(size) else {
             panic!("Could not find large enough chunk to allocate {size:#x} bytes");
@@ -329,9 +344,21 @@ impl Allocator {
 
     fn align(size: GuestUSize, align: GuestUSize) -> GuestUSize {
         if !size.is_multiple_of(align) {
-            size + align - (size % align)
+            // Use saturating_add so overflow returns GuestUSize::MAX rather
+            // than wrapping to 0 (which would pass 0 into allocate() and
+            // cause an assert failure).
+            size.saturating_add(align - (size % align))
         } else {
             size
+        }
+    }
+
+    /// Like align() but returns None on overflow.
+    fn checked_align(size: GuestUSize, align: GuestUSize) -> Option<GuestUSize> {
+        if !size.is_multiple_of(align) {
+            size.checked_add(align - (size % align))
+        } else {
+            Some(size)
         }
     }
 
