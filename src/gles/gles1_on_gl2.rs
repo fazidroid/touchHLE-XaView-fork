@@ -2255,6 +2255,13 @@ impl GLES for GLES1OnGL2<'_> {
         stride: GLsizei,
         ptr: *const GLvoid,
     ) {
+        // GL_HALF_FLOAT_OES (0x8D61) must be mapped to GL_HALF_FLOAT (0x140B)
+        // on desktop OpenGL — Asphalt 8 uses half-float vertex data for normals
+        // and tangents. Without this mapping the attribute reads garbage data,
+        // producing broken shading on cars and track surfaces.
+        const GL_HALF_FLOAT_OES: GLenum = 0x8D61;
+        const GL_HALF_FLOAT: GLenum = 0x140B;
+        let type_ = if type_ == GL_HALF_FLOAT_OES { GL_HALF_FLOAT } else { type_ };
         crate::gles::gl21compat_raw::VertexAttribPointer(indx, size, type_, normalized, stride, ptr)
     }
     unsafe fn DisableVertexAttribArray(&mut self, index: GLuint) {
