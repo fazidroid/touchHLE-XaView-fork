@@ -429,9 +429,17 @@ fn get_smart_retina_scale(env: &mut Environment, w: GLsizei, h: GLsizei) -> f32 
     if let Some(ctx) = current_ctx {
         let host_obj = env.objc.borrow::<EAGLContextHostObject>(*ctx);
         let r_scale = host_obj.retina_scale;
+        
+        // 🏎️ IPHONE 5 SCREEN FIX:
+        // We must explicitly tell the emulator that 568x320 is a valid Retina 
+        // resolution, otherwise it will drop the scale to 1.0x and chop the screen!
         if r_scale > 1.0
             && ((w == 480 && h == 320)
                 || (w == 320 && h == 480)
+                || (w == 568 && h == 320)  // iPhone 5 Landscape (Logical)
+                || (w == 320 && h == 568)  // iPhone 5 Portrait (Logical)
+                || (w == 1136 && h == 640) // iPhone 5 Native 
+                || (w == 640 && h == 1136)
                 || (w == 1024 && h == 768)
                 || (w == 768 && h == 1024))
         {
