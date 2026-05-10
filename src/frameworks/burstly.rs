@@ -41,9 +41,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, Box::new(BurstlyBannerAdViewHostObject), &mut env.mem)
 }
 
+// Add the class method copyWithZone:
++ (id)copyWithZone:(NSZonePtr)zone {
+    log_dbg!("BurstlyBannerAdView class copyWithZone:");
+    // Class objects are singletons; retain and autorelease.
+    retain(env, this);
+    autorelease(env, this)
+}
+
 - (id)copyWithZone:(NSZonePtr)zone {
-    log_dbg!("BurstlyBannerAdView copyWithZone:");
-    // Return a shallow copy: retain and autorelease
+    log_dbg!("BurstlyBannerAdView instance copyWithZone:");
     retain(env, this);
     autorelease(env, this)
 }
