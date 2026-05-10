@@ -83,6 +83,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     array
 }
 
++ (id)bundleForClass:(id)aClass {
+    log_dbg!("NSBundle bundleForClass: {:?}", aClass);
+    // For simplicity, return the main bundle.
+    // A more accurate implementation would need to track which bundle each class belongs to.
+    msg_class![env; NSBundle mainBundle]
+}
+
 - (())dealloc {
     let &NSBundleHostObject {
         bundle: _,
