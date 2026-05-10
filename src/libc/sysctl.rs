@@ -360,17 +360,21 @@ fn __assert_rtn(
     let file_str = if file.is_null() { "(unknown)".to_string() } else { env.mem.cstr_at_utf8(file).unwrap_or_default().to_string() };
     let func_str = if func.is_null() { "(unknown)".to_string() } else { env.mem.cstr_at_utf8(func).unwrap_or_default().to_string() };
 
-    // Log the assert for debugging but do NOT panic the emulator.
-    // Many EA asserts are non-fatal bounds/analytics checks; the old panic
-    // was a workaround that is no longer needed now that null-page SVCs and
-    // bad jumps are handled gracefully in dyld.rs / environment.rs.
-    // Redirect to thread_exit_routine so only the faulting thread dies.
-    log!(
-        "EA ASSERT (non-fatal, killing thread): Expr=[{}] File=[{}] Func=[{}] Line={}",
-        expr_str, file_str, func_str, line
-    );
-    let exit_fn = env.dyld.thread_exit_routine();
-    env.cpu.branch(exit_fn);
+    // On the main thread an EA ASSERT is always fatal — panic so we get a
+    // clear error rather than a silent broken state (restores Real Racing 2).
+    // On secondary threads kill only that thread so the main thread survives
+    // (fixes Nova 3's mid-gameplay null-pointer asserts without regressing RR2).
+    if env.current_thread == 0 {
+        panic!("EA ASSERT (fatal, main thread): Expr=[{}] File=[{}] Func=[{}] Line={}",
+            expr_str, file_str, func_str, line);
+    } else {
+        log!(
+            "EA ASSERT (non-fatal, killing thread {}): Expr=[{}] File=[{}] Func=[{}] Line={}",
+            env.current_thread, expr_str, file_str, func_str, line
+        );
+        let exit_fn = env.dyld.thread_exit_routine();
+        env.cpu.branch(exit_fn);
+    }
 }
 
 pub const FUNCTIONS: FunctionExports = &[
