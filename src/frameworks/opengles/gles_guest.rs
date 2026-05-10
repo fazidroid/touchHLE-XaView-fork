@@ -1818,14 +1818,8 @@ fn glShaderSource(
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
-        // ==========================================================
-        // 🏎️ GLSL LOGGER: DUMP THE RAW SHADER TO THE TERMINAL
-        // ==========================================================
-        println!(" ");
-        println!("================ SHADER INTERCEPT (ID: {}) ================", shader);
-        println!("{}", full_source);
-        println!("==========================================================");
-        println!(" ");
+        // Shader source logged at debug level only — not printed by default.
+        log_dbg!("glShaderSource(shader={}): {} chars", shader, full_source.len());
 
         if is_gles2 {
             // 🏎️ EXTENSION-SAFE PRECISION INJECTOR
@@ -1888,8 +1882,9 @@ fn glCompileShader(env: &mut Environment, shader: GLuint) {
                         std::ptr::null_mut(),
                         log_buf.as_mut_ptr() as *mut _,
                     );
-                    println!(
-                        "SHADER COMPILE ERROR: {}",
+                    log!(
+                        "glCompileShader: COMPILE ERROR for shader {}: {}",
+                        shader,
                         String::from_utf8_lossy(&log_buf)
                     );
                 }
