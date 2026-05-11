@@ -46,7 +46,7 @@ impl DeviceFamily {
         match self {
             DeviceFamily::iPhone => (320, 480),
             // 🏎️ FIX: Real 16:9 aspect ratio for iPhone 5 is 320x568!
-            DeviceFamily::iPhone5 => (320, 568), 
+            DeviceFamily::iPhone5 => (640, 1136), 
             DeviceFamily::iPad => (768, 1024),
         }
     }
@@ -56,8 +56,8 @@ impl TryFrom<u64> for DeviceFamily {
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(DeviceFamily::iPhone),
-            2 => Ok(DeviceFamily::iPad),
-            5 => Ok(DeviceFamily::iPhone5), 
+            5 => Ok(DeviceFamily::iPhone5),
+            2 => Ok(DeviceFamily::iPad), 
             _ => Err(()),
         }
     }
