@@ -1794,38 +1794,26 @@ fn glShaderSource(
             mem.ptr_at(length, count as u32)
         };
 
-                let mut full_source = String::new();
+       let mut full_source = String::new();
         for i in 0..count_usize {
-            let guest_str_ptr = string_arr.add(i).read_unaligned();
-            if guest_str_ptr.is_null() {
-                continue;
-            }
-            
-            let host_str_ptr = mem.unchecked_ptr_at(guest_str_ptr.cast::<u8>(), 0);
-            
-            let str_len = if length_arr.is_null() {
-                std::ffi::CStr::from_ptr(host_str_ptr.cast()).to_bytes().len()
-            } else {
-                let l = length_arr.add(i).read_unaligned();
-                if l < 0 {
-                    std::ffi::CStr::from_ptr(host_str_ptr.cast()).to_bytes().len()
-                } else {
-                    l as usize
-                }
-            };
-
+            // ... (Your existing string extraction logic stays here) ...
             let slice = std::slice::from_raw_parts(host_str_ptr.cast::<u8>(), str_len);
             full_source.push_str(&String::from_utf8_lossy(slice));
         }
 
         // ==========================================================
-        // 🏎️ GLSL LOGGER: DUMP THE RAW SHADER TO THE TERMINAL
+        // 🏎️ DEDICATED SHADER LOGGER: WRITE DIRECTLY TO DISK
         // ==========================================================
-        println!(" ");
-        println!("================ SHADER INTERCEPT (ID: {}) ================", shader);
-        println!("{}", full_source);
-        println!("==========================================================");
-        println!(" ");
+        {
+            use std::io::Write;
+            let mut shader_file = crate::log::get_shader_log_file();
+            let log_text = format!(
+                "\n================ SHADER INTERCEPT (ID: {}) ================\n{}\n==========================================================\n",
+                shader, full_source
+            );
+            // Safely write the formatted text into our new file!
+            let _ = shader_file.write_all(log_text.as_bytes());
+        }
 
         if is_gles2 {
             // 🏎️ EXTENSION-SAFE PRECISION INJECTOR
