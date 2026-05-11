@@ -287,6 +287,26 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
+            let mut is_asphalt7 = false;
+            if !env.is_app_picker {
+                is_asphalt7 = env.bundle.bundle_identifier() == "com.gameloft.asphalt7";
+            }
+
+            if is_asphalt7 && (name.contains("Burstly") || name.contains("AdView") || name.contains("AdManager")) {
+                let sel_str = selector.as_str(&env.mem);
+                println!("🎮 LOG: ADWARE ASSASSIN - Absorbing '{}' on dead ad class {} for Asphalt 7!", sel_str, name);
+                
+                // If the game engine wants a copy or an initialization, we feed it 'self' 
+                // so it gets a valid pointer and doesn't crash downstream.
+                // For all other random methods, we safely return nil (0).
+                if sel_str.contains("copy") || sel_str.contains("init") || sel_str == "self" || sel_str == "retain" {
+                    env.cpu.regs_mut()[0] = receiver.to_bits();
+                } else {
+                    env.cpu.regs_mut()[0] = 0;
+                }
+                env.cpu.regs_mut()[1] = 0;
+                return;
+            }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
