@@ -288,7 +288,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         
         // ONLY apply the widescreen stretch if the emulator is explicitly running the iPhone 5 preset!
-        if screen_w == 568.0 && screen_h == 320.0 {
+        if screen_w == 640.0 && screen_h == 1136.0 {
             // Override the tiny UI bounds with the full iPhone 5 widescreen resolution
             width = screen_w;
             height = screen_h;
