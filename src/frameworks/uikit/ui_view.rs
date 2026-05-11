@@ -739,4 +739,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+@implementation BurstlyBannerAdView: UIView
+
+// Absorb the class-level copy attempt
++ (id)copyWithZone:(crate::objc::NSZonePtr)_zone {
+    // Just return the class itself, simulating a successful copy
+    this
+}
+
+// Absorb instance-level copy attempts just in case
+- (id)copyWithZone:(crate::objc::NSZonePtr)_zone {
+    this
+}
+
+// Sinkhole the initialization so it doesn't try to load dead ads
+- (id)initWithFrame:(crate::frameworks::core_graphics::CGRect)_frame {
+    msg![env; this init]
+}
+
+// Prevent it from actually doing any work
+- (void)setDelegate:(id)_delegate {}
+- (void)loadRequest:(id)_request {}
+- (void)refreshAd {}
+
+@end
+
 };
