@@ -1861,13 +1861,25 @@ fn glShaderSource(
             }
         }
 
-        if is_gles2 {
+                if is_gles2 {
             // 🏎️ EXTENSION-SAFE PRECISION INJECTOR
             let mut s = full_source.clone();
             
             // 🏎️ ASPHALT 6 SYNTAX FIX
             // Automatically fix Gameloft's rogue bracket typo so modern drivers don't panic!
             s = s.replace("#endif]", "#endif");
+
+            // 🏎️ ASPHALT 8 SYNTAX FIX
+            // Gameloft broke GLSL rules by putting unescaped newlines inside #if directives.
+            // We safely strip the newlines after '||' and '&&' to glue the macros back together!
+            s = s.replace("||\n", "|| ");
+            s = s.replace("||\r\n", "|| ");
+            s = s.replace("|| \n", "|| ");
+            s = s.replace("|| \r\n", "|| ");
+            s = s.replace("&&\n", "&& ");
+            s = s.replace("&&\r\n", "&& ");
+            s = s.replace("&& \n", "&& ");
+            s = s.replace("&& \r\n", "&& ");
             
             // Only inject if the game engine forgot to define precision!
             if !s.contains("precision ") {
