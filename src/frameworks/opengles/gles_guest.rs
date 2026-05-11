@@ -1774,11 +1774,6 @@ fn glShaderSource(
     string: ConstVoidPtr,
     length: ConstPtr<GLint>,
 ) {
-    //log!(
-    //    "DEBUG_GL: glShaderSource(shader={}, count={})",
-    //    shader,
-    //    count
-    //); // ShaderSourceLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, mem| unsafe {
         let mut shader_type = 0;
@@ -1832,9 +1827,47 @@ fn glShaderSource(
             let _ = shader_file.write_all(log_text.as_bytes());
         }
 
+        // ==========================================================
+        // 🏎️ THE HLE SHADER INJECTOR (PowerVR Binary Bypass)
+        // ==========================================================
+        // If the string contains Mojibake or raw hex, it's a PowerVR hardware binary!
+        // We intercept it and swap it with generic Android GLSL to prevent a driver crash.
+        if !full_source.is_ascii() || full_source.contains('\0') {
+            println!("🎮 LOG: Intercepted PowerVR Binary (Type: {:#x})! Bypassing with Android GLSL...", shader_type);
+            
+            if shader_type == 0x8B31 { // GL_VERTEX_SHADER
+                full_source = "
+                    precision highp float;
+                    attribute vec4 position;
+                    attribute vec4 color;
+                    attribute vec2 texcoord;
+                    varying vec4 v_color;
+                    varying vec2 v_texcoord;
+                    void main() {
+                        gl_Position = position; 
+                        v_color = color;
+                        v_texcoord = texcoord;
+                    }
+                ".to_string();
+            } else { // GL_FRAGMENT_SHADER
+                full_source = "
+                    precision mediump float;
+                    varying vec4 v_color;
+                    varying vec2 v_texcoord;
+                    void main() {
+                        gl_FragColor = v_color;
+                    }
+                ".to_string();
+            }
+        }
+
         if is_gles2 {
             // 🏎️ EXTENSION-SAFE PRECISION INJECTOR
             let mut s = full_source.clone();
+            
+            // 🏎️ ASPHALT 6 SYNTAX FIX
+            // Automatically fix Gameloft's rogue bracket typo so modern drivers don't panic!
+            s = s.replace("#endif]", "#endif");
             
             // Only inject if the game engine forgot to define precision!
             if !s.contains("precision ") {
@@ -1868,6 +1901,7 @@ fn glShaderSource(
         gles.ShaderSource(shader, 1, c_source_array.as_ptr(), c_len_array.as_ptr());
     })
 }
+
 // GuestDeleteShaderImpl
 fn glDeleteShader(env: &mut Environment, shader: GLuint) {
     with_ctx_and_mem(env, |gles, _mem| unsafe { gles.DeleteShader(shader) })
