@@ -1872,6 +1872,7 @@ fn glShaderSource(
             // 🏎️ ASPHALT 8 SYNTAX FIX
             // Gameloft broke GLSL rules by putting unescaped newlines inside #if directives.
             // We safely strip the newlines after '||' and '&&' to glue the macros back together!
+                        // 🏎️ ASPHALT 8 SYNTAX FIX (Multiline Macros)
             s = s.replace("||\n", "|| ");
             s = s.replace("||\r\n", "|| ");
             s = s.replace("|| \n", "|| ");
@@ -1880,6 +1881,14 @@ fn glShaderSource(
             s = s.replace("&&\r\n", "&& ");
             s = s.replace("&& \n", "&& ");
             s = s.replace("&& \r\n", "&& ");
+
+            // 🏎️ ASPHALT 8 STRICT TYPING FIX (Integer to Float Casts)
+            // Gameloft illegally mixed integers and floats. Vulkan requires explicit decimals!
+            s = s.replace("vec3(1,1,1)", "vec3(1.0, 1.0, 1.0)");
+            s = s.replace("vec4(0.5, 0, 0, 0)", "vec4(0.5, 0.0, 0.0, 0.0)");
+            s = s.replace("vec4(0, 0.5, 0, 0)", "vec4(0.0, 0.5, 0.0, 0.0)");
+            s = s.replace("vec4(0, 0, 0.5, 0)", "vec4(0.0, 0.0, 0.5, 0.0)");
+            s = s.replace("vec4(0.5, 0.5, 0.5, 1)", "vec4(0.5, 0.5, 0.5, 1.0)");
             
             // Only inject if the game engine forgot to define precision!
             if !s.contains("precision ") {
@@ -1997,17 +2006,17 @@ fn glBindAttribLocation(env: &mut Environment, program: GLuint, index: GLuint, n
 }
 // LinkProgramBorrowFix
 fn glLinkProgram(env: &mut Environment, program: GLuint) {
-    //log!("DEBUG_GL: glLinkProgram(program={})", program); // LinkProgramLog
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         if is_gles2 {
-            // AppleGameloftAttribs
+            // AppleGameloftAttribs + EA NFS Fixes
             let n0 = [
                 c"position",
                 c"a_position",
                 c"aPosition",
                 c"inPosition",
                 c"rm_Vertex",
+                c"a_Position0", // 🏎️ NFS Most Wanted
             ];
             for n in n0 {
                 gles.BindAttribLocation(program, 0, n.as_ptr() as _);
@@ -2018,11 +2027,19 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
                 c"aNormal",
                 c"inNormal",
                 c"rm_Normal",
+                c"a_Normal0", // 🏎️ Future-proofing for EA
             ];
             for n in n1 {
                 gles.BindAttribLocation(program, 1, n.as_ptr() as _);
             }
-            let n2 = [c"color", c"a_color", c"aColor", c"inColor", c"rm_Color"];
+            let n2 = [
+                c"color", 
+                c"a_color", 
+                c"aColor", 
+                c"inColor", 
+                c"rm_Color",
+                c"a_Color0", // 🏎️ NFS Most Wanted
+            ];
             for n in n2 {
                 gles.BindAttribLocation(program, 2, n.as_ptr() as _);
             }
@@ -2033,6 +2050,7 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
                 c"aTexCoord",
                 c"inTexCoord",
                 c"rm_TexCoord0",
+                c"a_TexCoord0", // 🏎️ NFS Most Wanted
             ];
             for n in n3 {
                 gles.BindAttribLocation(program, 3, n.as_ptr() as _);
@@ -2043,6 +2061,7 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
                 c"aTexCoord1",
                 c"inTexCoord1",
                 c"rm_TexCoord1",
+                c"a_TexCoord1", // 🏎️ NFS Most Wanted
             ];
             for n in n4 {
                 gles.BindAttribLocation(program, 4, n.as_ptr() as _);
