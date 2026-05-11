@@ -758,9 +758,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 // Prevent it from actually doing any work
-- (void)setDelegate:(id)_delegate {}
-- (void)loadRequest:(id)_request {}
-- (void)refreshAd {}
+- (())setDelegate:(id)_delegate {}
+- (())loadRequest:(id)_request {}
+- (())refreshAd {}
 
 @end
 
