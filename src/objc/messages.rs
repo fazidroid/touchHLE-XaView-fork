@@ -289,7 +289,7 @@ fn objc_msgSend_inner(
             }
             let mut is_asphalt7 = false;
             if !env.is_app_picker {
-                is_asphalt7 = env.bundle.bundle_identifier() == "com.gameloft.asphalt7";
+                is_asphalt7 = env.bundle.bundle_identifier() == "com.gameloft.Asphalt7";
             }
 
             if is_asphalt7 && (name.contains("Burstly") || name.contains("AdView") || name.contains("AdManager")) {
