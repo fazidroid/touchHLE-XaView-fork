@@ -2009,63 +2009,36 @@ fn glLinkProgram(env: &mut Environment, program: GLuint) {
     let is_gles2 = env.options.gles_version == 2;
     with_ctx_and_mem(env, |gles, _mem| unsafe {
         if is_gles2 {
-            // AppleGameloftAttribs + EA NFS Fixes
+            // 🏎️ AppleGameloftAttribs + EA & Nova 3 Fixes
             let n0 = [
-                c"position",
-                c"a_position",
-                c"aPosition",
-                c"inPosition",
-                c"rm_Vertex",
-                c"a_Position0", // 🏎️ NFS Most Wanted
+                c"position", c"a_position", c"aPosition", c"inPosition", c"rm_Vertex", c"a_Position0", 
+                c"Vertex", // 🏎️ Nova 3 Position
             ];
-            for n in n0 {
-                gles.BindAttribLocation(program, 0, n.as_ptr() as _);
-            }
+            for n in n0 { gles.BindAttribLocation(program, 0, n.as_ptr() as _); }
+            
             let n1 = [
-                c"normal",
-                c"a_normal",
-                c"aNormal",
-                c"inNormal",
-                c"rm_Normal",
-                c"a_Normal0", // 🏎️ Future-proofing for EA
+                c"normal", c"a_normal", c"aNormal", c"inNormal", c"rm_Normal", c"a_Normal0", 
+                c"Normal", // 🏎️ Nova 3 Normal
             ];
-            for n in n1 {
-                gles.BindAttribLocation(program, 1, n.as_ptr() as _);
-            }
+            for n in n1 { gles.BindAttribLocation(program, 1, n.as_ptr() as _); }
+            
             let n2 = [
-                c"color", 
-                c"a_color", 
-                c"aColor", 
-                c"inColor", 
-                c"rm_Color",
-                c"a_Color0", // 🏎️ NFS Most Wanted
+                c"color", c"a_color", c"aColor", c"inColor", c"rm_Color", c"a_Color0", 
+                c"Color0", // 🏎️ Nova 3 Color
             ];
-            for n in n2 {
-                gles.BindAttribLocation(program, 2, n.as_ptr() as _);
-            }
+            for n in n2 { gles.BindAttribLocation(program, 2, n.as_ptr() as _); }
+            
             let n3 = [
-                c"texCoord",
-                c"texcoord",
-                c"a_texCoord",
-                c"aTexCoord",
-                c"inTexCoord",
-                c"rm_TexCoord0",
-                c"a_TexCoord0", // 🏎️ NFS Most Wanted
+                c"texCoord", c"texcoord", c"a_texCoord", c"aTexCoord", c"inTexCoord", c"rm_TexCoord0", c"a_TexCoord0", 
+                c"TexCoord0", c"Texcoord0", // 🏎️ Nova 3 UV 0
             ];
-            for n in n3 {
-                gles.BindAttribLocation(program, 3, n.as_ptr() as _);
-            }
+            for n in n3 { gles.BindAttribLocation(program, 3, n.as_ptr() as _); }
+            
             let n4 = [
-                c"texCoord1",
-                c"a_texCoord1",
-                c"aTexCoord1",
-                c"inTexCoord1",
-                c"rm_TexCoord1",
-                c"a_TexCoord1", // 🏎️ NFS Most Wanted
+                c"texCoord1", c"a_texCoord1", c"aTexCoord1", c"inTexCoord1", c"rm_TexCoord1", c"a_TexCoord1", 
+                c"TexCoord1", c"Texcoord1", // 🏎️ Nova 3 UV 1
             ];
-            for n in n4 {
-                gles.BindAttribLocation(program, 4, n.as_ptr() as _);
-            }
+            for n in n4 { gles.BindAttribLocation(program, 4, n.as_ptr() as _); }
         }
         gles.LinkProgram(program);
         if is_gles2 {
