@@ -933,7 +933,17 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
 
     // SDL2's documentation warns 0 should be bound to the draw framebuffer
     // when swapping the window, so this is the perfect moment.
-    env.window.as_ref().unwrap().swap_window();
+    
+    let fullscreen_layer = find_fullscreen_eagl_layer(env);
+    
+    // Firemint Engine presents offscreen buffers rapidly. If we unconditionally 
+    // swap the Android window for every buffer, the screen violently blinks!
+    // We strictly lock the physical swap to the main presentation layer.
+    if fullscreen_layer.is_some() && fullscreen_layer == Some(drawable) {
+        env.window.as_ref().unwrap().swap_window();
+    } else {
+        // Silently drop the physical swap for offscreen and null layers!
+    }
 
     let mut gles_boxed = gles_ctx.make_current(env.window.as_mut().unwrap());
     let gles = gles_boxed.as_mut();
