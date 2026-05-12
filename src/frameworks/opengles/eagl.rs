@@ -348,14 +348,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     let fullscreen_layer = find_fullscreen_eagl_layer(env);
-    
-    // Firemint Engine presents offscreen buffers rapidly. If we unconditionally 
-    // swap the Android window for every buffer, the screen violently blinks!
-    // We strictly lock the physical swap to the main presentation layer.
-    // (Note: Using touchHLE's 'nil' instead of standard Rust 'None')
-    if fullscreen_layer != nil && fullscreen_layer == drawable {
-        env.window.as_ref().unwrap().swap_window();
-    }
 
     // Unclear from documentation if this method requires the context to be
     // current, but it would be weird if it didn't?
@@ -384,23 +376,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     // We can use the fast path where we skip composition and present directly.
     //DebugPresentPath
     log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
-            if drawable == fullscreen_layer || fullscreen_layer == nil {
-            // Fast path:
-            // - drawable IS the fullscreen layer: normal case, present directly.
-            // - fullscreen_layer is nil: find_fullscreen_eagl_layer couldn't find
-            //   a covering EAGL layer (e.g. Nova 3's EAGL layer is not the deepest
-            //   sublayer). There's no UIKit compositor overlay to worry about, so
-            //   we can still present directly — this is correct and avoids the
-            //   broken slow path that stored pixels in RAM but never called
-            //   present_frame, leaving the screen blank.
-            log_dbg!(
-                "DEBUG_EAGL: Layer {:?} fast path (fullscreen_layer={:?}). renderbuffer: {:?}",
-                drawable, fullscreen_layer, renderbuffer,
-            );
-            unsafe {
-                // 🏎️ ADDED DRAWABLE ARGUMENT
-                present_renderbuffer(env, drawable);
-            }        
+    if drawable == fullscreen_layer || fullscreen_layer == nil {
+        // Fast path:
+        // - drawable IS the fullscreen layer: normal case, present directly.
+        // - fullscreen_layer is nil: find_fullscreen_eagl_layer couldn't find
+        //   a covering EAGL layer (e.g. Nova 3's EAGL layer is not the deepest
+        //   sublayer). There's no UIKit compositor overlay to worry about, so
+        //   we can still present directly — this is correct and avoids the
+        //   broken slow path that stored pixels in RAM but never called
+        //   present_frame, leaving the screen blank.
+        log_dbg!(
+            "DEBUG_EAGL: Layer {:?} fast path (fullscreen_layer={:?}). renderbuffer: {:?}",
+            drawable, fullscreen_layer, renderbuffer,
+        );
+        unsafe {
+            present_renderbuffer(env);
+        }
     } else {
         // fullscreen_layer is non-nil but drawable != fullscreen_layer:
         // a different layer covers the screen (compositor needed).
@@ -613,7 +604,7 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
 /// (which should be provided by the app) to a texture and presents it with
 /// [present_frame], trying to avoid noticeably modifying OpenGL ES state while
 /// doing so. The front and back buffers are then swapped.
-unsafe fn present_renderbuffer(env: &mut Environment, drawable: id) {
+unsafe fn present_renderbuffer(env: &mut Environment) {
     // Save these for when we need to draw the frame
     let viewport = env.window.as_mut().unwrap().viewport();
     let mut rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
@@ -740,13 +731,14 @@ unsafe fn present_renderbuffer(env: &mut Environment, drawable: id) {
         0,
     );
 
-    //DebugCopyTex
+    // Fix #4: Log CopyTexImage2D errors — previously silently swallowed.
+    // If the copy fails (e.g. FBO incomplete), we'd get a blank frame with no hint why.
     let err_after_copy = gles.GetError();
     if err_after_copy != 0 {
-        //log!(
-        //    "DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}",
-        //    err_after_copy
-        //);
+        log!(
+            "DEBUG_PRB: ERROR after CopyTexImage2D: {:#x}",
+            err_after_copy
+        );
     }
 
     // The texture will not have any mip levels so we must ensure the filter
@@ -871,9 +863,6 @@ unsafe fn present_renderbuffer(env: &mut Environment, drawable: id) {
     // Draw the quad
     present_frame(gles, viewport, rotation_matrix, virtual_cursor_visible_at);
 
-    // Clean up the texture
-    gles.DeleteTextures(1, &texture);
-
     // EsTwoRestoreBypass
     if !is_gles2 {
         for (&is_enabled, info) in old_arrays.iter().zip(gles1_on_gl2::ARRAYS.iter()) {
@@ -938,6 +927,16 @@ unsafe fn present_renderbuffer(env: &mut Environment, drawable: id) {
         old_tex_env_mode_arr.as_ptr().cast(),
     );
 
+    // Fix #1: Restore active texture unit — it was saved but never restored.
+    // present_frame changes the active unit; leaving it wrong corrupts the
+    // game's subsequent texture binds, causing per-frame flickering.
+    gles.ActiveTexture(active_texture as GLenum);
+
+    // Fix #2: Delete the texture BEFORE the swap is removed (moved to after
+    // swap_window below). On ANGLE/Vulkan (Adreno), command buffers are
+    // deferred — deleting the texture before the swap can cause the driver to
+    // present a partially-composed or blank frame.
+
     std::mem::drop(gles_boxed);
 
     // SDL2's documentation warns 0 should be bound to the draw framebuffer
@@ -946,6 +945,12 @@ unsafe fn present_renderbuffer(env: &mut Environment, drawable: id) {
 
     let mut gles_boxed = gles_ctx.make_current(env.window.as_mut().unwrap());
     let gles = gles_boxed.as_mut();
+
+    // Fix #2: Delete the texture here, after swap_window + make_current.
+    // On ANGLE/Vulkan (Adreno), command buffers are deferred — deleting the
+    // texture before the swap can cause the driver to present a
+    // partially-composed or blank frame, producing flickering.
+    gles.DeleteTextures(1, &texture);
 
     // Restore the other bindings
     gles.BindTexture(gles11::TEXTURE_2D, old_texture_2d);
