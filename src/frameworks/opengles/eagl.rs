@@ -108,20 +108,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     if context != nil {
         *current_ctx = Some(context);
-        // NFS Most Wanted and similar games call setCurrentContext: on background
-        // threads (e.g. thread 2) for the Firemonkey animation. If those threads
-        // later make GL calls but the context lookup uses env.current_thread which
-        // changed, the calls are silently ignored ("No EAGLContext for thread N").
-        // Store the context on thread 0 (main) as a shared fallback so any thread
-        // without its own context can use the main one for basic GL operations.
-        if env.current_thread != 0 {
-            let main_ctx = env.framework_state.opengles.current_ctx_for_thread(0);
-            if main_ctx.is_none() {
-                *main_ctx = Some(context);
-                retain(env, context);
-                log_dbg!("EAGLContext setCurrentContext: propagated context from thread {} to main thread as fallback", env.current_thread);
-            }
-        }
     }
 
     true
@@ -266,40 +252,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     env.objc.borrow_mut::<EAGLContextHostObject>(this).retina_scale = scale as f32; // SyncRetinaScale
 
-        let (width, height) = {
+    let (width, height) = {
         let bounds: CGRect = msg![env; drawable bounds];
-        let mut width = bounds.size.width;
-        let mut height = bounds.size.height;
-
-        // ==========================================================
-        // 🏎️ IPHONE 5 EXCLUSIVE: Dynamic 3D Renderbuffer Scaler
-        // ==========================================================
-        let screen: id = crate::msg_class![env; UIScreen mainScreen];
-        let screen_bounds: CGRect = crate::msg![env; screen bounds];
-        
-        let mut screen_w = screen_bounds.size.width;
-        let mut screen_h = screen_bounds.size.height;
-        
-        // Ensure we are calculating for landscape orientation
-        if screen_h > screen_w {
-            let temp = screen_w;
-            screen_w = screen_h;
-            screen_h = temp;
-        }
-        
-        // ONLY apply the widescreen stretch if the emulator is explicitly running the iPhone 5 preset!
-        if screen_w == 640.0 && screen_h == 1136.0 {
-            // Override the tiny UI bounds with the full iPhone 5 widescreen resolution
-            width = screen_w;
-            height = screen_h;
-            println!("🎮 LOG: IPHONE 5 PRESET DETECTED - Expanding 3D Renderbuffer to 16:9!");
-        }
-
+        let CGSize { width, height } = bounds.size;
         assert!((0.0..(u32::MAX as f32)).contains(&width));
         assert!((0.0..(u32::MAX as f32)).contains(&height));
         let scale_hack = env.options.scale_hack.get() as f32;
         let final_w = (width * scale * scale_hack).round() as u32;
         let final_h = (height * scale * scale_hack).round() as u32;
+        //DebugRenderSize
+        //log!("DEBUG_EAGL: renderbufferStorage:fromDrawable: {:?} Bounds: w={}, h={} | scale={}, scale_hack={} | Final FBO: {}x{}", drawable, width, height, scale, scale_hack, final_w, final_h);
         (final_w, final_h)
     };
 
@@ -375,32 +337,48 @@ pub const CLASSES: ClassExports = objc_classes! {
     // We're presenting to the opaque CAEAGLLayer that covers the screen.
     // We can use the fast path where we skip composition and present directly.
     //DebugPresentPath
-    log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
-    if drawable == fullscreen_layer || fullscreen_layer == nil {
-        // Fast path:
-        // - drawable IS the fullscreen layer: normal case, present directly.
-        // - fullscreen_layer is nil: find_fullscreen_eagl_layer couldn't find
-        //   a covering EAGL layer (e.g. Nova 3's EAGL layer is not the deepest
-        //   sublayer). There's no UIKit compositor overlay to worry about, so
-        //   we can still present directly — this is correct and avoids the
-        //   broken slow path that stored pixels in RAM but never called
-        //   present_frame, leaving the screen blank.
-        log_dbg!(
-            "DEBUG_EAGL: Layer {:?} fast path (fullscreen_layer={:?}). renderbuffer: {:?}",
-            drawable, fullscreen_layer, renderbuffer,
-        );
+    //log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
+    if drawable == fullscreen_layer {
+        //log!(
+        //    "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
+        //    drawable,
+        //    renderbuffer,
+        //);
+        // re-borrow
         unsafe {
             present_renderbuffer(env);
         }
     } else {
-        // fullscreen_layer is non-nil but drawable != fullscreen_layer:
-        // a different layer covers the screen (compositor needed).
-        // Use slow path: read pixels to RAM for the compositor to pick up.
+        if fullscreen_layer != nil {
+            //log!("DEBUG_EAGL: Layer {:?} is NOT fullscreen layer {:?}. Rendering to RAM (SLOW PATH) or skipped!", drawable, fullscreen_layer);
+            // If there's a single layer that covers the screen, and this isn't
+            // it, there's no point in presenting the output because it won't be
+            // seen. Using a noisy log because it's a weird scenario and might
+            // indicate a bug.
+            //log!(
+            //    "Layer {:?} is not the fullscreen layer {:?}, skipping presentation of renderbuffer {:?}!",
+            //    drawable,
+            //    fullscreen_layer,
+            //    renderbuffer,
+            //);
+            if let Some(sleep_for) = sleep_for {
+                env.sleep(sleep_for);
+            }
+            return true;
+        }
+
+        // The very slow and inefficient path: not only does glReadPixels()
+        // block the thread until rendering finishes, but the result has to be
+        // copied back to system RAM, and then will have to be copied to VRAM
+        // again during composition. find_fullscreen_eagl_layer() exists to
+        // avoid this.
         log_dbg!(
-            "Drawable {:?} != fullscreen layer {:?}; slow path (compositor).",
-            drawable, fullscreen_layer,
+            "There is no fullscreen layer, presenting renderbuffer {:?} to layer {:?} by copying to RAM (slow path).",
+            renderbuffer,
+            drawable,
         );
         let pixels_vec = get_pixels_vec_for_presenting(env, drawable);
+        // re-borrow
         let (pixels_vec, width, height) = {
             let mut gles = super::sync_context(&mut env.framework_state.opengles, &mut env.objc, env.window.as_mut().unwrap(), env.current_thread);
             unsafe {
