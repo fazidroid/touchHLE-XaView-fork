@@ -604,7 +604,7 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
 /// (which should be provided by the app) to a texture and presents it with
 /// [present_frame], trying to avoid noticeably modifying OpenGL ES state while
 /// doing so. The front and back buffers are then swapped.
-unsafe fn present_renderbuffer(env: &mut Environment) {
+unsafe fn present_renderbuffer(env: &mut Environment, drawable: id) {
     // Save these for when we need to draw the frame
     let viewport = env.window.as_mut().unwrap().viewport();
     let mut rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
@@ -934,12 +934,12 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     // SDL2's documentation warns 0 should be bound to the draw framebuffer
     // when swapping the window, so this is the perfect moment.
     
-    let fullscreen_layer = find_fullscreen_eagl_layer(env);
+        let fullscreen_layer = find_fullscreen_eagl_layer(env);
     
     // Firemint Engine presents offscreen buffers rapidly. If we unconditionally 
     // swap the Android window for every buffer, the screen violently blinks!
     // We strictly lock the physical swap to the main presentation layer.
-    if fullscreen_layer.is_some() && fullscreen_layer == Some(drawable) {
+    if fullscreen_layer != nil && fullscreen_layer == drawable {
         env.window.as_ref().unwrap().swap_window();
     } else {
         // Silently drop the physical swap for offscreen and null layers!
