@@ -108,6 +108,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     if context != nil {
         *current_ctx = Some(context);
+        // NFS Most Wanted and similar games call setCurrentContext: on background
+        // threads (e.g. thread 2) for the Firemonkey animation. If those threads
+        // later make GL calls but the context lookup uses env.current_thread which
+        // changed, the calls are silently ignored ("No EAGLContext for thread N").
+        // Store the context on thread 0 (main) as a shared fallback so any thread
+        // without its own context can use the main one for basic GL operations.
+        if env.current_thread != 0 {
+            let main_ctx = env.framework_state.opengles.current_ctx_for_thread(0);
+            if main_ctx.is_none() {
+                *main_ctx = Some(context);
+                retain(env, context);
+                log_dbg!("EAGLContext setCurrentContext: propagated context from thread {} to main thread as fallback", env.current_thread);
+            }
+        }
     }
 
     true
@@ -274,7 +288,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         
         // ONLY apply the widescreen stretch if the emulator is explicitly running the iPhone 5 preset!
-        if screen_w == 568.0 && screen_h == 320.0 {
+        if screen_w == 640.0 && screen_h == 1136.0 {
             // Override the tiny UI bounds with the full iPhone 5 widescreen resolution
             width = screen_w;
             height = screen_h;
@@ -362,29 +376,31 @@ pub const CLASSES: ClassExports = objc_classes! {
     // We can use the fast path where we skip composition and present directly.
     //DebugPresentPath
     log!("DEBUG_EAGL: presentRenderbuffer: target={}, drawable={:?}, fullscreen_layer={:?}", target, drawable, fullscreen_layer);
-    if drawable == fullscreen_layer {
-        log!(
-   "DEBUG_EAGL: Layer {:?} IS fullscreen layer. Fast path ACTIVE. renderbuffer: {:?}",
-         drawable,
-         renderbuffer,
-         );
-         unsafe {
-         present_renderbuffer(env);
+    if drawable == fullscreen_layer || fullscreen_layer == nil {
+        // Fast path:
+        // - drawable IS the fullscreen layer: normal case, present directly.
+        // - fullscreen_layer is nil: find_fullscreen_eagl_layer couldn't find
+        //   a covering EAGL layer (e.g. Nova 3's EAGL layer is not the deepest
+        //   sublayer). There's no UIKit compositor overlay to worry about, so
+        //   we can still present directly — this is correct and avoids the
+        //   broken slow path that stored pixels in RAM but never called
+        //   present_frame, leaving the screen blank.
+        log_dbg!(
+            "DEBUG_EAGL: Layer {:?} fast path (fullscreen_layer={:?}). renderbuffer: {:?}",
+            drawable, fullscreen_layer, renderbuffer,
+        );
+        unsafe {
+            present_renderbuffer(env);
         }
     } else {
-        // The drawable is not the detected fullscreen layer (or there is none).
-        // Previously we silently skipped here when fullscreen_layer != nil,
-        // but that caused blank screens for games like Nova 3 whose deepest
-        // sublayer is an overlay/HUD rather than the EAGL layer itself.
-        // Always fall through to the slow path so the frame is actually shown.
+        // fullscreen_layer is non-nil but drawable != fullscreen_layer:
+        // a different layer covers the screen (compositor needed).
+        // Use slow path: read pixels to RAM for the compositor to pick up.
         log_dbg!(
-            "Drawable {:?} is not fullscreen layer {:?}; presenting renderbuffer {:?} via slow path.",
-            drawable,
-            fullscreen_layer,
-            renderbuffer,
+            "Drawable {:?} != fullscreen layer {:?}; slow path (compositor).",
+            drawable, fullscreen_layer,
         );
         let pixels_vec = get_pixels_vec_for_presenting(env, drawable);
-        // re-borrow
         let (pixels_vec, width, height) = {
             let mut gles = super::sync_context(&mut env.framework_state.opengles, &mut env.objc, env.window.as_mut().unwrap(), env.current_thread);
             unsafe {
