@@ -436,9 +436,7 @@ fn get_smart_retina_scale(env: &mut Environment, w: GLsizei, h: GLsizei) -> f32 
         if r_scale > 1.0
             && ((w == 480 && h == 320)
                 || (w == 320 && h == 480)
-                || (w == 568 && h == 320)  // iPhone 5 Landscape (Logical)
-                || (w == 320 && h == 568)  // iPhone 5 Portrait (Logical)
-                || (w == 1136 && h == 640) // iPhone 5 Native 
+                || (w == 1136 && h == 640)
                 || (w == 640 && h == 1136)
                 || (w == 1024 && h == 768)
                 || (w == 768 && h == 1024))
