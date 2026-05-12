@@ -562,7 +562,13 @@ if !env.options.network_access {
             let type_ = socket_host_object.type_;
             match type_ {
                 SOCK_DGRAM => {
-                    let udp_socket = socket_host_object.udp_socket.as_ref().unwrap();
+                    // N.O.V.A. 3 (and similar games) may call select() on a UDP
+                    // socket before bind() has been called, so udp_socket is still
+                    // None. Treat an unbound socket as "not ready" rather than panic.
+                    let Some(udp_socket) = socket_host_object.udp_socket.as_ref() else {
+                        log_dbg!("select: SOCK_DGRAM fd {} has no host socket yet, skipping", fd);
+                        return false;
+                    };
                     // Peek just one byte to check if we have some data
                     let mut buf = [0; 1];
                     match udp_socket.peek(&mut buf) {
@@ -757,7 +763,10 @@ if !env.options.network_access {
                     }
                 }
                 SOCK_DGRAM => {
-                    todo!()
+                    // UDP sockets don't surface errors via take_error() the way
+                    // TCP does. Report no error so the game can continue normally.
+                    log_dbg!("select: error_set check for UDP socket {} — no error", fd);
+                    false
                 }
                 _ => unimplemented!(),
             }
@@ -833,29 +842,52 @@ fn accept(
             udp_socket: None,
         };
         State::get_mut(env).sockets.insert(new_fd, host_object);
-        assert!(!address.is_null());
-        let peer_guest_addr = sockaddr::from_sockaddr_v4(&addr);
-        //assert_eq!(guest_size_of::<sockaddr>(), env.mem.read(address_len));
-        env.mem.write(address_len, guest_size_of::<sockaddr>());
+        if !address.is_null() {
+            // BUG FIX: peer_guest_addr was computed but never written before,
+            // leaving the caller with a garbage peer address.
+            let peer_guest_addr = sockaddr::from_sockaddr_v4(&addr);
+            env.mem.write(address, peer_guest_addr);
+            env.mem.write(address_len, guest_size_of::<sockaddr>());
+        }
+        log_dbg!("accept: promoted pending stream to guest fd {}", new_fd);
         return new_fd;
     }
 
-    // re-borrow
     let socket_host_object = State::get(env).sockets.get(&socket).unwrap();
     let listener = socket_host_object.tcp_listener.as_ref().unwrap();
     match listener.accept() {
-        Ok((_, addr)) => {
-            log!("accept: New client: {}", addr);
-            unimplemented!()
+        Ok((stream, addr)) => {
+            log!("accept: New client from {}", addr);
+            // Mark the stream as non-blocking, consistent with every other
+            // host socket we create.
+            stream.set_nonblocking(true).unwrap();
+            let new_fd = find_or_create_socket(env);
+            assert!(!State::get(env).sockets.contains_key(&new_fd));
+            let host_object = SocketHostObject {
+                type_: SOCK_STREAM,
+                options: Default::default(),
+                tcp_listener: None,
+                pending_tcp_stream: None,
+                tcp_stream: Some(stream),
+                udp_socket: None,
+            };
+            State::get_mut(env).sockets.insert(new_fd, host_object);
+            if !address.is_null() {
+                let peer_guest_addr = sockaddr::from_sockaddr_v4(&addr);
+                env.mem.write(address, peer_guest_addr);
+                env.mem.write(address_len, guest_size_of::<sockaddr>());
+            }
+            log_dbg!("accept: accepted new connection as guest fd {}", new_fd);
+            new_fd
         }
         Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-            // No incoming connection is ready
-            // TODO: if this happened, take a deep breath and do:
-            // - block guest thread with a new [ThreadBlock] type
-            // - poll for data in thread scheduling part
-            // - write/read/accept/etc data once it is ready
-            // - unblock guest thread
-            unimplemented!("accept: TCP listener for socket {} would block on accepting, block current guest thread {}.", socket, env.current_thread)
+            // No connection is ready yet — perfectly normal for a non-blocking
+            // listener. Return -1 with EAGAIN so the guest retries via its
+            // select() loop instead of crashing the emulator.
+            // EAGAIN = 35 on iOS/BSD.
+            set_errno(env, 35); // EAGAIN
+            log_dbg!("accept: socket {} would block, returning EAGAIN", socket);
+            -1
         }
         Err(e) => {
             panic!("accept: Socket {socket} has error accepting connection: {e}");
