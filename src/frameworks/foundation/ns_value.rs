@@ -157,10 +157,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this)
 }
 
-- (*const u8)objCType {
+- (crate::mem::ConstPtr<u8>)objCType {
     let cstr = b"d\0";
     let ptr = env.mem.alloc_and_write_cstr(cstr);
-    ptr.cast()
+    ptr.cast_const()
 }
 
 - (MutVoidPtr)pointerValue {
