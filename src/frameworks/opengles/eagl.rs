@@ -565,6 +565,12 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
         renderbuffer,
     );
 
+    // FinishBeforeRead: flush and wait for all GPU commands to complete before
+    // calling ReadPixels. Without this, on ANGLE/Vulkan (Adreno), the GPU may
+    // still be drawing the current frame when ReadPixels runs — we'd read a
+    // partially-rendered frame, causing flickering in the compositor path.
+    gles.Finish();
+
     // Read the pixels
     let size = (width_u32 as usize)
         .checked_mul(height_u32 as usize)
