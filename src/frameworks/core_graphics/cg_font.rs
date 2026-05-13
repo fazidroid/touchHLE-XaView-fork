@@ -110,6 +110,12 @@ fn _CGFontGetGlyphBBoxes(
     }
 }
 
+pub fn CGFontCopyPostScriptName(env: &mut Environment, _font: CGFontRef) -> CFStringRef {
+    log!("CGFontCopyPostScriptName stub called -> returning 'Helvetica'");
+    // Return a fallback Helvetica string so EA/Firemint games don't panic!
+    ns_string::from_rust_string(env, "Helvetica".to_string())
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGFontRelease(_)),
     export_c_func!(CGFontRetain(_)),
