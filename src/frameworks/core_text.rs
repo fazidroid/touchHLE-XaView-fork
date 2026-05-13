@@ -7,6 +7,7 @@ use crate::frameworks::core_graphics::{CGAffineTransform, CGFloat};
 use crate::mem::ConstPtr;
 use crate::objc::{id, msg_class};
 use crate::Environment;
+use crate::dyld::{export_c_func, export_c_func_aliased, FunctionExports};
 
 /// Opaque type representing a Core Text font object.
 /// CTFontRef is toll‑free bridged with UIFont.
@@ -63,4 +64,5 @@ pub fn CGFontCopyPostScriptName(env: &mut Environment, font: CGFontRef) -> id {
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CTFontCreateWithGraphicsFont(_, _, _, _, _)),
+    export_c_func_aliased!("_CTFontCreateWithGraphicsFont", CTFontCreateWithGraphicsFont(_, _, _, _, _)),
 ];
