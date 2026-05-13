@@ -217,7 +217,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow_mut::<CALayerHostObject>(layer).superlayer = this;
 
     let CALayerHostObject { ref mut sublayers, .. } = env.objc.borrow_mut(this);
-    let idx = sublayers.iter().position(|&sublayer| sublayer == sibling).unwrap();
+    // SoftInsertBelow: if sibling is not found (already removed), append at end.
+    let idx = sublayers.iter().position(|&sublayer| sublayer == sibling)
+        .unwrap_or(sublayers.len());
     sublayers.insert(idx, layer);
 }
 
@@ -229,10 +231,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     let CALayerHostObject { ref mut sublayers, .. } = env.objc.borrow_mut(superlayer);
-    let idx = sublayers.iter().position(|&sublayer| sublayer == this).unwrap();
-    let sublayer = sublayers.remove(idx);
-    assert!(sublayer == this);
-    release(env, this);
+    // SoftRemove: if not found (already removed), just release and return.
+    if let Some(idx) = sublayers.iter().position(|&sublayer| sublayer == this) {
+        sublayers.remove(idx);
+        release(env, this);
+    } else {
+        log!("Warning: removeFromSuperlayer: layer {:?} not found in superlayer {:?}", this, superlayer);
+    }
 }
 
 - (CGRect)bounds {
