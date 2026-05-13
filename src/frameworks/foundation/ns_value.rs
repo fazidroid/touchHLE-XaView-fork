@@ -157,10 +157,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this)
 }
 
-- (const char *)objCType {
-    // Return a generic type encoding "d" (double). This is safe because the game
-    // typically only checks that the pointer is non‑null, not the exact encoding.
-    // Allocate a guest memory buffer with the string "d\0" and return its address.
+- (*const u8)objCType {
     let cstr = b"d\0";
     let ptr = env.mem.alloc_and_write_cstr(cstr);
     ptr.cast()
