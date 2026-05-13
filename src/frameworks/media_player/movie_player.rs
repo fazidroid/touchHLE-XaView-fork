@@ -38,25 +38,19 @@ type MPMovieControlStyle = NSInteger;
 type MPMoviePlaybackState = NSInteger;
 const MPMoviePlaybackStateStopped: MPMoviePlaybackState = 0;
 
-// Values might not be correct, but as these are linked symbol constants, it
-// shouldn't matter.
 pub const MPMovieDurationAvailableNotification: &str =
     "MPMovieDurationAvailableNotification";
-
 pub const MPMoviePlayerPlaybackDidFinishNotification: &str =
     "MPMoviePlayerPlaybackDidFinishNotification";
-/// Apparently an undocumented, private API. Spore Origins uses it.
 pub const MPMoviePlayerContentPreloadDidFinishNotification: &str =
     "MPMoviePlayerContentPreloadDidFinishNotification";
 pub const MPMoviePlayerScalingModeDidChangeNotification: &str =
     "MPMoviePlayerScalingModeDidChangeNotification";
 pub const MPMoviePlayerLoadStateDidChangeNotification: &str =
     "MPMoviePlayerLoadStateDidChangeNotification";
-// TODO: More notifications?
 const MPMoviePlayerPlaybackDidFinishReasonUserInfoKey: &str =
     "MPMoviePlayerPlaybackDidFinishReasonUserInfoKey";
 
-/// `NSNotificationName` values and other constants.
 pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMovieDurationAvailableNotification",
@@ -85,7 +79,6 @@ pub const CONSTANTS: ConstantExports = &[
 ];
 
 struct MPMoviePlayerControllerHostObject {
-    // NSURL *
     content_url: id,
 }
 impl HostObject for MPMoviePlayerControllerHostObject {}
@@ -96,8 +89,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation MPMoviePlayerController: NSObject
 
-// TODO: actual playback
-
 + (id)allocWithZone:(NSZonePtr)_zone {
     let host_object = Box::new(MPMoviePlayerControllerHostObject {
         content_url: nil,
@@ -105,29 +96,34 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
-- (id)initWithContentURL:(id)url { // NSURL*
+- (id)initWithContentURL:(id)url { 
     log!(
         "TODO: [(MPMoviePlayerController*){:?} initWithContentURL:{:?} ({:?})]",
-        this,
-        url,
-        ns_url::to_rust_path(env, url),
+        this, url, ns_url::to_rust_path(env, url),
     );
-
     retain(env, url);
     env.objc.borrow_mut::<MPMoviePlayerControllerHostObject>(this).content_url = url;
 
-    // Act as if loading immediately completed (Spore Origins waits for this).
+    // Fire ContentPreloadDidFinish immediately so the game knows content is ready.
     State::get(env).pending_notifications.push_back(
         (MPMoviePlayerContentPreloadDidFinishNotification, this, Instant::now())
     );
-
+    // For EA/Firemint games also queue PlaybackDidFinish — RR2 sometimes calls
+    // initWithContentURL without ever calling play, expecting auto-completion.
+    if !env.is_app_picker {
+        let bundle_id = env.bundle.bundle_identifier().to_string();
+        if bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint") {
+            State::get(env).pending_notifications.push_back(
+                (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now())
+            );
+        }
+    }
     this
 }
 
 - (())dealloc {
     let url = env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).content_url;
     release(env, url);
-
     env.objc.dealloc_object(this, &mut env.mem);
 }
 
@@ -135,77 +131,63 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<MPMoviePlayerControllerHostObject>(this).content_url
 }
 
-- (id)backgroundColor {
-    msg_class![env; UIColor blackColor] // TODO
-}
-- (())setBackgroundColor:(id)color { // UIColor*
-    todo_objc_setter!(this, color);
-}
+- (id)backgroundColor { msg_class![env; UIColor blackColor] }
+- (())setBackgroundColor:(id)color { todo_objc_setter!(this, color); }
+- (())setScalingMode:(MPMovieScalingMode)mode { todo_objc_setter!(this, mode); }
+- (())setUseApplicationAudioSession:(bool)use_session { todo_objc_setter!(this, use_session); }
+- (())setControlStyle:(MPMovieControlStyle)style { todo_objc_setter!(this, style); }
+- (())setFullscreen:(bool)fullsreen { todo_objc_setter!(this, fullsreen); }
 
-- (())setScalingMode:(MPMovieScalingMode)mode {
-    todo_objc_setter!(this, mode);
-}
-- (())setUseApplicationAudioSession:(bool)use_session {
-    todo_objc_setter!(this, use_session);
-}
-- (())setControlStyle:(MPMovieControlStyle)style {
-    todo_objc_setter!(this, style);
-}
-- (())setFullscreen:(bool)fullsreen {
-    todo_objc_setter!(this, fullsreen);
-}
+- (id)view { nil }
 
-- (id)view {
-    nil // TODO
-}
+- (MPMoviePlaybackState)playbackState { MPMoviePlaybackStateStopped }
 
-- (MPMoviePlaybackState)playbackState {
-    MPMoviePlaybackStateStopped // TODO
-}
-
-// Apparently an undocumented, private API, but Spore Origins uses it.
 - (())setMovieControlMode:(NSInteger)_mode {
-    // As this is undocumented and we don't have real video playback yet, let's
-    // ignore it.
-}
-
-// Another undocumented one! But some apps may still use it :/
-// https://stackoverflow.com/a/1390079/2241008
-- (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated {
-
-}
-
-// MPMediaPlayback implementation
-- (())play {
-        // ==========================================================
-        // 🏎️ DYNAMIC VIDEO BYPASS: EA-Exclusive Instant Completion
-        // ==========================================================
-        let mut is_ea_game = false;
-        
-        // Safety check to prevent crashing the app picker!
-        if !env.is_app_picker {
-            let bundle_id = env.bundle.bundle_identifier();
-            is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
-        }
-
-        if is_ea_game {
-            println!("🎮 LOG: EA Title Detected! Faking instant video completion for MPMoviePlayerController...");
-            
-            let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-            
-            // 1. Tell the game the video duration is available
-            let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
-            let _: () = msg![env; center postNotificationName:duration_notif object:this];
-
-            // 2. Broadcast that the video playback has completely finished!
-            let finish_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMoviePlayerPlaybackDidFinishNotification".to_string());
-            let _: () = msg![env; center postNotificationName:finish_notif object:this];
-        } else {
-            // Standard touchHLE behavior for Gameloft and other developers
-            println!("🎮 LOG: MPMoviePlayerController play called. Leaving standard behavior intact.");
-            // (If the original movie_player.rs implements actual video playback in the future, it goes here)
-        }
+    if env.bundle.bundle_identifier().starts_with("com.ea.spore") {
+        log!("Applying game-specific hack for Spore Origins: sending MPMoviePlayerPlaybackDidFinishNotification again.");
+        State::get(env).pending_notifications.push_back(
+            (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now())
+        );
     }
+}
+
+- (())setOrientation:(UIDeviceOrientation)_orientation animated:(bool)_animated { }
+
+- (())play {
+    let mut is_ea_game = false;
+    if !env.is_app_picker {
+        let bundle_id = env.bundle.bundle_identifier();
+        is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
+    }
+
+    if is_ea_game {
+        log!("MPMoviePlayerController play: EA/Firemint — faking instant video completion");
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+
+        // Fire the full sequence that RR2/Firemint games expect:
+        // LoadStateDidChange → DurationAvailable → PlaybackDidFinish
+        let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
+        let _: () = msg![env; center postNotificationName:load_notif object:this];
+
+        let duration_notif = ns_string::get_static_str(env, "MPMovieDurationAvailableNotification");
+        let _: () = msg![env; center postNotificationName:duration_notif object:this];
+
+        let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+        let _: () = msg![env; center postNotificationName:finish_notif object:this];
+    } else {
+        println!("🎮 LOG: Standard MPMoviePlayerController play called.");
+        if let Some(old) = env.framework_state.media_player.movie_player.active_player {
+            let _: () = msg![env; old stop];
+        }
+        assert!(env.framework_state.media_player.movie_player.active_player.is_none());
+        retain(env, this);
+        env.framework_state.media_player.movie_player.active_player = Some(this);
+
+        State::get(env).pending_notifications.push_back(
+            (MPMoviePlayerPlaybackDidFinishNotification, this, Instant::now())
+        );
+    }
+}
 
 - (())pause {
     log!("TODO: [(MPMoviePlayerController*){:?} pause]", this);
@@ -214,9 +196,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())stop {
     log!("TODO: [(MPMoviePlayerController*){:?} stop]", this);
     if env.framework_state.media_player.movie_player.active_player.is_some() {
-        // Some applications (like NOVA2) may send 2 `stop` messages for each
-        // 1 `play` message for the player. In that case, we want to release
-        // the active player only once.
         assert!(this == env.framework_state.media_player.movie_player.active_player.take().unwrap());
         release(env, this);
     }
@@ -226,75 +205,72 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation MPMoviePlayerViewController: UIViewController
 
-    - (id)initWithContentURL:(id)url {
-        log_dbg!("MPMoviePlayerViewController initWithContentURL: faking instant completion");
+- (id)initWithContentURL:(id)url {
+    let mut is_ea_game = false;
+    if !env.is_app_picker {
+        let bundle_id = env.bundle.bundle_identifier();
+        is_ea_game = bundle_id.starts_with("com.ea") || bundle_id.starts_with("com.firemint");
+    }
 
-        // Initialise the view controller normally so it has a valid object.
+    // 🏎️ DYNAMIC SPLIT: Real Racing 2 uses this, Gameloft gets nil!
+    if is_ea_game {
+        log_dbg!("MPMoviePlayerViewController initWithContentURL: EA/Firemint faking instant completion");
         let this: id = crate::msg_super![env; this init];
-        if this == nil {
-            return nil;
-        }
-
-        // Fire notifications immediately so the game stops waiting for video.
-        // Real Racing 2 calls initWithContentURL: in a loop (66+ times) waiting
-        // for MPMoviePlayerLoadStateDidChangeNotification — it never calls play.
+        if this == nil { return nil; }
 
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-
-        // 1. Signal that the load state changed (video is "ready to play").
+        
         let load_notif = ns_string::get_static_str(env, MPMoviePlayerLoadStateDidChangeNotification);
         let _: () = msg![env; center postNotificationName:load_notif object:this];
 
-        // 2. Signal that duration is known.
-        let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(
-            env, "MPMovieDurationAvailableNotification".to_string());
+        let duration_notif = crate::frameworks::foundation::ns_string::from_rust_string(env, "MPMovieDurationAvailableNotification".to_string());
         let _: () = msg![env; center postNotificationName:duration_notif object:this];
 
-        // 3. Signal that playback is finished so the game moves past the intro.
         let finish_notif = ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
         let _: () = msg![env; center postNotificationName:finish_notif object:this];
 
-        this
+        return this;
+    } else {
+        log!(
+            "TODO: [(MPMoviePlayerViewController*){:?} initWithContentURL:{:?} ({:?})] -> nil (Gameloft Bypass)",
+            this, url, ns_url::to_rust_path(env, url),
+        );
+        release(env, this);
+        return nil;
     }
+}
 
-    - (id)moviePlayer {
-        // Return 'this' to trick the game into sending video commands to this object
-        this
-    }
+- (id)moviePlayer { this }
 
 - (())play {
-        println!("🎮 LOG: Caught [MPMoviePlayerViewController play].");
-        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-        let finish_notif = crate::frameworks::foundation::ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
-        let _: () = msg![env; center postNotificationName:finish_notif object:this];
-    }
+    println!("🎮 LOG: Caught [MPMoviePlayerViewController play].");
+    let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+    let finish_notif = crate::frameworks::foundation::ns_string::get_static_str(env, MPMoviePlayerPlaybackDidFinishNotification);
+    let _: () = msg![env; center postNotificationName:finish_notif object:this];
+}
 
-    - (())stop { }
-    - (())pause { }
-    - (())setControlStyle:(i32)_style { }
-    - (())setScalingMode:(i32)_mode { }
-    - (())setFullscreen:(bool)_fullscreen animated:(bool)_animated { }
-    - (())setFullscreen:(bool)_fullscreen { }
+- (())stop { }
+- (())pause { }
+- (())setControlStyle:(i32)_style { }
+- (())setScalingMode:(i32)_mode { }
+- (())setFullscreen:(bool)_fullscreen animated:(bool)_animated { }
+- (())setFullscreen:(bool)_fullscreen { }
 
-    // ==========================================================
-    // 🏎️ THE MOVIE CONFIGURATION GAUNTLET: Absorb everything!
-    // ==========================================================
-    - (())setMovieSourceType:(i32)source_type { }
-    - (())setInitialPlaybackTime:(f64)time { }
-    - (())setEndPlaybackTime:(f64)time { }
-    - (())setShouldAutoplay:(bool)autoplay { }
-    - (())setRepeatMode:(i32)mode { }
-
-    - (i32)loadState { 3 }
-
-    - (())setUseApplicationAudioSession:(bool)use_session { }
+// ==========================================================
+// 🏎️ THE MOVIE CONFIGURATION GAUNTLET: Absorb everything!
+// ==========================================================
+- (())setMovieSourceType:(i32)source_type { }
+- (())setInitialPlaybackTime:(f64)time { }
+- (())setEndPlaybackTime:(f64)time { }
+- (())setShouldAutoplay:(bool)autoplay { }
+- (())setRepeatMode:(i32)mode { }
+- (i32)loadState { 3 }
+- (())setUseApplicationAudioSession:(bool)use_session { }
 
 @end
 
 };
 
-/// For use by `NSRunLoop` via [super::handle_players]: check movie players'
-/// status, send notifications if necessary.
 pub(super) fn handle_players(env: &mut Environment) {
     let mut notifs_to_run = Vec::new();
     let pending_notifs = &mut State::get(env).pending_notifications;
@@ -311,7 +287,6 @@ pub(super) fn handle_players(env: &mut Environment) {
     for (name_str, object) in notifs_to_run {
         let name = ns_string::get_static_str(env, name_str);
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-        // TODO: should there be some user info attached?
         let _: () = msg![env; center postNotificationName:name object:object];
     }
 }
