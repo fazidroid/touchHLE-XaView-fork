@@ -655,62 +655,8 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         renderbuffer,
     );
 
-    // DebugFboStatusExt
-    let fbo_status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
-    let mut px = [0u8; 20];
-    let hw = width.saturating_sub(1);
-    let hh = height.saturating_sub(1);
-    gles.ReadPixels(
-        0,
-        0,
-        1,
-        1,
-        gles11::RGBA,
-        gles11::UNSIGNED_BYTE,
-        px[0..4].as_mut_ptr() as *mut _,
-    );
-    gles.ReadPixels(
-        hw,
-        0,
-        1,
-        1,
-        gles11::RGBA,
-        gles11::UNSIGNED_BYTE,
-        px[4..8].as_mut_ptr() as *mut _,
-    );
-    gles.ReadPixels(
-        0,
-        hh,
-        1,
-        1,
-        gles11::RGBA,
-        gles11::UNSIGNED_BYTE,
-        px[8..12].as_mut_ptr() as *mut _,
-    );
-    gles.ReadPixels(
-        hw,
-        hh,
-        1,
-        1,
-        gles11::RGBA,
-        gles11::UNSIGNED_BYTE,
-        px[12..16].as_mut_ptr() as *mut _,
-    );
-    gles.ReadPixels(
-        width / 2,
-        height / 2,
-        1,
-        1,
-        gles11::RGBA,
-        gles11::UNSIGNED_BYTE,
-        px[16..20].as_mut_ptr() as *mut _,
-    );
-    //log!("DEBUG_PRB: FBO={:#x}. w={}, h={}. Pixels: BL[{},{},{},{}] BR[{},{},{},{}] TL[{},{},{},{}] TR[{},{},{},{}] C[{},{},{},{}]",
-    //    fbo_status, width, height,
-    //    px[0], px[1], px[2], px[3], px[4], px[5], px[6], px[7],
-    //    px[8], px[9], px[10], px[11], px[12], px[13], px[14], px[15],
-    //    px[16], px[17], px[18], px[19]
-    //);
+    // DebugFboStatusExt (disabled - ReadPixels stalls GPU every frame causing flicker)
+    let _fbo_status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
 
     // Create a texture with a copy of the pixels in the framebuffer
     let mut texture: GLuint = 0;
@@ -848,7 +794,13 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
     // matrix columns — this is equivalent to multiplying by [[-1,0],[0,-1]]
     // and costs nothing since it happens at the quad-draw level, not in the
     // game's own render pipeline.
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.gtr2") {
+    //
+    // Real Racing 2 (com.firemint.realracing2) uses the same 180° flip hack:
+    // the game renders in LandscapeRight but the device rotates LandscapeLeft,
+    // so the framebuffer is upside-down without this correction.
+    let needs_180_flip = env.bundle.bundle_identifier().starts_with("com.gameloft.gtr2")
+        || env.bundle.bundle_identifier().starts_with("com.firemint.realracing2");
+    if needs_180_flip {
         unsafe {
             let m_ptr = &mut rotation_matrix as *mut _ as *mut [[f32; 2]; 2];
             // Negate all components to rotate 180°
@@ -857,7 +809,7 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
             (*m_ptr)[1][0] = -(*m_ptr)[1][0];
             (*m_ptr)[1][1] = -(*m_ptr)[1][1];
         }
-        log_dbg!("GTR2 display hack: applied 180° rotation matrix flip");
+        log_dbg!("Display 180° flip applied for {}", env.bundle.bundle_identifier());
     }
 
     // Draw the quad
