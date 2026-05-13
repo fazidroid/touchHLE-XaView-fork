@@ -391,7 +391,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             drawable, fullscreen_layer, renderbuffer,
         );
         unsafe {
-            present_renderbuffer(env);
+            present_renderbuffer(env, drawable); // 🏎️ PASSED THE DRAWABLE ID
         }
     } else {
         // fullscreen_layer is non-nil but drawable != fullscreen_layer:
@@ -611,7 +611,7 @@ unsafe fn read_renderbuffer(gles: &mut dyn GLES, mut pixel_buffer: Vec<u8>) -> (
 /// (which should be provided by the app) to a texture and presents it with
 /// [present_frame], trying to avoid noticeably modifying OpenGL ES state while
 /// doing so. The front and back buffers are then swapped.
-unsafe fn present_renderbuffer(env: &mut Environment) {
+unsafe fn present_renderbuffer(env: &mut Environment, drawable: id) {
     // Save these for when we need to draw the frame
     let viewport = env.window.as_mut().unwrap().viewport();
     let mut rotation_matrix = env.window.as_mut().unwrap().rotation_matrix();
@@ -957,7 +957,13 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
 
     // SDL2's documentation warns 0 should be bound to the draw framebuffer
     // when swapping the window, so this is the perfect moment.
-    env.window.as_ref().unwrap().swap_window();
+    let fullscreen_layer = find_fullscreen_eagl_layer(env);
+    
+    // Ignore the pixel scanner. Only swap the physical Android window 
+    // if the engine is presenting the main fullscreen layer!
+    if fullscreen_layer != nil && fullscreen_layer == drawable {
+        env.window.as_ref().unwrap().swap_window();
+    }
 
     let mut gles_boxed = gles_ctx.make_current(env.window.as_mut().unwrap());
     let gles = gles_boxed.as_mut();
