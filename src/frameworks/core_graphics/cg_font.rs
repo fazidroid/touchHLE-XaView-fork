@@ -119,7 +119,7 @@ pub fn CGFontCopyPostScriptName(env: &mut Environment, _font: CGFontRef) -> CFSt
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGFontRelease(_)),
     export_c_func!(CGFontRetain(_)),
-    export_c_func!(CGFontCopyPostScriptName(_, _)),
+    export_c_func!(CGFontCopyPostScriptName(_)),
     ("_CGFontCreateWithDataProvider", &(_CGFontCreateWithDataProvider as fn(&mut Environment, CFTypeRef) -> CGFontRef)),
     ("_CGFontGetUnitsPerEm", &(_CGFontGetUnitsPerEm as fn(&mut Environment, CGFontRef) -> i32)),
     ("_CGFontGetAscent", &(_CGFontGetAscent as fn(&mut Environment, CGFontRef) -> i32)),
