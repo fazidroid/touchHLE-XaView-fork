@@ -89,10 +89,15 @@ pub fn find_fullscreen_eagl_layer(env: &mut Environment) -> id {
         // 🛡️ SILENCED 60FPS LOG
         // log!("DEBUG_CAEAGL: Inspecting layer: {:?} | bounds: x={},y={},w={},h={} | hidden: {}, opacity: {}", layer, bx, by, bw, bh, layer_host_obj.hidden, layer_host_obj.opacity);
 
-        // BypassStrictBounds
-        if layer_host_obj.hidden || layer_host_obj.opacity == 0.0 {
-            // 🛡️ SILENCED 60FPS LOG
-            // log!("DEBUG_CAEAGL: Layer hidden/transparent, returning nil.");
+        // BypassStrictBounds: only reject if the LEAF layer (no sublayers)
+        // is hidden/transparent. Intermediate layers in the hierarchy are
+        // often opacity=0 during transitions (e.g. Real Racing 2's window root
+        // layer), but the CAEAGLLayer at the bottom may still be valid.
+        // Bailing on any hidden intermediate layer caused fullscreen_layer=nil
+        // every frame, forcing the slow glReadPixels path and causing flicker.
+        if layer_host_obj.sublayers.is_empty()
+            && (layer_host_obj.hidden || layer_host_obj.opacity == 0.0)
+        {
             return nil;
         }
 
