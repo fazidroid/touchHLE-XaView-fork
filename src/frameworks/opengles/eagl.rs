@@ -23,6 +23,7 @@ use crate::Environment;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 // These are used by the EAGLDrawable protocol implemented by CAEAGLayer.
@@ -660,6 +661,63 @@ unsafe fn present_renderbuffer(env: &mut Environment) {
         gles11::RENDERBUFFER_OES,
         renderbuffer,
     );
+
+    // === Black-frame skip ===
+    // With SDL double-buffering on ANGLE/Vulkan, after swap_window() the new
+    // back buffer content is undefined (often black). We detect this by
+    // sampling 5 points from the app's renderbuffer (via src_framebuffer).
+    // If all are essentially black AND we haven't skipped too many frames in a
+    // row, we bail out without calling swap_window — the last good frame stays
+    // visible on screen.
+    //
+    // Each ReadPixels on a single pixel implicitly flushes only the commands
+    // targeting this FBO, so the cost is low (no full GPU stall).
+    static CONSECUTIVE_BLACK_FRAMES: AtomicU32 = AtomicU32::new(0);
+    const MAX_CONSECUTIVE_BLACK_SKIPS: u32 = 10;
+
+    let skip_count = CONSECUTIVE_BLACK_FRAMES.load(Ordering::Relaxed);
+    let sample_pts: [(GLint, GLint); 5] = [
+        (width / 2,         height / 2),        // center
+        (width / 4,         height / 4),        // top-left quadrant
+        (3 * width / 4,     height / 4),        // top-right quadrant
+        (width / 4,         3 * height / 4),    // bottom-left quadrant
+        (3 * width / 4,     3 * height / 4),    // bottom-right quadrant
+    ];
+    let mut any_color = false;
+    for (sx, sy) in sample_pts {
+        let mut px = [0u8; 4];
+        gles.ReadPixels(
+            sx, sy, 1, 1,
+            gles11::RGBA, gles11::UNSIGNED_BYTE,
+            px.as_mut_ptr() as *mut _,
+        );
+        // Threshold > 8 avoids false positives from near-black legitimately
+        // dark scenes while reliably catching true empty (0,0,0,0) frames.
+        if px[0] > 8 || px[1] > 8 || px[2] > 8 {
+            any_color = true;
+            break;
+        }
+    }
+
+    if !any_color && skip_count < MAX_CONSECUTIVE_BLACK_SKIPS {
+        CONSECUTIVE_BLACK_FRAMES.fetch_add(1, Ordering::Relaxed);
+        log_dbg!(
+            "DEBUG_PRB: Black frame #{} detected — skipping swap to keep last good frame visible",
+            skip_count + 1
+        );
+        // Clean up the src FBO and restore the bindings we already changed,
+        // then return WITHOUT swapping — the previous frame stays on screen.
+        gles.DeleteFramebuffersOES(1, &src_framebuffer);
+        gles.BindFramebufferOES(gles11::FRAMEBUFFER_OES, old_framebuffer);
+        gles.ActiveTexture(active_texture as GLenum);
+        // old_texture_2d is still bound (we haven't changed it yet), no
+        // need to restore it explicitly.
+        std::mem::drop(gles_boxed);
+        return;
+    }
+    // Frame has content (or we've hit the consecutive-skip limit) — reset
+    // counter and fall through to present normally.
+    CONSECUTIVE_BLACK_FRAMES.store(0, Ordering::Relaxed);
 
     // DebugFboStatusExt (disabled - ReadPixels stalls GPU every frame causing flicker)
     let _fbo_status = gles.CheckFramebufferStatusOES(gles11::FRAMEBUFFER_OES);
