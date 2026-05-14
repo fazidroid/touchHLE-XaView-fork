@@ -1295,6 +1295,34 @@ if symbol == "_CTFontCreateWithGraphicsFont" {
     }
     return Some(&(ct_font_stub as fn(&mut Environment, u32, f32, u32, u32) -> u32));
 }
+if symbol == "___snprintf_chk" {
+    fn snprintf_chk_stub(
+        env: &mut Environment,
+        str: crate::mem::MutPtr<u8>,
+        size: u32,
+        flags: u32,
+        fmt: crate::mem::ConstPtr<u8>,
+        ...
+    ) -> i32 {
+        log_dbg!("___snprintf_chk stub called");
+        // Use a simple vsnprintf with a temporary buffer.
+        // The real implementation would also check against the stack, but we ignore flags.
+        use std::ffi::VaList;
+        let mut args = VaList::start(env);
+        let result = unsafe {
+            let fmt_str = env.mem.cstr_at_utf8(fmt).unwrap_or_default();
+            // Format into a temporary Vec.
+            let formatted = format_args_with_va(fmt_str, args);
+            let bytes = formatted.as_bytes();
+            let len = bytes.len().min(size as usize - 1);
+            env.mem.bytes_at_mut(str, len).copy_from_slice(&bytes[..len]);
+            env.mem.write(str + len as u32, 0);
+            bytes.len() as i32
+        };
+        result
+    }
+    return Some(&(snprintf_chk_stub as fn(&mut Environment, crate::mem::MutPtr<u8>, u32, u32, crate::mem::ConstPtr<u8>, ...) -> i32));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
