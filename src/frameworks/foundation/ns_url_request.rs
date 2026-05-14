@@ -150,6 +150,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     release(env, old_url);
 }
 
+- (())setCachePolicy:(NSUInteger)cache_policy {
+    log_dbg!("NSMutableURLRequest setCachePolicy: {}", cache_policy);
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).cache_policy = cache_policy;
+}
+
+- (())setExpiration:(NSTimeInterval)expiration {
+    log_dbg!("NSMutableURLRequest setExpiration: {} (stub)", expiration);
+    // Not a standard iOS method; ignore.
+}
+
+// Ensure setHTTPShouldHandleCookies: exists (it does, but if not, add this)
+- (())setHTTPShouldHandleCookies:(bool)flag {
+    log_dbg!("NSMutableURLRequest setHTTPShouldHandleCookies: {}", flag);
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).http_should_handle_cookies = flag;
+}
+
 - (())addValue:(id)value // NSString*
     forHTTPHeaderField:(id)field { // NSString*
     if value == nil || field == nil { return; }
