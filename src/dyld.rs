@@ -1444,6 +1444,102 @@ if symbol == "_CFURLResourceIsReachable" {
     fn cf_url_resource_is_reachable(_env: &mut Environment, _url: u32, _error: u32) -> bool { false }
     return Some(&(cf_url_resource_is_reachable as fn(&mut Environment, u32, u32) -> bool));
 }
+// ==========================================================
+// Additional Core Foundation fallbacks for Real Racing 3
+// ==========================================================
+if symbol == "_CFAttributedStringCreate" {
+    fn cf_attributed_string_create(_env: &mut Environment, _alloc: u32, _str: u32, _attrs: u32) -> u32 { 0 }
+    return Some(&(cf_attributed_string_create as fn(&mut Environment, u32, u32, u32) -> u32));
+}
+if symbol == "_CFBooleanGetValue" {
+    fn cf_boolean_get_value(_env: &mut Environment, _bool: u32) -> bool { false }
+    return Some(&(cf_boolean_get_value as fn(&mut Environment, u32) -> bool));
+}
+if symbol == "_CFBundleCopyBundleURL" {
+    fn cf_bundle_copy_bundle_url(_env: &mut Environment, _bundle: u32) -> u32 { 0 }
+    return Some(&(cf_bundle_copy_bundle_url as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFBundleCopyResourceURL" {
+    fn cf_bundle_copy_resource_url(_env: &mut Environment, _bundle: u32, _res_name: u32, _res_type: u32, _sub_dir: u32) -> u32 { 0 }
+    return Some(&(cf_bundle_copy_resource_url as fn(&mut Environment, u32, u32, u32, u32) -> u32));
+}
+if symbol == "_CFBundleGetBundleWithIdentifier" {
+    fn cf_bundle_get_with_id(_env: &mut Environment, _id: u32) -> u32 { 0 }
+    return Some(&(cf_bundle_get_with_id as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFBundleGetIdentifier" {
+    fn cf_bundle_get_id(_env: &mut Environment, _bundle: u32) -> u32 { 0 }
+    return Some(&(cf_bundle_get_id as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFBundleGetMainBundle" {
+    fn cf_bundle_get_main(_env: &mut Environment) -> u32 { 0 }
+    return Some(&(cf_bundle_get_main as fn(&mut Environment) -> u32));
+}
+if symbol == "_CFBundleGetValueForInfoDictionaryKey" {
+    fn cf_bundle_get_value(_env: &mut Environment, _bundle: u32, _key: u32) -> u32 { 0 }
+    return Some(&(cf_bundle_get_value as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CFCharacterSetCreateWithCharactersInRange" {
+    fn cf_charset_create_range(_env: &mut Environment, _alloc: u32, _range: u32) -> u32 { 0 }
+    return Some(&(cf_charset_create_range as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CFCharacterSetGetLongCharacterBitmap" {
+    fn cf_charset_get_bitmap(_env: &mut Environment, _cs: u32) -> u32 { 0 }
+    return Some(&(cf_charset_get_bitmap as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFDataCreateMutable" {
+    fn cf_data_create_mutable(_env: &mut Environment, _alloc: u32, _capacity: u32) -> u32 { 0 }
+    return Some(&(cf_data_create_mutable as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CFDictionaryCreateMutable" {
+    fn cf_dict_create_mutable(_env: &mut Environment, _alloc: u32, _capacity: u32, _key_callbacks: u32, _value_callbacks: u32) -> u32 { 0 }
+    return Some(&(cf_dict_create_mutable as fn(&mut Environment, u32, u32, u32, u32) -> u32));
+}
+if symbol == "_CFDictionarySetValue" {
+    fn cf_dict_set_value(_env: &mut Environment, _dict: u32, _key: u32, _value: u32) { }
+    return Some(&(cf_dict_set_value as fn(&mut Environment, u32, u32, u32) -> ()));
+}
+if symbol == "_CFLocaleCopyCurrent" {
+    fn cf_locale_copy_current(_env: &mut Environment) -> u32 { 0 }
+    return Some(&(cf_locale_copy_current as fn(&mut Environment) -> u32));
+}
+if symbol == "_CFLocaleGetIdentifier" {
+    fn cf_locale_get_id(_env: &mut Environment, _locale: u32) -> u32 { 0 }
+    return Some(&(cf_locale_get_id as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFStringCreateWithFormat" {
+    fn cf_string_create_format(_env: &mut Environment, _alloc: u32, _format_options: u32, _format: u32) -> u32 {
+        // Varargs are ignored; return dummy string object
+        use crate::frameworks::foundation::ns_string::get_static_str;
+        let dummy = get_static_str(_env, "");
+        dummy.to_bits()
+    }
+    return Some(&(cf_string_create_format as fn(&mut Environment, u32, u32, u32) -> u32));
+}
+if symbol == "_CFStringGetLength" {
+    fn cf_string_get_length(_env: &mut Environment, _str: u32) -> u32 { 0 }
+    return Some(&(cf_string_get_length as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFStringGetCharacterAtIndex" {
+    fn cf_string_get_char(_env: &mut Environment, _str: u32, _idx: u32) -> u16 { 0 }
+    return Some(&(cf_string_get_char as fn(&mut Environment, u32, u32) -> u16));
+}
+if symbol == "_CFURLCreateWithString" {
+    fn cf_url_create_with_string(_env: &mut Environment, _alloc: u32, _url_str: u32, _base_url: u32) -> u32 { 0 }
+    return Some(&(cf_url_create_with_string as fn(&mut Environment, u32, u32, u32) -> u32));
+}
+if symbol == "_CFURLGetString" {
+    fn cf_url_get_string(_env: &mut Environment, _url: u32) -> u32 { 0 }
+    return Some(&(cf_url_get_string as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFUUIDCreateFromString" {
+    fn cf_uuid_create_from_string(_env: &mut Environment, _alloc: u32, _str: u32) -> u32 { 0 }
+    return Some(&(cf_uuid_create_from_string as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CFUUIDGetUUIDBytes" {
+    fn cf_uuid_get_bytes(_env: &mut Environment, _uuid: u32) -> u64 { 0 }
+    return Some(&(cf_uuid_get_bytes as fn(&mut Environment, u32) -> u64));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
