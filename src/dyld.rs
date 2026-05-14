@@ -1184,15 +1184,17 @@ if symbol == "_pthread_setname_np" {
                 &(fake_getipnodebyname
                     as fn(&mut crate::Environment, u32, i32, i32, u32) -> u32),
             );
-            // ==========================================================
+        }
+        // ==========================================================
 // Core Text fallbacks for Real Racing 3 (and other games)
 // ==========================================================
 if symbol == "_CTFontCopyGraphicsFont" {
     fn ct_copy_graphics_font(env: &mut Environment, _ct_font: u32, _attributes: u32) -> u32 {
         log_dbg!("CTFontCopyGraphicsFont stub called");
+        use crate::objc::TrivialHostObject;
         let class = env.objc.get_known_class("_touchHLE_CGFont", &mut env.mem);
-        let dummy_font = env.objc.alloc_object(class, Box::new(crate::frameworks::core_graphics::cg_font::CGFontHostObject), &mut env.mem);
-        dummy_font as u32
+        let dummy_font = env.objc.alloc_object(class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy_font.to_bits()
     }
     return Some(&(ct_copy_graphics_font as fn(&mut Environment, u32, u32) -> u32));
 }
@@ -1203,7 +1205,7 @@ if symbol == "_CTFontCreateWithName" {
         use crate::frameworks::foundation::ns_string::from_rust_string;
         let uifont_class = msg_class![env; UIFont class];
         let font: u32 = msg![env; uifont_class systemFontOfSize:17.0];
-        font as u32
+        font
     }
     return Some(&(ct_create_with_name as fn(&mut Environment, u32, f32, u32) -> u32));
 }
@@ -1213,14 +1215,14 @@ if symbol == "_CTFontCreateWithFontDescriptor" {
         use crate::objc::{msg, msg_class};
         let uifont_class = msg_class![env; UIFont class];
         let font: u32 = msg![env; uifont_class systemFontOfSize:17.0];
-        font as u32
+        font
     }
     return Some(&(ct_create_with_descriptor as fn(&mut Environment, u32, f32, u32) -> u32));
 }
 if symbol == "_CTFontGetGlyphsForCharacters" {
     fn ct_get_glyphs(_env: &mut Environment, _font: u32, _chars: u32, _glyphs: u32, _count: u32) -> bool {
         log_dbg!("CTFontGetGlyphsForCharacters stub called -> true");
-        true // pretend we mapped all glyphs
+        true
     }
     return Some(&(ct_get_glyphs as fn(&mut Environment, u32, u32, u32, u32) -> bool));
 }
@@ -1278,7 +1280,6 @@ if symbol == "_CTFontGetUnderlineThickness" {
     fn ct_get_ul_thick(_env: &mut Environment, _font: u32) -> f64 { 0.05 }
     return Some(&(ct_get_ul_thick as fn(&mut Environment, u32) -> f64));
 }
-        }
 if symbol == "_CTFontCreateWithGraphicsFont" {
     fn ct_font_stub(env: &mut Environment, _cg_font: u32, size: f32, _transform: u32, _attributes: u32) -> u32 {
         use crate::objc::{msg, msg_class, nil};
