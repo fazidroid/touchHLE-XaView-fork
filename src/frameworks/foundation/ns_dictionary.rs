@@ -738,7 +738,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     build_description(env, this)
 }
 
-- (void)enumerateKeysAndObjectsUsingBlock:(crate::abi::GuestFunction)block {
+- (())enumerateKeysAndObjectsUsingBlock:(crate::abi::GuestFunction)block { {
     log_dbg!("_touchHLE_NSDictionary enumerateKeysAndObjectsUsingBlock:");
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let keys: Vec<id> = host_obj.iter_keys().collect();
