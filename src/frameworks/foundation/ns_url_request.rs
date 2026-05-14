@@ -141,6 +141,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     println!("🎮 LOG: NSMutableURLRequest setTimeoutInterval: {} safely absorbed!", timeout_interval);
 }
 
+- (())setURL:(id)url {
+    log_dbg!("NSMutableURLRequest setURL: {:?}", url);
+    if url == nil { return; }
+    let url_copy = msg![env; url copy];
+    let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
+    let old_url = std::mem::replace(&mut host_obj.url, url_copy);
+    release(env, old_url);
+}
+
 - (())addValue:(id)value // NSString*
     forHTTPHeaderField:(id)field { // NSString*
     if value == nil || field == nil { return; }
