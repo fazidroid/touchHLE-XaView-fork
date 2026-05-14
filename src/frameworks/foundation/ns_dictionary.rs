@@ -738,19 +738,9 @@ pub const CLASSES: ClassExports = objc_classes! {
     build_description(env, this)
 }
 
-- (())enumerateKeysAndObjectsUsingBlock:(crate::abi::GuestFunction)block {
-    log_dbg!("_touchHLE_NSDictionary enumerateKeysAndObjectsUsingBlock:");
-    let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
-    let keys: Vec<id> = host_obj.iter_keys().collect();
-    let mut stop: bool = false;
-    for key in keys {
-        let obj = host_obj.lookup(env, key);
-        if block.to_ptr().is_null() { break; }
-        let block_fn: extern "C" fn(id, id, *mut bool) = unsafe { std::mem::transmute(block) };
-        block_fn(key, obj, &mut stop);
-        if stop { break; }
-    }
-    *env.objc.borrow_mut(this) = host_obj;
+- (())enumerateKeysAndObjectsUsingBlock:(crate::abi::GuestFunction)_block {
+    log_dbg!("_touchHLE_NSDictionary enumerateKeysAndObjectsUsingBlock: stub (ignoring block)");
+    // The block is ignored – real implementation would enumerate.
 }
 
 @end
