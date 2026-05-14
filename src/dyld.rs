@@ -1385,6 +1385,65 @@ if symbol == "_CTFontGetGlyphWithName" {
     }
     return Some(&(ct_get_glyph_with_name as fn(&mut Environment, u32, u32) -> u16));
 }
+// ==========================================================
+// Core Foundation fallbacks for Real Racing 3
+// ==========================================================
+if symbol == "_CFArrayGetCount" {
+    fn cf_array_get_count(_env: &mut Environment, _array: u32) -> u32 { 0 }
+    return Some(&(cf_array_get_count as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFArrayGetValueAtIndex" {
+    fn cf_array_get_value(_env: &mut Environment, _array: u32, _idx: u32) -> u32 { 0 }
+    return Some(&(cf_array_get_value as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CFDataCreate" {
+    fn cf_data_create(_env: &mut Environment, _alloc: u32, _bytes: u32, _len: u32) -> u32 { 0 }
+    return Some(&(cf_data_create as fn(&mut Environment, u32, u32, u32) -> u32));
+}
+if symbol == "_CFDataGetBytePtr" {
+    fn cf_data_get_byte_ptr(_env: &mut Environment, _data: u32) -> u32 { 0 }
+    return Some(&(cf_data_get_byte_ptr as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFDataGetLength" {
+    fn cf_data_get_length(_env: &mut Environment, _data: u32) -> u32 { 0 }
+    return Some(&(cf_data_get_length as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CFDictionaryGetValue" {
+    fn cf_dict_get_value(_env: &mut Environment, _dict: u32, _key: u32) -> u32 { 0 }
+    return Some(&(cf_dict_get_value as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CFNumberCreate" {
+    fn cf_number_create(_env: &mut Environment, _alloc: u32, _type: u32, _value_ptr: u32) -> u32 { 0 }
+    return Some(&(cf_number_create as fn(&mut Environment, u32, u32, u32) -> u32));
+}
+if symbol == "_CFNumberGetValue" {
+    fn cf_number_get_value(_env: &mut Environment, _num: u32, _type: u32, _out: u32) -> bool { false }
+    return Some(&(cf_number_get_value as fn(&mut Environment, u32, u32, u32) -> bool));
+}
+if symbol == "_CFReadStreamOpen" {
+    fn cf_read_stream_open(_env: &mut Environment, _stream: u32) -> bool { true }
+    return Some(&(cf_read_stream_open as fn(&mut Environment, u32) -> bool));
+}
+if symbol == "_CFReadStreamRead" {
+    fn cf_read_stream_read(_env: &mut Environment, _stream: u32, _buf: u32, _len: u32) -> u32 { 0 }
+    return Some(&(cf_read_stream_read as fn(&mut Environment, u32, u32, u32) -> u32));
+}
+if symbol == "_CFReadStreamClose" {
+    fn cf_read_stream_close(_env: &mut Environment, _stream: u32) { }
+    return Some(&(cf_read_stream_close as fn(&mut Environment, u32) -> ()));
+}
+if symbol == "_CFStringCreateWithBytes" {
+    fn cf_string_create_with_bytes(_env: &mut Environment, _alloc: u32, _bytes: u32, _len: u32, _encoding: u32, _is_external: bool) -> u32 { 0 }
+    return Some(&(cf_string_create_with_bytes as fn(&mut Environment, u32, u32, u32, u32, bool) -> u32));
+}
+if symbol == "_CFStringGetCString" {
+    fn cf_string_get_cstring(_env: &mut Environment, _str: u32, _buf: u32, _buf_size: u32, _encoding: u32) -> bool { false }
+    return Some(&(cf_string_get_cstring as fn(&mut Environment, u32, u32, u32, u32) -> bool));
+}
+if symbol == "_CFURLResourceIsReachable" {
+    fn cf_url_resource_is_reachable(_env: &mut Environment, _url: u32, _error: u32) -> bool { false }
+    return Some(&(cf_url_resource_is_reachable as fn(&mut Environment, u32, u32) -> bool));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
