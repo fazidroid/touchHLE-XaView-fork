@@ -284,6 +284,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)numberWithUnsignedLong:(u32)value {
+    println!("✅ NSNumber +numberWithUnsignedLong: called with {}", value);
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithUnsignedInt:value];
+    autorelease(env, new)
+}
+
 // TODO: types other than booleans and long longs
 
 // NSCoding implementation
