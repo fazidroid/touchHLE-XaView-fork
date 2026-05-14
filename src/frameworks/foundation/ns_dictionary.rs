@@ -287,7 +287,13 @@ pub fn init_with_objects_and_keys(
     mut va_args: VaList,
 ) -> id {
     let first_key: id = va_args.next(env);
-    assert!(first_key != nil); // TODO: raise proper exception
+    // BypassNilKeyCrash: nil first key means an empty/broken varargs list —
+    // return an empty dict rather than panicking.
+    if first_key == nil {
+        log!("Warning: dictionaryWithObjectsAndKeys: called with nil first key — returning empty dict");
+        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
+        return this;
+    }
 
     let mut host_object = <DictionaryHostObject as Default>::default();
     host_object.insert(env, first_key, first_object, /* copy_key: */ true);
@@ -298,7 +304,12 @@ pub fn init_with_objects_and_keys(
             break;
         }
         let key: id = va_args.next(env);
-        assert!(key != nil); // TODO: raise proper exception
+        // BypassNilKeyCrash: skip nil keys rather than panicking; the object
+        // has already been read so we just discard it and continue.
+        if key == nil {
+            log!("Warning: dictionaryWithObjectsAndKeys: nil key for object {:?} — skipping entry", object);
+            continue;
+        }
         host_object.insert(env, key, object, /* copy_key: */ true);
     }
 
@@ -404,7 +415,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)dictionaryWithObject:(id)object forKey:(id)key {
-    assert_ne!(key, nil); // TODO: raise proper exception
+    // BypassNilKeyCrash: real iOS raises NSInvalidArgumentException for a nil
+    // key, but crashing the emulator is worse than silently returning nil.
+    // RR3 triggers this when a lookup earlier in its pipeline returns nil.
+    if key == nil {
+        log!("Warning: dictionaryWithObject:forKey: called with nil key — returning nil");
+        return nil;
+    }
 
     let new_dict = dict_from_keys_and_objects(env, &[(key, object)]);
     autorelease(env, new_dict)
