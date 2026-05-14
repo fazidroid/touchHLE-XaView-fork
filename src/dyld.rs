@@ -1302,6 +1302,89 @@ if symbol == "___snprintf_chk" {
     }
     return Some(&(snprintf_chk_stub as fn(&mut Environment, u32, u32, u32, u32) -> i32));
 }
+if symbol == "_CTFontDescriptorCreateWithAttributes" {
+    fn ct_descriptor_create_with_attributes(_env: &mut Environment, _attributes: u32) -> u32 {
+        log_dbg!("CTFontDescriptorCreateWithAttributes stub called");
+        0
+    }
+    return Some(&(ct_descriptor_create_with_attributes as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontDescriptorCreateWithNameAndSize" {
+    fn ct_descriptor_create_with_name_and_size(_env: &mut Environment, _name: u32, _size: f32, _matrix: u32) -> u32 {
+        log_dbg!("CTFontDescriptorCreateWithNameAndSize stub called");
+        0
+    }
+    return Some(&(ct_descriptor_create_with_name_and_size as fn(&mut Environment, u32, f32, u32) -> u32));
+}
+if symbol == "_CTFontCopyFamilyName" {
+    fn ct_copy_family_name(env: &mut Environment, _font: u32) -> u32 {
+        log_dbg!("CTFontCopyFamilyName stub called");
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+        let name = from_rust_string(env, "Helvetica".to_string());
+        name as u32
+    }
+    return Some(&(ct_copy_family_name as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontCopyDisplayName" {
+    fn ct_copy_display_name(env: &mut Environment, _font: u32) -> u32 {
+        log_dbg!("CTFontCopyDisplayName stub called");
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+        let name = from_rust_string(env, "Helvetica".to_string());
+        name as u32
+    }
+    return Some(&(ct_copy_display_name as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontCopyPostScriptName" {
+    fn ct_copy_postscript_name(env: &mut Environment, _font: u32) -> u32 {
+        log_dbg!("CTFontCopyPostScriptName stub called");
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+        let name = from_rust_string(env, "Helvetica".to_string());
+        name as u32
+    }
+    return Some(&(ct_copy_postscript_name as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontGetSize" {
+    fn ct_get_size(_env: &mut Environment, _font: u32) -> f64 {
+        log_dbg!("CTFontGetSize stub called -> 17.0");
+        17.0
+    }
+    return Some(&(ct_get_size as fn(&mut Environment, u32) -> f64));
+}
+if symbol == "_CTFontGetMatrix" {
+    fn ct_get_matrix(_env: &mut Environment, _font: u32) -> u32 {
+        log_dbg!("CTFontGetMatrix stub called");
+        0 // identity matrix (CGAffineTransformIdentity)
+    }
+    return Some(&(ct_get_matrix as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontGetSymbolicTraits" {
+    fn ct_get_traits(_env: &mut Environment, _font: u32) -> u32 {
+        log_dbg!("CTFontGetSymbolicTraits stub called -> 0");
+        0
+    }
+    return Some(&(ct_get_traits as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontCopyAttribute" {
+    fn ct_copy_attribute(env: &mut Environment, _font: u32, _attr: u32) -> u32 {
+        log_dbg!("CTFontCopyAttribute stub called");
+        0 // nil
+    }
+    return Some(&(ct_copy_attribute as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CTFontCopyAvailableTables" {
+    fn ct_copy_available_tables(_env: &mut Environment, _font: u32, _options: u32) -> u32 {
+        log_dbg!("CTFontCopyAvailableTables stub called");
+        0 // nil (no tables)
+    }
+    return Some(&(ct_copy_available_tables as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CTFontGetGlyphWithName" {
+    fn ct_get_glyph_with_name(_env: &mut Environment, _font: u32, _glyph_name: u32) -> u16 {
+        log_dbg!("CTFontGetGlyphWithName stub called -> 0");
+        0
+    }
+    return Some(&(ct_get_glyph_with_name as fn(&mut Environment, u32, u32) -> u16));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
