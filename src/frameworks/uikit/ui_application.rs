@@ -444,6 +444,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; obj init]
 }
 
+- (())registerUserNotificationSettings:(id)settings {
+    log_dbg!("UIApplication registerUserNotificationSettings: {:?} (ignored)", settings);
+}
+
+- (id)currentUserNotificationSettings {
+    log_dbg!("UIApplication currentUserNotificationSettings stub called, returning nil");
+    nil
+}
+
 - (id)init {
     this
 }
