@@ -416,12 +416,11 @@ pub fn pread(
 
 /// Helper for C `feof()`.
 pub(super) fn eof(env: &mut Environment, fd: FileDescriptor) -> i32 {
-    let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
-    if file.reached_eof {
-        1
-    } else {
-        0
-    }
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        log!("Warning: feof({:?}) called with unknown fd, returning 0", fd);
+        return 0;
+    };
+    if file.reached_eof { 1 } else { 0 }
 }
 
 /// Helper for C `clearerr()`.
@@ -429,7 +428,10 @@ pub(super) fn clearerr(env: &mut Environment, fd: FileDescriptor) {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        log!("Warning: clearerr({:?}) called with unknown fd, ignoring", fd);
+        return;
+    };
     file.reached_eof = false;
 }
 
@@ -467,8 +469,27 @@ pub fn write(
         return size as GuestISize;
     }
 
-    // TODO: error handling for unknown fd?
-    let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+    // BypassWriteUnknownFdCrash: handle stdout/stderr (fd 1/2) and any other
+    // unknown fd gracefully instead of panicking. Games like RR3 call write()
+    // on stdout/stderr for logging; other callers may write to an already-closed
+    // fd. Mirrors the same pattern already used in read().
+    if matches!(fd, STDOUT_FILENO | STDERR_FILENO) {
+        let text = env.mem.bytes_at(buffer.cast(), size);
+        let msg = String::from_utf8_lossy(text);
+        log_dbg!("write(fd={}) (stdout/stderr): {}", fd, msg.trim_end());
+        return size as GuestISize;
+    }
+
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        log!(
+            "Warning: write({:?}, {:?}, {:#x}) called with unknown/closed fd, returning -1",
+            fd,
+            buffer,
+            size,
+        );
+        set_errno(env, EBADF);
+        return -1;
+    };
 
     let buffer_slice = env.mem.bytes_at(buffer.cast(), size);
     match file.file.write(buffer_slice) {
@@ -830,7 +851,11 @@ fn fcntl(
 
     match cmd {
         F_GETFD => {
-            let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+            let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+                log!("Warning: fcntl F_GETFD({:?}) called with unknown fd, returning -1", fd);
+                set_errno(env, EBADF);
+                return -1;
+            };
             return file.flags;
         }
                 F_SETFD => {
@@ -965,7 +990,11 @@ pub fn ftruncate(env: &mut Environment, fd: FileDescriptor, len: off_t) -> i32 {
     // TODO: handle errno properly
     set_errno(env, 0);
 
-    let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+    let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+        log!("Warning: ftruncate({:?}) called with unknown fd, returning -1", fd);
+        set_errno(env, EBADF);
+        return -1;
+    };
     match file.file.set_len(len as u64) {
         Ok(()) => 0,
         Err(_) => -1, // TODO: set errno
@@ -1077,12 +1106,16 @@ fn validate_lock(env: &mut Environment, fd: FileDescriptor, lock: &flock) -> Res
     let lock_start = match whence {
         SEEK_SET => lock.start,
         SEEK_CUR => {
-            let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+            let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+                return Err(EBADF);
+            };
             let file_position = file.file.stream_position().unwrap();
             file_position as i64 + lock.start
         }
         SEEK_END => {
-            let file = env.libc_state.posix_io.file_for_fd(fd).unwrap();
+            let Some(file) = env.libc_state.posix_io.file_for_fd(fd) else {
+                return Err(EBADF);
+            };
             let size: i64 = file.file.stream_len().unwrap().try_into().unwrap();
             size + lock.start
         }
