@@ -1066,7 +1066,7 @@ fn kevent(
     0
 }
 
-pub fn dispatch_queue_create(label: *const i8, _attr: *mut ()) -> dispatch_queue_t {
+pub fn dispatch_queue_create(_env: &mut Environment, label: *const i8, _attr: *mut ()) -> dispatch_queue_t {
     let name = if label.is_null() {
         "unknown".to_string()
     } else {
@@ -1078,49 +1078,49 @@ pub fn dispatch_queue_create(label: *const i8, _attr: *mut ()) -> dispatch_queue
     queue
 }
 
-pub fn dispatch_release(queue: dispatch_queue_t) {
+pub fn dispatch_release(_env: &mut Environment, queue: dispatch_queue_t) {
     log_dbg!("dispatch_release({:p})", queue);
     QUEUES.lock().unwrap().remove(&queue);
 }
 
-pub fn dispatch_retain(queue: dispatch_queue_t) {
+pub fn dispatch_retain(_env: &mut Environment, queue: dispatch_queue_t) {
     log_dbg!("dispatch_retain({:p}) stub", queue);
 }
 
-pub fn dispatch_get_main_queue() -> dispatch_queue_t {
+pub fn dispatch_get_main_queue(_env: &mut Environment) -> dispatch_queue_t {
     *MAIN_QUEUE
 }
 
-pub fn dispatch_get_global_queue(_priority: u64, _flags: u64) -> dispatch_queue_t {
+pub fn dispatch_get_global_queue(_env: &mut Environment, _priority: u64, _flags: u64) -> dispatch_queue_t {
     *GLOBAL_QUEUE
 }
 
-pub fn dispatch_get_current_queue() -> dispatch_queue_t {
+pub fn dispatch_get_current_queue(_env: &mut Environment) -> dispatch_queue_t {
     *CURRENT_QUEUE
 }
 
-pub fn dispatch_set_target_queue(_queue: dispatch_queue_t, _target: dispatch_queue_t) {
+pub fn dispatch_set_target_queue(_env: &mut Environment, _queue: dispatch_queue_t, _target: dispatch_queue_t) {
     log_dbg!("dispatch_set_target_queue stub");
 }
 
-pub fn dispatch_sync(queue: dispatch_queue_t, block: GuestFunction) {
+pub fn dispatch_sync(_env: &mut Environment, queue: dispatch_queue_t, block: GuestFunction) {
     log_dbg!("dispatch_sync({:p}, {:?})", queue, block);
     block.call_from_host(block);
 }
 
-pub fn dispatch_after(when: u64, queue: dispatch_queue_t, block: GuestFunction) {
+pub fn dispatch_after(_env: &mut Environment, when: u64, queue: dispatch_queue_t, block: GuestFunction) {
     log_dbg!("dispatch_after(when={}, queue={:p}) stub", when, queue);
     block.call_from_host(block);
 }
 
-pub fn dispatch_group_create() -> dispatch_group_t {
+pub fn dispatch_group_create(_env: &mut Environment) -> dispatch_group_t {
     let group = (GROUPS.lock().unwrap().len() + 100) as dispatch_group_t;
     GROUPS.lock().unwrap().insert(group, 0);
     log_dbg!("dispatch_group_create -> {:p}", group);
     group
 }
 
-pub fn dispatch_group_enter(group: dispatch_group_t) {
+pub fn dispatch_group_enter(_env: &mut Environment, group: dispatch_group_t) {
     log_dbg!("dispatch_group_enter({:p})", group);
     let mut groups = GROUPS.lock().unwrap();
     if let Some(count) = groups.get_mut(&group) {
@@ -1128,7 +1128,7 @@ pub fn dispatch_group_enter(group: dispatch_group_t) {
     }
 }
 
-pub fn dispatch_group_leave(group: dispatch_group_t) {
+pub fn dispatch_group_leave(_env: &mut Environment, group: dispatch_group_t) {
     log_dbg!("dispatch_group_leave({:p})", group);
     let mut groups = GROUPS.lock().unwrap();
     if let Some(count) = groups.get_mut(&group) {
@@ -1136,19 +1136,19 @@ pub fn dispatch_group_leave(group: dispatch_group_t) {
     }
 }
 
-pub fn dispatch_group_wait(group: dispatch_group_t, _timeout: u64) -> i32 {
+pub fn dispatch_group_wait(_env: &mut Environment, group: dispatch_group_t, _timeout: u64) -> i32 {
     log_dbg!("dispatch_group_wait({:p}) stub -> 0", group);
     0
 }
 
-pub fn dispatch_group_async(group: dispatch_group_t, queue: dispatch_queue_t, block: GuestFunction) {
+pub fn dispatch_group_async(_env: &mut Environment, group: dispatch_group_t, queue: dispatch_queue_t, block: GuestFunction) {
     log_dbg!("dispatch_group_async({:p}, {:p})", group, queue);
     dispatch_group_enter(group);
     block.call_from_host(block);
     dispatch_group_leave(group);
 }
 
-pub fn dispatch_group_notify(group: dispatch_group_t, queue: dispatch_queue_t, block: GuestFunction) {
+pub fn dispatch_group_notify(_env: &mut Environment, group: dispatch_group_t, queue: dispatch_queue_t, block: GuestFunction) {
     log_dbg!("dispatch_group_notify({:p}, {:p}) stub – executing immediately", group, queue);
     block.call_from_host(block);
 }
