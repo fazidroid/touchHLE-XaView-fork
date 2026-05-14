@@ -1303,9 +1303,12 @@ if symbol == "___snprintf_chk" {
     return Some(&(snprintf_chk_stub as fn(&mut Environment, u32, u32, u32, u32) -> i32));
 }
 if symbol == "_CTFontDescriptorCreateWithAttributes" {
-    fn ct_descriptor_create_with_attributes(_env: &mut Environment, _attributes: u32) -> u32 {
+    fn ct_descriptor_create_with_attributes(env: &mut Environment, _attributes: u32) -> u32 {
         log_dbg!("CTFontDescriptorCreateWithAttributes stub called");
-        0
+        use crate::objc::{msg_class, TrivialHostObject};
+        let obj_class = msg_class![env; NSObject class];
+        let dummy = env.objc.alloc_object(obj_class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy.to_bits()
     }
     return Some(&(ct_descriptor_create_with_attributes as fn(&mut Environment, u32) -> u32));
 }
