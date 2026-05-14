@@ -103,6 +103,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     app_init
 }
 
+- (())registerUserNotificationSettings:(id)settings {
+    log_dbg!("UIApplication registerUserNotificationSettings: {:?} (ignored)", settings);
+}
+
+- (id)currentUserNotificationSettings {
+    log_dbg!("UIApplication currentUserNotificationSettings stub called, returning nil");
+    nil
+}
+
 - (NSUInteger)beginBackgroundTaskWithExpirationHandler:(id)_handler {
     log!("TODO: UIApplication beginBackgroundTaskWithExpirationHandler: returning dummy task id 1");
     // UIBackgroundTaskInvalid is 0, so 1 is a valid identifier.
@@ -442,15 +451,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     // Return a dummy object (the actual settings are never used by the game)
     let obj: id = msg![env; this alloc];
     msg![env; obj init]
-}
-
-- (())registerUserNotificationSettings:(id)settings {
-    log_dbg!("UIApplication registerUserNotificationSettings: {:?} (ignored)", settings);
-}
-
-- (id)currentUserNotificationSettings {
-    log_dbg!("UIApplication currentUserNotificationSettings stub called, returning nil");
-    nil
 }
 
 - (id)init {
