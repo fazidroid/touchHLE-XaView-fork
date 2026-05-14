@@ -1185,9 +1185,6 @@ if symbol == "_pthread_setname_np" {
                     as fn(&mut crate::Environment, u32, i32, i32, u32) -> u32),
             );
         }
-        // ==========================================================
-// Core Text fallbacks for Real Racing 3 (and other games)
-// ==========================================================
 if symbol == "_CTFontCopyGraphicsFont" {
     fn ct_copy_graphics_font(env: &mut Environment, _ct_font: u32, _attributes: u32) -> u32 {
         log_dbg!("CTFontCopyGraphicsFont stub called");
@@ -1388,9 +1385,6 @@ if symbol == "_CTFontGetGlyphWithName" {
     }
     return Some(&(ct_get_glyph_with_name as fn(&mut Environment, u32, u32) -> u16));
 }
-// ==========================================================
-// More Core Text fallbacks for Real Racing 3
-// ==========================================================
 if symbol == "_CTTypesetterCreateWithAttributedString" {
     fn ct_typesetter_create(env: &mut Environment, _attr_str: u32) -> u32 {
         log_dbg!("CTTypesetterCreateWithAttributedString stub called");
@@ -1435,9 +1429,90 @@ if symbol == "_CTRunGetAttributes" {
     fn ct_run_get_attributes(_env: &mut Environment, _run: u32) -> u32 { 0 }
     return Some(&(ct_run_get_attributes as fn(&mut Environment, u32) -> u32));
 }
-// ==========================================================
-// Core Foundation fallbacks for Real Racing 3
-// ==========================================================
+if symbol == "_CTFontCopyName" {
+    fn ct_copy_name(env: &mut Environment, _font: u32, _name_key: u32) -> u32 {
+        log_dbg!("CTFontCopyName stub called");
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+        let dummy = from_rust_string(env, "Helvetica".to_string());
+        dummy.to_bits()
+    }
+    return Some(&(ct_copy_name as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CTFontCopyLocalizedName" {
+    fn ct_copy_localized_name(env: &mut Environment, _font: u32, _name_key: u32) -> u32 {
+        log_dbg!("CTFontCopyLocalizedName stub called");
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+        let dummy = from_rust_string(env, "Helvetica".to_string());
+        dummy.to_bits()
+    }
+    return Some(&(ct_copy_localized_name as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CTFrameGetLines" {
+    fn ct_frame_get_lines(_env: &mut Environment, _frame: u32, _range: u32, _origins: u32) -> u32 { 0 }
+    return Some(&(ct_frame_get_lines as fn(&mut Environment, u32, u32, u32) -> u32));
+}
+if symbol == "_CTFrameGetLineOrigins" {
+    fn ct_frame_get_line_origins(_env: &mut Environment, _frame: u32, _range: u32, _origins: u32) { }
+    return Some(&(ct_frame_get_line_origins as fn(&mut Environment, u32, u32, u32) -> ()));
+}
+if symbol == "_CTFramesetterCreateWithAttributedString" {
+    fn ct_framesetter_create(env: &mut Environment, _attr_str: u32) -> u32 {
+        log_dbg!("CTFramesetterCreateWithAttributedString stub called");
+        use crate::objc::{msg_class, TrivialHostObject};
+        let obj_class = msg_class![env; NSObject class];
+        let dummy = env.objc.alloc_object(obj_class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy.to_bits()
+    }
+    return Some(&(ct_framesetter_create as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFramesetterCreateFrame" {
+    fn ct_framesetter_create_frame(env: &mut Environment, _fs: u32, _string_range: u32, _path: u32, _frame_attrs: u32) -> u32 {
+        log_dbg!("CTFramesetterCreateFrame stub called");
+        use crate::objc::{msg_class, TrivialHostObject};
+        let obj_class = msg_class![env; NSObject class];
+        let dummy = env.objc.alloc_object(obj_class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy.to_bits()
+    }
+    return Some(&(ct_framesetter_create_frame as fn(&mut Environment, u32, u32, u32, u32) -> u32));
+}
+if symbol == "_CTFramesetterSuggestFrameSizeWithConstraints" {
+    fn ct_framesetter_suggest_size(_env: &mut Environment, _fs: u32, _string_range: u32, _frame_attrs: u32, _constraints: u32, _fit_range: u32) -> f64 { 0.0 }
+    return Some(&(ct_framesetter_suggest_size as fn(&mut Environment, u32, u32, u32, u32, u32) -> f64));
+}
+if symbol == "_CTParagraphStyleCreate" {
+    fn ct_paragraph_style_create(_env: &mut Environment, _settings: u32, _count: u32) -> u32 { 0 }
+    return Some(&(ct_paragraph_style_create as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CTParagraphStyleGetValue" {
+    fn ct_paragraph_style_get_value(_env: &mut Environment, _style: u32, _spec: u32, _buf: u32) -> bool { false }
+    return Some(&(ct_paragraph_style_get_value as fn(&mut Environment, u32, u32, u32) -> bool));
+}
+if symbol == "_CTLineGetStringRange" {
+    fn ct_line_get_string_range(_env: &mut Environment, _line: u32) -> u64 { 0 }
+    return Some(&(ct_line_get_string_range as fn(&mut Environment, u32) -> u64));
+}
+if symbol == "_CTRunGetStringRange" {
+    fn ct_run_get_string_range(_env: &mut Environment, _run: u32) -> u64 { 0 }
+    return Some(&(ct_run_get_string_range as fn(&mut Environment, u32) -> u64));
+}
+if symbol == "_CTRunGetStatus" {
+    fn ct_run_get_status(_env: &mut Environment, _run: u32) -> u32 { 0 }
+    return Some(&(ct_run_get_status as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontManagerCreateFontDescriptorFromData" {
+    fn ct_font_manager_create_descriptor(env: &mut Environment, _data: u32) -> u32 {
+        log_dbg!("CTFontManagerCreateFontDescriptorFromData stub called");
+        use crate::objc::{msg_class, TrivialHostObject};
+        let obj_class = msg_class![env; NSObject class];
+        let dummy = env.objc.alloc_object(obj_class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy.to_bits()
+    }
+    return Some(&(ct_font_manager_create_descriptor as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTFontManagerRegisterGraphicsFont" {
+    fn ct_font_manager_register_font(_env: &mut Environment, _font: u32, _error: u32) -> bool { true }
+    return Some(&(ct_font_manager_register_font as fn(&mut Environment, u32, u32) -> bool));
+}
 if symbol == "_CFArrayGetCount" {
     fn cf_array_get_count(_env: &mut Environment, _array: u32) -> u32 { 0 }
     return Some(&(cf_array_get_count as fn(&mut Environment, u32) -> u32));
@@ -1494,9 +1569,6 @@ if symbol == "_CFURLResourceIsReachable" {
     fn cf_url_resource_is_reachable(_env: &mut Environment, _url: u32, _error: u32) -> bool { false }
     return Some(&(cf_url_resource_is_reachable as fn(&mut Environment, u32, u32) -> bool));
 }
-// ==========================================================
-// Additional Core Foundation fallbacks for Real Racing 3
-// ==========================================================
 if symbol == "_CFAttributedStringCreate" {
     fn cf_attributed_string_create(_env: &mut Environment, _alloc: u32, _str: u32, _attrs: u32) -> u32 { 0 }
     return Some(&(cf_attributed_string_create as fn(&mut Environment, u32, u32, u32) -> u32));
