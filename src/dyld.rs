@@ -1523,6 +1523,26 @@ if symbol == "_CTTypesetterCreateLine" {
     }
     return Some(&(ct_typesetter_create_line as fn(&mut Environment, u32, u32) -> u32));
 }
+if symbol == "_CTLineGetGlyphCount" {
+    fn ct_line_get_glyph_count(_env: &mut Environment, _line: u32) -> u32 {
+        log_dbg!("CTLineGetGlyphCount stub called -> 0");
+        0
+    }
+    return Some(&(ct_line_get_glyph_count as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTRunGetGlyphCount" {
+    fn ct_run_get_glyph_count(_env: &mut Environment, _run: u32) -> u32 {
+        log_dbg!("CTRunGetGlyphCount stub called -> 0");
+        0
+    }
+    return Some(&(ct_run_get_glyph_count as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTRunGetPositions" {
+    fn ct_run_get_positions(_env: &mut Environment, _run: u32, _range: u32, _positions: u32) {
+        log_dbg!("CTRunGetPositions stub called (ignored)");
+    }
+    return Some(&(ct_run_get_positions as fn(&mut Environment, u32, u32, u32) -> ()));
+}
 if symbol == "_CFArrayGetCount" {
     fn cf_array_get_count(_env: &mut Environment, _array: u32) -> u32 { 0 }
     return Some(&(cf_array_get_count as fn(&mut Environment, u32) -> u32));
