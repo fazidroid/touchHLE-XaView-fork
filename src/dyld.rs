@@ -1513,6 +1513,16 @@ if symbol == "_CTFontManagerRegisterGraphicsFont" {
     fn ct_font_manager_register_font(_env: &mut Environment, _font: u32, _error: u32) -> bool { true }
     return Some(&(ct_font_manager_register_font as fn(&mut Environment, u32, u32) -> bool));
 }
+if symbol == "_CTTypesetterCreateLine" {
+    fn ct_typesetter_create_line(env: &mut Environment, _ts: u32, _range: u32) -> u32 {
+        log_dbg!("CTTypesetterCreateLine stub called");
+        use crate::objc::{msg_class, TrivialHostObject};
+        let obj_class = msg_class![env; NSObject class];
+        let dummy = env.objc.alloc_object(obj_class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy.to_bits()
+    }
+    return Some(&(ct_typesetter_create_line as fn(&mut Environment, u32, u32) -> u32));
+}
 if symbol == "_CFArrayGetCount" {
     fn cf_array_get_count(_env: &mut Environment, _array: u32) -> u32 { 0 }
     return Some(&(cf_array_get_count as fn(&mut Environment, u32) -> u32));
