@@ -28,27 +28,18 @@ pub extern "C" fn CTFontCreateWithGraphicsFont(
         size
     );
 
-    // Placeholder: always use Helvetica
     let font_name_str = "Helvetica".to_string();
     let default_size = if size == 0.0 { 17.0 } else { size };
 
     let uifont_class = msg_class![env; UIFont class];
     let name_ns = ns_string::from_rust_string(env, font_name_str);
-    let font = msg![env; uifont_class fontWithName:name_ns size:default_size];
-
-    font
+    msg![env; uifont_class fontWithName:name_ns size:default_size]
 }
 
 pub const FUNCTIONS: FunctionExports = &[
     (
         "_CTFontCreateWithGraphicsFont",
-        &(CTFontCreateWithGraphicsFont as fn(
-            &mut Environment,
-            CGFontRef,
-            f32, // CGFloat is f32 on 32-bit ARM
-            ConstPtr<CGAffineTransform>,
-            id,
-        ) -> id),
+        &CTFontCreateWithGraphicsFont, // direct reference, no explicit cast
     ),
 ];
 
