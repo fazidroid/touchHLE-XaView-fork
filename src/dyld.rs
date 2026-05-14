@@ -1547,8 +1547,8 @@ if symbol == "_CTFontDescriptorCreateMatchingFontDescriptors" {
     fn ct_descriptor_create_matching(env: &mut Environment, _descriptor: u32, _mandatory_attrs: u32) -> u32 {
         log_dbg!("CTFontDescriptorCreateMatchingFontDescriptors stub called");
         // Return an empty array (CFArrayRef) – dummy NSArray
-        use crate::objc::msg_class;
-        let arr = msg_class![env; NSArray array];
+        use crate::objc::{id, msg_class};
+        let arr: id = msg_class![env; NSArray array];
         arr.to_bits()
     }
     return Some(&(ct_descriptor_create_matching as fn(&mut Environment, u32, u32) -> u32));
@@ -1568,13 +1568,7 @@ if symbol == "_CTLineDraw" {
 if symbol == "_CTLineGetImageBounds" {
     fn ct_line_get_image_bounds(_env: &mut Environment, _line: u32, _context: u32) -> u64 {
         log_dbg!("CTLineGetImageBounds stub called -> CGRectZero");
-        // Return a CGRect with {0,0,0,0} packed as two u32s (origin.x, origin.y, size.width, size.height)
-        // On ARMv7, a CGRect is 16 bytes (four floats). We'll return 0 for all components as a 64-bit value?
-        // Simpler: return a pointer to a zero CGRect allocated in guest memory.
-        use crate::frameworks::core_graphics::{CGRect, CGPointZero, CGSizeZero};
-        let rect = CGRect { origin: CGPointZero, size: CGSizeZero };
-        let ptr = _env.mem.alloc_and_write(rect);
-        ptr.to_bits()
+        0
     }
     return Some(&(ct_line_get_image_bounds as fn(&mut Environment, u32, u32) -> u64));
 }
