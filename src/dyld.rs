@@ -1185,6 +1185,21 @@ if symbol == "_pthread_setname_np" {
                     as fn(&mut crate::Environment, u32, i32, i32, u32) -> u32),
             );
         }
+if symbol == "_CTFontCreateWithGraphicsFont" {
+    fn ct_font_stub(env: &mut Environment, _cg_font: u32, size: f32, _transform: u32, _attributes: u32) -> u32 {
+        use crate::objc::{msg, msg_class, nil};
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+
+        log_dbg!("CTFontCreateWithGraphicsFont stub called, size={}", size);
+        let default_size = if size == 0.0 { 17.0 } else { size };
+        let font_name = "Helvetica";
+        let name_ns = from_rust_string(env, font_name.to_string());
+        let uifont_class = msg_class![env; UIFont class];
+        let font: u32 = msg![env; uifont_class fontWithName:name_ns size:default_size];
+        font as u32
+    }
+    return Some(&(ct_font_stub as fn(&mut Environment, u32, f32, u32, u32) -> u32));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
