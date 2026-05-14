@@ -1,4 +1,4 @@
-// src/frameworks/core_text/mod.rs
+// src/frameworks/core_text.rs
 
 use crate::dyld::{export_c_func, FunctionExports, HostDylib};
 use crate::frameworks::core_graphics::cg_affine_transform::CGAffineTransform;
@@ -19,36 +19,34 @@ pub const DYLIB: HostDylib = HostDylib {
 
 pub type CTFontRef = id;
 
-#[no_mangle]
-pub extern "C" fn CTFontCreateWithGraphicsFont(
+// REMOVED: #[no_mangle] and extern "C"
+pub fn CTFontCreateWithGraphicsFont(
     env: &mut Environment,
     cg_font: CGFontRef,
     size: CGFloat,
     _transform: ConstPtr<CGAffineTransform>,
     _attributes: id,
 ) -> CTFontRef {
-    log_dbg!("CTFontCreateWithGraphicsFont called, size={}", size);
+    log!("CTFontCreateWithGraphicsFont called, size={}", size);
 
     // Get the name from the CGFont handle
     let name = crate::frameworks::core_graphics::cg_font::CGFontCopyPostScriptName(env, cg_font);
     let font_name_str = ns_string::to_rust_string(env, name);
     
     let default_size: CGFloat = if size == 0.0 { 17.0 } else { size };
-
-    // FIX: Added 'class' to retrieve the UIFont class object
     let uifont_class = msg_class![env; UIFont class];
     
     let name_ns = ns_string::from_rust_string(env, font_name_str.to_string());
     msg![env; uifont_class fontWithName:name_ns size:default_size]
 }
 
-#[no_mangle]
-pub extern "C" fn CTFontCopyGraphicsFont(
+// REMOVED: #[no_mangle] and extern "C"
+pub fn CTFontCopyGraphicsFont(
     _env: &mut Environment,
     _font: CTFontRef,
     _attributes: ConstPtr<id>,
 ) -> CGFontRef {
-    log_dbg!("CTFontCopyGraphicsFont stub called");
+    log!("CTFontCopyGraphicsFont stub called");
     crate::objc::nil
 }
 
