@@ -10,7 +10,6 @@ use crate::libc;
 use crate::objc;
 use crate::frameworks::mobile_core_services;
 use crate::frameworks::oauth_consumer;
-use crate::frameworks::core_text::DYLIB as CORE_TEXT_DYLIB;
 
 /// The single list of host dylibs that the linker (and Objective-C runtime)
 /// searches through.
@@ -24,6 +23,7 @@ pub const DYLIB_LIST: &[&super::HostDylib] = &[
     &frameworks::core_animation::DYLIB,
     &frameworks::core_foundation::DYLIB,
     &frameworks::core_graphics::DYLIB,
+    &frameworks::core_text::DYLIB,
     &frameworks::core_location::DYLIB,
     &frameworks::foundation::DYLIB,
     &frameworks::game_kit::DYLIB,
@@ -32,7 +32,6 @@ pub const DYLIB_LIST: &[&super::HostDylib] = &[
     &frameworks::opengles::DYLIB,
     &frameworks::store_kit::DYLIB,
     &frameworks::system_configuration::DYLIB,
-    &CORE_TEXT_DYLIB,
     &frameworks::uikit::DYLIB,
     &frameworks::core_motion::DYLIB,
     &mobile_core_services::DYLIB,
