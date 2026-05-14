@@ -1389,6 +1389,53 @@ if symbol == "_CTFontGetGlyphWithName" {
     return Some(&(ct_get_glyph_with_name as fn(&mut Environment, u32, u32) -> u16));
 }
 // ==========================================================
+// More Core Text fallbacks for Real Racing 3
+// ==========================================================
+if symbol == "_CTTypesetterCreateWithAttributedString" {
+    fn ct_typesetter_create(env: &mut Environment, _attr_str: u32) -> u32 {
+        log_dbg!("CTTypesetterCreateWithAttributedString stub called");
+        use crate::objc::{msg_class, TrivialHostObject};
+        let obj_class = msg_class![env; NSObject class];
+        let dummy = env.objc.alloc_object(obj_class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy.to_bits()
+    }
+    return Some(&(ct_typesetter_create as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTTypesetterSuggestLineBreak" {
+    fn ct_typesetter_suggest_line_break(_env: &mut Environment, _ts: u32, _start_index: u32, _width: f64) -> u32 { 0 }
+    return Some(&(ct_typesetter_suggest_line_break as fn(&mut Environment, u32, u32, f64) -> u32));
+}
+if symbol == "_CTTypesetterSuggestClusterBreak" {
+    fn ct_typesetter_suggest_cluster_break(_env: &mut Environment, _ts: u32, _start_index: u32, _width: f64) -> u32 { 0 }
+    return Some(&(ct_typesetter_suggest_cluster_break as fn(&mut Environment, u32, u32, f64) -> u32));
+}
+if symbol == "_CTLineCreateWithAttributedString" {
+    fn ct_line_create_with_attr_string(env: &mut Environment, _attr_str: u32) -> u32 {
+        log_dbg!("CTLineCreateWithAttributedString stub called");
+        use crate::objc::{msg_class, TrivialHostObject};
+        let obj_class = msg_class![env; NSObject class];
+        let dummy = env.objc.alloc_object(obj_class, Box::new(TrivialHostObject), &mut env.mem);
+        dummy.to_bits()
+    }
+    return Some(&(ct_line_create_with_attr_string as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTLineGetGlyphRuns" {
+    fn ct_line_get_glyph_runs(_env: &mut Environment, _line: u32) -> u32 { 0 }
+    return Some(&(ct_line_get_glyph_runs as fn(&mut Environment, u32) -> u32));
+}
+if symbol == "_CTLineGetTypographicBounds" {
+    fn ct_line_get_typographic_bounds(_env: &mut Environment, _line: u32, _ascent: u32, _descent: u32, _leading: u32) -> f64 { 0.0 }
+    return Some(&(ct_line_get_typographic_bounds as fn(&mut Environment, u32, u32, u32, u32) -> f64));
+}
+if symbol == "_CTRunGetGlyphs" {
+    fn ct_run_get_glyphs(_env: &mut Environment, _run: u32, _range: u32, _glyphs: u32) { }
+    return Some(&(ct_run_get_glyphs as fn(&mut Environment, u32, u32, u32) -> ()));
+}
+if symbol == "_CTRunGetAttributes" {
+    fn ct_run_get_attributes(_env: &mut Environment, _run: u32) -> u32 { 0 }
+    return Some(&(ct_run_get_attributes as fn(&mut Environment, u32) -> u32));
+}
+// ==========================================================
 // Core Foundation fallbacks for Real Racing 3
 // ==========================================================
 if symbol == "_CFArrayGetCount" {
