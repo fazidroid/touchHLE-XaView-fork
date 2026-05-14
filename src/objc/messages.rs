@@ -371,10 +371,16 @@ Type mismatch when sending message {} to {:?}!
                                     expected_type_id,
                                     expected_type_desc
                                 );
+                                // Always log type mismatches but never panic —
+                                // ObjC is duck-typed and subclasses often have
+                                // compatible ABI even when Rust types differ.
+                                // Real Racing 3 sends fontWithName:size: to a
+                                // UIFont subclass that has a different TypeId.
+                                // Panicking here breaks legitimate subclass calls.
                                 if tolerate_type_mismatch {
                                     log!("Warning: {}", msg);
                                 } else {
-                                    panic!("{}", msg);
+                                    log!("Warning (type mismatch, continuing): {}", msg);
                                 }
                             }
                         }
