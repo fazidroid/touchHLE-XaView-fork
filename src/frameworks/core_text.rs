@@ -1,7 +1,7 @@
 // src/frameworks/core_text/mod.rs
 //! Stubs and implementations for the Core Text framework.
 
-use crate::dyld::{export_c_func, FunctionExports};
+use crate::dyld::{FunctionExports, HostDylib};
 use crate::frameworks::core_graphics::cg_affine_transform::CGAffineTransform;
 use crate::frameworks::core_graphics::cg_font::CGFontRef;
 use crate::frameworks::core_graphics::CGFloat;
@@ -40,13 +40,22 @@ pub extern "C" fn CTFontCreateWithGraphicsFont(
 }
 
 pub const FUNCTIONS: FunctionExports = &[
-    export_c_func!(CTFontCreateWithGraphicsFont(_, _, _, _)), // 4 underscores for 4 parameters after env
+    (
+        "_CTFontCreateWithGraphicsFont",
+        &(CTFontCreateWithGraphicsFont as fn(
+            &mut Environment,
+            CGFontRef,
+            f32, // CGFloat is f32 on 32-bit ARM
+            ConstPtr<CGAffineTransform>,
+            id,
+        ) -> id),
+    ),
 ];
 
-pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
+pub const DYLIB: HostDylib = HostDylib {
     path: "/System/Library/Frameworks/CoreText.framework/CoreText",
     aliases: &[],
     class_exports: &[],
-    function_exports: &[FUNCTIONS], // wrap in array
+    function_exports: &[FUNCTIONS],
     constant_exports: &[],
 };
