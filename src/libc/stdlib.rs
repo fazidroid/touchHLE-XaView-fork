@@ -15,6 +15,20 @@ use crate::libc::wchar::wchar_t;
 use crate::mem::{ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, Ptr};
 use crate::Environment;
 use std::str::FromStr;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+type dispatch_queue_t = *mut ();
+type dispatch_group_t = *mut ();
+
+lazy_static! {
+    static ref QUEUES: Mutex<HashMap<dispatch_queue_t, String>> = Mutex::new(HashMap::new());
+    static ref GROUPS: Mutex<HashMap<dispatch_group_t, i32>> = Mutex::new(HashMap::new());
+    static ref MAIN_QUEUE: dispatch_queue_t = 1 as dispatch_queue_t;
+    static ref GLOBAL_QUEUE: dispatch_queue_t = 2 as dispatch_queue_t;
+    static ref CURRENT_QUEUE: dispatch_queue_t = 3 as dispatch_queue_t;
+}
 
 pub mod qsort;
 
@@ -1052,6 +1066,93 @@ fn kevent(
     0
 }
 
+pub fn dispatch_queue_create(label: *const i8, _attr: *mut ()) -> dispatch_queue_t {
+    let name = if label.is_null() {
+        "unknown".to_string()
+    } else {
+        unsafe { std::ffi::CStr::from_ptr(label) }.to_string_lossy().to_string()
+    };
+    let queue = (QUEUES.lock().unwrap().len() + 10) as dispatch_queue_t;
+    QUEUES.lock().unwrap().insert(queue, name);
+    log_dbg!("dispatch_queue_create('{}') -> {:p}", name, queue);
+    queue
+}
+
+pub fn dispatch_release(queue: dispatch_queue_t) {
+    log_dbg!("dispatch_release({:p})", queue);
+    QUEUES.lock().unwrap().remove(&queue);
+}
+
+pub fn dispatch_retain(queue: dispatch_queue_t) {
+    log_dbg!("dispatch_retain({:p}) stub", queue);
+}
+
+pub fn dispatch_get_main_queue() -> dispatch_queue_t {
+    *MAIN_QUEUE
+}
+
+pub fn dispatch_get_global_queue(_priority: u64, _flags: u64) -> dispatch_queue_t {
+    *GLOBAL_QUEUE
+}
+
+pub fn dispatch_get_current_queue() -> dispatch_queue_t {
+    *CURRENT_QUEUE
+}
+
+pub fn dispatch_set_target_queue(_queue: dispatch_queue_t, _target: dispatch_queue_t) {
+    log_dbg!("dispatch_set_target_queue stub");
+}
+
+pub fn dispatch_sync(queue: dispatch_queue_t, block: GuestFunction) {
+    log_dbg!("dispatch_sync({:p}, {:?})", queue, block);
+    block.call_from_host(block);
+}
+
+pub fn dispatch_after(when: u64, queue: dispatch_queue_t, block: GuestFunction) {
+    log_dbg!("dispatch_after(when={}, queue={:p}) stub", when, queue);
+    block.call_from_host(block);
+}
+
+pub fn dispatch_group_create() -> dispatch_group_t {
+    let group = (GROUPS.lock().unwrap().len() + 100) as dispatch_group_t;
+    GROUPS.lock().unwrap().insert(group, 0);
+    log_dbg!("dispatch_group_create -> {:p}", group);
+    group
+}
+
+pub fn dispatch_group_enter(group: dispatch_group_t) {
+    log_dbg!("dispatch_group_enter({:p})", group);
+    let mut groups = GROUPS.lock().unwrap();
+    if let Some(count) = groups.get_mut(&group) {
+        *count += 1;
+    }
+}
+
+pub fn dispatch_group_leave(group: dispatch_group_t) {
+    log_dbg!("dispatch_group_leave({:p})", group);
+    let mut groups = GROUPS.lock().unwrap();
+    if let Some(count) = groups.get_mut(&group) {
+        *count -= 1;
+    }
+}
+
+pub fn dispatch_group_wait(group: dispatch_group_t, _timeout: u64) -> i32 {
+    log_dbg!("dispatch_group_wait({:p}) stub -> 0", group);
+    0
+}
+
+pub fn dispatch_group_async(group: dispatch_group_t, queue: dispatch_queue_t, block: GuestFunction) {
+    log_dbg!("dispatch_group_async({:p}, {:p})", group, queue);
+    dispatch_group_enter(group);
+    block.call_from_host(block);
+    dispatch_group_leave(group);
+}
+
+pub fn dispatch_group_notify(group: dispatch_group_t, queue: dispatch_queue_t, block: GuestFunction) {
+    log_dbg!("dispatch_group_notify({:p}, {:p}) stub – executing immediately", group, queue);
+    block.call_from_host(block);
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(kqueue()),
     export_c_func!(kevent(_, _, _, _, _, _)),
@@ -1140,6 +1241,23 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(system(_)),
     export_c_func!(div(_, _)),
     export_c_func!(times(_)),
+    export_c_func!(dispatch_once(_, _)),
+    export_c_func!(dispatch_async(_, _)),
+    export_c_func!(dispatch_queue_create(_, _)),
+    export_c_func!(dispatch_release(_)),
+    export_c_func!(dispatch_retain(_)),
+    export_c_func!(dispatch_get_main_queue()),
+    export_c_func!(dispatch_get_global_queue(_, _)),
+    export_c_func!(dispatch_get_current_queue()),
+    export_c_func!(dispatch_set_target_queue(_, _)),
+    export_c_func!(dispatch_sync(_, _)),
+    export_c_func!(dispatch_after(_, _, _)),
+    export_c_func!(dispatch_group_create()),
+    export_c_func!(dispatch_group_enter(_)),
+    export_c_func!(dispatch_group_leave(_)),
+    export_c_func!(dispatch_group_wait(_, _)),
+    export_c_func!(dispatch_group_async(_, _, _)),
+    export_c_func!(dispatch_group_notify(_, _, _)),
 ];
 
 /// A simple wrapper around [atof_inner_generic] for the case of C string.
