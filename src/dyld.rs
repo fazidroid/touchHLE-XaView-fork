@@ -1543,6 +1543,41 @@ if symbol == "_CTRunGetPositions" {
     }
     return Some(&(ct_run_get_positions as fn(&mut Environment, u32, u32, u32) -> ()));
 }
+if symbol == "_CTFontDescriptorCreateMatchingFontDescriptors" {
+    fn ct_descriptor_create_matching(env: &mut Environment, _descriptor: u32, _mandatory_attrs: u32) -> u32 {
+        log_dbg!("CTFontDescriptorCreateMatchingFontDescriptors stub called");
+        // Return an empty array (CFArrayRef) – dummy NSArray
+        use crate::objc::msg_class;
+        let arr = msg_class![env; NSArray array];
+        arr.to_bits()
+    }
+    return Some(&(ct_descriptor_create_matching as fn(&mut Environment, u32, u32) -> u32));
+}
+if symbol == "_CTFrameDraw" {
+    fn ct_frame_draw(_env: &mut Environment, _frame: u32, _context: u32) {
+        log_dbg!("CTFrameDraw stub called (ignored)");
+    }
+    return Some(&(ct_frame_draw as fn(&mut Environment, u32, u32) -> ()));
+}
+if symbol == "_CTLineDraw" {
+    fn ct_line_draw(_env: &mut Environment, _line: u32, _context: u32) {
+        log_dbg!("CTLineDraw stub called (ignored)");
+    }
+    return Some(&(ct_line_draw as fn(&mut Environment, u32, u32) -> ()));
+}
+if symbol == "_CTLineGetImageBounds" {
+    fn ct_line_get_image_bounds(_env: &mut Environment, _line: u32, _context: u32) -> u64 {
+        log_dbg!("CTLineGetImageBounds stub called -> CGRectZero");
+        // Return a CGRect with {0,0,0,0} packed as two u32s (origin.x, origin.y, size.width, size.height)
+        // On ARMv7, a CGRect is 16 bytes (four floats). We'll return 0 for all components as a 64-bit value?
+        // Simpler: return a pointer to a zero CGRect allocated in guest memory.
+        use crate::frameworks::core_graphics::{CGRect, CGPointZero, CGSizeZero};
+        let rect = CGRect { origin: CGPointZero, size: CGSizeZero };
+        let ptr = _env.mem.alloc_and_write(rect);
+        ptr.to_bits()
+    }
+    return Some(&(ct_line_get_image_bounds as fn(&mut Environment, u32, u32) -> u64));
+}
 if symbol == "_CFArrayGetCount" {
     fn cf_array_get_count(_env: &mut Environment, _array: u32) -> u32 { 0 }
     return Some(&(cf_array_get_count as fn(&mut Environment, u32) -> u32));
