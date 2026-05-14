@@ -432,6 +432,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setSecond:(NSInteger)_v {}
 @end
 
+// ==========================================================
+// Stub for UIUserNotificationSettings (iOS 8+)
+// ==========================================================
+@implementation UIUserNotificationSettings: NSObject
+
++ (id)settingsForTypes:(NSUInteger)types categories:(id)categories {
+    log_dbg!("UIUserNotificationSettings settingsForTypes:{} categories:{:?}", types, categories);
+    // Return a dummy object (the actual settings are never used by the game)
+    let obj: id = msg![env; this alloc];
+    msg![env; obj init]
+}
+
+- (id)init {
+    this
+}
+
+// Needed for the dummy object to be properly retained/released.
+- (id)retain { this }
+- (())release {}
+- (id)autorelease { this }
+
+@end
+
 };
 
 pub(super) fn UIApplicationMain(
