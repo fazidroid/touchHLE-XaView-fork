@@ -48,6 +48,7 @@ static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 39] = [
     ((6, 33), "hw.physicalcpu",      SysInfoType::Int32(2)),
     ((6, 34), "hw.logicalcpu",       SysInfoType::Int32(2)),
     ((6, 35), "hw.cpu64bit_capable", SysInfoType::Int32(0)),
+    ((0, 0), "sysctl.proc_native", SysInfoType::Int32(1)), 
 
     // Kernel (CTL_KERN = 1)
     ((1,1),  "kern.ostype",         String(b"Darwin")),
