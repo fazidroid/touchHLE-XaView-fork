@@ -10,6 +10,14 @@ use crate::mem::ConstPtr;
 use crate::objc::{id, msg, msg_class};
 use crate::Environment;
 
+pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
+    path: "/System/Library/Frameworks/CoreText.framework/CoreText",
+    aliases: &[],
+    class_exports: &[],
+    function_exports: &[FUNCTIONS],
+    constant_exports: &[],
+};
+
 /// Opaque type representing a Core Text font object.
 /// CTFontRef is toll‑free bridged with UIFont.
 pub type CTFontRef = id;
@@ -38,11 +46,3 @@ pub fn CTFontCreateWithGraphicsFont(
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CTFontCreateWithGraphicsFont(_, _, _, _)),
 ];
-
-pub const DYLIB: HostDylib = HostDylib {
-    path: "/System/Library/Frameworks/CoreText.framework/CoreText",
-    aliases: &[],
-    class_exports: &[],
-    function_exports: &[FUNCTIONS],
-    constant_exports: &[],
-};
