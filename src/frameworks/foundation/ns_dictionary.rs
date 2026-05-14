@@ -738,7 +738,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     build_description(env, this)
 }
 
-- (())enumerateKeysAndObjectsUsingBlock:(crate::abi::GuestFunction)block { {
+- (())enumerateKeysAndObjectsUsingBlock:(crate::abi::GuestFunction)block {
     log_dbg!("_touchHLE_NSDictionary enumerateKeysAndObjectsUsingBlock:");
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let keys: Vec<id> = host_obj.iter_keys().collect();
@@ -746,9 +746,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     for key in keys {
         let obj = host_obj.lookup(env, key);
         if block.to_ptr().is_null() { break; }
-        // The block is a C function pointer with signature `void (*)(id, id, BOOL *)`.
-        // Real blocks also have the block object as first argument, but many games
-        // accept the simplified form. We'll cast it directly.
         let block_fn: extern "C" fn(id, id, *mut bool) = unsafe { std::mem::transmute(block) };
         block_fn(key, obj, &mut stop);
         if stop { break; }
