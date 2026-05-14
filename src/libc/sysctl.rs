@@ -14,7 +14,7 @@ use crate::libc::sysctl::SysInfoType::String;
 use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, PAGE_SIZE};
 use crate::Environment;
 
-static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 33] = [
+static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 34] = [
     // Hardware (CTL_HW = 6)
     ((6,1),  "hw.machine",          String(b"iPhone4,1")),
     ((6,2),  "hw.model",            String(b"N94AP")),
@@ -23,6 +23,7 @@ static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 33] = [
     ((6,5),  "hw.physmem",          SysInfoType::Int32(121634816)), // duplicate for compatibility
     ((6,6),  "hw.usermem",          SysInfoType::Int32(93564928)),
     ((6,7),  "hw.pagesize",         SysInfoType::Int64(PAGE_SIZE as i64)),
+    ((6,8),  "hw.cputype",          SysInfoType::Int32(12)), 
     ((6,12), "hw.machine_arch",     String(b"arm64")),
     ((6,13), "hw.vectorunit",       SysInfoType::Int32(0)),
     ((6,14), "hw.busfrequency",     SysInfoType::Int64(103000000)),
