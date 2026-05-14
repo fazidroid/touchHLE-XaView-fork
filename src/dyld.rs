@@ -1321,7 +1321,7 @@ if symbol == "_CTFontCopyFamilyName" {
         log_dbg!("CTFontCopyFamilyName stub called");
         use crate::frameworks::foundation::ns_string::from_rust_string;
         let name = from_rust_string(env, "Helvetica".to_string());
-        name as u32
+        name.to_bits()
     }
     return Some(&(ct_copy_family_name as fn(&mut Environment, u32) -> u32));
 }
@@ -1330,7 +1330,7 @@ if symbol == "_CTFontCopyDisplayName" {
         log_dbg!("CTFontCopyDisplayName stub called");
         use crate::frameworks::foundation::ns_string::from_rust_string;
         let name = from_rust_string(env, "Helvetica".to_string());
-        name as u32
+        name.to_bits()
     }
     return Some(&(ct_copy_display_name as fn(&mut Environment, u32) -> u32));
 }
@@ -1339,7 +1339,7 @@ if symbol == "_CTFontCopyPostScriptName" {
         log_dbg!("CTFontCopyPostScriptName stub called");
         use crate::frameworks::foundation::ns_string::from_rust_string;
         let name = from_rust_string(env, "Helvetica".to_string());
-        name as u32
+        name.to_bits()
     }
     return Some(&(ct_copy_postscript_name as fn(&mut Environment, u32) -> u32));
 }
