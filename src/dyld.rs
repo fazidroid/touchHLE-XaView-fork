@@ -2063,6 +2063,73 @@ if symbol == "_CFURLCreateStringByReplacingPercentEscapesUsingEncoding" {
     }
     return Some(&(fake_CFURLCreateStringByReplacingPercentEscapesUsingEncoding as fn(&mut crate::Environment, u32, u32, u32, u32) -> u32));
 }
+if symbol == "_CGPathCreateMutable" {
+    fn fake_CGPathCreateMutable(_env: &mut crate::Environment) -> u32 {
+        log_dbg!("CGPathCreateMutable stub called - returning dummy");
+        // Return a non-zero dummy value (real CGPathRef is opaque)
+        0xDEADBEEF
+    }
+    return Some(&(fake_CGPathCreateMutable as fn(&mut crate::Environment) -> u32));
+}
+
+if symbol == "_CGPathRelease" {
+    fn fake_CGPathRelease(_env: &mut crate::Environment, _path: u32) {
+        log_dbg!("CGPathRelease stub called - no-op");
+    }
+    return Some(&(fake_CGPathRelease as fn(&mut crate::Environment, u32) -> ()));
+}
+
+if symbol == "_CGPathAddLineToPoint" {
+    fn fake_CGPathAddLineToPoint(_env: &mut crate::Environment, _path: u32, _transform: u32, _x: f64, _y: f64) {
+        log_dbg!("CGPathAddLineToPoint stub called - no-op");
+    }
+    return Some(&(fake_CGPathAddLineToPoint as fn(&mut crate::Environment, u32, u32, f64, f64) -> ()));
+}
+
+if symbol == "_CGPathMoveToPoint" {
+    fn fake_CGPathMoveToPoint(_env: &mut crate::Environment, _path: u32, _transform: u32, _x: f64, _y: f64) {
+        log_dbg!("CGPathMoveToPoint stub called - no-op");
+    }
+    return Some(&(fake_CGPathMoveToPoint as fn(&mut crate::Environment, u32, u32, f64, f64) -> ()));
+}
+
+if symbol == "_CGPathAddRect" {
+    fn fake_CGPathAddRect(_env: &mut crate::Environment, _path: u32, _transform: u32, _rect: u32) {
+        log_dbg!("CGPathAddRect stub called - no-op");
+    }
+    return Some(&(fake_CGPathAddRect as fn(&mut crate::Environment, u32, u32, u32) -> ()));
+}
+
+if symbol == "_CGPathCreateWithRect" {
+    fn fake_CGPathCreateWithRect(_env: &mut crate::Environment, _rect: u32, _transform: u32) -> u32 {
+        log_dbg!("CGPathCreateWithRect stub called - returning dummy");
+        0xDEADBEEF
+    }
+    return Some(&(fake_CGPathCreateWithRect as fn(&mut crate::Environment, u32, u32) -> u32));
+}
+
+if symbol == "_CGPathCreateCopy" {
+    fn fake_CGPathCreateCopy(_env: &mut crate::Environment, _path: u32) -> u32 {
+        log_dbg!("CGPathCreateCopy stub called - returning dummy");
+        0xDEADBEEF
+    }
+    return Some(&(fake_CGPathCreateCopy as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CGPathContainsPoint" {
+    fn fake_CGPathContainsPoint(_env: &mut crate::Environment, _path: u32, _transform: u32, _point: u32, _eoFill: bool) -> bool {
+        log_dbg!("CGPathContainsPoint stub called - returning false");
+        false
+    }
+    return Some(&(fake_CGPathContainsPoint as fn(&mut crate::Environment, u32, u32, u32, bool) -> bool));
+}
+
+if symbol == "_CGPathApply" {
+    fn fake_CGPathApply(_env: &mut crate::Environment, _path: u32, _info: u32, _func: u32) {
+        log_dbg!("CGPathApply stub called - no-op");
+    }
+    return Some(&(fake_CGPathApply as fn(&mut crate::Environment, u32, u32, u32) -> ()));
+}
 if symbol == "_class_getMethodImplementation" {
     fn fake_class_getMethodImplementation(
         _env: &mut crate::Environment,
@@ -2155,6 +2222,12 @@ if symbol == "_objc_retainAutoreleasedReturnValue" {
         obj
     }
     return Some(&(fake_objc_retain_autoreleased_return_value as fn(&mut crate::Environment, u32) -> u32));
+}
+if symbol == "_objc_retainAutoreleaseReturnValue" {
+    fn fake_objc_retain_autorelease_return_value(_env: &mut crate::Environment, obj: u32) -> u32 {
+        obj
+    }
+    return Some(&(fake_objc_retain_autorelease_return_value as fn(&mut crate::Environment, u32) -> u32));
 }
 
 if symbol == "_setvbuf" {
