@@ -83,6 +83,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())addTimer:(id)timer // NSTimer*
        forMode:(NSRunLoopMode)mode {
+    // NFS Most Wanted (and similar games) may call addTimer:forMode: on a nil
+    // run loop (e.g. when scheduling on a background thread that has no loop
+    // yet, or when the caller stored a stale run loop reference). Mirror real
+    // ObjC behaviour: silently ignore messages to nil.
+    if this == nil {
+        log!("WARNING: addTimer:forMode: called on nil NSRunLoop, ignoring");
+        return;
+    }
     let default_mode = ns_string::get_static_str(env, NSDefaultRunLoopMode);
     let common_modes = ns_string::get_static_str(env, NSRunLoopCommonModes);
     // TODO: handle other modes
@@ -164,6 +172,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 /// For use by Audio Toolbox.
 pub fn add_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) {
+    if run_loop == nil {
+        log!("WARNING: add_audio_unit called with nil run_loop, ignoring");
+        return;
+    }
     env.objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
         .audio_units
@@ -172,6 +184,10 @@ pub fn add_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) {
 
 /// For use by Audio Toolbox.
 pub fn remove_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) -> Result<(), ()> {
+    if run_loop == nil {
+        log!("WARNING: remove_audio_unit called with nil run_loop, ignoring");
+        return Err(());
+    }
     let units = &mut env
         .objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
@@ -189,6 +205,10 @@ pub fn remove_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) -
 /// mechanism?
 /// TODO: Handle run loop modes. Currently assumes the common modes.
 pub fn add_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueueRef) {
+    if run_loop == nil {
+        log!("WARNING: add_audio_queue called with nil run_loop, ignoring");
+        return;
+    }
     env.objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
         .audio_queues
@@ -197,6 +217,10 @@ pub fn add_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueueRef
 
 /// For use by Audio Toolbox.
 pub fn remove_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueueRef) {
+    if run_loop == nil {
+        log!("WARNING: remove_audio_queue called with nil run_loop, ignoring");
+        return;
+    }
     let queues = &mut env
         .objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
@@ -207,6 +231,13 @@ pub fn remove_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueue
 
 /// For use by NSTimer so it can remove itself once it's invalidated.
 pub(super) fn remove_timer(env: &mut Environment, run_loop: id, timer: id) {
+    // A timer created with timerWithTimeInterval: (non-scheduled variant) may
+    // be invalidated before it is ever added to a run loop, leaving its stored
+    // run_loop as nil.  Guard here so we don't crash on borrow_mut(nil).
+    if run_loop == nil {
+        log!("WARNING: remove_timer called with nil run_loop for timer {:?}, ignoring", timer);
+        return;
+    }
     log_dbg!("Removing timer {:?} from run loop {:?}", timer, run_loop,);
     let NSRunLoopHostObject { timers, .. } = env.objc.borrow_mut(run_loop);
 
