@@ -2,8 +2,7 @@
 
 use crate::dyld::HostDylib;
 use crate::objc::{id, msg_class, nil, objc_classes, ClassExports, TrivialHostObject};
-use crate::msg;
-use crate::msg_class;
+use crate::msg; // msg is not in objc, so this is fine
 
 pub const CLASSES: ClassExports = objc_classes! {
 
