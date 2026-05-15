@@ -264,6 +264,171 @@ fn _CGContextShowGlyphsAtPoint(
     log!("_CGContextShowGlyphsAtPoint stub called");
 }
 
+fn CGContextAddArcToPoint(
+    _env: &mut Environment,
+    _ctx: CGContextRef,
+    _x1: CGFloat,
+    _y1: CGFloat,
+    _x2: CGFloat,
+    _y2: CGFloat,
+    _radius: CGFloat,
+) {
+    log_dbg!("CGContextAddArcToPoint stub");
+}
+
+fn CGContextAddEllipseInRect(_env: &mut Environment, _ctx: CGContextRef, _rect: CGRect) {
+    log_dbg!("CGContextAddEllipseInRect stub");
+}
+
+fn CGContextAddLineToPoint(_env: &mut Environment, _ctx: CGContextRef, _x: CGFloat, _y: CGFloat) {
+    log_dbg!("CGContextAddLineToPoint stub");
+}
+
+fn CGContextAddRect(_env: &mut Environment, _ctx: CGContextRef, _rect: CGRect) {
+    log_dbg!("CGContextAddRect stub");
+}
+
+fn CGContextBeginPath(_env: &mut Environment, _ctx: CGContextRef) {
+    log_dbg!("CGContextBeginPath stub");
+}
+
+fn CGContextClosePath(_env: &mut Environment, _ctx: CGContextRef) {
+    log_dbg!("CGContextClosePath stub");
+}
+
+fn CGContextDrawLinearGradient(
+    _env: &mut Environment,
+    _ctx: CGContextRef,
+    _gradient: u32,
+    _start: CGPoint,
+    _end: CGPoint,
+    _options: u32,
+) {
+    log_dbg!("CGContextDrawLinearGradient stub");
+}
+
+fn CGContextFillEllipseInRect(_env: &mut Environment, _ctx: CGContextRef, _rect: CGRect) {
+    log_dbg!("CGContextFillEllipseInRect stub");
+}
+
+fn CGContextFillPath(_env: &mut Environment, _ctx: CGContextRef) {
+    log_dbg!("CGContextFillPath stub");
+}
+
+fn CGContextFlush(_env: &mut Environment, _ctx: CGContextRef) {
+    log_dbg!("CGContextFlush stub");
+}
+
+fn CGContextMoveToPoint(_env: &mut Environment, _ctx: CGContextRef, _x: CGFloat, _y: CGFloat) {
+    log_dbg!("CGContextMoveToPoint stub");
+}
+
+fn CGContextSetAllowsAntialiasing(_env: &mut Environment, _ctx: CGContextRef, _allows: bool) {
+    log_dbg!("CGContextSetAllowsAntialiasing stub");
+}
+
+fn CGContextSetAllowsFontSmoothing(_env: &mut Environment, _ctx: CGContextRef, _allows: bool) {
+    log_dbg!("CGContextSetAllowsFontSmoothing stub");
+}
+
+fn CGContextSetAllowsFontSubpixelPositioning(_env: &mut Environment, _ctx: CGContextRef, _allows: bool) {
+    log_dbg!("CGContextSetAllowsFontSubpixelPositioning stub");
+}
+
+fn CGContextSetAllowsFontSubpixelQuantization(_env: &mut Environment, _ctx: CGContextRef, _allows: bool) {
+    log_dbg!("CGContextSetAllowsFontSubpixelQuantization stub");
+}
+
+fn CGContextSetFillColor(_env: &mut Environment, _ctx: CGContextRef, _components: ConstPtr<CGFloat>) {
+    log_dbg!("CGContextSetFillColor stub");
+}
+
+fn CGContextSetFont(_env: &mut Environment, _ctx: CGContextRef, _font: CGFontRef) {
+    log_dbg!("CGContextSetFont stub");
+}
+
+fn CGContextSetFontSize(_env: &mut Environment, _ctx: CGContextRef, _size: CGFloat) {
+    log_dbg!("CGContextSetFontSize stub");
+}
+
+fn CGContextSetLineCap(_env: &mut Environment, _ctx: CGContextRef, _cap: i32) {
+    log_dbg!("CGContextSetLineCap stub");
+}
+
+fn CGContextSetLineJoin(_env: &mut Environment, _ctx: CGContextRef, _join: i32) {
+    log_dbg!("CGContextSetLineJoin stub");
+}
+
+fn CGContextSetLineWidth(_env: &mut Environment, _ctx: CGContextRef, _width: CGFloat) {
+    log_dbg!("CGContextSetLineWidth stub");
+}
+
+fn CGContextSetRGBStrokeColor(
+    _env: &mut Environment,
+    _ctx: CGContextRef,
+    _r: CGFloat,
+    _g: CGFloat,
+    _b: CGFloat,
+    _a: CGFloat,
+) {
+    log_dbg!("CGContextSetRGBStrokeColor stub");
+}
+
+fn CGContextSetShouldAntialias(_env: &mut Environment, _ctx: CGContextRef, _should: bool) {
+    log_dbg!("CGContextSetShouldAntialias stub");
+}
+
+fn CGContextSetShouldSmoothFonts(_env: &mut Environment, _ctx: CGContextRef, _should: bool) {
+    log_dbg!("CGContextSetShouldSmoothFonts stub");
+}
+
+fn CGContextSetShouldSubpixelPositionFonts(_env: &mut Environment, _ctx: CGContextRef, _should: bool) {
+    log_dbg!("CGContextSetShouldSubpixelPositionFonts stub");
+}
+
+fn CGContextSetShouldSubpixelQuantizeFonts(_env: &mut Environment, _ctx: CGContextRef, _should: bool) {
+    log_dbg!("CGContextSetShouldSubpixelQuantizeFonts stub");
+}
+
+fn CGContextSetStrokeColor(_env: &mut Environment, _ctx: CGContextRef, _components: ConstPtr<CGFloat>) {
+    log_dbg!("CGContextSetStrokeColor stub");
+}
+
+fn CGContextSetStrokeColorSpace(_env: &mut Environment, _ctx: CGContextRef, _space: u32) {
+    log_dbg!("CGContextSetStrokeColorSpace stub");
+}
+
+fn CGContextSetTextDrawingMode(_env: &mut Environment, _ctx: CGContextRef, _mode: i32) {
+    log_dbg!("CGContextSetTextDrawingMode stub");
+}
+
+fn CGContextSetTextPosition(_env: &mut Environment, _ctx: CGContextRef, _x: CGFloat, _y: CGFloat) {
+    log_dbg!("CGContextSetTextPosition stub");
+}
+
+fn CGContextShowGlyphsAtPositions(
+    _env: &mut Environment,
+    _ctx: CGContextRef,
+    _glyphs: ConstPtr<u16>,
+    _positions: ConstPtr<CGPoint>,
+    _count: GuestUSize,
+) {
+    log_dbg!("CGContextShowGlyphsAtPositions stub");
+}
+
+fn CGContextStrokeLineSegments(
+    _env: &mut Environment,
+    _ctx: CGContextRef,
+    _points: ConstPtr<CGPoint>,
+    _count: GuestUSize,
+) {
+    log_dbg!("CGContextStrokeLineSegments stub");
+}
+
+fn CGContextStrokePath(_env: &mut Environment, _ctx: CGContextRef) {
+    log_dbg!("CGContextStrokePath stub");
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextRetain(_)),
     export_c_func!(CGContextRelease(_)),
@@ -282,8 +447,38 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextSaveGState(_)),
     export_c_func!(CGContextRestoreGState(_)),
     export_c_func!(CGContextSetInterpolationQuality(_, _)),
-    ("_CGContextSetTextMatrix", &(_CGContextSetTextMatrix as fn(&mut Environment, CGContextRef, CGAffineTransform))),
-    ("_CGContextSetFont", &(_CGContextSetFont as fn(&mut Environment, CGContextRef, CGFontRef))),
-    ("_CGContextSetFontSize", &(_CGContextSetFontSize as fn(&mut Environment, CGContextRef, CGFloat))),
-    ("_CGContextShowGlyphsAtPoint", &(_CGContextShowGlyphsAtPoint as fn(&mut Environment, CGContextRef, CGFloat, CGFloat, ConstPtr<u16>, GuestUSize))),
+    export_c_func!(CGContextAddArcToPoint(_, _, _, _, _, _)),
+    export_c_func!(CGContextAddEllipseInRect(_, _)),
+    export_c_func!(CGContextAddLineToPoint(_, _, _)),
+    export_c_func!(CGContextAddRect(_, _)),
+    export_c_func!(CGContextBeginPath(_)),
+    export_c_func!(CGContextClosePath(_)),
+    export_c_func!(CGContextDrawLinearGradient(_, _, _, _, _)),
+    export_c_func!(CGContextFillEllipseInRect(_, _)),
+    export_c_func!(CGContextFillPath(_)),
+    export_c_func!(CGContextFlush(_)),
+    export_c_func!(CGContextMoveToPoint(_, _, _)),
+    export_c_func!(CGContextSetAllowsAntialiasing(_, _)),
+    export_c_func!(CGContextSetAllowsFontSmoothing(_, _)),
+    export_c_func!(CGContextSetAllowsFontSubpixelPositioning(_, _)),
+    export_c_func!(CGContextSetAllowsFontSubpixelQuantization(_, _)),
+    export_c_func!(CGContextSetFillColor(_, _)),
+    export_c_func!(CGContextSetFont(_, _)),
+    export_c_func!(CGContextSetFontSize(_, _)),
+    export_c_func!(CGContextSetLineCap(_, _)),
+    export_c_func!(CGContextSetLineJoin(_, _)),
+    export_c_func!(CGContextSetLineWidth(_, _)),
+    export_c_func!(CGContextSetRGBStrokeColor(_, _, _, _, _)),
+    export_c_func!(CGContextSetShouldAntialias(_, _)),
+    export_c_func!(CGContextSetShouldSmoothFonts(_, _)),
+    export_c_func!(CGContextSetShouldSubpixelPositionFonts(_, _)),
+    export_c_func!(CGContextSetShouldSubpixelQuantizeFonts(_, _)),
+    export_c_func!(CGContextSetStrokeColor(_, _)),
+    export_c_func!(CGContextSetStrokeColorSpace(_, _)),
+    export_c_func!(CGContextSetTextDrawingMode(_, _)),
+    export_c_func!(CGContextSetTextPosition(_, _, _)),
+    export_c_func!(CGContextShowGlyphsAtPoint(_, _, _, _, _)),
+    export_c_func!(CGContextShowGlyphsAtPositions(_, _, _, _)),
+    export_c_func!(CGContextStrokeLineSegments(_, _, _)),
+    export_c_func!(CGContextStrokePath(_)),
 ];
