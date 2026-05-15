@@ -1790,6 +1790,33 @@ if symbol == "_objc_autorelease" {
     }
     return Some(&(fake_objc_autorelease as fn(&mut crate::Environment, u32) -> u32));
 }
+if symbol == "_objc_retainAutoreleasedReturnValue" {
+    fn fake_objc_retain_autoreleased_return_value(_env: &mut crate::Environment, obj: u32) -> u32 {
+        obj
+    }
+    return Some(&(fake_objc_retain_autoreleased_return_value as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_objc_autoreleaseReturnValue" {
+    fn fake_objc_autorelease_return_value(_env: &mut crate::Environment, obj: u32) -> u32 {
+        obj
+    }
+    return Some(&(fake_objc_autorelease_return_value as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_objc_retainAutorelease" {
+    fn fake_objc_retain_autorelease(_env: &mut crate::Environment, obj: u32) -> u32 {
+        obj
+    }
+    return Some(&(fake_objc_retain_autorelease as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_objc_storeStrong" {
+    fn fake_objc_store_strong(_env: &mut crate::Environment, _ptr: u32, _obj: u32) {
+        // No-op
+    }
+    return Some(&(fake_objc_store_strong as fn(&mut crate::Environment, u32, u32) -> ()));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
