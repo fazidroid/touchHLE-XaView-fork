@@ -12,12 +12,17 @@ pub struct NSUUIDHostObject {
 }
 impl HostObject for NSUUIDHostObject {}
 
+// ── ASIdentifierManagerHostObject ───────────────────────────────────────────
+pub struct ASIdentifierManagerHostObject {
+    pub advertising_identifier: id,
+}
+impl HostObject for ASIdentifierManagerHostObject {}
+
 pub const CLASSES: ClassExports = objc_classes! {
     (env, this, _cmd);
 
     @implementation NSUUID: NSObject
 
-    // +alloc is inherited; -init is the default (no-op).
     - (id)init {
         let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
         retain(env, uuid_str);
@@ -36,8 +41,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     @end
 
-    // ── ASIdentifierManager ──────────────────────────────────────────────────
-
     @implementation ASIdentifierManager: NSObject
 
     + (id)sharedManager {
@@ -52,13 +55,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (id)init {
-        // Create an NSUUID instance without calling any initialiser.
         let uuid_class = env.objc.get_known_class("NSUUID", &mut env.mem);
         let uuid: id = msg![env; uuid_class alloc];
         let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
         retain(env, uuid_str);
         env.objc.replace_host_object(uuid, Box::new(NSUUIDHostObject { uuid_string: uuid_str }));
-        // Keep the UUID alive for the lifetime of this singleton.
         retain(env, uuid);
 
         env.objc.replace_host_object(
