@@ -1727,6 +1727,359 @@ if symbol == "_CFUUIDGetUUIDBytes" {
     fn cf_uuid_get_bytes(_env: &mut Environment, _uuid: u32) -> u64 { 0 }
     return Some(&(cf_uuid_get_bytes as fn(&mut Environment, u32) -> u64));
 }
+if symbol == "_CFStringCreateWithBytes" {
+    fn fake_CFStringCreateWithBytes(
+        env: &mut crate::Environment,
+        _alloc: u32,
+        bytes: crate::mem::ConstPtr<u8>,
+        numBytes: u32,
+        _encoding: u32,
+        _isExternal: bool,
+    ) -> u32 {
+        use crate::frameworks::foundation::ns_string::from_rust_bytes;
+        let slice = env.mem.bytes_at(bytes, numBytes);
+        let str = String::from_utf8_lossy(slice).to_string();
+        let nsstr = from_rust_bytes(env, str.as_bytes());
+        nsstr.to_bits()
+    }
+    return Some(&(fake_CFStringCreateWithBytes as fn(&mut crate::Environment, u32, crate::mem::ConstPtr<u8>, u32, u32, bool) -> u32));
+}
+
+if symbol == "_CFStringCreateWithCString" {
+    fn fake_CFStringCreateWithCString(
+        env: &mut crate::Environment,
+        _alloc: u32,
+        cStr: crate::mem::ConstPtr<u8>,
+        _encoding: u32,
+    ) -> u32 {
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+        let rust_str = env.mem.cstr_at_utf8(cStr).unwrap_or_default();
+        let nsstr = from_rust_string(env, rust_str.to_string());
+        nsstr.to_bits()
+    }
+    return Some(&(fake_CFStringCreateWithCString as fn(&mut crate::Environment, u32, crate::mem::ConstPtr<u8>, u32) -> u32));
+}
+
+if symbol == "_CFStringCreateWithFormat" {
+    fn fake_CFStringCreateWithFormat(
+        env: &mut crate::Environment,
+        _alloc: u32,
+        _formatOptions: u32,
+        format: crate::mem::ConstPtr<u8>,
+        // ... varargs ignored
+    ) -> u32 {
+        // Return empty string – varargs are too complex to handle in a stub
+        use crate::frameworks::foundation::ns_string::get_static_str;
+        let empty = get_static_str(env, "");
+        empty.to_bits()
+    }
+    return Some(&(fake_CFStringCreateWithFormat as fn(&mut crate::Environment, u32, u32, crate::mem::ConstPtr<u8>) -> u32));
+}
+
+if symbol == "_CFStringCreateMutable" {
+    fn fake_CFStringCreateMutable(_env: &mut crate::Environment, _alloc: u32, _maxLength: u32) -> u32 {
+        0 // nil (we don't support mutable CFStrings)
+    }
+    return Some(&(fake_CFStringCreateMutable as fn(&mut crate::Environment, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringCreateMutableCopy" {
+    fn fake_CFStringCreateMutableCopy(_env: &mut crate::Environment, _alloc: u32, _maxLength: u32, _theString: u32) -> u32 {
+        0
+    }
+    return Some(&(fake_CFStringCreateMutableCopy as fn(&mut crate::Environment, u32, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringCreateCopy" {
+    fn fake_CFStringCreateCopy(env: &mut crate::Environment, _alloc: u32, theString: u32) -> u32 {
+        // Just retain the original string (toll-free bridged)
+        use crate::objc::retain;
+        let nsstr = crate::mem::MutPtr::<crate::objc::objc_object>::from_bits(theString);
+        retain(env, nsstr);
+        theString
+    }
+    return Some(&(fake_CFStringCreateCopy as fn(&mut crate::Environment, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringCreateArrayBySeparatingStrings" {
+    fn fake_CFStringCreateArrayBySeparatingStrings(_env: &mut crate::Environment, _alloc: u32, _string: u32, _separator: u32) -> u32 {
+        // Return empty array
+        use crate::objc::msg_class;
+        let arr: u32 = msg_class![_env; NSArray array];
+        arr
+    }
+    return Some(&(fake_CFStringCreateArrayBySeparatingStrings as fn(&mut crate::Environment, u32, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringCreateWithSubstring" {
+    fn fake_CFStringCreateWithSubstring(
+        env: &mut crate::Environment,
+        _alloc: u32,
+        string: u32,
+        _range: u64, // CFRange packed into u64
+    ) -> u32 {
+        // Return the original string (simplistic)
+        string
+    }
+    return Some(&(fake_CFStringCreateWithSubstring as fn(&mut crate::Environment, u32, u32, u64) -> u32));
+}
+
+if symbol == "_CFStringGetLength" {
+    fn fake_CFStringGetLength(env: &mut crate::Environment, theString: u32) -> u32 {
+        use crate::frameworks::foundation::ns_string::to_rust_string;
+        let nsstr = crate::mem::MutPtr::from_bits(theString);
+        let s = to_rust_string(env, nsstr);
+        s.len() as u32
+    }
+    return Some(&(fake_CFStringGetLength as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFStringGetBytes" {
+    fn fake_CFStringGetBytes(
+        env: &mut crate::Environment,
+        theString: u32,
+        _range: u64,
+        _encoding: u32,
+        _lossByte: u8,
+        _buffer: crate::mem::MutPtr<u8>,
+        _maxBufLen: u32,
+        _usedBufLen: crate::mem::MutPtr<u32>,
+    ) -> u32 {
+        use crate::frameworks::foundation::ns_string::to_rust_string;
+        let nsstr = crate::mem::MutPtr::from_bits(theString);
+        let s = to_rust_string(env, nsstr);
+        s.len() as u32
+    }
+    return Some(&(fake_CFStringGetBytes as fn(&mut crate::Environment, u32, u64, u32, u8, crate::mem::MutPtr<u8>, u32, crate::mem::MutPtr<u32>) -> u32));
+}
+
+if symbol == "_CFStringGetCString" {
+    fn fake_CFStringGetCString(
+        env: &mut crate::Environment,
+        theString: u32,
+        buffer: crate::mem::MutPtr<u8>,
+        bufferSize: u32,
+        _encoding: u32,
+    ) -> bool {
+        use crate::frameworks::foundation::ns_string::to_rust_string;
+        let nsstr = crate::mem::MutPtr::from_bits(theString);
+        let s = to_rust_string(env, nsstr);
+        let bytes = s.as_bytes();
+        let copy_len = bufferSize.min(bytes.len() as u32);
+        for i in 0..copy_len {
+            env.mem.write(buffer + i, bytes[i as usize]);
+        }
+        if copy_len < bufferSize {
+            env.mem.write(buffer + copy_len, 0);
+        }
+        true
+    }
+    return Some(&(fake_CFStringGetCString as fn(&mut crate::Environment, u32, crate::mem::MutPtr<u8>, u32, u32) -> bool));
+}
+
+if symbol == "_CFStringGetCStringPtr" {
+    fn fake_CFStringGetCStringPtr(
+        env: &mut crate::Environment,
+        theString: u32,
+        _encoding: u32,
+    ) -> u32 {
+        // Return NULL pointer – caller should fall back to GetCString
+        0
+    }
+    return Some(&(fake_CFStringGetCStringPtr as fn(&mut crate::Environment, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringGetFastestEncoding" {
+    fn fake_CFStringGetFastestEncoding(_env: &mut crate::Environment, _theString: u32) -> u32 {
+        0x08000100 // kCFStringEncodingUTF8
+    }
+    return Some(&(fake_CFStringGetFastestEncoding as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFStringGetMaximumSizeForEncoding" {
+    fn fake_CFStringGetMaximumSizeForEncoding(_env: &mut crate::Environment, _length: u32, _encoding: u32) -> u32 {
+        _length * 4 // worst-case UTF-8
+    }
+    return Some(&(fake_CFStringGetMaximumSizeForEncoding as fn(&mut crate::Environment, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringCompare" {
+    fn fake_CFStringCompare(
+        env: &mut crate::Environment,
+        str1: u32,
+        str2: u32,
+        _options: u32,
+    ) -> u32 {
+        use crate::frameworks::foundation::ns_string::to_rust_string;
+        let s1 = to_rust_string(env, crate::mem::MutPtr::from_bits(str1));
+        let s2 = to_rust_string(env, crate::mem::MutPtr::from_bits(str2));
+        match s1.cmp(&s2) {
+            std::cmp::Ordering::Less => -1i32 as u32,
+            std::cmp::Ordering::Equal => 0,
+            std::cmp::Ordering::Greater => 1,
+        }
+    }
+    return Some(&(fake_CFStringCompare as fn(&mut crate::Environment, u32, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringHasPrefix" {
+    fn fake_CFStringHasPrefix(
+        env: &mut crate::Environment,
+        str: u32,
+        prefix: u32,
+    ) -> bool {
+        use crate::frameworks::foundation::ns_string::to_rust_string;
+        let s = to_rust_string(env, crate::mem::MutPtr::from_bits(str));
+        let p = to_rust_string(env, crate::mem::MutPtr::from_bits(prefix));
+        s.starts_with(&p)
+    }
+    return Some(&(fake_CFStringHasPrefix as fn(&mut crate::Environment, u32, u32) -> bool));
+}
+
+if symbol == "_CFStringHasSuffix" {
+    fn fake_CFStringHasSuffix(
+        env: &mut crate::Environment,
+        str: u32,
+        suffix: u32,
+    ) -> bool {
+        use crate::frameworks::foundation::ns_string::to_rust_string;
+        let s = to_rust_string(env, crate::mem::MutPtr::from_bits(str));
+        let suf = to_rust_string(env, crate::mem::MutPtr::from_bits(suffix));
+        s.ends_with(&suf)
+    }
+    return Some(&(fake_CFStringHasSuffix as fn(&mut crate::Environment, u32, u32) -> bool));
+}
+
+if symbol == "_CFStringFind" {
+    fn fake_CFStringFind(
+        env: &mut crate::Environment,
+        str: u32,
+        substr: u32,
+        _options: u32,
+    ) -> u64 {
+        use crate::frameworks::foundation::ns_string::to_rust_string;
+        let s = to_rust_string(env, crate::mem::MutPtr::from_bits(str));
+        let sub = to_rust_string(env, crate::mem::MutPtr::from_bits(substr));
+        if let Some(pos) = s.find(&sub) {
+            // Pack CFRange (location, length) into u64
+            (pos as u64) << 32 | (sub.len() as u64)
+        } else {
+            // kCFNotFound = 0x7fffffff
+            0x7fffffff00000000
+        }
+    }
+    return Some(&(fake_CFStringFind as fn(&mut crate::Environment, u32, u32, u32) -> u64));
+}
+
+if symbol == "_CFStringLowercase" {
+    fn fake_CFStringLowercase(
+        env: &mut crate::Environment,
+        theString: u32,
+        _locale: u32,
+    ) -> u32 {
+        use crate::frameworks::foundation::ns_string::{from_rust_string, to_rust_string};
+        let s = to_rust_string(env, crate::mem::MutPtr::from_bits(theString));
+        let lower = s.to_lowercase();
+        let nsstr = from_rust_string(env, lower);
+        nsstr.to_bits()
+    }
+    return Some(&(fake_CFStringLowercase as fn(&mut crate::Environment, u32, u32) -> u32));
+}
+
+if symbol == "_CFStringAppendCharacters" {
+    fn fake_CFStringAppendCharacters(_env: &mut crate::Environment, _theString: u32, _chars: u32, _numChars: u32) {
+        // no-op (mutable strings not supported)
+    }
+    return Some(&(fake_CFStringAppendCharacters as fn(&mut crate::Environment, u32, u32, u32) -> ()));
+}
+
+if symbol == "_CFStringAppendFormat" {
+    fn fake_CFStringAppendFormat(_env: &mut crate::Environment, _theString: u32, _formatOptions: u32, _format: u32) {
+        // no-op
+    }
+    return Some(&(fake_CFStringAppendFormat as fn(&mut crate::Environment, u32, u32, u32) -> ()));
+}
+
+if symbol == "_CFStringConvertEncodingToNSStringEncoding" {
+    fn fake_CFStringConvertEncodingToNSStringEncoding(_env: &mut crate::Environment, _encoding: u32) -> u32 {
+        0x08000100 // NSUTF8StringEncoding
+    }
+    return Some(&(fake_CFStringConvertEncodingToNSStringEncoding as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFStringConvertNSStringEncodingToEncoding" {
+    fn fake_CFStringConvertNSStringEncodingToEncoding(_env: &mut crate::Environment, _nsEncoding: u32) -> u32 {
+        0x08000100
+    }
+    return Some(&(fake_CFStringConvertNSStringEncodingToEncoding as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFStringConvertEncodingToIANACharSetName" {
+    fn fake_CFStringConvertEncodingToIANACharSetName(env: &mut crate::Environment, _encoding: u32) -> u32 {
+        use crate::frameworks::foundation::ns_string::get_static_str;
+        let name = get_static_str(env, "utf-8");
+        name.to_bits()
+    }
+    return Some(&(fake_CFStringConvertEncodingToIANACharSetName as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFStringConvertIANACharSetNameToEncoding" {
+    fn fake_CFStringConvertIANACharSetNameToEncoding(_env: &mut crate::Environment, _charsetName: u32) -> u32 {
+        0x08000100 // UTF-8 encoding constant
+    }
+    return Some(&(fake_CFStringConvertIANACharSetNameToEncoding as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFURLCopyFileSystemPath" {
+    fn fake_CFURLCopyFileSystemPath(env: &mut crate::Environment, _url: u32, _pathStyle: u32) -> u32 {
+        use crate::frameworks::foundation::ns_string::get_static_str;
+        let path = get_static_str(env, "/");
+        path.to_bits()
+    }
+    return Some(&(fake_CFURLCopyFileSystemPath as fn(&mut crate::Environment, u32, u32) -> u32));
+}
+
+if symbol == "_CFURLCopyPassword" {
+    fn fake_CFURLCopyPassword(_env: &mut crate::Environment, _url: u32) -> u32 {
+        0 // nil
+    }
+    return Some(&(fake_CFURLCopyPassword as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFURLCopyUserName" {
+    fn fake_CFURLCopyUserName(_env: &mut crate::Environment, _url: u32) -> u32 {
+        0
+    }
+    return Some(&(fake_CFURLCopyUserName as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_CFURLCreateStringByAddingPercentEscapes" {
+    fn fake_CFURLCreateStringByAddingPercentEscapes(
+        env: &mut crate::Environment,
+        _allocator: u32,
+        originalString: u32,
+        _charactersToLeaveUnescaped: u32,
+        _legalURLCharactersToBeEscaped: u32,
+        _encoding: u32,
+    ) -> u32 {
+        // Return the original string unmodified
+        originalString
+    }
+    return Some(&(fake_CFURLCreateStringByAddingPercentEscapes as fn(&mut crate::Environment, u32, u32, u32, u32, u32) -> u32));
+}
+
+if symbol == "_CFURLCreateStringByReplacingPercentEscapesUsingEncoding" {
+    fn fake_CFURLCreateStringByReplacingPercentEscapesUsingEncoding(
+        env: &mut crate::Environment,
+        _allocator: u32,
+        originalString: u32,
+        _charactersToLeaveEscaped: u32,
+        _encoding: u32,
+    ) -> u32 {
+        originalString
+    }
+    return Some(&(fake_CFURLCreateStringByReplacingPercentEscapesUsingEncoding as fn(&mut crate::Environment, u32, u32, u32, u32) -> u32));
+}
 if symbol == "_dispatch_time" {
     fn dispatch_time_stub(_env: &mut Environment, when: u64, delta: i64) -> u64 {
         log_dbg!("_dispatch_time stub called, when={}, delta={}", when, delta);
