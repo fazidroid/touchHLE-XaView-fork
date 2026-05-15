@@ -33,7 +33,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 pub const DYLIB: HostDylib = HostDylib {
     path: "/System/Library/Frameworks/AdSupport.framework/AdSupport",
     aliases: &[],
-    class_exports: CLASSES,
+    class_exports: &[CLASSES], 
     function_exports: &[],
     constant_exports: &[],
 };
