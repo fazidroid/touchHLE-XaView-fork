@@ -243,6 +243,20 @@ impl super::ObjC {
         self.objects.get(&object).map(|entry| &*entry.host_object)
     }
 
+    /// Replace the host object of an already-allocated guest object with a new
+    /// one of a (potentially different) type.
+    ///
+    /// This is needed in `init`-family methods where `alloc` has already stored
+    /// a [TrivialHostObject] and `init` now wants to install the real host
+    /// object. Using [Self::borrow_mut] + deref-assign would fail because
+    /// `borrow_mut` downcasts first and can't find the target type.
+    pub fn replace_host_object(&mut self, object: id, new_host_object: Box<dyn AnyHostObject>) {
+        let entry = self.objects.get_mut(&object).unwrap_or_else(|| {
+            panic!("replace_host_object: object {object:?} is not in memory (was it deallocated?)");
+        });
+        entry.host_object = new_host_object;
+    }
+
     pub fn borrow<T: AnyHostObject + 'static>(&self, object: id) -> &T {
         if object == nil {
             panic!("NULL POINTER DEREFERENCE: Attempted to borrow `nil` as {:?}. Check the host function calling this!", std::any::type_name::<T>());
