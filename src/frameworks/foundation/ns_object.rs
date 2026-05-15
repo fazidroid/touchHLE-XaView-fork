@@ -415,37 +415,6 @@ forUndefinedKey:(id)key { // NSString*
     // no-op
 }
 
-// ── Selector introspection ───────────────────────────────────────────────────
-//
-// methodSignatureForSelector: is required for NSInvocation-based forwarding.
-// Real Racing 3 and similar games call this before forwardInvocation: to check
-// whether a proxy/wrapper object can handle an unknown selector. Return nil to
-// indicate "not handled here"; callers are expected to check for nil.
-// Previously this was only on NSAssertionHandler — moved here so all NSObject
-// subclasses inherit it.
-- (id)methodSignatureForSelector:(SEL)sel {
-    log_dbg!(
-        "NSObject methodSignatureForSelector: {:?} — returning nil (not implemented)",
-        sel.as_str(&env.mem)
-    );
-    nil
-}
-
-// doesNotRecognizeSelector: is the last-resort handler iOS calls when no
-// implementation is found anywhere in the class hierarchy. Instead of letting
-// the emulator panic with a bare "Unknown selector", log the offending
-// selector + class so it is easy to add a proper stub later.
-- (())doesNotRecognizeSelector:(SEL)sel {
-    let class_name = env
-        .objc
-        .get_class_name(crate::objc::ObjC::read_isa(this, &env.mem));
-    log!(
-        "doesNotRecognizeSelector: [{}  {}] — selector not implemented, ignoring",
-        class_name,
-        sel.as_str(&env.mem)
-    );
-}
-
 @end
 
 @implementation NSAssertionHandler: NSObject
@@ -468,38 +437,6 @@ forUndefinedKey:(id)key { // NSString*
 
 - (())handleFailureInFunction:(id)function file:(id)file lineNumber:(i32)line description:(id)description {
     log_dbg!("NSAssertionHandler handleFailureInFunction:... ignored");
-}
-
-- (id)instanceMethodSignatureForSelector:(SEL)sel {
-    log_dbg!("NSAssertionHandler instanceMethodSignatureForSelector: {:?} — delegating to NSObject", sel.as_str(&env.mem));
-    // Delegate up to the NSObject implementation added above.
-    msg![env; this methodSignatureForSelector:sel]
-}
-
-@end
-
-@implementation ASIdentifierManager: NSObject
-
-+ (id)sharedManager {
-    let shared: id = msg![env; this alloc];
-    let shared: id = msg![env; shared init];
-    autorelease(env, shared)
-}
-
-- (id)init {
-    this
-}
-
-- (id)advertisingIdentifier {
-    let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
-    let uuid_class = msg_class![env; NSUUID class];
-    let uuid: id = msg![env; uuid_class alloc];
-    let uuid: id = msg![env; uuid initWithUUIDString:uuid_str];
-    autorelease(env, uuid)
-}
-
-- (bool)isAdvertisingTrackingEnabled {
-    false
 }
 
 @end
