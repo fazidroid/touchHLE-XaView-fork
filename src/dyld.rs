@@ -1142,6 +1142,12 @@ if symbol == "_pthread_setname_np" {
             }
             return Some(&(fake_dyld_register as fn(&mut crate::Environment, u32) -> ()));
         }
+        if symbol == "__dyld_register_func_for_remove_image" {
+           fn fake_dyld_register_remove(_env: &mut crate::Environment, _func: u32) {
+               println!("🎮 LOG: Bypassing __dyld_register_func_for_remove_image (Crashlytics/Analytics disabled)!");
+                  }
+         return Some(&(fake_dyld_register_remove as fn(&mut crate::Environment, u32) -> ()));
+        }
 
         if symbol == "__Znwm" || symbol == "__Znwj" {
             fn fake_cpp_new(env: &mut crate::Environment, size: u32) -> u32 {
@@ -1723,6 +1729,15 @@ if symbol == "_CFUUIDGetUUIDBytes" {
 }
 if symbol == "_dispatch_time" {
     fn dispatch_time_stub(_env: &mut Environment, when: u64, delta: i64) -> u64 {
+        log_dbg!("_dispatch_time stub called, when={}, delta={}", when, delta);
+        // If when is DISPATCH_TIME_NOW (0), return current time + delta.
+        // Otherwise just return when + delta as a dummy value.
+        (when as i64 + delta) as u64
+    }
+    return Some(&(dispatch_time_stub as fn(&mut Environment, u64, i64) -> u64));
+}
+if symbol == "_dispatch_after" {
+    fn dispatch_after_stub(_env: &mut Environment, when: u64, delta: i64) -> u64 {
         log_dbg!("_dispatch_time stub called, when={}, delta={}", when, delta);
         // If when is DISPATCH_TIME_NOW (0), return current time + delta.
         // Otherwise just return when + delta as a dummy value.
