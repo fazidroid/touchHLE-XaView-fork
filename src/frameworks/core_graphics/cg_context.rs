@@ -19,6 +19,7 @@ use crate::frameworks::core_graphics::cg_color::CGColorRef;
 use crate::frameworks::core_graphics::cg_geometry::CGPointZero;
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
+use crate::frameworks::core_graphics::cg_geometry::CGPoint;
 
 type CGInterpolationQuality = i32;
 
@@ -241,19 +242,19 @@ fn CGContextSetInterpolationQuality(
 }
 
 // NEW STUBS
-fn _CGContextSetTextMatrix(_env: &mut Environment, _context: CGContextRef, _matrix: CGAffineTransform) {
+fn CGContextSetTextMatrix(_env: &mut Environment, _context: CGContextRef, _matrix: CGAffineTransform) {
     log!("_CGContextSetTextMatrix stub called");
 }
 
-fn _CGContextSetFont(_env: &mut Environment, _context: CGContextRef, _font: CGFontRef) {
+fn CGContextSetFont(_env: &mut Environment, _context: CGContextRef, _font: CGFontRef) {
     log!("_CGContextSetFont stub called");
 }
 
-fn _CGContextSetFontSize(_env: &mut Environment, _context: CGContextRef, _size: CGFloat) {
+fn CGContextSetFontSize(_env: &mut Environment, _context: CGContextRef, _size: CGFloat) {
     log!("_CGContextSetFontSize stub called");
 }
 
-fn _CGContextShowGlyphsAtPoint(
+fn CGContextShowGlyphsAtPoint(
     _env: &mut Environment,
     _context: CGContextRef,
     _x: CGFloat,
