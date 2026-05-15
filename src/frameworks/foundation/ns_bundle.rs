@@ -113,7 +113,11 @@ pub const CLASSES: ClassExports = objc_classes! {
         bundle_url: None,
         info_dictionary: None,
     };
-    *env.objc.borrow_mut(this) = host_object;
+    // `alloc` may have placed a TrivialHostObject here; we can't use
+    // borrow_mut because that downcasts first and would panic if the
+    // existing host object is not already an NSBundleHostObject.
+    // replace_host_object swaps the box directly without a downcast.
+    env.objc.replace_host_object(this, Box::new(host_object));
     this
 }
 
