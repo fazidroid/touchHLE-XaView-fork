@@ -1,4 +1,5 @@
-use crate::objc::{id, nil, objc_classes, ClassExports, HostObject, msg, msg_class};
+use crate::frameworks::foundation::ns_string::from_rust_string;
+use crate::objc::{autorelease, id, nil, objc_classes, retain, ClassExports, HostObject, msg, msg_class};
 use std::cell::Cell;
 
 thread_local! {
@@ -28,16 +29,34 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (id)init {
-        env.objc.borrow_mut::<ASIdentifierManagerHostObject>(this)
-            .advertising_identifier = nil;
+        // `alloc` stores a TrivialHostObject; we cannot borrow_mut to the real
+        // type until replace_host_object swaps the box — same pattern as NSBundle.
+
+        // Build a fake but valid IDFA UUID so callers never receive nil.
+        let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
+        let uuid: id = msg_class![env; NSUUID alloc];
+        let uuid: id = msg![env; uuid initWithUUIDString:uuid_str];
+        // Keep the UUID alive for the lifetime of this singleton.
+        retain(env, uuid);
+
+        env.objc.replace_host_object(
+            this,
+            Box::new(ASIdentifierManagerHostObject {
+                advertising_identifier: uuid,
+            }),
+        );
         this
     }
 
     // Returns the advertising identifier (IDFA) as an NSUUID.
     - (id)advertisingIdentifier {
-        env.objc
+        let uuid = env
+            .objc
             .borrow::<ASIdentifierManagerHostObject>(this)
-            .advertising_identifier
+            .advertising_identifier;
+        // Return an autoreleased reference — callers don't own this object.
+        autorelease(env, uuid);
+        uuid
     }
 
     - (bool)isAdvertisingTrackingEnabled {
