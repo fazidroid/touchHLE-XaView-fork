@@ -31,6 +31,7 @@ pub const DYLIB_LIST: &[&super::HostDylib] = &[
     &frameworks::openal::DYLIB,
     &frameworks::opengles::DYLIB,
     &frameworks::store_kit::DYLIB,
+    &frameworks::ad_support::DYLIB,
     &frameworks::system_configuration::DYLIB,
     &frameworks::uikit::DYLIB,
     &frameworks::core_motion::DYLIB,
