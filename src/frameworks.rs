@@ -44,6 +44,7 @@ pub mod sbjson;
 pub mod oauthconsumer;
 pub mod burstly;
 pub mod core_text;
+pub mod accounts;
 
 /// Container for state of various child modules
 #[derive(Default)]
