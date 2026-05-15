@@ -22,6 +22,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     (env, this, _cmd);
 
     @implementation NSUUID: NSObject
+    
+    - (())getUUIDBytes:(crate::mem::MutVoidPtr)uuid_bytes {
+    if !uuid_bytes.is_null() {
+        let slice = env.mem.bytes_at_mut(uuid_bytes.cast::<u8>(), 16);
+        for b in slice.iter_mut() {
+            *b = 0;
+        }
+    }
+}
 
     - (id)init {
         let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
