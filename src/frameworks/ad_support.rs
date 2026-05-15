@@ -12,10 +12,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     @implementation ASIdentifierManager: NSObject
 
-    + (id)sharedManager {
+        + (id)sharedManager {
+        // 🏎️ TIP: Check your console for this log! 
+        // If it appears, we know the runtime successfully found your class.
         log!("ASIdentifierManager sharedManager stub called");
-        let class = env.objc.get_known_class("ASIdentifierManager", &mut env.mem);
-        env.objc.alloc_object(class, Box::new(ASIdentifierManagerHost), &mut env.mem)
+
+        // FIX: Use 'this' directly instead of get_known_class
+        env.objc.alloc_object(this, Box::new(ASIdentifierManagerHost), &mut env.mem)
     }
 
     - (id)advertisingIdentifier {
