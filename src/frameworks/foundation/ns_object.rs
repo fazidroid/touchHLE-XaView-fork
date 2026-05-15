@@ -469,7 +469,7 @@ forUndefinedKey:(id)key { // NSString*
     false
 }
 
-- (void)setAdvertisingTrackingEnabled:(bool)enabled {
+- (())setAdvertisingTrackingEnabled:(bool)enabled {
     // no-op
 }
 
@@ -482,7 +482,7 @@ forUndefinedKey:(id)key { // NSString*
     autorelease(env, signature)
 }
 
-- (void)forwardInvocation:(id)invocation {
+- (())forwardInvocation:(id)invocation {
     log_dbg!("ASIdentifierManager forwardInvocation: ignoring unknown selector");
 }
 
