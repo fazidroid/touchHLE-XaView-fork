@@ -88,13 +88,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this description]
 }
 
-- (void)performSelector:(SEL)sel withObject:(id)anObject afterDelay:(NSTimeInterval)delay {
+- (())performSelector:(SEL)sel withObject:(id)anObject afterDelay:(f64)delay {
     log_dbg!("performSelector:withObject:afterDelay: called (sel={:?}, delay={})", sel.as_str(&env.mem), delay);
     // Execute immediately; proper delay would require a run loop.
     if sel.as_str(&env.mem).ends_with(':') {
-        let _: id = msg_send(env, (this, sel, anObject));
+        let _: id = msg![env; this performSelector:sel withObject:anObject];
     } else {
-        let _: id = msg_send(env, (this, sel));
+        let _: id = msg![env; this performSelector:sel];
     }
 }
 
