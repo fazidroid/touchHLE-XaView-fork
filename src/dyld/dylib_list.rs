@@ -29,6 +29,7 @@ pub const DYLIB_LIST: &[&super::HostDylib] = &[
     &frameworks::store_kit::DYLIB,
     &frameworks::system_configuration::DYLIB,
     &frameworks::ad_support::DYLIB,
+    &frameworks::accounts::DYLIB,
     
     // ⚠️ CRITICAL: The User Interface framework!
     &frameworks::uikit::DYLIB,
