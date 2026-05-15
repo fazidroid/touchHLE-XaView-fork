@@ -250,7 +250,9 @@ fn CFStringCreateMutable(
     max_length: CFIndex,
 ) -> CFMutableStringRef {
     assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
-    assert_eq!(max_length, 0);
+    // max_length is a capacity hint only (0 = unbounded). CF does not enforce
+    // a hard limit, and neither do we — NSMutableString is always unbounded.
+    let _ = max_length;
     msg_class![env; NSMutableString new]
 }
 
@@ -261,7 +263,9 @@ fn CFStringCreateMutableCopy(
     the_string: CFStringRef,
 ) -> CFMutableStringRef {
     assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
-    assert_eq!(max_length, 0);
+    // max_length is a capacity hint only (0 = unbounded). Ignored for the
+    // same reason as CFStringCreateMutable.
+    let _ = max_length;
     msg![env; the_string mutableCopy]
 }
 
