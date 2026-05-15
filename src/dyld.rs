@@ -1797,6 +1797,22 @@ if symbol == "_objc_retainAutoreleasedReturnValue" {
     return Some(&(fake_objc_retain_autoreleased_return_value as fn(&mut crate::Environment, u32) -> u32));
 }
 
+if symbol == "_setvbuf" {
+    fn fake_setvbuf(_env: &mut crate::Environment, _stream: u32, _buf: u32, _mode: i32, _size: u32) -> i32 {
+        log_dbg!("_setvbuf stub called, returning 0 (success)");
+        0
+    }
+    return Some(&(fake_setvbuf as fn(&mut crate::Environment, u32, u32, i32, u32) -> i32));
+}
+
+if symbol == "_setxattr" {
+    fn fake_setxattr(_env: &mut crate::Environment, _path: u32, _name: u32, _value: u32, _size: u32, _position: u32, _flags: i32) -> i32 {
+        log_dbg!("_setxattr stub called, returning 0 (success)");
+        0
+    }
+    return Some(&(fake_setxattr as fn(&mut crate::Environment, u32, u32, u32, u32, u32, i32) -> i32));
+}
+
 if symbol == "_objc_autoreleaseReturnValue" {
     fn fake_objc_autorelease_return_value(_env: &mut crate::Environment, obj: u32) -> u32 {
         obj
