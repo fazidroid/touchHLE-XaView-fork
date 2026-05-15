@@ -1741,24 +1741,6 @@ if symbol == "_CFUUIDGetUUIDBytes" {
     fn cf_uuid_get_bytes(_env: &mut Environment, _uuid: u32) -> u64 { 0 }
     return Some(&(cf_uuid_get_bytes as fn(&mut Environment, u32) -> u64));
 }
-if symbol == "_CFStringCreateWithBytes" {
-    fn fake_CFStringCreateWithBytes(
-        env: &mut crate::Environment,
-        _alloc: u32,
-        bytes: crate::mem::ConstPtr<u8>,
-        numBytes: u32,
-        _encoding: u32,
-        _isExternal: bool,
-    ) -> u32 {
-        use crate::frameworks::foundation::ns_string::from_rust_bytes;
-        let slice = env.mem.bytes_at(bytes, numBytes);
-        let str = String::from_utf8_lossy(slice).to_string();
-        let nsstr = from_rust_bytes(env, str.as_bytes());
-        nsstr.to_bits()
-    }
-    return Some(&(fake_CFStringCreateWithBytes as fn(&mut crate::Environment, u32, crate::mem::ConstPtr<u8>, u32, u32, bool) -> u32));
-}
-
 if symbol == "_CFStringCreateWithCString" {
     fn fake_CFStringCreateWithCString(
         env: &mut crate::Environment,
