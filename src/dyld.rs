@@ -1769,6 +1769,27 @@ if symbol == "_sigaltstack" {
     }
     return Some(&(fake_sigaltstack as fn(&mut crate::Environment, u32, u32) -> i32));
 }
+if symbol == "_objc_retain" {
+    fn fake_objc_retain(_env: &mut crate::Environment, obj: u32) -> u32 {
+        // Return the same object (retain is a no-op in our simplified runtime)
+        obj
+    }
+    return Some(&(fake_objc_retain as fn(&mut crate::Environment, u32) -> u32));
+}
+
+if symbol == "_objc_release" {
+    fn fake_objc_release(_env: &mut crate::Environment, _obj: u32) {
+        // No-op
+    }
+    return Some(&(fake_objc_release as fn(&mut crate::Environment, u32) -> ()));
+}
+
+if symbol == "_objc_autorelease" {
+    fn fake_objc_autorelease(_env: &mut crate::Environment, obj: u32) -> u32 {
+        obj
+    }
+    return Some(&(fake_objc_autorelease as fn(&mut crate::Environment, u32) -> u32));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
