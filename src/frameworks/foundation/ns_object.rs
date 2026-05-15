@@ -441,4 +441,30 @@ forUndefinedKey:(id)key { // NSString*
 
 @end
 
+@implementation ASIdentifierManager: NSObject
+
++ (id)sharedManager {
+    let shared: id = msg![env; this alloc];
+    let shared: id = msg![env; shared init];
+    autorelease(env, shared)
+}
+
+- (id)init {
+    this
+}
+
+- (id)advertisingIdentifier {
+    let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
+    let uuid_class = msg_class![env; NSUUID class];
+    let uuid: id = msg![env; uuid_class alloc];
+    let uuid: id = msg![env; uuid initWithUUIDString:uuid_str];
+    autorelease(env, uuid)
+}
+
+- (bool)isAdvertisingTrackingEnabled {
+    false
+}
+
+@end
+
 };
