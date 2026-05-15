@@ -2,6 +2,8 @@
 
 use crate::dyld::HostDylib;
 use crate::objc::{id, msg_class, nil, objc_classes, ClassExports, TrivialHostObject};
+use crate::msg;
+use crate::msg_class;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -22,7 +24,6 @@ pub const CLASSES: ClassExports = objc_classes! {
                               options:(id)options
                             completion:(id)completion {
     log_dbg!("ACAccountStore requestAccessToAccountsWithType:... called - returning denied");
-    // Return nil; real implementation would call the completion block.
     nil
 }
 
