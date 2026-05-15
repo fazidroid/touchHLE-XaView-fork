@@ -1623,8 +1623,22 @@ if symbol == "_CFReadStreamClose" {
     return Some(&(cf_read_stream_close as fn(&mut Environment, u32) -> ()));
 }
 if symbol == "_CFStringCreateWithBytes" {
-    fn cf_string_create_with_bytes(_env: &mut Environment, _alloc: u32, _bytes: u32, _len: u32, _encoding: u32, _is_external: bool) -> u32 { 0 }
-    return Some(&(cf_string_create_with_bytes as fn(&mut Environment, u32, u32, u32, u32, bool) -> u32));
+    fn fake_CFStringCreateWithBytes(
+        env: &mut crate::Environment,
+        _alloc: u32,
+        bytes: crate::mem::ConstPtr<u8>,
+        numBytes: u32,
+        _encoding: u32,
+        _isExternal: bool,
+    ) -> u32 {
+        use crate::frameworks::foundation::ns_string::from_rust_string;
+        let slice = env.mem.bytes_at(bytes, numBytes);
+        // Convert bytes to a String (lossy UTF-8)
+        let s = String::from_utf8_lossy(slice).to_string();
+        let nsstr = from_rust_string(env, s);
+        nsstr.to_bits()
+    }
+    return Some(&(fake_CFStringCreateWithBytes as fn(&mut crate::Environment, u32, crate::mem::ConstPtr<u8>, u32, u32, bool) -> u32));
 }
 if symbol == "_CFStringGetCString" {
     fn cf_string_get_cstring(_env: &mut Environment, _str: u32, _buf: u32, _buf_size: u32, _encoding: u32) -> bool { false }
@@ -1792,9 +1806,8 @@ if symbol == "_CFStringCreateMutableCopy" {
 
 if symbol == "_CFStringCreateCopy" {
     fn fake_CFStringCreateCopy(env: &mut crate::Environment, _alloc: u32, theString: u32) -> u32 {
-        // Just retain the original string (toll-free bridged)
         use crate::objc::retain;
-        let nsstr = crate::mem::MutPtr::<crate::objc::objc_object>::from_bits(theString);
+        let nsstr = crate::objc::id::from_bits(theString);
         retain(env, nsstr);
         theString
     }
@@ -1822,16 +1835,6 @@ if symbol == "_CFStringCreateWithSubstring" {
         string
     }
     return Some(&(fake_CFStringCreateWithSubstring as fn(&mut crate::Environment, u32, u32, u64) -> u32));
-}
-
-if symbol == "_CFStringGetLength" {
-    fn fake_CFStringGetLength(env: &mut crate::Environment, theString: u32) -> u32 {
-        use crate::frameworks::foundation::ns_string::to_rust_string;
-        let nsstr = crate::mem::MutPtr::from_bits(theString);
-        let s = to_rust_string(env, nsstr);
-        s.len() as u32
-    }
-    return Some(&(fake_CFStringGetLength as fn(&mut crate::Environment, u32) -> u32));
 }
 
 if symbol == "_CFStringGetBytes" {
@@ -1929,9 +1932,9 @@ if symbol == "_CFStringHasPrefix" {
         prefix: u32,
     ) -> bool {
         use crate::frameworks::foundation::ns_string::to_rust_string;
-        let s = to_rust_string(env, crate::mem::MutPtr::from_bits(str));
-        let p = to_rust_string(env, crate::mem::MutPtr::from_bits(prefix));
-        s.starts_with(&p)
+        let s = to_rust_string(env, crate::objc::id::from_bits(str));
+        let p = to_rust_string(env, crate::objc::id::from_bits(prefix));
+        s.starts_with(&*p)
     }
     return Some(&(fake_CFStringHasPrefix as fn(&mut crate::Environment, u32, u32) -> bool));
 }
@@ -1943,9 +1946,9 @@ if symbol == "_CFStringHasSuffix" {
         suffix: u32,
     ) -> bool {
         use crate::frameworks::foundation::ns_string::to_rust_string;
-        let s = to_rust_string(env, crate::mem::MutPtr::from_bits(str));
-        let suf = to_rust_string(env, crate::mem::MutPtr::from_bits(suffix));
-        s.ends_with(&suf)
+        let s = to_rust_string(env, crate::objc::id::from_bits(str));
+        let suf = to_rust_string(env, crate::objc::id::from_bits(suffix));
+        s.ends_with(&*suf)
     }
     return Some(&(fake_CFStringHasSuffix as fn(&mut crate::Environment, u32, u32) -> bool));
 }
@@ -1958,13 +1961,11 @@ if symbol == "_CFStringFind" {
         _options: u32,
     ) -> u64 {
         use crate::frameworks::foundation::ns_string::to_rust_string;
-        let s = to_rust_string(env, crate::mem::MutPtr::from_bits(str));
-        let sub = to_rust_string(env, crate::mem::MutPtr::from_bits(substr));
-        if let Some(pos) = s.find(&sub) {
-            // Pack CFRange (location, length) into u64
+        let s = to_rust_string(env, crate::objc::id::from_bits(str));
+        let sub = to_rust_string(env, crate::objc::id::from_bits(substr));
+        if let Some(pos) = s.find(&*sub) {
             (pos as u64) << 32 | (sub.len() as u64)
         } else {
-            // kCFNotFound = 0x7fffffff
             0x7fffffff00000000
         }
     }
