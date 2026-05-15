@@ -439,6 +439,16 @@ forUndefinedKey:(id)key { // NSString*
     log_dbg!("NSAssertionHandler handleFailureInFunction:... ignored");
 }
 
+- (id)methodSignatureForSelector:(SEL)sel {
+    log_dbg!("methodSignatureForSelector: called for selector {:?}", sel.as_str(&env.mem));
+    nil
+}
+
+- (id)instanceMethodSignatureForSelector:(SEL)sel {
+    log_dbg!("instanceMethodSignatureForSelector: called for selector {:?}", sel.as_str(&env.mem));
+    nil
+}
+
 @end
 
 @implementation ASIdentifierManager: NSObject
