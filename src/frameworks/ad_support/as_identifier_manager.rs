@@ -1,19 +1,10 @@
-/*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/ .
- */
-//! `ASIdentifierManager` class from the AdSupport framework.
-
 use crate::objc::{id, nil, objc_classes, ClassExports, HostObject, msg, msg_class};
 use std::cell::Cell;
 
-// Singleton storage. touchHLE runs single-threaded, so thread_local is safe.
 thread_local! {
     static SHARED_MANAGER: Cell<id> = Cell::new(nil);
 }
 
-// Host object for `ASIdentifierManager` instances.
 pub struct ASIdentifierManagerHostObject {
     pub advertising_identifier: id,
 }
@@ -49,7 +40,6 @@ pub const CLASSES: ClassExports = objc_classes! {
             .advertising_identifier
     }
 
-    // Returns whether ad tracking is enabled.
     - (bool)isAdvertisingTrackingEnabled {
         false
     }
