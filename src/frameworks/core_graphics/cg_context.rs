@@ -246,14 +246,6 @@ fn CGContextSetTextMatrix(_env: &mut Environment, _context: CGContextRef, _matri
     log!("_CGContextSetTextMatrix stub called");
 }
 
-fn CGContextSetFont(_env: &mut Environment, _context: CGContextRef, _font: CGFontRef) {
-    log!("_CGContextSetFont stub called");
-}
-
-fn CGContextSetFontSize(_env: &mut Environment, _context: CGContextRef, _size: CGFloat) {
-    log!("_CGContextSetFontSize stub called");
-}
-
 fn CGContextShowGlyphsAtPoint(
     _env: &mut Environment,
     _context: CGContextRef,
