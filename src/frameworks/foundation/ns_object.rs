@@ -441,4 +441,51 @@ forUndefinedKey:(id)key { // NSString*
 
 @end
 
+@implementation ASIdentifierManager: NSObject
+
++ (id)sharedManager {
+    let shared: id = msg![env; this alloc];
+    let shared: id = msg![env; shared init];
+    autorelease(env, shared)
+}
+
+- (id)init {
+    this
+}
+
+- (id)advertisingIdentifier {
+    let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
+    let uuid_class = msg_class![env; NSUUID class];
+    let uuid: id = msg![env; uuid_class alloc];
+    let uuid: id = msg![env; uuid initWithUUIDString:uuid_str];
+    autorelease(env, uuid)
+}
+
+- (bool)isAdvertisingTrackingEnabled {
+    false
+}
+
+- (bool)advertisingTrackingEnabled {
+    false
+}
+
+- (void)setAdvertisingTrackingEnabled:(bool)enabled {
+    // no-op
+}
+
+- (id)methodSignatureForSelector:(SEL)sel {
+    log_dbg!("ASIdentifierManager methodSignatureForSelector: {:?} — returning generic signature", sel.as_str(&env.mem));
+    let types = b"v@:@@\0";
+    let types_ptr = env.mem.alloc_and_write_cstr(types);
+    let signature_class = msg_class![env; NSMethodSignature class];
+    let signature: id = msg![env; signature_class signatureWithObjCTypes:types_ptr];
+    autorelease(env, signature)
+}
+
+- (void)forwardInvocation:(id)invocation {
+    log_dbg!("ASIdentifierManager forwardInvocation: ignoring unknown selector");
+}
+
+@end
+
 };
