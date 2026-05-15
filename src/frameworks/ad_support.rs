@@ -4,6 +4,8 @@ use crate::dyld::HostDylib;
 use crate::objc::{id, nil, objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
+pub mod as_identifier_manager;
+
 struct ASIdentifierManagerHost;
 impl HostObject for ASIdentifierManagerHost {}
 
