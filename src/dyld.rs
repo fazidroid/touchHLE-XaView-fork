@@ -1738,12 +1738,12 @@ if symbol == "_dispatch_time" {
 }
 if symbol == "_dispatch_after" {
     fn dispatch_after_stub(_env: &mut Environment, when: u64, delta: i64) -> u64 {
-        log_dbg!("_dispatch_time stub called, when={}, delta={}", when, delta);
+        log_dbg!("_dispatch_after stub called, when={}, delta={}", when, delta);
         // If when is DISPATCH_TIME_NOW (0), return current time + delta.
         // Otherwise just return when + delta as a dummy value.
         (when as i64 + delta) as u64
     }
-    return Some(&(dispatch_time_stub as fn(&mut Environment, u64, i64) -> u64));
+    return Some(&(dispatch_after_stub as fn(&mut Environment, u64, i64) -> u64));
 }
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
