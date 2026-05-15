@@ -2074,6 +2074,19 @@ if symbol == "_class_getMethodImplementation" {
     }
     return Some(&(fake_class_getMethodImplementation as fn(&mut crate::Environment, u32, u32) -> u32));
 }
+if symbol == "_class_replaceMethod" {
+    fn fake_class_replace_method(
+        _env: &mut crate::Environment,
+        _cls: u32,
+        _sel: u32,
+        _imp: u32,
+        _types: u32,
+    ) -> u32 {
+        log_dbg!("_class_replaceMethod stub called, returning 0 (previous IMP or nil)");
+        0
+    }
+    return Some(&(fake_class_replace_method as fn(&mut crate::Environment, u32, u32, u32, u32) -> u32));
+}
 if symbol == "_dispatch_time" {
     fn dispatch_time_stub(_env: &mut Environment, when: u64, delta: i64) -> u64 {
         log_dbg!("_dispatch_time stub called, when={}, delta={}", when, delta);
