@@ -1745,6 +1745,30 @@ if symbol == "_dispatch_after" {
     }
     return Some(&(dispatch_after_stub as fn(&mut Environment, u64, i64) -> u64));
 }
+if symbol == "_sigaction" {
+    fn fake_sigaction(
+        _env: &mut crate::Environment,
+        _sig: i32,
+        _act: u32,
+        _oact: u32,
+    ) -> i32 {
+        log_dbg!("_sigaction stub called, returning 0 (success)");
+        0
+    }
+    return Some(&(fake_sigaction as fn(&mut crate::Environment, i32, u32, u32) -> i32));
+}
+
+if symbol == "_sigaltstack" {
+    fn fake_sigaltstack(
+        _env: &mut crate::Environment,
+        _ss: u32,
+        _oss: u32,
+    ) -> i32 {
+        log_dbg!("_sigaltstack stub called, returning 0 (success)");
+        0
+    }
+    return Some(&(fake_sigaltstack as fn(&mut crate::Environment, u32, u32) -> i32));
+}
         if symbol == "_objc_autoreleasePoolPush" {
             fn fake_pool_push(_env: &mut crate::Environment) -> u32 {
                 // Return a dummy pool token so the game thinks it created a memory pool
