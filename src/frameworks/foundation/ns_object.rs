@@ -88,6 +88,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this description]
 }
 
+- (())performSelector:(SEL)sel withObject:(id)anObject afterDelay:(f64)delay {
+    log_dbg!("performSelector:withObject:afterDelay: called (sel={:?}, delay={})", sel.as_str(&env.mem), delay);
+    // Execute immediately; proper delay would require a run loop.
+    if sel.as_str(&env.mem).ends_with(':') {
+        let _: id = msg![env; this performSelector:sel withObject:anObject];
+    } else {
+        let _: id = msg![env; this performSelector:sel];
+    }
+}
+
 - (())performSelector:(SEL)sel onThread:(id)_thread withObject:(id)arg waitUntilDone:(bool)wait {
     log_dbg!("NSObject performSelector:onThread:withObject:waitUntilDone: stub (sel: {}, wait: {})", sel.as_str(&env.mem), wait);
     // For simplicity, perform immediately. The thread and wait flag are ignored.

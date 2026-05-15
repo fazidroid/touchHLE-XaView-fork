@@ -18,7 +18,7 @@ use crate::frameworks::core_foundation::cf_run_loop::{
     kCFRunLoopCommonModes, kCFRunLoopDefaultMode, CFRunLoopRef,
 };
 use crate::frameworks::{core_animation, media_player, uikit};
-use crate::objc::{id, msg, objc_classes, release, retain, Class, ClassExports, HostObject};
+use crate::objc::{id, msg, nil, objc_classes, release, retain, Class, ClassExports, HostObject};
 use crate::Environment;
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
