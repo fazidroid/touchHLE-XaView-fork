@@ -90,6 +90,47 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg_class![env; NSBundle mainBundle]
 }
 
++ (id)bundleWithPath:(id)path {
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithPath:path];
+    autorelease(env, new)
+}
+
+- (id)initWithPath:(id)path {
+    let self: id = msg![env; super init];
+    if self == nil { return nil; }
+
+    let path_str = ns_string::to_rust_string(env, path);
+    // Create a host object for this bundle. We don't have a full Bundle struct for it,
+    // but we can store the path and later read Info.plist when needed.
+    let bundle_path_ns = ns_string::from_rust_string(env, path_str.clone());
+    // Try to read bundle identifier from Info.plist at that path
+    let plist_path = format!("{}/Info.plist", path_str);
+    let identifier = if let Ok(plist) = std::fs::read(&plist_path) {
+        if let Ok(dict) = plist::from_bytes::<plist::Dictionary>(&plist) {
+            dict.get("CFBundleIdentifier")
+                .and_then(|v| v.as_string())
+                .unwrap_or(&path_str)
+                .to_string()
+        } else {
+            path_str.clone()
+        }
+    } else {
+        path_str.clone()
+    };
+    let bundle_identifier_ns = ns_string::from_rust_string(env, identifier);
+
+    let host_object = NSBundleHostObject {
+        bundle: None,
+        bundle_path: bundle_path_ns,
+        bundle_identifier: bundle_identifier_ns,
+        bundle_url: None,
+        info_dictionary: None,
+    };
+    *env.objc.borrow_mut(self) = host_object;
+    self
+}
+
 - (())dealloc {
     let &NSBundleHostObject {
         bundle: _,
