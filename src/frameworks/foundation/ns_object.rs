@@ -396,15 +396,7 @@ forUndefinedKey:(id)key { // NSString*
     let sel_key: id = get_static_str(env, "SEL");
     let sel_str_id: id = msg![env; dict objectForKey:sel_key];
     let sel_str = to_rust_string(env, sel_str_id);
-    
-    // SAFELY unwrap the selector so we don't crash RR3!
-    let sel = match env.objc.lookup_selector(&sel_str) {
-        Some(s) => s,
-        None => {
-            println!("🎮 LOG: RR3 FIX - Bypassed unknown timer selector: '{}' on object {:?}", sel_str, this);
-            return; // Exit the method gracefully
-        }
-    };
+    let sel = env.objc.lookup_selector(&sel_str).unwrap();
 
     let arg_key: id = get_static_str(env, "arg");
     let arg: id = msg![env; dict objectForKey:arg_key];
@@ -445,53 +437,6 @@ forUndefinedKey:(id)key { // NSString*
 
 - (())handleFailureInFunction:(id)function file:(id)file lineNumber:(i32)line description:(id)description {
     log_dbg!("NSAssertionHandler handleFailureInFunction:... ignored");
-}
-
-@end
-
-@implementation ASIdentifierManager: NSObject
-
-+ (id)sharedManager {
-    let shared: id = msg![env; this alloc];
-    let shared: id = msg![env; shared init];
-    autorelease(env, shared)
-}
-
-- (id)init {
-    this
-}
-
-- (id)advertisingIdentifier {
-    let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
-    let uuid_class = msg_class![env; NSUUID class];
-    let uuid: id = msg![env; uuid_class alloc];
-    let uuid: id = msg![env; uuid initWithUUIDString:uuid_str];
-    autorelease(env, uuid)
-}
-
-- (bool)isAdvertisingTrackingEnabled {
-    false
-}
-
-- (bool)advertisingTrackingEnabled {
-    false
-}
-
-- (())setAdvertisingTrackingEnabled:(bool)enabled {
-    // no-op
-}
-
-- (id)methodSignatureForSelector:(SEL)sel {
-    log_dbg!("ASIdentifierManager methodSignatureForSelector: {:?} — returning generic signature", sel.as_str(&env.mem));
-    let types = b"v@:@@\0";
-    let types_ptr = env.mem.alloc_and_write_cstr(types);
-    let signature_class = msg_class![env; NSMethodSignature class];
-    let signature: id = msg![env; signature_class signatureWithObjCTypes:types_ptr];
-    autorelease(env, signature)
-}
-
-- (())forwardInvocation:(id)invocation {
-    log_dbg!("ASIdentifierManager forwardInvocation: ignoring unknown selector");
 }
 
 @end
