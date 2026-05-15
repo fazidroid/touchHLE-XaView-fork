@@ -6,6 +6,12 @@ thread_local! {
     static SHARED_MANAGER: Cell<id> = Cell::new(nil);
 }
 
+// ── NSUUID stub ──────────────────────────────────────────────────────────────
+pub struct NSUUIDHostObject {
+    pub uuid_string: id,
+}
+impl HostObject for NSUUIDHostObject {}
+
 // ── ASIdentifierManagerHostObject ───────────────────────────────────────────
 pub struct ASIdentifierManagerHostObject {
     pub advertising_identifier: id,
@@ -15,8 +21,23 @@ impl HostObject for ASIdentifierManagerHostObject {}
 pub const CLASSES: ClassExports = objc_classes! {
     (env, this, _cmd);
 
-    // ── Category on NSUUID to add the missing method ────────────────────────
-    @implementation NSUUID (TouchHLE_AdSupport)
+    @implementation NSUUID: NSObject
+
+    - (id)init {
+        let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
+        retain(env, uuid_str);
+        env.objc.replace_host_object(
+            this,
+            Box::new(NSUUIDHostObject { uuid_string: uuid_str }),
+        );
+        this
+    }
+
+    - (id)UUIDString {
+        let s = env.objc.borrow::<NSUUIDHostObject>(this).uuid_string;
+        autorelease(env, s);
+        s
+    }
 
     - (())getUUIDBytes:(crate::mem::MutVoidPtr)uuid_bytes {
         if !uuid_bytes.is_null() {
@@ -29,7 +50,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     @end
 
-    // ── ASIdentifierManager (unchanged) ──────────────────────────────────────
     @implementation ASIdentifierManager: NSObject
 
     + (id)sharedManager {
@@ -48,7 +68,6 @@ pub const CLASSES: ClassExports = objc_classes! {
         let uuid: id = msg![env; uuid_class alloc];
         let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
         retain(env, uuid_str);
-        // NSUUID already exists; we just replace its host object to store the string.
         env.objc.replace_host_object(uuid, Box::new(NSUUIDHostObject { uuid_string: uuid_str }));
         retain(env, uuid);
 
@@ -76,9 +95,3 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     @end
 };
-
-// We still need the NSUUIDHostObject definition (but not the class implementation)
-pub struct NSUUIDHostObject {
-    pub uuid_string: id,
-}
-impl HostObject for NSUUIDHostObject {}
