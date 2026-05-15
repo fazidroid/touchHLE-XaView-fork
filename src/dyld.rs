@@ -2063,6 +2063,17 @@ if symbol == "_CFURLCreateStringByReplacingPercentEscapesUsingEncoding" {
     }
     return Some(&(fake_CFURLCreateStringByReplacingPercentEscapesUsingEncoding as fn(&mut crate::Environment, u32, u32, u32, u32) -> u32));
 }
+if symbol == "_class_getMethodImplementation" {
+    fn fake_class_getMethodImplementation(
+        _env: &mut crate::Environment,
+        _cls: u32,
+        _sel: u32,
+    ) -> u32 {
+        // Return NULL (0) – calling code should handle nil
+        0
+    }
+    return Some(&(fake_class_getMethodImplementation as fn(&mut crate::Environment, u32, u32) -> u32));
+}
 if symbol == "_dispatch_time" {
     fn dispatch_time_stub(_env: &mut Environment, when: u64, delta: i64) -> u64 {
         log_dbg!("_dispatch_time stub called, when={}, delta={}", when, delta);
