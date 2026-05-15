@@ -396,7 +396,15 @@ forUndefinedKey:(id)key { // NSString*
     let sel_key: id = get_static_str(env, "SEL");
     let sel_str_id: id = msg![env; dict objectForKey:sel_key];
     let sel_str = to_rust_string(env, sel_str_id);
-    let sel = env.objc.lookup_selector(&sel_str).unwrap();
+    
+    // SAFELY unwrap the selector so we don't crash RR3!
+    let sel = match env.objc.lookup_selector(&sel_str) {
+        Some(s) => s,
+        None => {
+            println!("🎮 LOG: RR3 FIX - Bypassed unknown timer selector: '{}' on object {:?}", sel_str, this);
+            return; // Exit the method gracefully
+        }
+    };
 
     let arg_key: id = get_static_str(env, "arg");
     let arg: id = msg![env; dict objectForKey:arg_key];
