@@ -36,6 +36,7 @@ pub mod media_player;
 pub mod openal;
 pub mod opengles;
 pub mod store_kit;
+pub mod ad_support;
 pub mod system_configuration;
 pub mod uikit;
 pub mod mobile_core_services;
