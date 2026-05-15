@@ -181,6 +181,25 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)localeIdentifier {
+    let host_obj = env.objc.borrow::<NSLocaleHostObject>(this);
+    let lang = host_obj.language_code;
+    let country = host_obj.country_code;
+    let identifier: id = if lang != nil && country != nil {
+        let lang_str = ns_string::to_rust_string(env, lang);
+        let country_str = ns_string::to_rust_string(env, country);
+        let combined = format!("{}_{}", lang_str, country_str);
+        ns_string::from_rust_string(env, combined)
+    } else if lang != nil {
+        lang
+    } else if country != nil {
+        country
+    } else {
+        ns_string::get_static_str(env, "en_US")
+    };
+    crate::objc::autorelease(env, identifier)
+}
+
 - (())dealloc {
     let &NSLocaleHostObject { country_code, language_code } = env.objc.borrow::<NSLocaleHostObject>(this);
     release(env, country_code);
