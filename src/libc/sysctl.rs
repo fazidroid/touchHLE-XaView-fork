@@ -14,17 +14,17 @@ use crate::libc::sysctl::SysInfoType::String;
 use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, MutPtr, MutVoidPtr, PAGE_SIZE};
 use crate::Environment;
 
-static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); ,41] = [
+static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); 41] = [
     // Hardware (CTL_HW = 6)
     ((6,1),  "hw.machine",          String(b"iPhone4,1")),
     ((6,2),  "hw.model",            String(b"N94AP")),
     ((6,3),  "hw.ncpu",             SysInfoType::Int32(1)),
     ((6,4),  "hw.physmem",          SysInfoType::Int32(512 * 1024 * 1024)),
-    ((6,5),  "hw.physmem",          SysInfoType::Int32(121634816)), // duplicate for compatibility
+    ((6,5),  "hw.physmem",          SysInfoType::Int32(121634816)),
     ((6,6),  "hw.usermem",          SysInfoType::Int32(93564928)),
     ((6,7),  "hw.pagesize",         SysInfoType::Int64(PAGE_SIZE as i64)),
     ((6,8),  "hw.cputype",          SysInfoType::Int32(12)), 
-    ((6,12), "hw.machine_arch",     String(b"arm64")),
+    ((6,12), "hw.machine_arch",     String(b"armv7")), // Fix: armv7 for iPhone 4S
     ((6,13), "hw.vectorunit",       SysInfoType::Int32(0)),
     ((6,14), "hw.busfrequency",     SysInfoType::Int64(103000000)),
     ((6,15), "hw.cpufrequency",     SysInfoType::Int64(412000000)),
@@ -43,19 +43,21 @@ static SYSCTL_VALUES: [((i32, i32), &str, SysInfoType); ,41] = [
     ((6,28), "hw.l2cachesize",      SysInfoType::Int32(524288)),
     ((6,29), "hw.tbfrequency",      SysInfoType::Int64(1000000000)),
     ((6,30), "hw.packages",         SysInfoType::Int32(1)),
-    ((6, 31), "hw.physicalcpu_max",  SysInfoType::Int32(2)),
-    ((6, 32), "hw.logicalcpu_max",   SysInfoType::Int32(2)),
-    ((6, 33), "hw.physicalcpu",      SysInfoType::Int32(2)),
-    ((6, 34), "hw.logicalcpu",       SysInfoType::Int32(2)),
-    ((6, 35), "hw.cpu64bit_capable", SysInfoType::Int32(0)),
+    ((6,31), "hw.physicalcpu_max",  SysInfoType::Int32(2)),
+    ((6,32), "hw.logicalcpu_max",   SysInfoType::Int32(2)),
+    ((6,33), "hw.physicalcpu",      SysInfoType::Int32(2)),
+    ((6,34), "hw.logicalcpu",       SysInfoType::Int32(2)),
+    ((6,35), "hw.cpu64bit_capable", SysInfoType::Int32(0)),
+    ((6,36), "hw.cpufamily",        SysInfoType::Int32(0x573d5e62)), // Swift family
     
-    ((1, 0), "sysctl.proc_native",  SysInfoType::Int32(1)),
+    // Kernel / System
+    ((1, 0), "sysctl.proc_native",  SysInfoType::Int32(1)), // Standard for emulators
 
     // Kernel (CTL_KERN = 1)
     ((1,1),  "kern.ostype",         String(b"Darwin")),
     ((1,2),  "kern.osrelease",      String(b"10.0.0d3")),
     ((1,3),  "kern.osversion",      String(b"7A341")),
-    ((1,4),  "kern.version",        String(b"Darwin Kernel Version 10.0.0d3: Wed May 13 22:11:58 PDT 2009; root:xnu-1357.2.89~4/RELEASE_ARM_S5L8900X")),
+    ((1,4),  "kern.version",        String(b"Darwin Kernel Version 10.0.0d3...")),
     ((1,10), "kern.hostname",       String(b"touchHLE")),
     ((1,21), "kern.boottime",       SysInfoType::Int64(1000000000)),
     ((1,65), "kern.osversion_65",   String(b"7A341")),
