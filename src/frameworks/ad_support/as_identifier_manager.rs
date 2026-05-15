@@ -6,13 +6,13 @@ thread_local! {
     static SHARED_MANAGER: Cell<id> = Cell::new(nil);
 }
 
-// ── NSUUID stub ──────────────────────────────────────────────────────────────
-pub struct NSUUIDHostObject {
+// ── Fake NSUUID class that responds to all required selectors ───────────────
+pub struct FakeUUIDHostObject {
     pub uuid_string: id,
 }
-impl HostObject for NSUUIDHostObject {}
+impl HostObject for FakeUUIDHostObject {}
 
-// ── ASIdentifierManagerHostObject ───────────────────────────────────────────
+// ── ASIdentifierManagerHostObject definition ────────────────────────────────
 pub struct ASIdentifierManagerHostObject {
     pub advertising_identifier: id,
 }
@@ -21,20 +21,19 @@ impl HostObject for ASIdentifierManagerHostObject {}
 pub const CLASSES: ClassExports = objc_classes! {
     (env, this, _cmd);
 
-    @implementation NSUUID: NSObject
+    @implementation _TouchHLE_FakeNSUUID: NSObject
 
-    - (id)init {
-        let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
-        retain(env, uuid_str);
+    - (id)initWithUUIDString:(id)string {
+        retain(env, string);
         env.objc.replace_host_object(
             this,
-            Box::new(NSUUIDHostObject { uuid_string: uuid_str }),
+            Box::new(FakeUUIDHostObject { uuid_string: string }),
         );
         this
     }
 
     - (id)UUIDString {
-        let s = env.objc.borrow::<NSUUIDHostObject>(this).uuid_string;
+        let s = env.objc.borrow::<FakeUUIDHostObject>(this).uuid_string;
         autorelease(env, s);
         s
     }
@@ -64,11 +63,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     - (id)init {
-        let uuid_class = env.objc.get_known_class("NSUUID", &mut env.mem);
-        let uuid: id = msg![env; uuid_class alloc];
+        let fake_class = env.objc.get_known_class("_TouchHLE_FakeNSUUID", &mut env.mem);
+        let uuid: id = msg![env; fake_class alloc];
         let uuid_str = from_rust_string(env, "00000000-0000-0000-0000-000000000000".to_string());
-        retain(env, uuid_str);
-        env.objc.replace_host_object(uuid, Box::new(NSUUIDHostObject { uuid_string: uuid_str }));
+        let uuid: id = msg![env; uuid initWithUUIDString:uuid_str];
         retain(env, uuid);
 
         env.objc.replace_host_object(
