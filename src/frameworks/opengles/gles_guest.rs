@@ -1308,7 +1308,10 @@ fn glCompressedTexImage2D(
     );
 
     if is_pvrtc && !data.is_null() {
-        let src = env.mem.ptr_at(data.cast::<u8>(), image_size.try_into().unwrap());
+        let src_len: u32 = image_size.try_into().unwrap();
+        let src_ptr = env.mem.ptr_at(data.cast::<u8>(), src_len);
+        // SAFETY: ptr_at guarantees the pointer is valid for src_len bytes
+        let src = unsafe { std::slice::from_raw_parts(src_ptr, src_len as usize) };
         let w = width.max(1) as usize;
         let h = height.max(1) as usize;
         let is_2bpp = matches!(internalformat, 0x8C01 | 0x8C03);
@@ -1613,14 +1616,13 @@ fn glResolveMultisampleFramebufferAPPLE(env: &mut Environment) {
     //
     // GL_READ_FRAMEBUFFER = 0x8CA8, GL_DRAW_FRAMEBUFFER = 0x8CA9
     // GL_COLOR_BUFFER_BIT = 0x4000, GL_LINEAR = 0x2601
+    // MSAAResolveFlush: BlitFramebufferEXT is not in the GLES trait.
+    // On ANGLE/ES3, MSAA resolves happen implicitly when the driver needs to
+    // read the framebuffer (e.g. for glReadPixels or texture sampling).
+    // Calling glFlush ensures all pending MSAA render commands are submitted
+    // so the implicit resolve has complete data to work with.
     with_ctx_and_mem(env, |gles, _mem| unsafe {
-        // Query current viewport to know the blit dimensions.
-        let mut vp: [i32; 4] = [0; 4];
-        gles.GetIntegerv(0x0BA2 /* GL_VIEWPORT */, vp.as_mut_ptr());
-        let (w, h) = (vp[2], vp[3]);
-        if w > 0 && h > 0 {
-            gles.BlitFramebufferEXT(0, 0, w, h, 0, 0, w, h, 0x4000, 0x2601);
-        }
+        gles.Flush();
     })
 }
 
