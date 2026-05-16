@@ -230,20 +230,22 @@ fn CFDictionaryCreate(
 ) -> CFDictionaryRef {
     assert_eq!(allocator, kCFAllocatorDefault);
     
-    let keys_buf = env.mem.alloc((numValues as u32) * 4);
-    let values_buf = env.mem.alloc((numValues as u32) * 4);
+    let num = numValues as u32;
+    let keys_buf = env.mem.alloc(num * 4);
+    let values_buf = env.mem.alloc(num * 4);
     
     for i in 0..numValues {
-        let key_ptr: ConstVoidPtr = env.mem.read(keys + i);
-        let val_ptr: ConstVoidPtr = env.mem.read(values + i);
-        env.mem.write((keys_buf + (i as u32) * 4).cast(), key_ptr.cast::<id>());
-        env.mem.write((values_buf + (i as u32) * 4).cast(), val_ptr.cast::<id>());
+        let idx = i as u32;
+        let key_ptr: ConstVoidPtr = env.mem.read(keys + idx);
+        let val_ptr: ConstVoidPtr = env.mem.read(values + idx);
+        env.mem.write((keys_buf + idx * 4).cast(), key_ptr.cast::<id>());
+        env.mem.write((values_buf + idx * 4).cast(), val_ptr.cast::<id>());
     }
     
     let nsarray_class = env.objc.get_known_class("NSArray", &mut env.mem);
     let sel_array_with_objects = env.objc.lookup_selector("arrayWithObjects:count:").unwrap();
-    let keys_arr: id = msg_send_no_type_checking(env, (nsarray_class, sel_array_with_objects, keys_buf, numValues as u32));
-    let vals_arr: id = msg_send_no_type_checking(env, (nsarray_class, sel_array_with_objects, values_buf, numValues as u32));
+    let keys_arr: id = msg_send_no_type_checking(env, (nsarray_class, sel_array_with_objects, keys_buf, num));
+    let vals_arr: id = msg_send_no_type_checking(env, (nsarray_class, sel_array_with_objects, values_buf, num));
     
     let nsdict_class = env.objc.get_known_class("NSDictionary", &mut env.mem);
     let sel_dict_with_objects = env.objc.lookup_selector("dictionaryWithObjects:forKeys:").unwrap();
