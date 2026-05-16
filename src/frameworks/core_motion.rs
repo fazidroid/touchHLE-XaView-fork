@@ -40,14 +40,10 @@ const CLASSES: ClassExports = objc_classes! {
 - (())setAccelerometerUpdateInterval:(f64)_interval {}
 - (())startAccelerometerUpdates {}
 - (())stopAccelerometerUpdates {}
-
 - (())setGyroUpdateInterval:(f64)_interval {}
 - (())startGyroUpdates {}
-- (())stopGyroUpdates {}
-
 - (())setDeviceMotionUpdateInterval:(f64)_interval {}
 - (())startDeviceMotionUpdates {}
-- (())stopDeviceMotionUpdates {}
 
 - (bool)isDeviceMotionActive { false }
 - (bool)isAccelerometerActive { true }
@@ -79,22 +75,17 @@ const CLASSES: ClassExports = objc_classes! {
     let options = env.options.clone();
     let (x, y, z) = env.window.as_ref().unwrap().get_acceleration(&options);
     
-    // 3. Create raw memory pointers to the struct buffer
+    // 3. Create raw memory pointers to Asphalt 8's struct buffer
     let ptr_x: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr);
     let ptr_y: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 8);
     let ptr_z: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 16);
     
-    // 4. Safely write directly to guest memory using touchHLE's native ptr_at API
-    unsafe {
-        // We pass 1 as the count argument because we are writing a single f64 value per pointer
-        let p_x = env.mem.ptr_at(ptr_x, 1) as *mut f64;
-        let p_y = env.mem.ptr_at(ptr_y, 1) as *mut f64;
-        let p_z = env.mem.ptr_at(ptr_z, 1) as *mut f64;
-
-        if !p_x.is_null() { *p_x = x; }
-        if !p_y.is_null() { *p_y = y; }
-        if !p_z.is_null() { *p_z = z; }
-    }
+    // 4. Forcefully write the 3 doubles (f64) directly into the guest's RAM
+    env.mem.write(ptr_x, x as f64);
+    env.mem.write(ptr_y, y as f64);
+    env.mem.write(ptr_z, z as f64);
+    
+    // 5. Return void to satisfy the compiler; the struct is perfectly constructed in memory!
 }
 
 @end
