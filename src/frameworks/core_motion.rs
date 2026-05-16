@@ -40,10 +40,14 @@ const CLASSES: ClassExports = objc_classes! {
 - (())setAccelerometerUpdateInterval:(f64)_interval {}
 - (())startAccelerometerUpdates {}
 - (())stopAccelerometerUpdates {}
+
 - (())setGyroUpdateInterval:(f64)_interval {}
 - (())startGyroUpdates {}
+- (())stopGyroUpdates {}
+
 - (())setDeviceMotionUpdateInterval:(f64)_interval {}
 - (())startDeviceMotionUpdates {}
+- (())stopDeviceMotionUpdates {}
 
 - (bool)isDeviceMotionActive { false }
 - (bool)isAccelerometerActive { true }
@@ -72,20 +76,19 @@ const CLASSES: ClassExports = objc_classes! {
     let stret_ptr = this.to_bits();
     
     // 2. Grab the physical Android hardware sensor data safely
-    let options = env.options.clone();
-    let (x, y, z) = env.window.as_ref().unwrap().get_acceleration(&options);
+    let (x, y, z) = env.window().get_acceleration(&env.options);
     
-    // 3. Create raw memory pointers to Asphalt 8's struct buffer
+    // 3. Create raw memory pointers to the struct buffer
     let ptr_x: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr);
     let ptr_y: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 8);
     let ptr_z: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 16);
     
-    // 4. Forcefully write the 3 doubles (f64) directly into the guest's RAM
-    env.mem.write(ptr_x, x as f64);
-    env.mem.write(ptr_y, y as f64);
-    env.mem.write(ptr_z, z as f64);
-    
-    // 5. Return void to satisfy the compiler; the struct is perfectly constructed in memory!
+    // 4. Safely write directly to guest memory
+    unsafe {
+        if let Ok(p_x) = env.mem.ptr_mut_at(ptr_x) { *p_x = x; }
+        if let Ok(p_y) = env.mem.ptr_mut_at(ptr_y) { *p_y = y; }
+        if let Ok(p_z) = env.mem.ptr_mut_at(ptr_z) { *p_z = z; }
+    }
 }
 
 @end
