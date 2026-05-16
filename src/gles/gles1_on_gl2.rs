@@ -686,13 +686,18 @@ impl GLES for GLES1OnGL2<'_> {
     }
     unsafe fn Enable(&mut self, cap: GLenum) {
         if ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == cap) {
+            // Client-state enums (e.g. GL_VERTEX_ARRAY) are not valid glEnable
+            // caps in desktop GL — forwarding them would produce a GL error.
             log_dbg!("Tolerating glEnable({:#x}) of client state", cap);
+            return;
         } else if cap == gl21::PERSPECTIVE_CORRECTION_HINT
             || cap == gl21::SMOOTH
             || cap == gl21::BLEND_EQUATION
             || cap == gl21::TEXTURE
         {
+            // These are not valid glEnable targets in OpenGL 2.1; ignore silently.
             log_dbg!("Tolerating glEnable({:#x})", cap);
+            return;
         } else {
             assert!(
                 CAPABILITIES.contains(&cap),
@@ -710,12 +715,17 @@ impl GLES for GLES1OnGL2<'_> {
     unsafe fn Disable(&mut self, cap: GLenum) {
         if CAPABILITIES.contains(&cap) {
             log_dbg!("glDisable{:#x}", cap);
+            // fallthrough — valid cap, call gl21::Disable below
         } else if ARRAYS.iter().any(|&ArrayInfo { name, .. }| name == cap) {
+            // Client-state enums are not valid glDisable caps — ignore.
             log_dbg!("Tolerating glDisable({:#x}) of client state", cap);
+            return;
         } else if UNSUPPORTED_CAPABILITIES.contains(&cap) {
             log_dbg!("Tolerating glDisable({:#x}) of unsupported capability", cap);
+            return;
         } else if GET_PARAMS.contains(cap) || UNSUPPORTED_GET_PARAMS.contains(cap) {
             log_dbg!("Tolerating glDisable({:#x}) of parameter", cap);
+            return;
         } else {
             panic!("Unexpected glDisable({cap:#x})");
         }
@@ -2144,45 +2154,139 @@ impl GLES for GLES1OnGL2<'_> {
         string: *const *const std::ffi::c_char,
         length: *const GLint,
     ) {
-        // 🏎️ GLSL HOT-PATCHER: Catch Gameloft's shaders and inject Android precision rules!
+        // 🏎️ GLSL HOT-PATCHER: Consolidate shader fixups before handing to the
+        // desktop OpenGL 2.1 driver. Note: for GLES 2 games, gles_guest.rs has
+        // already run its fixup pass (precision injection, lowp stripping, array
+        // varying unrolling). The checks below are defensive — they also handle
+        // cases where this path is reached without the guest-side pass.
+
         let mut full_source = String::new();
-        
+
         // 1. Extract the raw C-strings sent by the game
         for i in 0..(count as isize) {
             let str_ptr = *string.offset(i);
             if str_ptr.is_null() { continue; }
-            
+
             let len = if !length.is_null() && *length.offset(i) >= 0 {
                 *length.offset(i) as usize
             } else {
                 std::ffi::CStr::from_ptr(str_ptr).to_bytes().len()
             };
-            
+
             let slice = std::slice::from_raw_parts(str_ptr as *const u8, len);
             if let Ok(s) = std::str::from_utf8(slice) {
                 full_source.push_str(s);
             }
         }
 
-        // 2. The Android Precision Injection
-        let injection = "\nprecision highp float;\nprecision highp int;\n";
-        let mut final_source = String::new();
-        
-        // Safely inject right after #version (if it exists) or at the very top
-        if full_source.contains("#version") {
-            let mut parts = full_source.splitn(2, '\n');
-            final_source.push_str(parts.next().unwrap_or(""));
-            final_source.push_str(injection);
-            final_source.push_str(parts.next().unwrap_or(""));
-        } else {
-            final_source.push_str(injection);
-            final_source.push_str(&full_source);
+        // 2. Strip illegal precision-qualifier redefinitions (#define lowp mediump
+        //    etc.). These are reserved GLSL ES keywords; redefining them causes
+        //    compile errors on strict drivers. The gles_guest.rs pass strips them
+        //    for GLES2 games; this is a safety net for other paths.
+        if full_source.contains("#define ") {
+            full_source = full_source
+                .lines()
+                .filter(|line| {
+                    let t = line.trim();
+                    if !t.starts_with("#define ") {
+                        return true;
+                    }
+                    let first_word = t["#define ".len()..].split_whitespace().next().unwrap_or("");
+                    !matches!(first_word, "lowp" | "mediump" | "highp")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            full_source.push('\n');
         }
 
-        // Strip any null bytes that might accidentally terminate the string early
-        let clean_source = final_source.replace('\0', "");
+        // 3. Unroll array varyings (e.g. "varying highp vec2 v_TexCoord[5];").
+        //    Array varyings are unsupported in GLSL ES 1.00 on most host drivers.
+        //    The gles_guest.rs pass handles this for GLES2; this is a safety net.
+        if full_source.contains("varying") && full_source.contains('[') {
+            let mut unrolled = String::with_capacity(full_source.len() + 256);
+            let mut array_varyings: Vec<(String, usize)> = Vec::new();
 
-        // 3. Compile the patched shader!
+            for line in full_source.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("varying ")
+                    && trimmed.contains('[')
+                    && trimmed.ends_with(';')
+                {
+                    let body = trimmed.trim_end_matches(';');
+                    if let Some(bracket_pos) = body.rfind('[') {
+                        let close_bracket = body.rfind(']').unwrap_or(body.len());
+                        let count_str = &body[bracket_pos + 1..close_bracket];
+                        if let Ok(count) = count_str.trim().parse::<usize>() {
+                            let before_bracket = &body[..bracket_pos];
+                            let var_name = before_bracket
+                                .split_whitespace()
+                                .last()
+                                .unwrap_or("")
+                                .to_string();
+                            let prefix_end = before_bracket
+                                .rfind(&*var_name)
+                                .unwrap_or(before_bracket.len());
+                            let prefix = &before_bracket[..prefix_end];
+                            for i in 0..count {
+                                unrolled.push_str(&format!("varying {}{}_{};\n", prefix, var_name, i));
+                            }
+                            array_varyings.push((var_name, count));
+                            continue;
+                        }
+                    }
+                }
+                unrolled.push_str(line);
+                unrolled.push('\n');
+            }
+            for (name, count) in &array_varyings {
+                for i in 0..*count {
+                    unrolled = unrolled.replace(&format!("{}[{}]", name, i), &format!("{}_{}", name, i));
+                }
+            }
+            full_source = unrolled;
+        }
+
+        // 4. Precision injection — only if no precision statement already exists.
+        //    (Avoids double-injection when gles_guest.rs already ran this pass.)
+        if !full_source.contains("precision ") {
+            let injection = "\nprecision highp float;\nprecision highp int;\nprecision lowp sampler2D;\n";
+            let mut final_source = String::new();
+
+            if full_source.contains("#version") {
+                // Inject right after the #version line
+                let mut parts = full_source.splitn(2, '\n');
+                final_source.push_str(parts.next().unwrap_or(""));
+                final_source.push('\n');
+                final_source.push_str(injection);
+                final_source.push_str(parts.next().unwrap_or(""));
+            } else {
+                // No #version — inject after any leading #define/#extension lines
+                let mut insert_pos = 0usize;
+                let mut current_pos = 0usize;
+                for line in full_source.split_inclusive('\n') {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("#version")
+                        || trimmed.starts_with("#extension")
+                        || trimmed.starts_with("#define")
+                        || trimmed.is_empty()
+                    {
+                        current_pos += line.len();
+                        insert_pos = current_pos;
+                    } else {
+                        break;
+                    }
+                }
+                final_source.push_str(&full_source[..insert_pos]);
+                final_source.push_str(injection);
+                final_source.push_str(&full_source[insert_pos..]);
+            }
+            full_source = final_source;
+        }
+
+        // 5. Strip any null bytes that might accidentally terminate the string early
+        let clean_source = full_source.replace('\0', "");
+
+        // 6. Compile the patched shader!
         if let Ok(c_str) = std::ffi::CString::new(clean_source) {
             let ptrs = [c_str.as_ptr()];
             let lengths = [c_str.as_bytes().len() as GLint];
