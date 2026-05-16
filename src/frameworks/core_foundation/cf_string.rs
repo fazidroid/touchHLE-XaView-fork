@@ -482,6 +482,18 @@ fn CFStringGetPascalString(
     )
 }
 
+fn CFStringCreateWithCharacters(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    chars: ConstPtr<unichar>,
+    num_chars: CFIndex,
+) -> CFStringRef {
+    assert_eq!(allocator, kCFAllocatorDefault);
+    let length: NSUInteger = num_chars.try_into().unwrap();
+    let nsstring: id = msg_class![env; NSString stringWithCharacters:chars length:length];
+    nsstring.cast()
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringAppend(_, _)),
     export_c_func!(CFStringAppendCharacters(_, _, _)),
@@ -514,4 +526,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFStringUppercase(_, _)),
     export_c_func!(CFStringCreateWithPascalString(_, _, _)),
     export_c_func!(CFStringGetPascalString(_, _, _, _)),
+    export_c_func!(CFStringCreateWithCharacters(_, _, _)),
 ];
