@@ -76,18 +76,24 @@ const CLASSES: ClassExports = objc_classes! {
     let stret_ptr = this.to_bits();
     
     // 2. Grab the physical Android hardware sensor data safely
-    let (x, y, z) = env.window().get_acceleration(&env.options);
+    let options = env.options.clone();
+    let (x, y, z) = env.window.as_ref().unwrap().get_acceleration(&options);
     
     // 3. Create raw memory pointers to the struct buffer
     let ptr_x: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr);
     let ptr_y: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 8);
     let ptr_z: crate::mem::MutPtr<f64> = crate::mem::Ptr::from_bits(stret_ptr + 16);
     
-    // 4. Safely write directly to guest memory
+    // 4. Safely write directly to guest memory using touchHLE's native ptr_at API
     unsafe {
-        if let Ok(p_x) = env.mem.ptr_mut_at(ptr_x) { *p_x = x; }
-        if let Ok(p_y) = env.mem.ptr_mut_at(ptr_y) { *p_y = y; }
-        if let Ok(p_z) = env.mem.ptr_mut_at(ptr_z) { *p_z = z; }
+        // We pass 1 as the count argument because we are writing a single f64 value per pointer
+        let p_x = env.mem.ptr_at(ptr_x, 1) as *mut f64;
+        let p_y = env.mem.ptr_at(ptr_y, 1) as *mut f64;
+        let p_z = env.mem.ptr_at(ptr_z, 1) as *mut f64;
+
+        if !p_x.is_null() { *p_x = x; }
+        if !p_y.is_null() { *p_y = y; }
+        if !p_z.is_null() { *p_z = z; }
     }
 }
 
