@@ -156,13 +156,26 @@ fn write_dir_stat(env: &mut Environment, buf: MutPtr<stat>) {
 }
 
 fn fstat(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
-    // TODO: handle errno properly
     set_errno(env, 0);
-
-    log!("Warning: fstat() call, this function is mostly unimplemented");
     let result = fstat_inner(env, fd, buf);
     log_dbg!("fstat({:?}, {:?}) -> {}", fd, buf, result);
     result
+}
+
+/// fstat64: same as fstat on iOS — the stat struct already uses 64-bit fields.
+/// NFS Shift 2 (and other EA titles) call fstat64 instead of fstat.
+fn fstat64(env: &mut Environment, fd: FileDescriptor, buf: MutPtr<stat>) -> i32 {
+    fstat(env, fd, buf)
+}
+
+/// stat64: same as stat on iOS — the stat struct already uses 64-bit fields.
+fn stat64(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
+    stat(env, path, buf)
+}
+
+/// lstat64: same as lstat on iOS.
+fn lstat64(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
+    lstat(env, path, buf)
 }
 
 fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
@@ -201,6 +214,38 @@ fn stat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
             let result = fstat_inner(env, fd, buf);
             assert!(close(env, fd) == 0);
             return result;
+        }
+
+        // ── Fast-path: known file extensions are always files, never dirs ──
+        // This avoids the create_dir probe for common bundle assets.
+        // The probe itself can create spurious directories (fixed below) but
+        // the fast-path is both safer and faster.
+        let last_component = path_str.rsplit('/').next().unwrap_or(&path_str);
+        let file_extensions = [
+            ".nib", ".png", ".jpg", ".jpeg", ".plist", ".sb", ".xml",
+            ".json", ".mp3", ".m4a", ".caf", ".wav", ".mp4", ".m4v",
+            ".pvr", ".atlasc", ".ttf", ".otf", ".ghost", ".dat", ".bin",
+            ".lua", ".pak", ".cfg", ".ini", ".txt", ".csv", ".svg",
+            ".prefabs", ".scene", ".mat", ".atlas",
+            // PowerVR compiled shader cache and compressed variants
+            // Real Racing 3 uses .ptc.pvr.z (compressed PVR compiled shaders)
+            // stat.rs was treating these as directories causing magenta rendering
+            ".ptc", ".z", ".pvr.z", ".ptc.pvr", ".ptc.pvr.z",
+            // Other common game asset extensions
+            ".fsh", ".vsh", ".glsl", ".vert", ".frag", ".shader",
+            ".model", ".mesh", ".anim", ".skel",
+            ".ogg", ".aac", ".flac",
+            ".zip", ".gz", ".bz2", ".lz4",
+        ];
+        if file_extensions.iter().any(|ext| {
+            last_component.to_ascii_lowercase().ends_with(ext)
+        }) {
+            log_dbg!("stat: '{}' fast-path as bundle file (known extension)", path_str);
+            let mut s = stat::default();
+            s.st_mode  = S_IFREG;
+            s.st_nlink = 1;
+            env.mem.write(buf, s);
+            return 0;
         }
 
         // ── Step 2: open_direct failed — probe whether it is a directory ─────
@@ -290,6 +335,9 @@ fn lstat(env: &mut Environment, path: ConstPtr<u8>, buf: MutPtr<stat>) -> i32 {
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(mkdir(_, _)),
     export_c_func!(fstat(_, _)),
+    export_c_func!(fstat64(_, _)),
     export_c_func!(stat(_, _)),
+    export_c_func!(stat64(_, _)),
     export_c_func!(lstat(_, _)),
+    export_c_func!(lstat64(_, _)),
 ];
