@@ -1831,7 +1831,7 @@ fn glShaderSource(
         // If the string contains Mojibake or raw hex, it's a PowerVR hardware binary!
         // We intercept it and swap it with generic Android GLSL to prevent a driver crash.
         if !full_source.is_ascii() || full_source.contains('\0') {
-            println!("🎮 LOG: Intercepted PowerVR Binary (Type: {:#x})! Bypassing with Android GLSL...", shader_type);
+            log!("glShaderSource: intercepted PowerVR binary (type={:#x}), substituting passthrough GLSL", shader_type);
             
             if shader_type == 0x8B31 { // GL_VERTEX_SHADER
                 full_source = "
@@ -1888,6 +1888,30 @@ fn glShaderSource(
             s = s.replace("vec4(0, 0, 0.5, 0)", "vec4(0.0, 0.0, 0.5, 0.0)");
             s = s.replace("vec4(0.5, 0.5, 0.5, 1)", "vec4(0.5, 0.5, 0.5, 1.0)");
             
+            // De-duplicate precision declarations: GLES allows multiple precision
+            // statements in different #if blocks, but desktop GL (NVIDIA) rejects
+            // them with "domain specified twice". Keep only the FIRST occurrence
+            // and strip all subsequent ones.
+            {
+                let mut found_precision = false;
+                let mut deduped = String::with_capacity(s.len());
+                for line in s.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with("precision ") && trimmed.ends_with(';') {
+                        if !found_precision {
+                            found_precision = true;
+                            deduped.push_str(line);
+                            deduped.push('\n');
+                        }
+                        // else: skip duplicate precision declaration
+                    } else {
+                        deduped.push_str(line);
+                        deduped.push('\n');
+                    }
+                }
+                s = deduped;
+            }
+
             // Only inject if the game engine forgot to define precision!
             if !s.contains("precision ") {
                 let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
