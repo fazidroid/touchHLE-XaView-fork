@@ -21,7 +21,7 @@ use crate::frameworks::foundation::ns_dictionary::{
 };
 use crate::frameworks::foundation::NSUInteger;
 use crate::mem::{ConstPtr, ConstVoidPtr, Mem, MutVoidPtr};
-use crate::objc::{id, msg, msg_class, nil};
+use crate::objc::{id, msg, msg_class, msg_send_no_type_checking, nil};
 use crate::Environment;
 
 pub type CFDictionaryRef = super::CFTypeRef;
@@ -228,19 +228,26 @@ fn CFDictionaryCreate(
     _keyCallBacks: ConstPtr<CFDictionaryKeyCallBacks>,
     _valueCallBacks: ConstPtr<CFDictionaryValueCallBacks>,
 ) -> CFDictionaryRef {
-    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
-    // Build arrays of keys and values
-    let mut key_objs = Vec::with_capacity(numValues as usize);
-    let mut val_objs = Vec::with_capacity(numValues as usize);
+    assert_eq!(allocator, kCFAllocatorDefault);
+    
+    let keys_buf = env.mem.alloc((numValues as u32) * 4);
+    let values_buf = env.mem.alloc((numValues as u32) * 4);
+    
     for i in 0..numValues {
         let key_ptr: ConstVoidPtr = env.mem.read(keys + i);
         let val_ptr: ConstVoidPtr = env.mem.read(values + i);
-        key_objs.push(key_ptr.cast::<crate::objc::objc_object>().cast_mut());
-        val_objs.push(val_ptr.cast::<crate::objc::objc_object>().cast_mut());
+        env.mem.write((keys_buf + (i as u32) * 4).cast(), key_ptr.cast::<id>());
+        env.mem.write((values_buf + (i as u32) * 4).cast(), val_ptr.cast::<id>());
     }
-    let keys_arr: id = msg_class![env; NSArray arrayWithObjects:&key_objs[0] count:numValues as u32];
-    let vals_arr: id = msg_class![env; NSArray arrayWithObjects:&val_objs[0] count:numValues as u32];
-    let dict: id = msg_class![env; NSDictionary dictionaryWithObjects:vals_arr forKeys:keys_arr];
+    
+    let nsarray_class = env.objc.get_known_class("NSArray", &mut env.mem);
+    let sel_array_with_objects = env.objc.lookup_selector("arrayWithObjects:count:").unwrap();
+    let keys_arr: id = msg_send_no_type_checking(env, (nsarray_class, sel_array_with_objects, keys_buf, numValues as u32));
+    let vals_arr: id = msg_send_no_type_checking(env, (nsarray_class, sel_array_with_objects, values_buf, numValues as u32));
+    
+    let nsdict_class = env.objc.get_known_class("NSDictionary", &mut env.mem);
+    let sel_dict_with_objects = env.objc.lookup_selector("dictionaryWithObjects:forKeys:").unwrap();
+    let dict: id = msg_send_no_type_checking(env, (nsdict_class, sel_dict_with_objects, vals_arr, keys_arr));
     dict.cast()
 }
 
