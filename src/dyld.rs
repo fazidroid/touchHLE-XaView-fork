@@ -2229,7 +2229,19 @@ if symbol == "_objc_retainAutoreleaseReturnValue" {
     }
     return Some(&(fake_objc_retain_autorelease_return_value as fn(&mut crate::Environment, u32) -> u32));
 }
-
+if symbol == "_task_info" {
+    fn fake_task_info(
+        _env: &mut crate::Environment,
+        _task: u32,
+        _flavor: i32,
+        _task_info_out: u32,
+        _task_info_out_cnt: u32,
+    ) -> i32 {
+        log_dbg!("_task_info stub called, returning 0 (success)");
+        0
+    }
+    return Some(&(fake_task_info as fn(&mut crate::Environment, u32, i32, u32, u32) -> i32));
+}
 if symbol == "_setvbuf" {
     fn fake_setvbuf(_env: &mut crate::Environment, _stream: u32, _buf: u32, _mode: i32, _size: u32) -> i32 {
         log_dbg!("_setvbuf stub called, returning 0 (success)");
