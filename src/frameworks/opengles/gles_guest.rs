@@ -1887,112 +1887,19 @@ fn glShaderSource(
             s = s.replace("vec4(0, 0.5, 0, 0)", "vec4(0.0, 0.5, 0.0, 0.0)");
             s = s.replace("vec4(0, 0, 0.5, 0)", "vec4(0.0, 0.0, 0.5, 0.0)");
             s = s.replace("vec4(0.5, 0.5, 0.5, 1)", "vec4(0.5, 0.5, 0.5, 1.0)");
-
-            // 🏎️ RR3 FIX 1: Strip illegal precision-qualifier redefinitions.
-            // Real Racing 3 (Firemint) prepends "#define lowp mediump" to every
-            // shader. In GLSL ES, lowp/mediump/highp are reserved keywords — they
-            // cannot legally be used as macro names. Strict drivers (Mali, Adreno,
-            // modern desktop GLSL ES) reject the shader with a compile error.
-            // Strip any "#define <precision_word> ..." lines before handing the
-            // source to the driver; the precision injector below covers the intent.
-            s = s.lines()
-                .filter(|line| {
-                    let t = line.trim();
-                    if !t.starts_with("#define ") {
-                        return true;
-                    }
-                    let first_word = t["#define ".len()..].split_whitespace().next().unwrap_or("");
-                    !matches!(first_word, "lowp" | "mediump" | "highp")
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            s.push('\n');
-
-            // 🏎️ RR3 FIX 2: Unroll array varyings.
-            // The RADIAL_BLUR path in full_screen_effects uses:
-            //   "varying highp vec2 v_TexCoord[5];"
-            // Array varyings are not supported in GLSL ES 1.00 on most host
-            // drivers (Mali, Adreno, desktop GL). We unroll them into N individual
-            // varyings and rewrite all indexed accesses (v_TexCoord[0] → v_TexCoord_0).
-            if s.contains("varying") && s.contains('[') {
-                let mut unrolled = String::with_capacity(s.len() + 256);
-                let mut array_varyings: Vec<(String, usize)> = Vec::new();
-
-                for line in s.lines() {
-                    let trimmed = line.trim();
-                    // Match: "varying <qualifiers...> <type> <name>[<N>];"
-                    if trimmed.starts_with("varying ")
-                        && trimmed.contains('[')
-                        && trimmed.ends_with(';')
-                    {
-                        let body = trimmed.trim_end_matches(';');
-                        if let Some(bracket_pos) = body.rfind('[') {
-                            let close_bracket = body.rfind(']').unwrap_or(body.len());
-                            let count_str = &body[bracket_pos + 1..close_bracket];
-                            if let Ok(count) = count_str.trim().parse::<usize>() {
-                                let before_bracket = &body[..bracket_pos];
-                                let var_name = before_bracket
-                                    .split_whitespace()
-                                    .last()
-                                    .unwrap_or("")
-                                    .to_string();
-                                // prefix = everything before the var name
-                                let prefix_end = before_bracket
-                                    .rfind(&*var_name)
-                                    .unwrap_or(before_bracket.len());
-                                let prefix = &before_bracket[..prefix_end];
-                                for i in 0..count {
-                                    unrolled.push_str(&format!(
-                                        "varying {}{}_{};\n",
-                                        prefix, var_name, i
-                                    ));
-                                }
-                                array_varyings.push((var_name, count));
-                                continue;
-                            }
-                        }
-                    }
-                    unrolled.push_str(line);
-                    unrolled.push('\n');
-                }
-
-                // Rewrite indexed accesses: name[i] → name_i
-                for (name, count) in &array_varyings {
-                    for i in 0..*count {
-                        let from = format!("{}[{}]", name, i);
-                        let to = format!("{}_{}", name, i);
-                        unrolled = unrolled.replace(&from, &to);
-                    }
-                }
-                s = unrolled;
-            }
-
+            
             // Only inject if the game engine forgot to define precision!
             if !s.contains("precision ") {
-                // Inject precision for float, int, and sampler2D.
-                // sampler2D always uses lowp per GLSL ES 1.00 spec defaults.
-                let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\n\
-                    precision highp float;\n\
-                    precision highp int;\n\
-                    #else\n\
-                    precision mediump float;\n\
-                    precision mediump int;\n\
-                    #endif\n\
-                    precision lowp sampler2D;\n";
+                let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
                 
                 let mut insert_pos = 0;
                 let mut current_pos = 0;
                 
-                // GLSL strictly requires that all #version and #extension directives
-                // remain at the absolute top of the file. Also skip leading #define
-                // lines (e.g. MIPMAP_BIAS guard) so precision lands after them.
+                // GLSL strictly requires that all #version and #extension directives 
+                // remain at the absolute top of the file. We safely skip past them!
                 for line in s.split_inclusive('\n') {
                     let trimmed = line.trim();
-                    if trimmed.starts_with("#version")
-                        || trimmed.starts_with("#extension")
-                        || trimmed.starts_with("#define")
-                        || trimmed.is_empty()
-                    {
+                    if trimmed.starts_with("#version") || trimmed.starts_with("#extension") || trimmed.is_empty() {
                         current_pos += line.len();
                         insert_pos = current_pos;
                     } else {
