@@ -2179,24 +2179,38 @@ impl GLES for GLES1OnGL2<'_> {
             }
         }
 
-        // 2. Strip illegal precision-qualifier redefinitions (#define lowp mediump
-        //    etc.). These are reserved GLSL ES keywords; redefining them causes
-        //    compile errors on strict drivers. The gles_guest.rs pass strips them
-        //    for GLES2 games; this is a safety net for other paths.
-        if full_source.contains("#define ") {
-            full_source = full_source
-                .lines()
-                .filter(|line| {
-                    let t = line.trim();
-                    if !t.starts_with("#define ") {
-                        return true;
+        // 2. Replace precision-qualifier redefinitions with empty defines so
+        //    precision keywords vanish from the shader body.
+        //    Desktop GLSL 1.20 has NO precision qualifiers at all — stripping
+        //    them (old behaviour) left the keywords undefined; replacing them
+        //    with empty macros causes `lowp vec4` → ` vec4`, which is valid.
+        //    Also override MIPMAP_BIAS to empty: the 3-argument form of
+        //    texture2D(sampler, coord, bias) is GLSL ES-only and fails on
+        //    desktop GLSL 1.20.
+        {
+            let mut patched = String::with_capacity(full_source.len());
+            for line in full_source.lines() {
+                let t = line.trim();
+                if t.starts_with("#define ") {
+                    let rest = &t["#define ".len()..];
+                    let first_word = rest.split_whitespace().next().unwrap_or("");
+                    match first_word {
+                        // Precision qualifiers: replace with empty define so
+                        // all uses of lowp/mediump/highp in the body expand to
+                        // nothing, giving valid desktop GLSL.
+                        "lowp"    => { patched.push_str("#define lowp\n");    continue; }
+                        "mediump" => { patched.push_str("#define mediump\n"); continue; }
+                        "highp"   => { patched.push_str("#define highp\n");   continue; }
+                        // MIPMAP_BIAS expands to `, -3.0` making texture2D
+                        // 3-arg — invalid on desktop GLSL 1.20. Strip it.
+                        "MIPMAP_BIAS" => { patched.push_str("#define MIPMAP_BIAS\n"); continue; }
+                        _ => {}
                     }
-                    let first_word = t["#define ".len()..].split_whitespace().next().unwrap_or("");
-                    !matches!(first_word, "lowp" | "mediump" | "highp")
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            full_source.push('\n');
+                }
+                patched.push_str(line);
+                patched.push('\n');
+            }
+            full_source = patched;
         }
 
         // 3. Unroll array varyings (e.g. "varying highp vec2 v_TexCoord[5];").
@@ -2246,41 +2260,16 @@ impl GLES for GLES1OnGL2<'_> {
             full_source = unrolled;
         }
 
-        // 4. Precision injection — only if no precision statement already exists.
-        //    (Avoids double-injection when gles_guest.rs already ran this pass.)
-        if !full_source.contains("precision ") {
-            let injection = "\nprecision highp float;\nprecision highp int;\nprecision lowp sampler2D;\n";
-            let mut final_source = String::new();
-
-            if full_source.contains("#version") {
-                // Inject right after the #version line
-                let mut parts = full_source.splitn(2, '\n');
-                final_source.push_str(parts.next().unwrap_or(""));
-                final_source.push('\n');
-                final_source.push_str(injection);
-                final_source.push_str(parts.next().unwrap_or(""));
-            } else {
-                // No #version — inject after any leading #define/#extension lines
-                let mut insert_pos = 0usize;
-                let mut current_pos = 0usize;
-                for line in full_source.split_inclusive('\n') {
-                    let trimmed = line.trim();
-                    if trimmed.starts_with("#version")
-                        || trimmed.starts_with("#extension")
-                        || trimmed.starts_with("#define")
-                        || trimmed.is_empty()
-                    {
-                        current_pos += line.len();
-                        insert_pos = current_pos;
-                    } else {
-                        break;
-                    }
-                }
-                final_source.push_str(&full_source[..insert_pos]);
-                final_source.push_str(injection);
-                final_source.push_str(&full_source[insert_pos..]);
-            }
-            full_source = final_source;
+        // 4. Strip any `precision X Y;` statements that remain in the source.
+        //    These are GLSL ES-only; desktop GLSL 1.20 rejects them as syntax
+        //    errors. We previously injected them — now we strip instead.
+        if full_source.contains("precision ") {
+            full_source = full_source
+                .lines()
+                .filter(|line| !line.trim().starts_with("precision "))
+                .collect::<Vec<_>>()
+                .join("\n");
+            full_source.push('\n');
         }
 
         // 5. Strip any null bytes that might accidentally terminate the string early
