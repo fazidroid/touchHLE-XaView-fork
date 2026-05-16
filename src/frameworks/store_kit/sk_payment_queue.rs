@@ -65,4 +65,16 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @end
 
+@implementation SKPayment: NSObject
+    + (id)paymentWithProduct:(id)_product { nil }
+    - (id)productIdentifier { nil }
+    @end
+
+    @implementation SKPaymentTransaction: NSObject
+    - (id)error { nil }
+    - (id)payment { nil }
+    - (id)transactionIdentifier { nil }
+    - (i32)transactionState { 0 } // 0 = SKPaymentTransactionStatePurchasing
+    @end
+
 };
