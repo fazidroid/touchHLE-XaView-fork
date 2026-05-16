@@ -219,6 +219,31 @@ fn create_default_callback_functions(mem: &mut Mem, dyld: &mut Dyld) -> DefaultC
     }
 }
 
+fn CFDictionaryCreate(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    keys: ConstPtr<ConstVoidPtr>,
+    values: ConstPtr<ConstVoidPtr>,
+    numValues: CFIndex,
+    _keyCallBacks: ConstPtr<CFDictionaryKeyCallBacks>,
+    _valueCallBacks: ConstPtr<CFDictionaryValueCallBacks>,
+) -> CFDictionaryRef {
+    assert_eq!(allocator, kCFAllocatorDefault); // unimplemented
+    // Build arrays of keys and values
+    let mut key_objs = Vec::with_capacity(numValues as usize);
+    let mut val_objs = Vec::with_capacity(numValues as usize);
+    for i in 0..numValues {
+        let key_ptr: ConstVoidPtr = env.mem.read(keys + i);
+        let val_ptr: ConstVoidPtr = env.mem.read(values + i);
+        key_objs.push(key_ptr.cast::<crate::objc::objc_object>().cast_mut());
+        val_objs.push(val_ptr.cast::<crate::objc::objc_object>().cast_mut());
+    }
+    let keys_arr: id = msg_class![env; NSArray arrayWithObjects:&key_objs[0] count:numValues as u32];
+    let vals_arr: id = msg_class![env; NSArray arrayWithObjects:&val_objs[0] count:numValues as u32];
+    let dict: id = msg_class![env; NSDictionary dictionaryWithObjects:vals_arr forKeys:keys_arr];
+    dict.cast()
+}
+
 pub const CONSTANTS: ConstantExports = &[
     (
         "_kCFTypeDictionaryKeyCallBacks",
@@ -265,4 +290,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFDictionaryGetValue(_, _)),
     export_c_func!(CFDictionaryGetCount(_)),
     export_c_func!(CFDictionaryGetKeysAndValues(_, _, _)),
+    export_c_func!(CFDictionaryCreate(_, _, _, _, _, _)),
 ];
