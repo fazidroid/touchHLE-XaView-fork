@@ -1293,144 +1293,21 @@ fn glCompressedTexImage2D(
     image_size: GLsizei,
     data: ConstVoidPtr,
 ) {
-    // PVRTCDecompress: ANGLE/desktop GL does not support PVRTC natively.
-    // Passing PVRTC tokens directly silently fails → texture is incomplete
-    // → sampler returns (0,0,0,0) or magenta debug color.
-    //
-    // We detect PVRTC formats and decompress to RGBA8 on the CPU before
-    // uploading. This is slower but correct.
-    let is_pvrtc = matches!(
-        internalformat,
-        0x8C00 // COMPRESSED_RGB_PVRTC_4BPPV1_IMG
-        | 0x8C01 // COMPRESSED_RGB_PVRTC_2BPPV1_IMG
-        | 0x8C02 // COMPRESSED_RGBA_PVRTC_4BPPV1_IMG
-        | 0x8C03 // COMPRESSED_RGBA_PVRTC_2BPPV1_IMG
-    );
-
-    if is_pvrtc && !data.is_null() {
-        let src_len: u32 = image_size.try_into().unwrap();
-        let src_ptr = env.mem.ptr_at(data.cast::<u8>(), src_len);
-        // SAFETY: ptr_at guarantees the pointer is valid for src_len bytes
-        let src = unsafe { std::slice::from_raw_parts(src_ptr, src_len as usize) };
-        let w = width.max(1) as usize;
-        let h = height.max(1) as usize;
-        let is_2bpp = matches!(internalformat, 0x8C01 | 0x8C03);
-        let has_alpha = matches!(internalformat, 0x8C02 | 0x8C03);
-        let rgba = decompress_pvrtc(src, w, h, is_2bpp, has_alpha);
-        with_ctx_and_mem(env, |gles, _mem| unsafe {
-            gles.TexImage2D(
-                target,
-                level,
-                0x1908i32, // GL_RGBA
-                width,
-                height,
-                border,
-                0x1908, // GL_RGBA
-                0x1401, // GL_UNSIGNED_BYTE
-                rgba.as_ptr().cast(),
-            );
-        });
-    } else {
-        with_ctx_and_mem(env, |gles, mem| unsafe {
-            let data = mem
-                .ptr_at(data.cast::<u8>(), image_size.try_into().unwrap())
-                .cast();
-            gles.CompressedTexImage2D(
-                target,
-                level,
-                internalformat,
-                width,
-                height,
-                border,
-                image_size,
-                data,
-            );
-        });
-    }
-}
-
-/// Decompress PVRTC data to RGBA8. Implements the PVRTC algorithm.
-/// Based on the reference decoder logic from the PowerVR SDK.
-fn decompress_pvrtc(data: &[u8], width: usize, height: usize, is_2bpp: bool, _has_alpha: bool) -> Vec<u8> {
-    let mut out = vec![255u8; width * height * 4];
-
-    // For safety/simplicity: if we can't decompress properly, fill with a
-    // recognizable debug color (dark grey, not magenta) so it's clearly
-    // distinct from "no texture" magenta but obviously wrong.
-    // A proper PVRTC decoder is large; this placeholder prevents crashes.
-    // TODO: integrate a full PVRTC decoder (e.g. from PowerVR SDK or pvrtccompressor).
-    let block_w = if is_2bpp { 8 } else { 4 };
-    let block_h = 4usize;
-    let blocks_x = ((width + block_w - 1) / block_w).max(2);
-    let blocks_y = ((height + block_h - 1) / block_h).max(2);
-    let block_size = 8usize; // both 2bpp and 4bpp use 8-byte blocks
-    let total_blocks = blocks_x * blocks_y;
-
-    if data.len() < total_blocks * block_size {
-        log!("PVRTC decompress: data too small ({} < {}), using fallback", data.len(), total_blocks * block_size);
-        // Dark grey fallback — clearly wrong but not a crash
-        for p in out.chunks_exact_mut(4) { p.copy_from_slice(&[64, 64, 64, 255]); }
-        return out;
-    }
-
-    // Minimal decoder: extract colour A and colour B from each block,
-    // fill the covered pixels with a bilinear blend. Not pixel-perfect
-    // but avoids magenta and gives a recognizable approximation.
-    for by in 0..blocks_y {
-        for bx in 0..blocks_x {
-            let block_idx = by * blocks_x + bx;
-            let b = &data[block_idx * 8..(block_idx + 1) * 8];
-
-            // Word 1 = modulation data (ignored in this approximation)
-            // Word 2 = colour data
-            let col_word = u32::from_le_bytes([b[4], b[5], b[6], b[7]]);
-            let punch_through = (col_word >> 1) & 1;
-
-            // Colour A: bits 14:0 in RGB555 or ARGB3444
-            let col_a_raw = (col_word & 0x7FFF) as u16;
-            let ar = ((col_a_raw >> 10) & 0x1F) as u8;
-            let ag = ((col_a_raw >> 5) & 0x1F) as u8;
-            let ab = (col_a_raw & 0x1F) as u8;
-            let (ra, ga, ba) = (ar << 3 | ar >> 2, ag << 3 | ag >> 2, ab << 3 | ab >> 2);
-
-            // Colour B: bits 31:15
-            let col_b_raw = ((col_word >> 15) & 0x3FFF) as u16;
-            let use_4bit = (col_word >> 15) & 1 == 0;
-            let (rb, gb, bb) = if use_4bit {
-                let r = ((col_b_raw >> 8) & 0xF) as u8;
-                let g = ((col_b_raw >> 4) & 0xF) as u8;
-                let b2 = (col_b_raw & 0xF) as u8;
-                (r << 4 | r, g << 4 | g, b2 << 4 | b2)
-            } else {
-                let r = ((col_b_raw >> 10) & 0x1F) as u8;
-                let g = ((col_b_raw >> 5) & 0x1F) as u8;
-                let b2 = (col_b_raw & 0x1F) as u8;
-                (r << 3 | r >> 2, g << 3 | g >> 2, b2 << 3 | b2 >> 2)
-            };
-
-            // Average A and B for the block fill colour
-            let r = ((ra as u16 + rb as u16) / 2) as u8;
-            let g = ((ga as u16 + gb as u16) / 2) as u8;
-            let b_val = ((ba as u16 + bb as u16) / 2) as u8;
-            let a = if punch_through == 1 { 0u8 } else { 255u8 };
-
-            // Write to output pixels
-            for py in 0..block_h {
-                let y = by * block_h + py;
-                if y >= height { continue; }
-                for px in 0..block_w {
-                    let x = bx * block_w + px;
-                    if x >= width { continue; }
-                    let idx = (y * width + x) * 4;
-                    out[idx] = r;
-                    out[idx+1] = g;
-                    out[idx+2] = b_val;
-                    out[idx+3] = a;
-                }
-            }
-        }
-    }
-    out
+    with_ctx_and_mem(env, |gles, mem| unsafe {
+        let data = mem
+            .ptr_at(data.cast::<u8>(), image_size.try_into().unwrap())
+            .cast();
+        gles.CompressedTexImage2D(
+            target,
+            level,
+            internalformat,
+            width,
+            height,
+            border,
+            image_size,
+            data,
+        );
+    })
 }
 fn glCopyTexImage2D(
     env: &mut Environment,
@@ -1608,23 +1485,7 @@ fn glRenderbufferStorageMultisampleAPPLE(
     glRenderbufferStorageOES(env, target, internalformat, width, height)
 }
 
-fn glResolveMultisampleFramebufferAPPLE(env: &mut Environment) {
-    // MSAAResolveFix: the no-op stub caused checkerboard artifacts because
-    // the game renders into a multisampled FBO then samples from it directly.
-    // We blit from the MSAA FBO to the resolve FBO using GL_COLOR_BUFFER_BIT.
-    // On ANGLE/OpenGL ES 3.x this maps to glBlitFramebuffer under the hood.
-    //
-    // GL_READ_FRAMEBUFFER = 0x8CA8, GL_DRAW_FRAMEBUFFER = 0x8CA9
-    // GL_COLOR_BUFFER_BIT = 0x4000, GL_LINEAR = 0x2601
-    // MSAAResolveFlush: BlitFramebufferEXT is not in the GLES trait.
-    // On ANGLE/ES3, MSAA resolves happen implicitly when the driver needs to
-    // read the framebuffer (e.g. for glReadPixels or texture sampling).
-    // Calling glFlush ensures all pending MSAA render commands are submitted
-    // so the implicit resolve has complete data to work with.
-    with_ctx_and_mem(env, |gles, _mem| unsafe {
-        gles.Flush();
-    })
-}
+fn glResolveMultisampleFramebufferAPPLE(_env: &mut Environment) {}
 
 fn glDiscardFramebufferEXT(
     _env: &mut Environment,
@@ -1970,7 +1831,7 @@ fn glShaderSource(
         // If the string contains Mojibake or raw hex, it's a PowerVR hardware binary!
         // We intercept it and swap it with generic Android GLSL to prevent a driver crash.
         if !full_source.is_ascii() || full_source.contains('\0') {
-            log!("glShaderSource: intercepted PowerVR binary (type={:#x}), substituting passthrough GLSL", shader_type);
+            println!("🎮 LOG: Intercepted PowerVR Binary (Type: {:#x})! Bypassing with Android GLSL...", shader_type);
             
             if shader_type == 0x8B31 { // GL_VERTEX_SHADER
                 full_source = "
@@ -2027,30 +1888,6 @@ fn glShaderSource(
             s = s.replace("vec4(0, 0, 0.5, 0)", "vec4(0.0, 0.0, 0.5, 0.0)");
             s = s.replace("vec4(0.5, 0.5, 0.5, 1)", "vec4(0.5, 0.5, 0.5, 1.0)");
             
-            // De-duplicate precision declarations: GLES allows multiple precision
-            // statements in different #if blocks, but desktop GL (NVIDIA) rejects
-            // them with "domain specified twice". Keep only the FIRST occurrence
-            // and strip all subsequent ones.
-            {
-                let mut found_precision = false;
-                let mut deduped = String::with_capacity(s.len());
-                for line in s.lines() {
-                    let trimmed = line.trim();
-                    if trimmed.starts_with("precision ") && trimmed.ends_with(';') {
-                        if !found_precision {
-                            found_precision = true;
-                            deduped.push_str(line);
-                            deduped.push('\n');
-                        }
-                        // else: skip duplicate precision declaration
-                    } else {
-                        deduped.push_str(line);
-                        deduped.push('\n');
-                    }
-                }
-                s = deduped;
-            }
-
             // Only inject if the game engine forgot to define precision!
             if !s.contains("precision ") {
                 let inject = "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n";
@@ -2662,27 +2499,6 @@ fn glGetShaderSource(
 
 
 
-// EXT_occlusion_query_boolean stubs.
-// Real Racing 3 and Nova 3 advertise and call these to profile GPU timing.
-// We stub them as no-ops — returning query result 0 (no samples passed),
-// which is the safest value: the game continues without GPU timing data.
-fn glGenQueriesEXT(_env: &mut Environment, n: GLsizei, ids: MutPtr<GLuint>) {
-    // Fill with sequential fake IDs (non-zero so the game doesn't think alloc failed)
-    let ids_slice = _env.mem.bytes_at_mut(ids.cast(), (n as u32) * 4);
-    for i in 0..n as usize {
-        let fake_id = (i + 1) as u32;
-        ids_slice[i*4..i*4+4].copy_from_slice(&fake_id.to_le_bytes());
-    }
-}
-fn glDeleteQueriesEXT(_env: &mut Environment, _n: GLsizei, _ids: ConstPtr<GLuint>) {}
-fn glBeginQueryEXT(_env: &mut Environment, _target: GLenum, _id: GLuint) {}
-fn glEndQueryEXT(_env: &mut Environment, _target: GLenum) {}
-fn glGetQueryObjectuivEXT(env: &mut Environment, _id: GLuint, pname: GLenum, params: MutPtr<GLuint>) {
-    // GL_QUERY_RESULT_EXT = 0x8866, GL_QUERY_RESULT_AVAILABLE_EXT = 0x8867
-    let val: u32 = if pname == 0x8867 { 1 } else { 0 }; // available=true, result=0
-    env.mem.write(params, val);
-}
-
 pub const FUNCTIONS: FunctionExports = &[
     // Generic state manipulation
     export_c_func!(glGetError()),
@@ -2931,12 +2747,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(glWeightPointerOES(_, _, _, _)),
     export_c_func!(glValidateProgram(_)),
     export_c_func!(glGetShaderSource(_, _, _, _)),
-    // EXT_occlusion_query_boolean stubs (Real Racing 3, Nova 3, etc.)
-    export_c_func!(glGenQueriesEXT(_, _)),
-    export_c_func!(glDeleteQueriesEXT(_, _)),
-    export_c_func!(glBeginQueryEXT(_, _)),
-    export_c_func!(glEndQueryEXT(_)),
-    export_c_func!(glGetQueryObjectuivEXT(_, _, _)),
 ];
 
 fn _get_currently_bound_buffer_object_name(env: &mut Environment, target: GLenum) -> GLuint {

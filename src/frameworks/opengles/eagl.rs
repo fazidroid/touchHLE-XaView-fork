@@ -158,12 +158,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
     env.window.as_mut().unwrap().set_share_with_current_context(true);
 
+    // FixGlesContextSharegroup: mirror the gles_version=2 fix from initWithAPI:
+    if api == kEAGLRenderingAPIOpenGLES2 {
+        env.options.gles_version = 2;
+    }
+
     let mut gles1_ins = create_gles1_ctx(env);
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
-        let gles1_ctx = gles1_ins.make_current(window);
-        //log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
+        let _gles1_ctx = gles1_ins.make_current(window);
+        log!("Driver info (GLES{} shared): {}", api, unsafe { _gles1_ctx.driver_description() });
     }
 
     let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
@@ -190,13 +195,27 @@ pub const CLASSES: ClassExports = objc_classes! {
             return nil; // RejectEsTwo
         }
 
-        // FixGlesContext
+        // FixGlesContext: create the underlying GLES context.
+    // When api == 2 (GLES2), we set env.options.gles_version = 2 BEFORE
+    // creating the context so that gles1_native sees the correct mode flag
+    // and so that gles_guest.rs shader preprocessing strips precision
+    // qualifiers / inserts correct defines.
+    //
+    // This is the root cause of magenta textures and broken shaders in
+    // GLES2 games (Real Racing 3, Nova 3, etc.):
+    //   - gles_guest.rs checks env.options.gles_version for shader rewriting
+    //   - gles1_native.rs checks is_gles2 for GL dispatch routing
+    // Both were seeing gles_version=0 (unset), so GLES2 games got GLES1 paths.
+    if api == kEAGLRenderingAPIOpenGLES2 {
+        env.options.gles_version = 2;
+    }
+
     let mut gles1_ins = create_gles1_ctx(env);
 
     let window = env.window.as_mut().expect("OpenGL ES is not supported in headless mode");
     {
-        let gles1_ctx = gles1_ins.make_current(window);
-        //log!("Driver info: {}", unsafe { gles1_ctx.driver_description() });
+        let _gles1_ctx = gles1_ins.make_current(window);
+        log!("Driver info (GLES{}): {}", api, unsafe { _gles1_ctx.driver_description() });
     }
 
     let host_obj = env.objc.borrow_mut::<EAGLContextHostObject>(this); // SetApi
