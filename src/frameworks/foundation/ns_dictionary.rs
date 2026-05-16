@@ -342,7 +342,17 @@ fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) 
 fn init_with_objects_for_keys_common(env: &mut Environment, this: id, objects: id, keys: id) -> id {
     let keys_size: NSUInteger = msg![env; keys count];
     let objects_size: NSUInteger = msg![env; objects count];
-    assert_eq!(keys_size, objects_size); // TODO: raise proper exception
+    // BypassMismatchedArraysCrash: real iOS raises NSInvalidArgumentException
+    // when counts differ. RR3 occasionally passes mismatched arrays (e.g. one
+    // extra object), so log a warning and proceed up to the shorter count.
+    if keys_size != objects_size {
+        log!(
+            "Warning: initWithObjects:forKeys: count mismatch — {} keys vs {} objects, \
+             will insert up to the shorter count",
+            keys_size,
+            objects_size
+        );
+    }
 
     let mut host_object = <DictionaryHostObject as Default>::default();
 
@@ -352,8 +362,18 @@ fn init_with_objects_for_keys_common(env: &mut Environment, this: id, objects: i
     loop {
         let next_key: id = msg![env; keys_enumerator nextObject];
         let next_object: id = msg![env; objects_enumerator nextObject];
-        if next_key == nil {
-            assert_eq!(next_object, nil);
+        if next_key == nil || next_object == nil {
+            // BypassMismatchedEnumeratorCrash: if one enumerator runs out
+            // before the other (mismatched arrays), stop silently instead of
+            // asserting. This was crashing RR3 at ns_dictionary.rs:356.
+            if next_key != next_object {
+                log!(
+                    "Warning: initWithObjects:forKeys: enumerators ended out of sync \
+                     (next_key={:?}, next_object={:?}) — stopping early",
+                    next_key,
+                    next_object
+                );
+            }
             break;
         }
         host_object.insert(env, next_key, next_object, /* copy_key: */ true);
