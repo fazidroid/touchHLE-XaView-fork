@@ -7,7 +7,7 @@
 
 use crate::frameworks::foundation::{ns_string, NSInteger};
 use crate::objc::{autorelease, id, nil, release, retain, ClassExports, HostObject, NSZonePtr};
-use crate::{msg, objc_classes};
+use crate::{msg, msg_class, objc_classes};
 
 struct NSTimeZoneHostObject {
     // NSString*
@@ -20,6 +20,20 @@ pub const CLASSES: ClassExports = objc_classes! {
 (env, this, _cmd);
 
 @implementation NSTimeZone: NSObject
+
++ (id)systemTimeZone {
+    // Return a default time zone (e.g., UTC)
+    let tz_name = ns_string::get_static_str(env, "UTC");
+    let tz = msg![env; this timeZoneWithName:tz_name];
+    autorelease(env, tz)
+}
+
++ (id)knownTimeZoneNames {
+    // Return a minimal array with one common time zone
+    let tz_name = ns_string::get_static_str(env, "UTC");
+    let array = msg_class![env; NSArray arrayWithObject:tz_name];
+    autorelease(env, array)
+}
 
 + (id)allocWithZone:(NSZonePtr)_zone {
     let host_object = Box::new(NSTimeZoneHostObject {

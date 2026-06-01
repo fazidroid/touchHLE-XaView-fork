@@ -136,14 +136,47 @@ pub const CLASSES: ClassExports = objc_classes! {
     assert!(!result.is_null());
     skip_characters(env, this);
 
-    let NSScannerHostObject { to_be_skipped: _set, string, len, pos } = env.objc.borrow::<NSScannerHostObject>(this).clone();
-    assert!(pos < len);
-    let susbstring: id = msg![env; string substringFromIndex:pos];
-    let tmp = to_rust_string(env, susbstring);
-    assert!(!tmp.starts_with("0x") && !tmp.starts_with("0X"));
-    assert!(!tmp.chars().next().unwrap().is_ascii_hexdigit()); // TODO
-    env.mem.write(result, 0);
-    false
+    let NSScannerHostObject { to_be_skipped, string, len, pos } = std::mem::take(env.objc.borrow_mut::<NSScannerHostObject>(this));
+    if pos >= len {
+        *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
+        return false;
+    }
+
+    let left: id = msg![env; string substringFromIndex:pos];
+    let st = to_rust_string(env, left);
+    let bytes = st.as_bytes();
+    let n = bytes.len();
+    let mut i = 0;
+
+    // Allow optional "0x" or "0X" prefix
+    if n >= 2 && bytes[0] == b'0' && (bytes[1] == b'x' || bytes[1] == b'X') {
+        i = 2;
+    }
+
+    // Scan consecutive hex digits
+    let start = i;
+    while i < n && bytes[i].is_ascii_hexdigit() {
+        i += 1;
+    }
+    if i == start {
+        // No hex digits found
+        *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject { to_be_skipped, string, len, pos };
+        return false;
+    }
+
+    let hex_str = &st[start..i];
+    // Parse as u32, saturating on overflow (matches Apple's documented behavior)
+    let value = u32::from_str_radix(hex_str, 16).unwrap_or(u32::MAX);
+    env.mem.write(result, value);
+
+    // Advance scanner position
+    *env.objc.borrow_mut::<NSScannerHostObject>(this) = NSScannerHostObject {
+        to_be_skipped,
+        string,
+        len,
+        pos: pos + i as NSUInteger,
+    };
+    true
 }
 
 - (bool)scanUpToString:(id)stop_string // NSString *

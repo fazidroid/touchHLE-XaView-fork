@@ -181,6 +181,37 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (id)localeIdentifier {
+    let host_obj = env.objc.borrow::<NSLocaleHostObject>(this);
+    let lang = host_obj.language_code;
+    let country = host_obj.country_code;
+    let identifier: id = if lang != nil && country != nil {
+        let lang_str = ns_string::to_rust_string(env, lang);
+        let country_str = ns_string::to_rust_string(env, country);
+        let combined = format!("{}_{}", lang_str, country_str);
+        ns_string::from_rust_string(env, combined)
+    } else if lang != nil {
+        lang
+    } else if country != nil {
+        country
+    } else {
+        ns_string::get_static_str(env, "en_US")
+    };
+    crate::objc::autorelease(env, identifier)
+}
+
+- (id)displayNameForKey:(id)key value:(id)value {
+    log_dbg!("NSLocale displayNameForKey: {:?} value: {:?}",
+        if key != nil { ns_string::to_rust_string(env, key) } else { std::borrow::Cow::from("(null)") },
+        if value != nil { ns_string::to_rust_string(env, value) } else { std::borrow::Cow::from("(null)") }
+    );
+    // Return the value string as the display name (simplistic stub)
+    if value != nil {
+        return value;
+    }
+    ns_string::get_static_str(env, "")
+}
+
 - (())dealloc {
     let &NSLocaleHostObject { country_code, language_code } = env.objc.borrow::<NSLocaleHostObject>(this);
     release(env, country_code);
@@ -203,7 +234,14 @@ pub const CLASSES: ClassExports = objc_classes! {
             let &NSLocaleHostObject { country_code, .. } = env.objc.borrow(this);
             country_code
         },
-        _ => unimplemented!()
+        // ==========================================================
+        // 🏎️ GT RACING 2 BYPASS: Don't panic on unknown locale keys!
+        // ==========================================================
+        _ => {
+            println!("🎮 LOG: Safely ignored unimplemented NSLocale key: {}", key_str);
+            // Return 'nil' so the game safely falls back to defaults
+            crate::objc::nil
+        }
     }
 }
 

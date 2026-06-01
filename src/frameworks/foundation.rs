@@ -50,6 +50,10 @@ pub mod ns_url_request;
 pub mod ns_user_defaults;
 pub mod ns_value;
 pub mod ns_xml_parser;
+pub mod ns_condition_lock;
+pub mod ns_sort_descriptor;
+pub mod ns_invocation;
+
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/System/Library/Frameworks/Foundation.framework/Foundation",
@@ -93,6 +97,8 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
         ns_user_defaults::CLASSES,
         ns_value::CLASSES,
         ns_xml_parser::CLASSES,
+        ns_condition_lock::CLASSES,
+        ns_sort_descriptor::CLASSES,
     ],
     constant_exports: &[
         ns_error::CONSTANTS,

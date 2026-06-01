@@ -29,6 +29,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation NSObject
 
++ (id)superclass {
+    // Return the class of NSObject (or nil for NSObject itself)
+    if this == msg_class![env; NSObject class] {
+        return nil;
+    }
+    msg_class![env; NSObject class]
+}
+
 + (id)alloc {
     msg![env; this allocWithZone:(MutVoidPtr::null())]
 }
@@ -45,6 +53,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (Class)class {
     this
 }
+
++ (id)self {
+    this
+}
+
 + (bool)isSubclassOfClass:(Class)class {
     env.objc.class_is_subclass_of(this, class)
 }
@@ -73,6 +86,48 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 + (id)debugDescription {
     msg![env; this description]
+}
+
+- (())performSelector:(SEL)sel withObject:(id)anObject afterDelay:(f64)delay {
+    log_dbg!("performSelector:withObject:afterDelay: called (sel={:?}, delay={})", sel.as_str(&env.mem), delay);
+    // Execute immediately; proper delay would require a run loop.
+    if sel.as_str(&env.mem).ends_with(':') {
+        let _: id = msg![env; this performSelector:sel withObject:anObject];
+    } else {
+        let _: id = msg![env; this performSelector:sel];
+    }
+}
+
+- (())performSelector:(SEL)sel onThread:(id)_thread withObject:(id)arg waitUntilDone:(bool)wait {
+    log_dbg!("NSObject performSelector:onThread:withObject:waitUntilDone: stub (sel: {}, wait: {})", sel.as_str(&env.mem), wait);
+    // For simplicity, perform immediately. The thread and wait flag are ignored.
+    if sel.as_str(&env.mem).ends_with(':') {
+        () = msg_send(env, (this, sel, arg));
+    } else {
+        () = msg_send(env, (this, sel));
+    }
+}
+
+    - (id)dictionaryWithValuesForKeys:(id)keys {
+        println!(" LOG: Caught [NSObject dictionaryWithValuesForKeys:]. Returning empty dictionary to safely bypass SDK!");
+        // Returning a real, empty dictionary prevents the SDK from crashing!
+        crate::msg_class![env; NSDictionary dictionary]
+    }
+    
+    - (id)initWithDictionary:(id)dict {
+        this
+    }
+
+    - (id)toJSONAs:(id)arg0 excludingInArray:(id)arg1 withTranslations:(id)arg2 {
+        println!(" LOG: Caught [NSObject toJSONAs:...]. Faking empty JSON string to prevent C++ crash!");
+        // Returning "{}" guarantees the C++ std::string parser won't hit a null-pointer!
+        let empty_json = crate::frameworks::foundation::ns_string::from_rust_string(env, "{}".to_string());
+        crate::objc::autorelease(env, empty_json)
+    }
+
+- (())setPersistent:(bool)persistent {
+    log!("NSObject setPersistent: {} stub called on class {}", persistent,
+         env.objc.get_class_name(ObjC::read_isa(this, &env.mem)));
 }
 
 - (id)init {
@@ -130,6 +185,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (id)mutableCopy {
     msg![env; this mutableCopyWithZone:(MutVoidPtr::null())]
+}
+
+- (())willChangeValueForKey:(id)key {
+    // stub – ignore KVO change notifications
+    log_dbg!("NSObject willChangeValueForKey: ignored");
+}
+
+- (())didChangeValueForKey:(id)key {
+    log_dbg!("NSObject didChangeValueForKey: ignored");
 }
 
 - (())setValue:(id)value
@@ -248,17 +312,52 @@ forUndefinedKey:(id)key { // NSString*
         log!("Applying game-specific hack for AssassinsCreed: ignoring performSelectorOnMainThread:SEL(moviePlayerInit:) waitUntilDone:true");
         return;
     }
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.Ferrari") && wait {
-        if sel == env.objc.lookup_selector("startMovie:").unwrap() {
-            log!("Applying game-specific hack for Ferrari GT: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
+    // Ferrari GT and GT Racing Motor Academy share the same Gameloft engine
+    // and the same UITextField dispatch pattern.
+    // NOTE: Use sel.as_str() comparisons instead of lookup_selector().unwrap()
+    // because some selectors may not be registered yet when this runs.
+    let is_ferrari_or_gtracing = env.bundle.bundle_identifier().starts_with("com.gameloft.Ferrari")
+        || env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacing")
+        || env.bundle.bundle_identifier().starts_with("com.gameloft.Asphalt6"); // <-- Added Asphalt 6!
+
+    if is_ferrari_or_gtracing && wait {
+        let sel_str = sel.as_str(&env.mem);
+                if sel_str == "startMovie:" || sel_str == "stopMovie:" || sel_str == "stopMovie" {
+            println!("🎮 LOG: GAMELOFT FIX - Bypassed {}, injecting fake video finish notification to prevent UI freeze!", sel_str);
+            
+            // Instantly tell the game the video finished playing so it unlocks the menu!
+            let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+            let notif = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+            
+            // REMOVED crate::objc:: from nil here!
+            let _: () = crate::msg![env; center postNotificationName:notif object:nil]; 
+            
+            return;
+        }       
+        if sel_str == "initTextInput:"
+            || sel_str == "removeTextField:"
+            || sel_str == "showTextField:"
+            || sel_str == "hideTextField:"
+            || sel_str == "dismissKeyboard"
+            || sel_str == "dismissKeyboard:"
+        {
+            log!("Applying game-specific hack for Ferrari/GTRacing: performing performSelectorOnMainThread:SEL({}) on thread {}", sel_str, env.current_thread);
+            if sel_str.ends_with(':') {
+                () = msg_send(env, (this, sel, arg));
+            } else {
+                () = msg_send(env, (this, sel));
+            }
             return;
         }
-        if sel == env.objc.lookup_selector("initTextInput:").unwrap() ||
-            sel == env.objc.lookup_selector("removeTextField:").unwrap() {
-            log!("Applying game-specific hack for Ferrari GT: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
+        // For any other waitUntilDone:true selector in this engine, execute
+        // it immediately on the current thread rather than ignoring it.
+        log!("Applying game-specific hack for Ferrari/GTRacing: executing performSelectorOnMainThread:SEL({}) on current thread {}", sel_str, env.current_thread);
+        if sel_str.ends_with(':') {
             () = msg_send(env, (this, sel, arg));
-            return;
+        } else {
+            () = msg_send(env, (this, sel));
         }
+        return;
     }
     if env.bundle.bundle_identifier().starts_with("com.gameloft.HOS2") && wait {
         if sel == env.objc.lookup_selector("loadMovie:").unwrap() ||
@@ -314,6 +413,30 @@ forUndefinedKey:(id)key { // NSString*
 
 - (())awakeFromNib {
     // no-op
+}
+
+@end
+
+@implementation NSAssertionHandler: NSObject
+
++ (id)currentHandler {
+    this   // return the class object
+}
+
++ (())handleFailureInFunction:(id)function file:(id)file lineNumber:(i32)line description:(id)description {
+    log_dbg!("NSAssertionHandler class method handleFailureInFunction:... ignored");
+}
+
++ (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(i32)line description:(id)description {
+    log_dbg!("NSAssertionHandler class method handleFailureInMethod:... ignored");
+}
+
+- (())handleFailureInMethod:(SEL)method object:(id)object file:(id)file lineNumber:(i32)line description:(id)description {
+    log_dbg!("NSAssertionHandler handleFailureInMethod:... ignored");
+}
+
+- (())handleFailureInFunction:(id)function file:(id)file lineNumber:(i32)line description:(id)description {
+    log_dbg!("NSAssertionHandler handleFailureInFunction:... ignored");
 }
 
 @end

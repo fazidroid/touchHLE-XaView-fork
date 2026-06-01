@@ -238,7 +238,12 @@ pub(super) fn handle_timer(env: &mut Environment, timer: id) -> Option<Instant> 
         let advance_by = rust_interval.checked_mul(advance_by).unwrap();
         Some(due_by.checked_add(advance_by).unwrap())
     } else {
-        ns_run_loop::remove_timer(env, run_loop, timer);
+        // GuardNilRunLoop: only call remove_timer if this timer was actually
+        // added to a run loop. A timer created with timerWithTimeInterval:...
+        // but never scheduled would have run_loop == nil.
+        if run_loop != nil {
+            ns_run_loop::remove_timer(env, run_loop, timer);
+        }
         None
     };
     env.objc.borrow_mut::<NSTimerHostObject>(timer).due_by = new_due_by;

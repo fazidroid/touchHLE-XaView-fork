@@ -7,7 +7,7 @@
 
 use super::mutex::pthread_mutex_t;
 use crate::dyld::FunctionExports;
-use crate::libc::pthread::mutex::pthread_mutex_unlock;
+use crate::libc::pthread::mutex::{pthread_mutex_lock, pthread_mutex_unlock};
 use crate::mem::{ConstPtr, MutPtr, SafeRead};
 use crate::{export_c_func, Environment};
 use std::collections::{HashMap, VecDeque};
@@ -79,19 +79,20 @@ pub fn pthread_cond_wait(
         cond
     );
     let current_thread = env.current_thread;
-    let mutex = env.mem.read(mutex).mutex_id;
+    let mutex_id = env.mem.read(mutex).mutex_id;
     let cond_var = env.mem.read(cond);
-    let host_object = State::get_mut(env)
+    let Some(host_object) = State::get_mut(env)
         .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
-    // The mutex used must be the same as the currently waiting mutex, or there
-    // must be no other waiters.
+        .get_mut(&cond_var) else {
+        log!("pthread_cond_wait: unknown condvar {:?} (PTHREAD_COND_INITIALIZER?), re-locking", cond_var);
+        pthread_mutex_lock(env, mutex);
+        return 0;
+    };
     assert!(
-        host_object.curr_mutex == Some(mutex)
+        host_object.curr_mutex == Some(mutex_id)
             || host_object.waking.is_empty() && host_object.waiting.is_empty()
     );
-    host_object.curr_mutex = Some(mutex);
+    host_object.curr_mutex = Some(mutex_id);
     host_object.waiting.push_back(current_thread);
     env.yield_thread(ThreadBlock::Condition(cond_var));
     0 // success
@@ -99,10 +100,12 @@ pub fn pthread_cond_wait(
 
 pub fn pthread_cond_signal(env: &mut Environment, cond: MutPtr<pthread_cond_t>) -> i32 {
     let cond_var = env.mem.read(cond);
-    let host_object = State::get_mut(env)
+    let Some(host_object) = State::get_mut(env)
         .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
+        .get_mut(&cond_var) else {
+        log!("pthread_cond_signal: unknown condvar {:?} (PTHREAD_COND_INITIALIZER?), ignoring", cond_var);
+        return 0;
+    };
     if let Some(tid) = host_object.waiting.pop_front() {
         host_object.waking.push_back(tid);
         log_dbg!(
@@ -128,21 +131,29 @@ pub fn pthread_cond_broadcast(env: &mut Environment, cond: MutPtr<pthread_cond_t
         env.current_thread,
         cond
     );
-    let host_object = State::get_mut(env)
+    let Some(host_object) = State::get_mut(env)
         .condition_variables
-        .get_mut(&cond_var)
-        .unwrap();
+        .get_mut(&cond_var) else {
+        log!("pthread_cond_broadcast: unknown condvar {:?} (PTHREAD_COND_INITIALIZER?), ignoring", cond_var);
+        return 0;
+    };
     host_object.waking.extend(host_object.waiting.drain(..));
     0 // success
 }
 
 pub fn pthread_cond_destroy(env: &mut Environment, cond: MutPtr<pthread_cond_t>) -> i32 {
     let cond_var = env.mem.read(cond);
-    let old_object = State::get_mut(env)
+    let Some(old_object) = State::get_mut(env)
         .condition_variables
-        .remove(&cond_var)
-        .unwrap();
-    assert!(old_object.waiting.is_empty() && old_object.waking.is_empty());
+        .remove(&cond_var) else {
+        log!("pthread_cond_destroy: unknown condvar {:?}, ignoring", cond_var);
+        return 0;
+    };
+    // SoftAssertDestroy: warn instead of panic if threads still in queue.
+    if !old_object.waiting.is_empty() || !old_object.waking.is_empty() {
+        log!("Warning: pthread_cond_destroy: {} waiting, {} waking threads remain",
+            old_object.waiting.len(), old_object.waking.len());
+    }
     env.mem.free(cond_var.cast());
     0 // success
 }
@@ -151,9 +162,55 @@ pub fn pthread_cond_timedwait(
     env: &mut Environment,
     cond: MutPtr<pthread_cond_t>,
     mutex: MutPtr<pthread_mutex_t>,
-    _abstime: u32,
+    _abstime: u32,   // still ignored – all games expect a quick timeout
 ) -> i32 {
-    pthread_cond_wait(env, cond, mutex)
+    let cond_var = env.mem.read(cond);
+
+    // 1. Fast path: has another thread already signalled *this* thread?
+    //    If yes, consume the signal and return immediately (no sleep).
+    let current_thread = env.current_thread;
+    let Some(host_object) = State::get_mut(env)
+        .condition_variables
+        .get_mut(&cond_var) else {
+        return 0;
+    };
+    if let Some(idx) = host_object.waking.iter().position(|&t| t == current_thread) {
+        host_object.waking.remove(idx);
+        return 0; // success – signal consumed
+    }
+
+    // 2. Slow path: unlock, adaptive sleep, relock, return ETIMEDOUT.
+    //
+    // NoWaiterRegistration: timedwait does NOT register in the waiting queue.
+    // Registering caused corruption: multiple threads could end up with the
+    // same ID in waiting (due to cooperative interleaving), then retain()
+    // would loop forever producing infinite "Can't free" errors.
+    //
+    // timedwait doesn't need to be woken by signal — it just needs to yield
+    // the CPU briefly and return ETIMEDOUT so the caller can re-check its
+    // predicate. The fast path above already handles any pre-queued signal.
+    //
+    // AdaptiveSleep: scale sleep time with number of active waiters on this
+    // condvar to prevent scheduler thrashing from many concurrent timedwait
+    // threads (e.g. Asphalt 8's 12-thread pool).
+    let sleep_ms = {
+        let Some(ho) = State::get_mut(env)
+            .condition_variables
+            .get_mut(&cond_var) else { return 60; };
+        // Count only threads registered via pthread_cond_wait (not timedwait).
+        match ho.waiting.len() {
+            0..=1 => 2u64,
+            2..=4 => 4,
+            5..=8 => 6,
+            _     => 8,
+        }
+    };
+
+    let _ = pthread_mutex_unlock(env, mutex);
+    env.sleep(std::time::Duration::from_millis(sleep_ms));
+    let _ = pthread_mutex_lock(env, mutex);
+
+    60 // ETIMEDOUT — caller re-checks its predicate and loops
 }
 
 pub const FUNCTIONS: FunctionExports = &[

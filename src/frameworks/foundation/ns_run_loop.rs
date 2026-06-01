@@ -18,7 +18,7 @@ use crate::frameworks::core_foundation::cf_run_loop::{
     kCFRunLoopCommonModes, kCFRunLoopDefaultMode, CFRunLoopRef,
 };
 use crate::frameworks::{core_animation, media_player, uikit};
-use crate::objc::{id, msg, objc_classes, release, retain, Class, ClassExports, HostObject};
+use crate::objc::{id, msg, nil, objc_classes, release, retain, Class, ClassExports, HostObject};
 use crate::Environment;
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -83,6 +83,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())addTimer:(id)timer // NSTimer*
        forMode:(NSRunLoopMode)mode {
+    // NFS Most Wanted (and similar games) may call addTimer:forMode: on a nil
+    // run loop (e.g. when scheduling on a background thread that has no loop
+    // yet, or when the caller stored a stale run loop reference). Mirror real
+    // ObjC behaviour: silently ignore messages to nil.
+    if this == nil {
+        log!("WARNING: addTimer:forMode: called on nil NSRunLoop, ignoring");
+        return;
+    }
     let default_mode = ns_string::get_static_str(env, NSDefaultRunLoopMode);
     let common_modes = ns_string::get_static_str(env, NSRunLoopCommonModes);
     // TODO: handle other modes
@@ -114,11 +122,49 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (bool)runMode:(NSRunLoopMode)_mode beforeDate:(id)limit_date {
     let time_limit: NSTimeInterval = msg![env; limit_date timeIntervalSince1970];
+    // CoopYield: must call run_run_loop (which calls env.sleep) so that
+    // the cooperative scheduler gives other threads CPU time.
+    // If we returned immediately here, the game's loading spin-wait would
+    // starve all background threads and deadlock.
     run_run_loop(env, this, /* single_iteration: */ true, Some(time_limit));
-    false
+    true  // RunLoopDidRun: return true to indicate the loop ran, not false (timed out without running)
 }
 
+- (())addPort:(id)port forMode:(NSRunLoopMode)mode {
+        println!("🎮 LOG: Caught [NSRunLoop addPort:forMode:]. Absorbing safely!");
+    }
+
+    - (())removePort:(id)port forMode:(NSRunLoopMode)mode {
+        println!("🎮 LOG: Caught [NSRunLoop removePort:forMode:]. Absorbing safely!");
+    }
+
 // TODO: other run methods
+
+@end
+
+// ==========================================================
+// 🏎️ GAMELOFT BYPASS: Stub NSMachPort for GT Racing 2
+// ==========================================================
+@implementation NSMachPort: NSObject
+
+    + (id)port {
+        println!("🎮 LOG: Caught [NSMachPort port]. Returning dummy port!");
+        let port: id = msg![env; this new];
+        crate::objc::autorelease(env, port)
+    }
+
+    // Proactively stub the methods the game will likely call on the port next!
+    - (())setDelegate:(id)delegate {
+        println!("🎮 LOG: Caught [NSMachPort setDelegate:]. Absorbing safely!");
+    }
+
+    - (())scheduleInRunLoop:(id)runLoop forMode:(id)mode {
+        println!("🎮 LOG: Caught [NSMachPort scheduleInRunLoop:forMode:]. Absorbing safely!");
+    }
+    
+    - (())setBorderStyle:(crate::frameworks::foundation::NSInteger)style {
+        println!("🎮 LOG: Caught [UITextField setBorderStyle:{}] via UIControl parent! Absorbing safely.", style);
+    }
 
 @end
 
@@ -126,6 +172,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 /// For use by Audio Toolbox.
 pub fn add_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) {
+    if run_loop == nil {
+        log!("WARNING: add_audio_unit called with nil run_loop, ignoring");
+        return;
+    }
     env.objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
         .audio_units
@@ -134,6 +184,10 @@ pub fn add_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) {
 
 /// For use by Audio Toolbox.
 pub fn remove_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) -> Result<(), ()> {
+    if run_loop == nil {
+        log!("WARNING: remove_audio_unit called with nil run_loop, ignoring");
+        return Err(());
+    }
     let units = &mut env
         .objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
@@ -151,6 +205,10 @@ pub fn remove_audio_unit(env: &mut Environment, run_loop: id, unit: AudioUnit) -
 /// mechanism?
 /// TODO: Handle run loop modes. Currently assumes the common modes.
 pub fn add_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueueRef) {
+    if run_loop == nil {
+        log!("WARNING: add_audio_queue called with nil run_loop, ignoring");
+        return;
+    }
     env.objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
         .audio_queues
@@ -159,6 +217,10 @@ pub fn add_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueueRef
 
 /// For use by Audio Toolbox.
 pub fn remove_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueueRef) {
+    if run_loop == nil {
+        log!("WARNING: remove_audio_queue called with nil run_loop, ignoring");
+        return;
+    }
     let queues = &mut env
         .objc
         .borrow_mut::<NSRunLoopHostObject>(run_loop)
@@ -169,6 +231,13 @@ pub fn remove_audio_queue(env: &mut Environment, run_loop: id, queue: AudioQueue
 
 /// For use by NSTimer so it can remove itself once it's invalidated.
 pub(super) fn remove_timer(env: &mut Environment, run_loop: id, timer: id) {
+    // A timer created with timerWithTimeInterval: (non-scheduled variant) may
+    // be invalidated before it is ever added to a run loop, leaving its stored
+    // run_loop as nil.  Guard here so we don't crash on borrow_mut(nil).
+    if run_loop == nil {
+        log!("WARNING: remove_timer called with nil run_loop for timer {:?}, ignoring", timer);
+        return;
+    }
     log_dbg!("Removing timer {:?} from run loop {:?}", timer, run_loop,);
     let NSRunLoopHostObject { timers, .. } = env.objc.borrow_mut(run_loop);
 
@@ -305,7 +374,9 @@ pub fn run_run_loop(
         // or until the next scheduled event, whichever is sooner. iPhone OS
         // apps can't do more than 60fps so this should be fine.
         let limit = Duration::from_millis(1000 / 60);
-        env.sleep(sleep_until.map_or(limit, |i| i.duration_since(Instant::now()).min(limit)));
+        // SafeSleepCalc: use saturating_duration_since to avoid a panic when
+        // sleep_until is already in the past (overdue timer or stale event due-time).
+        env.sleep(sleep_until.map_or(limit, |i| i.saturating_duration_since(Instant::now()).min(limit)));
 
         if single_iteration {
             break;

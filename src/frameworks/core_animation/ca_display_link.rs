@@ -45,8 +45,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())setFrameInterval:(NSInteger)frameInterval {
     log_dbg!("[(CADisplayLink*){:?} setFrameInterval:{}]", this, frameInterval);
-    assert!(frameInterval >= 1);
-    let interval = frameInterval as f64 / 60.0;
+    
+    // ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Safely clamp invalid frame intervals!
+    // ==========================================================
+    let safe_interval = if frameInterval < 1 {
+        println!("🎮 LOG: Bypassed CADisplayLink panic! Clamped invalid frameInterval {} to 1.", frameInterval);
+        1
+    } else {
+        frameInterval
+    };
+
+    let interval = safe_interval as f64 / 60.0;
     let ns_timer = env.objc.borrow::<CADisplayLinkHostObject>(this).ns_timer;
     set_time_interval(env, ns_timer, interval);
 }
@@ -68,6 +78,31 @@ pub const CLASSES: ClassExports = objc_classes! {
     release(env, host_object.ns_timer);
     env.objc.dealloc_object(this, &mut env.mem);
 }
+
+// ==========================================================
+    // PauseDisplayLink: actually invalidate the underlying NSTimer when paused.
+    // Previously this was a no-op which caused the display link to keep firing
+    // during movie player sequences, producing extra render frames and flicker.
+    // The game re-adds the display link to the run loop (addToRunLoop:forMode:)
+    // when it wants to resume, which creates a new timer — so we only need to
+    // handle the pause direction here.
+    - (())setPaused:(bool)paused {
+        log_dbg!("[(CADisplayLink*){:?} setPaused:{}]", this, paused);
+        if paused {
+            let ns_timer = env.objc.borrow::<CADisplayLinkHostObject>(this).ns_timer;
+            let is_valid: bool = msg![env; ns_timer isValid];
+            if is_valid {
+                let _: () = msg![env; ns_timer invalidate];
+            }
+        }
+        // Resuming: the game calls addToRunLoop:forMode: to restart, handled above.
+    }
+
+    - (bool)isPaused {
+        let ns_timer = env.objc.borrow::<CADisplayLinkHostObject>(this).ns_timer;
+        let is_valid: bool = msg![env; ns_timer isValid];
+        !is_valid
+    }
 
 @end
 

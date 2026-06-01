@@ -26,6 +26,8 @@ pub const EISDIR: i32 = 21;
 pub const EINVAL: i32 = 22;
 pub const ESPIPE: i32 = 29;
 pub const EROFS: i32 = 30;
+// 🏎️ GAMELOFT BYPASS: Added EAGAIN (Resource temporarily unavailable)
+pub const EAGAIN: i32 = 35; 
 #[allow(dead_code)]
 pub const EPROTONOSUPPORT: i32 = 43;
 pub const ENOTSUP: i32 = 45;

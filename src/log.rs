@@ -21,6 +21,15 @@ pub fn get_log_file() -> &'static File {
     &LOG_FILE
 }
 
+pub fn get_shader_log_file() -> &'static File {
+    static SHADER_LOG_FILE: LazyLock<File> = LazyLock::new(|| {
+        // This will create a fresh touchHLE_shader_log.txt next to your main log!
+        File::create(crate::paths::user_data_base_path().join("touchHLE_shader_log.txt")).unwrap()
+    });
+
+    &SHADER_LOG_FILE
+}
+
 /// Prints a log message unconditionally. Use this for errors or warnings.
 ///
 /// The message is prefixed with the module path, so it is clear where it comes

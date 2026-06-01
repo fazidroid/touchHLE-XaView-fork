@@ -24,6 +24,17 @@ use crate::Environment;
 
 // TODO: There are many members of this enum missing.
 pub type UIControlEvents = NSUInteger;
+
+/// Exposed for use by `ui_text_field::handle_return` so it can fire
+/// `UIControlEventEditingDidEndOnExit` after the Return key is pressed.
+pub fn send_actions_from_text_field(
+    env: &mut Environment,
+    text_field: id,
+    control_event: UIControlEvents,
+) {
+    let nil_event: id = nil;
+    send_actions(env, text_field, nil_event, control_event);
+}
 const UIControlEventTouchDown: UIControlEvents = 1 << 0;
 const UIControlEventTouchDragInside: UIControlEvents = 1 << 2;
 const UIControlEventTouchDragOutside: UIControlEvents = 1 << 3;
@@ -32,6 +43,10 @@ const UIControlEventTouchDragExit: UIControlEvents = 1 << 5;
 pub const UIControlEventTouchUpInside: UIControlEvents = 1 << 6;
 const UIControlEventTouchUpOutside: UIControlEvents = 1 << 7;
 pub const UIControlEventValueChanged: UIControlEvents = 1 << 12;
+pub const UIControlEventEditingDidBegin: UIControlEvents     = 1 << 16;
+pub const UIControlEventEditingChanged: UIControlEvents      = 1 << 17;
+pub const UIControlEventEditingDidEnd: UIControlEvents       = 1 << 18;
+pub const UIControlEventEditingDidEndOnExit: UIControlEvents = 1 << 19; // Return key pressed
 
 struct UIControlHostObject {
     superclass: super::UIViewHostObject,
@@ -329,6 +344,23 @@ forControlEvents:(UIControlEvents)events {
         }
         _ => panic!(),
     };
+}
+
+- (bool)canBecomeFirstResponder { true }
+
+- (bool)becomeFirstResponder { true }
+
+- (bool)isFirstResponder { true }
+
+- (bool)resignFirstResponder {
+    // Base implementation — UITextField overrides this with the full
+    // keyboard-dismiss + delegate-callback logic.
+    true
+}
+
+- (bool)endEditing:(bool)_force {
+    // Base implementation — subclasses override as needed.
+    true
 }
 
 // TODO: more triggers/targets/actions stuff

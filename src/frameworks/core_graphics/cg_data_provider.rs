@@ -62,6 +62,7 @@ pub const CLASSES: ClassExports = objc_classes! {
             size,
             release_callback,
         } => {
+            // FIX: use to_ptr() to check null
             if !release_callback.to_ptr().is_null() {
                 let args: (MutVoidPtr, ConstVoidPtr, GuestUSize) = (info, data, size);
                 log_dbg!(
@@ -166,8 +167,6 @@ fn CGDataProviderCopyData(env: &mut Environment, provider: CGDataProviderRef) ->
                 .bytes_at_mut(alloc.cast(), len)
                 .copy_from_slice(bytes);
 
-            // TODO: it would be cleaner to use CFDataCreateWithBytesNoCopy, but
-            // that's a bit more tricky.
             let ns_data: id = msg_class![env; NSData alloc];
             msg![env; ns_data initWithBytesNoCopy:alloc length:len]
         }
@@ -202,6 +201,25 @@ fn CGDataProviderCreateWithCFData(env: &mut Environment, data: CFDataRef) -> CGD
     )
 }
 
+// ==========================================================
+// NEW: Stub for _CGDataProviderCreateSequential
+// ==========================================================
+fn CGDataProviderCreateSequential(
+    env: &mut Environment,
+    _info: MutVoidPtr,
+    _callbacks: ConstVoidPtr,
+) -> CGDataProviderRef {
+    log!("_CGDataProviderCreateSequential stub called");
+    // Return a dummy empty data provider to avoid crashes.
+    CGDataProviderCreateWithData(
+        env,
+        MutVoidPtr::null(),
+        ConstVoidPtr::null(),
+        0,
+        GuestFunction::null_ptr(),
+    )
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGDataProviderRetain(_)),
     export_c_func!(CGDataProviderRelease(_)),
@@ -209,4 +227,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGDataProviderCopyData(_)),
     export_c_func!(CGDataProviderCreateWithURL(_)),
     export_c_func!(CGDataProviderCreateWithCFData(_)),
+    // Manual export for the sequential provider function
+    ("_CGDataProviderCreateSequential", &(CGDataProviderCreateSequential as fn(&mut Environment, MutVoidPtr, ConstVoidPtr) -> CGDataProviderRef)),
 ];

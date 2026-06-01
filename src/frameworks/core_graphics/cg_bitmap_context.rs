@@ -14,6 +14,7 @@ use super::cg_image::{
     self, kCGBitmapAlphaInfoMask, kCGBitmapByteOrderMask, kCGImageAlphaFirst, kCGImageAlphaLast,
     kCGImageAlphaNone, kCGImageAlphaNoneSkipFirst, kCGImageAlphaNoneSkipLast, kCGImageAlphaOnly,
     kCGImageAlphaPremultipliedFirst, kCGImageAlphaPremultipliedLast, kCGImageByteOrder32Big,
+    kCGImageByteOrder32Little,
     kCGImageByteOrderDefault, CGBitmapInfo, CGImageAlphaInfo, CGImageRef,
 };
 use super::{CGFloat, CGPoint, CGRect};
@@ -50,9 +51,24 @@ pub fn CGBitmapContextCreate(
     let color_space = env.objc.borrow::<CGColorSpaceHostObject>(color_space).name;
 
     let component_count = match color_space {
-        kCGColorSpaceGenericRGB => components_for_rgb(bitmap_info).unwrap(),
-        kCGColorSpaceGenericGray => components_for_gray(bitmap_info).unwrap(),
-        _ => unimplemented!("support other color spaces"),
+        kCGColorSpaceGenericRGB => match components_for_rgb(bitmap_info) {
+            Ok(n) => n,
+            Err(()) => {
+                log!("CGBitmapContextCreate: unsupported RGB bitmap_info {:#x}, defaulting to 4 components (RGBA)", bitmap_info);
+                4 // RGBA fallback
+            }
+        },
+        kCGColorSpaceGenericGray => match components_for_gray(bitmap_info) {
+            Ok(n) => n,
+            Err(()) => {
+                log!("CGBitmapContextCreate: unsupported Gray bitmap_info {:#x}, defaulting to 1 component", bitmap_info);
+                1 // Gray fallback
+            }
+        },
+        _ => {
+            log!("CGBitmapContextCreate: unsupported color space, defaulting to 4 components");
+            4
+        }
     };
 
     let (data, data_is_owned, bytes_per_row) = if data.is_null() {
@@ -145,13 +161,21 @@ pub fn CGBitmapContextCreateImage(env: &mut Environment, context: CGContextRef) 
 
 fn components_for_rgb(bitmap_info: CGBitmapInfo) -> Result<GuestUSize, ()> {
     let byte_order = bitmap_info & kCGBitmapByteOrderMask;
-    if byte_order != kCGImageByteOrderDefault && byte_order != kCGImageByteOrder32Big {
-        return Err(()); // TODO: handle other byte orders
+    // Accept all 32-bit byte orders (Default, Big, Little/BGRA).
+    // Real Racing 3 and UIKit use kCGBitmapByteOrder32Little + AlphaPremultipliedFirst
+    // (BGRA format) — the most common iOS bitmap format.
+    if byte_order != kCGImageByteOrderDefault
+        && byte_order != kCGImageByteOrder32Big
+        && byte_order != kCGImageByteOrder32Little
+    {
+        return Err(()); // TODO: handle 16-bit byte orders
     }
 
     let alpha_info = bitmap_info & kCGBitmapAlphaInfoMask;
-    if (alpha_info | byte_order) != bitmap_info {
-        return Err(()); // TODO: handle other cases (float)
+    // Allow float bit (kCGBitmapFloatComponents = 0x100) to be present without erroring.
+    let known_bits = kCGBitmapAlphaInfoMask | kCGBitmapByteOrderMask | 0x100;
+    if (bitmap_info & !known_bits) != 0 {
+        return Err(()); // truly unknown bits
     }
     match alpha_info & kCGBitmapAlphaInfoMask {
         kCGImageAlphaNone => Ok(3), // RGB
@@ -168,13 +192,17 @@ fn components_for_rgb(bitmap_info: CGBitmapInfo) -> Result<GuestUSize, ()> {
 
 fn components_for_gray(bitmap_info: CGBitmapInfo) -> Result<GuestUSize, ()> {
     let byte_order = bitmap_info & kCGBitmapByteOrderMask;
-    if byte_order != kCGImageByteOrderDefault && byte_order != kCGImageByteOrder32Big {
-        return Err(()); // TODO: handle other byte orders
+    if byte_order != kCGImageByteOrderDefault
+        && byte_order != kCGImageByteOrder32Big
+        && byte_order != kCGImageByteOrder32Little
+    {
+        return Err(());
     }
 
     let alpha_info = bitmap_info & kCGBitmapAlphaInfoMask;
-    if (alpha_info | byte_order) != bitmap_info {
-        return Err(()); // TODO: handle other cases (float)
+    let known_bits = kCGBitmapAlphaInfoMask | kCGBitmapByteOrderMask | 0x100;
+    if (bitmap_info & !known_bits) != 0 {
+        return Err(());
     }
     match alpha_info & kCGBitmapAlphaInfoMask {
         kCGImageAlphaNone => Ok(1), // gray

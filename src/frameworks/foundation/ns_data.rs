@@ -5,7 +5,7 @@
  */
 //! `NSData` and `NSMutableData`.
 
-use super::ns_string::to_rust_string;
+use super::ns_string::{get_static_str, to_rust_string};
 use super::{NSRange, NSUInteger};
 use crate::frameworks::foundation::ns_keyed_unarchiver::decode_current_data;
 use crate::fs::GuestPath;
@@ -83,6 +83,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this initWithBytesNoCopy:bytes length:length freeWhenDone:true]
 }
 
+- (id)description {
+    get_static_str(env, "<NSData>")
+}
+
 - (id)initWithBytesNoCopy:(MutVoidPtr)bytes length:(NSUInteger)length freeWhenDone:(bool)free_when_done {
     let host_object = env.objc.borrow_mut::<NSDataHostObject>(this);
     assert!(host_object.bytes.is_null() && host_object.length == 0);
@@ -141,6 +145,20 @@ pub const CLASSES: ClassExports = objc_classes! {
     host_object.bytes = alloc;
     host_object.length = size;
     this
+}
+
+- (id)initWithContentsOfFile:(id)path
+                     options:(NSUInteger)options
+                       error:(id)error {
+    let path_str = if path == nil {
+        "(nil)".to_string()
+    } else {
+        to_rust_string(env, path).to_string()
+    };
+    log_dbg!("[(NSData*){:?} initWithContentsOfFile:{} options:{} error:{:?}]",
+             this, path_str, options, error);
+    // Delegate to the single-argument version
+    msg![env; this initWithContentsOfFile:path]
 }
 
 - (id)initWithContentsOfMappedFile:(id)path {

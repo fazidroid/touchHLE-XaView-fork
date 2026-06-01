@@ -34,4 +34,102 @@ fn CFSocketCreate(
     Ptr::null()
 }
 
-pub const FUNCTIONS: FunctionExports = &[export_c_func!(CFSocketCreate(_, _, _, _, _, _, _))];
+// ==========================================================
+// 🏎️ EA/FIREMINT BYPASS: Stub CFHTTPMessageCreateRequest
+// ==========================================================
+fn CFHTTPMessageCreateRequest(
+    _env: &mut crate::Environment,
+    _alloc: crate::objc::id,
+    _request_method: crate::objc::id,
+    _url: crate::objc::id,
+    _http_version: crate::objc::id,
+) -> crate::objc::id {
+    println!("🎮 LOG: Caught CFHTTPMessageCreateRequest. Forcing offline mode!");
+    crate::objc::nil
+}
+
+fn CFHTTPMessageSetHeaderFieldValue(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+    _header_field: CFTypeRef,
+    _value: CFTypeRef,
+) {
+    log!("🎮 LOG: Caught CFHTTPMessageSetHeaderFieldValue. Absorbing safely!");
+}
+
+// ==========================================================
+// 🏎️ EA/FIREMINT BYPASS: Stub CFHTTPMessageSetBody
+// ==========================================================
+fn CFHTTPMessageSetBody(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+    _body_data: CFTypeRef,
+) {
+    log!("🎮 LOG: Caught CFHTTPMessageSetBody. Absorbing safely!");
+}
+
+fn CFReadStreamCreateForHTTPRequest(
+    _env: &mut Environment,
+    _alloc: CFTypeRef,
+    _request: CFTypeRef,
+) -> CFTypeRef {
+    log!("🎮 LOG: Caught CFReadStreamCreateForHTTPRequest. Returning null stream to force offline mode!");
+    Ptr::null()
+}
+
+// 🏎️ PROACTIVE STUBS: Just in case the game checks its work!
+fn CFHTTPMessageCopyHeaderFieldValue(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+    _header_field: CFTypeRef,
+) -> CFTypeRef {
+    Ptr::null()
+}
+
+fn CFHTTPMessageCopyAllHeaderFields(
+    _env: &mut Environment,
+    _message: CFTypeRef,
+) -> CFTypeRef {
+    Ptr::null()
+}
+
+fn CFReadStreamSetClient(
+    _env: &mut Environment,
+    _stream: CFTypeRef,
+    _stream_events: u32,
+    _client_cb: MutVoidPtr,
+    _client_context: MutVoidPtr,
+) -> bool {
+    log!("🎮 LOG: Caught CFReadStreamSetClient. Bypassed safely!");
+    true // Pretend we successfully set the client
+}
+
+fn CFReadStreamScheduleWithRunLoop(
+    _env: &mut Environment,
+    _stream: CFTypeRef,
+    _run_loop: CFTypeRef,
+    _run_loop_mode: CFTypeRef,
+) {
+    log!("🎮 LOG: Caught CFReadStreamScheduleWithRunLoop.");
+}
+
+fn CFReadStreamOpen(
+    _env: &mut Environment,
+    _stream: CFTypeRef,
+) -> bool {
+    log!("🎮 LOG: Caught CFReadStreamOpen. Forcing failure!");
+    false // Returning false safely tells the game the connection failed!
+}
+
+pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(CFSocketCreate(_, _, _, _, _, _, _)),
+    export_c_func!(CFHTTPMessageCreateRequest(_, _, _, _)),
+    export_c_func!(CFHTTPMessageSetHeaderFieldValue(_, _, _)),
+    export_c_func!(CFHTTPMessageSetBody(_, _)),
+    export_c_func!(CFReadStreamCreateForHTTPRequest(_, _)),
+    export_c_func!(CFHTTPMessageCopyHeaderFieldValue(_, _)),
+    export_c_func!(CFHTTPMessageCopyAllHeaderFields(_)),
+    export_c_func!(CFReadStreamSetClient(_, _, _, _)),
+    export_c_func!(CFReadStreamScheduleWithRunLoop(_, _, _)),
+    export_c_func!(CFReadStreamOpen(_)),
+];

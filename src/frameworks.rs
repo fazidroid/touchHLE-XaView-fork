@@ -36,8 +36,15 @@ pub mod media_player;
 pub mod openal;
 pub mod opengles;
 pub mod store_kit;
+pub mod ad_support;
 pub mod system_configuration;
 pub mod uikit;
+pub mod mobile_core_services;
+pub mod sbjson;
+pub mod oauthconsumer;
+pub mod burstly;
+pub mod core_text;
+pub mod accounts;
 
 /// Container for state of various child modules
 #[derive(Default)]

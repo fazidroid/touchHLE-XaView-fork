@@ -20,7 +20,7 @@ use crate::frameworks::foundation::ns_string::{
 };
 use crate::frameworks::foundation::NSUInteger;
 use crate::mem::{ConstPtr, MutPtr, Ptr};
-use crate::objc::{id, msg, msg_class, release};
+use crate::objc::{id, msg, msg_class, nil, release};
 use crate::Environment;
 
 pub type CFURLRef = super::CFTypeRef;
@@ -182,6 +182,40 @@ fn CFURLHasDirectoryPath(env: &mut Environment, url: CFURLRef) -> bool {
         || msg![env; last isEqual:(get_static_str(env, ".."))]
 }
 
+// 🏎️ GAMELOFT BYPASS: Stub for URL encoding to prevent the GT Racing crash!
+fn CFURLCreateStringByAddingPercentEscapes(
+    env: &mut Environment,
+    _allocator: CFAllocatorRef,
+    original_string: CFStringRef,
+    _characters_to_leave_unescaped: CFStringRef,
+    _legal_url_characters_to_be_escaped: CFStringRef,
+    _encoding: CFStringEncoding,
+) -> CFStringRef {
+    log!("🏎️ GAMELOFT BYPASS: Intercepted CFURLCreateStringByAddingPercentEscapes! Returning unescaped string.");
+    // The "Create" rule in Apple's CoreFoundation means we must return an object with a +1 retain count.
+    // Calling `copy` on the original string satisfies the memory manager perfectly!
+    msg![env; original_string copy]
+}
+
+// Private alias for CFURLCreateWithString
+fn _CFURLCreateWithString(
+    env: &mut Environment,
+    _allocator: CFAllocatorRef,
+    string: CFStringRef,
+    _base_url: CFURLRef,
+) -> CFURLRef {
+    log!("_CFURLCreateWithString stub called");
+    if string.is_null() {
+        return nil;
+    }
+    // NSString and CFString are toll-free bridged, so we can use string directly as NSString
+    let url: id = msg_class![env; NSURL URLWithString:string];
+    if url == nil {
+        log!("_CFURLCreateWithString failed to create URL, returning nil");
+    }
+    url // CFURLRef is toll-free bridged to NSURL
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLGetFileSystemRepresentation(_, _, _, _)),
     export_c_func!(CFURLCreateFromFileSystemRepresentation(_, _, _, _)),
@@ -192,4 +226,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLCreateCopyAppendingPathComponent(_, _, _, _)),
     export_c_func!(CFURLCreateCopyDeletingLastPathComponent(_, _)),
     export_c_func!(CFURLHasDirectoryPath(_)),
+    export_c_func!(CFURLCreateStringByAddingPercentEscapes(_, _, _, _, _)), // 🏎️ Added our new bypass function
+    ("_CFURLCreateWithString", &(_CFURLCreateWithString as fn(&mut Environment, CFAllocatorRef, CFStringRef, CFURLRef) -> CFURLRef)),
 ];

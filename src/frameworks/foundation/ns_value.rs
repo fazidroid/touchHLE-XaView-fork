@@ -157,6 +157,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, this)
 }
 
+- (crate::mem::ConstPtr<u8>)objCType {
+    let cstr = b"d\0";
+    let ptr = env.mem.alloc_and_write_cstr(cstr);
+    ptr.cast_const()
+}
+
 - (MutVoidPtr)pointerValue {
     let class: Class = msg![env; this class];
     assert!(class == env.objc.get_known_class("NSNumber", &mut env.mem));
@@ -272,6 +278,19 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)numberWithUnsignedLong:(u32)value {
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithUnsignedInt:value];
+    autorelease(env, new)
+}
+
++ (id)numberWithUnsignedLong:(u32)value {
+    println!("✅ NSNumber +numberWithUnsignedLong: called with {}", value);
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithUnsignedInt:value];
+    autorelease(env, new)
+}
+
 // TODO: types other than booleans and long longs
 
 // NSCoding implementation
@@ -285,6 +304,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     release(env, this);
     new_num
+}
+
+- (id)initWithUnsignedLong:(u32)value {
+    *env.objc.borrow_mut(this) = NSNumberHostObject::UnsignedInt(value);
+    this
 }
 
 - (id)initWithBool:(bool)value {
@@ -500,6 +524,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO: accessors etc
 
 @end
+
+@implementation NSDecimalNumber: NSNumber
+
+    + (id)decimalNumberWithString:(id)string {
+        println!("🎮 LOG: Stubbed [NSDecimalNumber decimalNumberWithString:]");
+        // We return a dummy NSNumber (0) so the game doesn't crash 
+        // trying to read a null pointer later on.
+        let dummy: id = crate::msg_class![env; NSNumber numberWithInt:0];
+        return dummy;
+    }
+
+    @end
 
 };
 

@@ -18,6 +18,8 @@ use crate::frameworks::core_audio_types::{
 use crate::frameworks::core_foundation::cf_url::CFURLRef;
 use crate::frameworks::foundation::ns_url::to_rust_path;
 use crate::mem::{guest_size_of, GuestUSize, MutPtr, MutVoidPtr, SafeRead};
+use crate::frameworks::core_foundation::CFTypeRef;
+use crate::objc::nil;
 use crate::Environment;
 use std::collections::HashMap;
 
@@ -66,6 +68,9 @@ pub const kAudioFilePropertyPacketSizeUpperBound: AudioFilePropertyID = fourcc(b
 const kAudioFilePropertyMagicCookieData: AudioFilePropertyID = fourcc(b"mgic");
 const kAudioFilePropertyChannelLayout: AudioFilePropertyID = fourcc(b"cmap");
 const kAudioFilePropertyEstimatedDuration: AudioFilePropertyID = fourcc(b"edur");
+const kAudioFilePropertyInfoDictionary: AudioFilePropertyID = fourcc(b"pnfo");
+const kAudioFilePropertyFirstPacketOffset: AudioFilePropertyID = fourcc(b"frpk");
+const kAudioFilePropertyFileLengthSamples: AudioFilePropertyID = fourcc(b"flst");
 
 pub fn AudioFileOpenURL(
     env: &mut Environment,
@@ -230,7 +235,14 @@ fn property_size(property_id: AudioFilePropertyID) -> GuestUSize {
         kAudioFilePropertyAudioDataPacketCount => guest_size_of::<u64>(),
         kAudioFilePropertyPacketSizeUpperBound => guest_size_of::<u32>(),
         kAudioFilePropertyEstimatedDuration => guest_size_of::<f64>(),
-        _ => unimplemented!("Unimplemented property ID: {}", debug_fourcc(property_id)),
+        kAudioFilePropertyFileLengthSamples => guest_size_of::<u64>(),
+        kAudioFilePropertyInfoDictionary => guest_size_of::<CFTypeRef>(),
+        // kAudioFilePropertyFirstPacketOffset intentionally returns an error
+        // from AudioFileGetProperty, so give it size 0 here so property_size == 0
+        // check fires first and returns the error early.
+        kAudioFilePropertyFirstPacketOffset => 0,
+        // Unknown property — return 0 so the size check doesn't panic.
+        _ => 0,
     }
 }
 
@@ -243,7 +255,8 @@ fn AudioFileGetPropertyInfo(
 ) -> OSStatus {
     return_if_null!(in_audio_file);
 
-    if in_property_id == kAudioFilePropertyMagicCookieData
+    if property_size(in_property_id) == 0
+        || in_property_id == kAudioFilePropertyMagicCookieData
         || in_property_id == kAudioFilePropertyChannelLayout
     {
         // Our currently supported formats probably don't use these properties.
@@ -276,17 +289,29 @@ pub fn AudioFileGetProperty(
     return_if_null!(in_audio_file);
 
     let required_size = property_size(in_property_id);
-    if env.mem.read(io_data_size) != required_size {
-        log!("Warning: AudioFileGetProperty() failed");
+
+    // Return early for completely unknown properties — don't panic.
+    if required_size == 0 {
+        log!("Warning: AudioFileGetProperty() unhandled property {} — returning error",
+            debug_fourcc(in_property_id));
         return kAudioFileBadPropertySizeError;
     }
+
+    // Accept buffers that are >= required size (some callers over-allocate).
+    if env.mem.read(io_data_size) < required_size {
+        log!("Warning: AudioFileGetProperty() buffer too small: got {} need {}",
+            env.mem.read(io_data_size), required_size);
+        return kAudioFileBadPropertySizeError;
+    }
+    // Write back the actual size we will fill.
+    env.mem.write(io_data_size, required_size);
 
     let host_object = State::get(&mut env.framework_state)
         .audio_files
         .get_mut(&in_audio_file)
         .unwrap();
 
-    match in_property_id {
+        match in_property_id {
         kAudioFilePropertyDataFormat => {
             let audio::AudioDescription {
                 sample_rate,
@@ -321,19 +346,17 @@ pub fn AudioFileGetProperty(
                         _reserved: 0,
                     }
                 }
-                audio::AudioFormat::AppleIma4 => {
-                    AudioStreamBasicDescription {
-                        sample_rate,
-                        format_id: kAudioFormatAppleIMA4,
-                        format_flags: 0,
-                        bytes_per_packet,
-                        frames_per_packet,
-                        bytes_per_frame: 0, // compressed
-                        channels_per_frame,
-                        bits_per_channel,
-                        _reserved: 0,
-                    }
-                }
+                audio::AudioFormat::AppleIma4 => AudioStreamBasicDescription {
+                    sample_rate,
+                    format_id: kAudioFormatAppleIMA4,
+                    format_flags: 0,
+                    bytes_per_packet,
+                    frames_per_packet,
+                    bytes_per_frame: 0, // compressed
+                    channels_per_frame,
+                    bits_per_channel,
+                    _reserved: 0,
+                },
             };
             env.mem.write(out_property_data.cast(), desc);
         }
@@ -363,7 +386,32 @@ pub fn AudioFileGetProperty(
                 / (bytes_per_packet as f64 * sample_rate);
             env.mem.write(out_property_data.cast(), estimated_duration);
         }
-        _ => unreachable!(),
+        kAudioFilePropertyInfoDictionary => {
+    log!("AudioFileGetProperty: kAudioFilePropertyInfoDictionary requested");
+    env.mem.write(out_property_data.cast::<CFTypeRef>(), nil);
+        }
+        kAudioFilePropertyFirstPacketOffset => {
+            // Intentionally return an error for this property.
+            // Real Racing 2 uses the failure of kAudioFilePropertyFirstPacketOffset
+            // as a signal that the audio track is not decodeable via offline render,
+            // which causes it to exit its audio extraction loop and proceed past
+            // the movie player. Returning success here causes an infinite
+            // AudioQueueOfflineRender loop that stalls the boot screen.
+            log!("AudioFileGetProperty: kAudioFilePropertyFirstPacketOffset -> returning error to break RR2 loop");
+            return kAudioFileBadPropertySizeError;
+        }
+        kAudioFilePropertyFileLengthSamples => {
+    let packet_count = host_object.audio_file.packet_count();
+    let AudioDescription { frames_per_packet, .. } = host_object.audio_file.audio_description();
+    let total_samples = packet_count * frames_per_packet as u64;
+    env.mem.write(out_property_data.cast::<u64>(), total_samples);
+         }
+        _ => {
+            // Unknown property — already handled by the required_size == 0
+            // check above, but the compiler needs this arm.
+            log_dbg!("AudioFileGetProperty: unexpected property {} reached match arm",
+                debug_fourcc(in_property_id));
+        }
     }
 
     0 // success

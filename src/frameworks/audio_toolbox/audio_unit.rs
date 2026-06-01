@@ -225,8 +225,11 @@ fn AudioOutputUnitStart(env: &mut Environment, ci: AudioUnit) -> OSStatus {
     audio_unit_state.started = true;
 
     let result = 0; // Success
-    // TraceUnitStart
-    println!("AUDIO_TRACE: AudioOutputUnitStart({:?}) -> {:?}", ci, result);
+                    // TraceUnitStart
+    println!(
+        "AUDIO_TRACE: AudioOutputUnitStart({:?}) -> {:?}",
+        ci, result
+    );
     result
 }
 

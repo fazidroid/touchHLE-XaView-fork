@@ -6,9 +6,6 @@
 //! CPU emulation.
 //!
 //! Implemented using the C++ library dynarmic, which is a dynamic recompiler.
-//!
-//! iPhone OS apps used either ARMv6 or ARMv7-A, which are both 32-bit ISAs.
-//! For the moment, only ARMv6 has been tested.
 
 use crate::abi::GuestFunction;
 use crate::mem::{ConstPtr, GuestUSize, Mem, MutPtr, Ptr, SafeRead, SafeWrite};
@@ -16,7 +13,15 @@ use crate::mem::{ConstPtr, GuestUSize, Mem, MutPtr, Ptr, SafeRead, SafeWrite};
 // Import functions from C++
 use touchHLE_dynarmic_wrapper::*;
 
-type VAddr = u32;
+// ==========================================================
+// 🏎️ ARCHITECTURE TOGGLE (32-bit vs 64-bit)
+// ==========================================================
+#[cfg(not(feature = "aarch64"))]
+pub type VAddr = u32;
+
+#[cfg(feature = "aarch64")]
+pub type VAddr = u64;
+
 pub type CpuContext = touchHLE_DynarmicContext;
 
 fn touchHLE_cpu_read_impl<T: SafeRead + Default>(
@@ -24,22 +29,10 @@ fn touchHLE_cpu_read_impl<T: SafeRead + Default>(
     addr: VAddr,
     error: *mut bool,
 ) -> T {
-    // If a panic occurs (probably due to a null-pointer access), we can't let
-    // it keep unwinding as it will hit non-Rust stack frames (dynarmic).
-    // Instead we catch the unwind and then tell the C++ code a problem occurred
-    // so it can immediately halt CPU execution and then panic itself, now
-    // with only Rust stack frames to worry about and with CPU state information
-    // available that's useful for debugging.
-    //
-    // TODO: Disable this in debug mode? This relies on dynarmic's
-    // check_halt_on_memory_access option which surely has a significant
-    // performance impact.
-    //
-    // I'm not sure if this actually is unwind-safe, but considering
-    // the emulator will crash anyway, maybe this is okay.
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mem = unsafe { &mut *mem.cast::<Mem>() };
-        let ptr: ConstPtr<T> = Ptr::from_bits(addr);
+        // Ptr::from_bits will need to handle 64-bit sizes when AArch64 is active
+        let ptr: ConstPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
         mem.read(ptr)
     }));
     unsafe {
@@ -49,10 +42,9 @@ fn touchHLE_cpu_read_impl<T: SafeRead + Default>(
 }
 
 fn touchHLE_cpu_write_impl<T: SafeWrite>(mem: *mut touchHLE_Mem, addr: VAddr, value: T) -> bool {
-    // See comments above about catch_unwind
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mem = unsafe { &mut *mem.cast::<Mem>() };
-        let ptr: MutPtr<T> = Ptr::from_bits(addr);
+        let ptr: MutPtr<T> = Ptr::from_bits(addr); // TODO: AArch64 pointer cast update
         mem.write(ptr, value)
     }));
     res.is_err()
@@ -94,8 +86,6 @@ extern "C" fn touchHLE_cpu_write_u64(mem: *mut touchHLE_Mem, addr: VAddr, value:
 
 pub struct Cpu {
     dynarmic_wrapper: *mut touchHLE_DynarmicWrapper,
-    /// Copy of the direct memory access pointer used to check it has not
-    /// changed. If this is null, direct memory access is not in use.
     direct_memory_access_ptr: *const std::ffi::c_void,
 }
 
@@ -105,70 +95,44 @@ impl Drop for Cpu {
     }
 }
 
-/// Why CPU execution ended.
 #[derive(Debug)]
 pub enum CpuState {
-    /// Execution halted due to using up all remaining ticks (normal execution)
-    /// or after the single instruction was executed (step execution).
     Normal,
-    /// SVC instruction encountered.
     Svc(u32),
-    /// An error was encountered.
     Error(CpuError),
 }
 
-/// A reason that can cause CPU execution to be interrupted.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CpuError {
-    /// Memory error during execution (probably a null page access).
     MemoryError,
-    /// Undefined instruction (perhaps from a GDB software breakpoint).
     UndefinedInstruction,
-    /// Breakpoint (`bkpt` instruction).
     Breakpoint,
 }
 
+// ==========================================================
+// 🏎️ 32-BIT REGISTERS AND LOGIC (DEFAULT)
+// ==========================================================
+#[cfg(not(feature = "aarch64"))]
 impl Cpu {
-    /// The register number of the stack pointer.
     pub const SP: usize = 13;
-    /// The register number of the link register.
-    #[allow(unused)]
     pub const LR: usize = 14;
-    /// The register number of the program counter.
     pub const PC: usize = 15;
-
-    /// When this bit is set in CPSR, the CPU is in Thumb mode.
     pub const CPSR_THUMB: u32 = 0x00000020;
-
-    /// When this bit is set in CPSR, the CPU is in user mode.
     pub const CPSR_USER_MODE: u32 = 0x00000010;
 
-    /// Construct a new CPU instance. If a mutable reference to a [Mem] instance
-    /// is provided, direct memory access is enabled, and the CPU instance
-    /// becomes bound to that [Mem] instance (subsequent calls must use the same
-    /// one).
     pub fn new(direct_memory_access: Option<&mut Mem>) -> Cpu {
-        // Null page count is in pages rather than bytes. Mem ensures it is
-        // page aligned.
         let null_page_count: usize = direct_memory_access
             .as_ref()
             .map_or(0, |mem| mem.null_segment_size() / 0x1000)
             .try_into()
             .unwrap();
-        // Safety: the direct memory access pointer will be retained directly by
-        // the dynarmic wrapper and indirectly by cached JIT code, so we must
-        // ensure we only execute the CPU while holding a &mut on the Mem object
-        // to which that pointer belongs.
         let direct_memory_access_ptr = direct_memory_access
             .map_or(std::ptr::null_mut(), |mem| unsafe {
                 mem.direct_memory_access_ptr()
             });
         let dynarmic_wrapper =
             unsafe { touchHLE_DynarmicWrapper_new(direct_memory_access_ptr, null_page_count) };
-        Cpu {
-            dynarmic_wrapper,
-            direct_memory_access_ptr,
-        }
+        Cpu { dynarmic_wrapper, direct_memory_access_ptr }
     }
 
     pub fn regs(&self) -> &[u32; 16] {
@@ -177,6 +141,7 @@ impl Cpu {
             &*(ptr as *const [u32; 16])
         }
     }
+    
     pub fn regs_mut(&mut self) -> &mut [u32; 16] {
         unsafe {
             let ptr = touchHLE_DynarmicWrapper_regs_mut(self.dynarmic_wrapper);
@@ -184,16 +149,11 @@ impl Cpu {
         }
     }
 
-    /// Dump the registers of the current cpu to the log output.
-    /// Silently ignores panics.
     pub fn dump_regs(&self) {
-        let regs = self.regs();
-        Self::echo_regs(regs);
+        Self::echo_regs(self.regs());
     }
 
     pub fn echo_regs(regs: &[u32; 16]) {
-        // Silently ignore panics so it's safe to use in contexts where we
-        // can't panic.
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             for row in 0..4 {
                 use std::fmt::Write;
@@ -218,33 +178,23 @@ impl Cpu {
     pub fn cpsr(&self) -> u32 {
         unsafe { touchHLE_DynarmicWrapper_cpsr(self.dynarmic_wrapper) }
     }
+    
     pub fn set_cpsr(&mut self, cpsr: u32) {
         unsafe { touchHLE_DynarmicWrapper_set_cpsr(self.dynarmic_wrapper, cpsr) }
     }
 
-    /// Swap the current state of the CPU (registers etc) with the state stored
-    /// in the context object.
-    pub fn swap_context(&mut self, context: &mut CpuContext) {
-        unsafe { touchHLE_DynarmicWrapper_swap_context(self.dynarmic_wrapper, context) }
-    }
-
-    /// Get PC with the Thumb bit appropriately set.
     pub fn pc_with_thumb_bit(&self) -> GuestFunction {
         let pc = self.regs()[Self::PC];
         let thumb = (self.cpsr() & Self::CPSR_THUMB) == Self::CPSR_THUMB;
         GuestFunction::from_addr_and_thumb_flag(pc, thumb)
     }
 
-    /// Set PC and the Thumb flag for executing a guest function. Note that this
-    /// does not touch LR.
     pub fn branch(&mut self, new_pc: GuestFunction) {
         self.regs_mut()[Self::PC] = new_pc.addr_without_thumb_bit();
         let cpsr_without_thumb = self.cpsr() & (!Self::CPSR_THUMB);
         self.set_cpsr(cpsr_without_thumb | ((new_pc.is_thumb() as u32) * Self::CPSR_THUMB))
     }
 
-    /// Set the PC and Thumb flag (like [Self::branch]), but also set the LR,
-    /// and return the original PC and LR.
     pub fn branch_with_link(
         &mut self,
         new_pc: GuestFunction,
@@ -256,29 +206,108 @@ impl Cpu {
         self.regs_mut()[Self::LR] = new_lr.addr_with_thumb_bit();
         (old_pc, old_lr)
     }
+}
 
-    /// Clear dynarmic's instruction cache for some range of addresses.
-    /// This is of interest to the dynamic linker, which will sometimes rewrite
-    /// code.
-    pub fn invalidate_cache_range(&mut self, base: VAddr, size: GuestUSize) {
+// ==========================================================
+// 🏎️ 64-BIT REGISTERS AND LOGIC (AARCH64)
+// ==========================================================
+#[cfg(feature = "aarch64")]
+impl Cpu {
+    // AArch64 uses x0-x30, plus separate SP and PC.
+    // Assuming the C++ wrapper exposes an array of 33 u64s (31 general + SP + PC).
+    pub const SP: usize = 31;
+    pub const PC: usize = 32;
+    pub const LR: usize = 30; // x30 is the link register in AArch64
+    
+    // AArch64 uses PSTATE instead of CPSR
+    pub const PSTATE_EL0: u64 = 0x00000000;
+
+    pub fn new(direct_memory_access: Option<&mut Mem>) -> Cpu {
+        // Implementation remains similar, but calls an A64 wrapper variant
+        let null_page_count: usize = direct_memory_access
+            .as_ref()
+            .map_or(0, |mem| mem.null_segment_size() / 0x1000)
+            .try_into()
+            .unwrap();
+        let direct_memory_access_ptr = direct_memory_access
+            .map_or(std::ptr::null_mut(), |mem| unsafe {
+                mem.direct_memory_access_ptr()
+            });
+            
+        // NOTE: You must update `touchHLE_dynarmic_wrapper.cpp` to support A64 initialization!
+        let dynarmic_wrapper =
+            unsafe { touchHLE_DynarmicWrapper_new_a64(direct_memory_access_ptr, null_page_count) };
+        Cpu { dynarmic_wrapper, direct_memory_access_ptr }
+    }
+
+    pub fn regs(&self) -> &[u64; 33] {
         unsafe {
-            touchHLE_DynarmicWrapper_invalidate_cache_range(self.dynarmic_wrapper, base, size)
+            // 🏎️ Use the A64 specific FFI call
+            let ptr = touchHLE_DynarmicWrapper_regs_const_a64(self.dynarmic_wrapper);
+            &*(ptr as *const [u64; 33])
+        }
+    }
+    
+    pub fn regs_mut(&mut self) -> &mut [u64; 33] {
+        unsafe {
+            // 🏎️ Use the A64 specific FFI call
+            let ptr = touchHLE_DynarmicWrapper_regs_mut_a64(self.dynarmic_wrapper);
+            &mut *(ptr as *mut [u64; 33])
         }
     }
 
-    /// Start CPU execution.
-    ///
-    /// If `ticks` is [Some], it is used as an abstract time limit. The value
-    /// will be reduced proportionately with the amount of ticks expended.
-    ///
-    /// If `ticks` is [None], the CPU executes only a single instruction. This
-    /// is also known as "stepping".
-    ///
-    /// This will return either because the CPU ran out of time, or because
-    /// something else happened which requires attention from the host.
+    pub fn dump_regs(&self) {
+        Self::echo_regs(self.regs());
+    }
+
+    pub fn echo_regs(regs: &[u64; 33]) {
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            // Updated dump logic for 33 64-bit registers
+            for i in 0..31 {
+                echo!("\t X{}: {:#018x}", i, regs[i]);
+            }
+            echo!("\t SP: {:#018x}", regs[Self::SP]);
+            echo!("\t PC: {:#018x}", regs[Self::PC]);
+        }));
+    }
+
+    pub fn pstate(&self) -> u32 {
+        // Assuming you add an A64 PSTATE getter to your C++ wrapper
+        unsafe { touchHLE_DynarmicWrapper_pstate(self.dynarmic_wrapper) }
+    }
+
+    pub fn branch(&mut self, new_pc: u64) {
+        self.regs_mut()[Self::PC] = new_pc;
+        // AArch64 doesn't use the thumb bit in the PC
+    }
+
+    pub fn branch_with_link(&mut self, new_pc: u64, new_lr: u64) -> (u64, u64) {
+        let old_pc = self.regs()[Self::PC];
+        let old_lr = self.regs()[Self::LR];
+        self.branch(new_pc);
+        self.regs_mut()[Self::LR] = new_lr;
+        (old_pc, old_lr)
+    }
+}
+
+// ==========================================================
+// 🏎️ SHARED LOGIC (BOTH ARCHITECTURES)
+// ==========================================================
+impl Cpu {
+    pub fn swap_context(&mut self, context: &mut CpuContext) {
+        unsafe { touchHLE_DynarmicWrapper_swap_context(self.dynarmic_wrapper, context) }
+    }
+
+    pub fn invalidate_cache_range(&mut self, base: VAddr, size: GuestUSize) {
+        unsafe {
+            // Remove the 'as u64' cast and use 'as _' to let the compiler infer the 
+            // correct FFI type depending on whether you are in 32-bit or 64-bit mode!
+            touchHLE_DynarmicWrapper_invalidate_cache_range(self.dynarmic_wrapper, base as _, size)
+        }
+    }
+
     #[must_use]
     pub fn run_or_step(&mut self, mem: &mut Mem, ticks: Option<&mut u64>) -> CpuState {
-        // See ::new() for why this is done.
         if !self.direct_memory_access_ptr.is_null() {
             assert!(self.direct_memory_access_ptr == unsafe { mem.direct_memory_access_ptr() });
         }

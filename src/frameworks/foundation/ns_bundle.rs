@@ -15,6 +15,7 @@ use crate::objc::{
     autorelease, id, msg, msg_class, nil, objc_classes, release, retain, ClassExports, HostObject,
     NSZonePtr,
 };
+use crate::msg_super;
 use crate::Environment;
 use std::collections::{HashMap, HashSet};
 
@@ -75,6 +76,49 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (id)preferredLocalizationsFromArray:(id)localizations_array { // NSArray<NSString *> *
     let preferredLocalizations = CFBundleCopyPreferredLocalizationsFromArray(env, localizations_array);
     autorelease(env, preferredLocalizations)
+}
+
++ (id)allBundles {
+    let main: id = msg_class![env; NSBundle mainBundle];
+    let array: id = msg_class![env; NSArray arrayWithObject:main];
+    array
+}
+
++ (id)bundleForClass:(id)aClass {
+    log_dbg!("NSBundle bundleForClass: {:?}", aClass);
+    // For simplicity, return the main bundle.
+    // A more accurate implementation would need to track which bundle each class belongs to.
+    msg_class![env; NSBundle mainBundle]
+}
+
++ (id)bundleWithPath:(id)path {
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithPath:path];
+    autorelease(env, new)
+}
+
+- (id)initWithPath:(id)path {
+    let this: id = msg_super![env; this init];
+    if this == nil { return nil; }
+
+    let path_str = ns_string::to_rust_string(env, path);
+    let bundle_path_ns = ns_string::from_rust_string(env, path_str.to_string());
+    // Use the path as a fallback identifier (most games only compare equality)
+    let bundle_identifier_ns = ns_string::from_rust_string(env, path_str.to_string());
+
+    let host_object = NSBundleHostObject {
+        bundle: None,
+        bundle_path: bundle_path_ns,
+        bundle_identifier: bundle_identifier_ns,
+        bundle_url: None,
+        info_dictionary: None,
+    };
+    // `alloc` may have placed a TrivialHostObject here; we can't use
+    // borrow_mut because that downcasts first and would panic if the
+    // existing host object is not already an NSBundleHostObject.
+    // replace_host_object swaps the box directly without a downcast.
+    env.objc.replace_host_object(this, Box::new(host_object));
+    this
 }
 
 - (())dealloc {

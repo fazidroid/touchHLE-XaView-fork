@@ -58,8 +58,22 @@ fn pthread_setspecific(env: &mut Environment, key: pthread_key_t, value: ConstVo
     0 // success
 }
 
+pub fn pthread_key_delete(env: &mut Environment, key: pthread_key_t) -> i32 {
+    let idx: usize = match key.checked_sub(1) {
+        Some(i) => i.try_into().unwrap(),
+        None => return crate::libc::errno::EINVAL,
+    };
+    if idx >= get_state(env).keys.len() {
+        return crate::libc::errno::EINVAL;
+    }
+    // No need to run destructors now – they run on thread exit.
+    get_state(env).keys.remove(idx);
+    0
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_key_create(_, _)),
     export_c_func!(pthread_getspecific(_)),
     export_c_func!(pthread_setspecific(_, _)),
+    export_c_func!(pthread_key_delete(_)),
 ];

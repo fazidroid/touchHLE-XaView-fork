@@ -73,12 +73,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)retain {
-    // TODO: throw proper exception?
-    panic!("NSAutoreleasePool can't be retained!");
+    // NSAutoreleasePool can't be retained — log and return self instead of
+    // panicking, because GT Racing Free+ sends retain to a zombie pool.
+    log!("Warning: NSAutoreleasePool retain ignored (pools cannot be retained)");
+    this
 }
 - (id)autorelease {
-    // TODO: throw proper exception?
-    panic!("NSAutoreleasePool can't be autoreleased!");
+    // Same as retain — log and return self rather than crashing.
+    log!("Warning: NSAutoreleasePool autorelease ignored (pools cannot be autoreleased)");
+    this
 }
 
 - (())drain {
@@ -101,7 +104,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_obj: &mut NSAutoreleasePoolHostObject = env.objc.borrow_mut(this);
     // It's unclear what should happen when draining a pool on the wrong thread,
     // but we prefer to be conservative here
-    assert_eq!(host_obj.original_thread, current_thread);
+    // Guard against wrong-thread drain — this can happen when GT Racing Free+
+    // releases a pool from a background thread. Abort the drain gracefully
+    // instead of panicking with an assert failure.
+    if host_obj.original_thread != current_thread {
+        log!(
+            "Warning: NSAutoreleasePool {:?} drained from thread {} but created on thread {} — skipping drain",
+            this, current_thread, host_obj.original_thread
+        );
+        return;
+    }
     let pool_stack = &mut env
         .framework_state
         .foundation
@@ -118,22 +130,34 @@ pub const CLASSES: ClassExports = objc_classes! {
         .rev()
         .find(|(_, pool)| **pool == this)
     else {
-        panic!(
-            "Bad [{:?} (NSAutoReleasePool) release] on thread {}!",
+        // Pool not found in stack — already drained or double-release.
+        // Log and bail out rather than panicking.
+        log!(
+            "Warning: NSAutoreleasePool {:?} not found in pool stack for thread {} — ignoring release",
             this, env.current_thread
-        )
+        );
+        return;
     };
     let to_drop: Vec<id> = pool_stack.drain(index..).collect();
     log_dbg!("Dropping pools {:?}", to_drop);
     for pool in to_drop.into_iter().rev() {
-        if pool != this {
+                if pool != this {
             // It's a bit ugly, but we cannot call a release on those other
             // pools as we already drained the shared pool stacks.
             // So we manually decrement and dealloc instead.
             // TODO: refactor this
-            assert_eq!(env.objc.get_refcount(pool), NonZeroU32::new(1).unwrap());
-            _ = env.objc.decrement_refcount(pool);
+            
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Absorb unbalanced autorelease pool pops!
+            // ==========================================================
+            let actual_refcount = env.objc.get_refcount(pool).get();
+            if actual_refcount != 1 {
+                println!("🎮 LOG: Bypassed unbalanced pool pop! Refcount was {} instead of 1.", actual_refcount);
+            } else {
+                _ = env.objc.decrement_refcount(pool);
+            }
         }
+
         let host_obj: &mut NSAutoreleasePoolHostObject = env.objc.borrow_mut(pool);
         let objects = std::mem::take(&mut host_obj.objects);
         env.objc.dealloc_object(pool, &mut env.mem);

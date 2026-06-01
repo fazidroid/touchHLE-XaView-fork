@@ -317,6 +317,15 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
+- (id)sortedArrayUsingDescriptors:(id)sortDescriptors {
+    log_dbg!("NSArray sortedArrayUsingDescriptors:");
+    let mut_array: id = msg![env; this mutableCopy];
+    let _: () = msg![env; mut_array sortUsingDescriptors:sortDescriptors];
+    let sorted_array: id = msg![env; mut_array copy];
+    release(env, mut_array);
+    autorelease(env, sorted_array)
+}
+
 // NSCoding implementation
 - (id)initWithCoder:(id)coder {
     let class: Class = msg![env; coder class];
@@ -499,6 +508,42 @@ pub const CLASSES: ClassExports = objc_classes! {
         array: Vec::new(),
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
+- (id)sortedArrayUsingSelector:(SEL)comparator {
+    let new = msg![env; this mutableCopy];
+    () = msg![env; new sortUsingSelector:comparator];
+    autorelease(env, new)
+}
+
+- (())sortUsingDescriptors:(id)sortDescriptors {
+    log_dbg!("NSMutableArray sortUsingDescriptors:");
+    let host_object = env.objc.borrow_mut::<ArrayHostObject>(this);
+    let mut vec = std::mem::take(&mut host_object.array);
+
+    vec.sort_by(|a, b| {
+        let count: NSUInteger = msg![env; sortDescriptors count];
+        for i in 0..count {
+            let descriptor: id = msg![env; sortDescriptors objectAtIndex:i];
+            let key: id = msg![env; descriptor key];
+            let ascending: bool = msg![env; descriptor ascending];
+
+            let val_a: id = msg![env; (*a) valueForKey:key];
+            let val_b: id = msg![env; (*b) valueForKey:key];
+
+            let ordering: i32 = msg![env; val_a compare:val_b];
+            if ordering != 0 {
+                return if ascending {
+                    if ordering < 0 { core::cmp::Ordering::Less } else { core::cmp::Ordering::Greater }
+                } else {
+                    if ordering < 0 { core::cmp::Ordering::Greater } else { core::cmp::Ordering::Less }
+                };
+            }
+        }
+        core::cmp::Ordering::Equal
+    });
+
+    env.objc.borrow_mut::<ArrayHostObject>(this).array = vec;
 }
 
 - (id)initWithCapacity:(NSUInteger)capacity {
@@ -685,6 +730,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     // TODO: runtime here is O(n^2), it could be O(n) instead
     for i in to_remove {
         () = msg![env; this removeObjectAtIndex:i];
+    }
+}
+
+- (())removeObjectsInArray:(id)otherArray {
+    if otherArray == nil {
+        return;
+    }
+    let count: NSUInteger = msg![env; otherArray count];
+    for i in 0..count {
+        let obj: id = msg![env; otherArray objectAtIndex:i];
+        // Reuse the existing removeObject: logic
+        () = msg![env; this removeObject:obj];
     }
 }
 

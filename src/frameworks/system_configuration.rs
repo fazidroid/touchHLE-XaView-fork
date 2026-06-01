@@ -6,11 +6,16 @@
 //! SystemConfiguration framework.
 
 mod sc_network_reachability;
+pub mod captive_network;
 
 pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration",
     aliases: &[],
     class_exports: &[sc_network_reachability::CLASSES],
     constant_exports: &[],
-    function_exports: &[sc_network_reachability::FUNCTIONS],
+    // Make sure BOTH functions are inside this exact bracket array!
+    function_exports: &[
+        sc_network_reachability::FUNCTIONS,
+        captive_network::FUNCTIONS,
+    ],
 };

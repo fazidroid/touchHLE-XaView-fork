@@ -29,6 +29,7 @@ mod objects;
 mod properties;
 mod selectors;
 mod synchronization;
+mod exception;
 
 pub use classes::{objc_classes, Class, ClassExports, ClassTemplate};
 pub use messages::{
@@ -41,8 +42,9 @@ pub use objects::{
 };
 pub use properties::todo_objc_setter;
 pub use selectors::{selector, SEL};
+pub use exception::*; 
 
-use crate::mem::ConstVoidPtr;
+use crate::mem::{ConstVoidPtr, MutPtr, MutVoidPtr, Ptr};
 use crate::Environment;
 use classes::{ClassHostObject, FakeClass, UnimplementedClass};
 use messages::{
@@ -149,5 +151,8 @@ const FUNCTIONS: FunctionExports = &[
     export_c_func!(objc_sync_exit(_)),
     export_c_func!(sel_registerName(_)),
     export_c_func!(_Block_object_dispose(_, _)),
-    export_c_func!(class_copyPropertyList(_, _)), // <--- REGISTERS OUR NEW FIX
+    export_c_func!(class_copyPropertyList(_, _)), 
+    export_c_func!(objc_exception_throw(_)),
+    export_c_func!(objc_begin_catch(_)),
+    export_c_func!(objc_end_catch()),
 ];

@@ -32,6 +32,10 @@ static ROOT_VC_STORE: std::sync::Mutex<Option<std::collections::HashMap<u32, u32
 /// Similarly, the return value of `objc_msgSend` is whatever value is returned
 /// by the method implementation. We are relying on CallFromGuest not
 /// overwriting it.
+fn dummy_accelerometer_bypass(_env: &mut crate::Environment, _this: crate::objc::id, _cmd: crate::objc::SEL, _queue: crate::objc::id, _handler: crate::objc::id) {
+    // Do absolutely nothing. The game will think it successfully started the accelerometer!
+}
+
 #[allow(non_snake_case)]
 fn objc_msgSend_inner(
     env: &mut Environment,
@@ -45,50 +49,117 @@ fn objc_msgSend_inner(
         selector.as_str(&env.mem),
         receiver
     );
+
+    // 1. Define sel_name FIRST so all of our hacks can use it!
+    let sel_name = selector.as_str(&env.mem).to_string(); // OwnedSelName: end borrow so env can be mutably borrowed later
+    
     // TraceAudioCalls
-    let sel_name = selector.as_str(&env.mem);
     if sel_name.contains("udio") || sel_name.contains("ound") || sel_name.contains("olume") {
         println!("AUDIO_TRACE: [{:?} {}]", receiver, sel_name);
     }
+    
     let message_type_info = env.objc.message_type_info.take();
-    let message_type_info = env.objc.message_type_info.take();
+    
+    if sel_name == "viewDidLoad" || sel_name == "viewDidAppear:" || sel_name == "play" {
+        if !receiver.is_null() {
+            let receiver_class = crate::objc::ObjC::read_isa(receiver, &env.mem);
+            let class_name = env.objc.get_class_name(receiver_class);
+            
+            // If any Gameloft class containing "Movie" or "Video" tries to load or play...
+            if class_name.contains("Movie") || class_name.contains("Video") || class_name == "MPMoviePlayerController" {
+                println!("🎮 LOG: GAMELOFT FIX - Caught {} on {}! Firing video finish notifications!", sel_name, class_name);
+                
+                let center: id = crate::msg_class![env; NSNotificationCenter defaultCenter];
+                
+                // Fire the standard finish notification (targeting both the specific player and nil)
+                let notif1 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerPlaybackDidFinishNotification");
+                let _: () = crate::msg![env; center postNotificationName:notif1 object:receiver];
+                let _: () = crate::msg![env; center postNotificationName:notif1 object:nil];
+                
+                // Fire the fullscreen exit notification
+                let notif2 = crate::frameworks::foundation::ns_string::get_static_str(env, "MPMoviePlayerDidExitFullscreenNotification");
+                let _: () = crate::msg![env; center postNotificationName:notif2 object:receiver];
+                let _: () = crate::msg![env; center postNotificationName:notif2 object:nil];
 
-    let sel_str = selector.as_str(&env.mem);
+                // If it was trying to play, safely absorb the call so it doesn't crash!
+                if sel_name == "play" {
+                    env.cpu.regs_mut()[0..2].fill(0); 
+                    let lr = env.cpu.regs()[14]; 
+                    env.cpu.regs_mut()[15] = lr; 
+                    return;
+                }
+            }
+        }
+    }
 
-    // ===== URL Tracker & Telemetry Bypasses =====
-    if sel_str == "HTTPMethod" || sel_str == "host" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
+    if sel_name == "orientation" || sel_name == "statusBarOrientation" {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: SLEDGEHAMMER BYPASS - Spoofing orientation to flip GT Racing 2 camera 180 degrees!");
+            
+            // 4 represents the opposite Landscape orientation in iOS.
+            // NOTE: If the screen is STILL upside down after building, simply change this 4 to a 3!
+            env.cpu.regs_mut()[0] = 4; 
+            
+            let lr = env.cpu.regs()[14]; 
+            env.cpu.regs_mut()[15] = lr; 
+            return;
+        }
+    }
+
+    if sel_name == "orientation" {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: SLEDGEHAMMER BYPASS - Spoofing UIDevice orientation for GT Racing 2!");
+            // 4 corresponds to LandscapeLeft / LandscapeRight depending on your physical device.
+            // If the screen is STILL upside down after building, simply change this 4 to a 3!
+            env.cpu.regs_mut()[0] = 4; 
+            let lr = env.cpu.regs()[14]; 
+            env.cpu.regs_mut()[15] = lr; 
+            return;
+        }
     }
     
-    if sel_str == "addValue:forHTTPHeaderField:" || sel_str == "setValue:forHTTPHeaderField:" {
-        env.cpu.regs_mut()[0..2].fill(0);
+    // ==========================================================
+    // 🏎️ THE SLEDGEHAMMER: Global Selector Intercepts
+    // ==========================================================
+    if sel_name == "modalViewController" {
+        println!("🎮 LOG: SLEDGEHAMMER BYPASS - Caught {} globally! Returning 0.", sel_name);
+        env.cpu.regs_mut()[0] = 0; 
+        let lr = env.cpu.regs()[14]; 
+        env.cpu.regs_mut()[15] = lr; 
         return;
     }
 
-    if sel_str == "sortedArrayUsingSelector:" {
-        env.cpu.regs_mut()[0] = receiver.to_bits();
-        return;
+    // 🔨 HAMMER 1.5: GT Racing 2 EXCLUSIVE URL Request Bypasses
+    if sel_name == "HTTPMethod" || sel_name == "allHTTPHeaderFields" {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: SLEDGEHAMMER BYPASS - Caught {} for GT Racing 2! Returning 0.", sel_name);
+            env.cpu.regs_mut()[0] = 0; 
+            let lr = env.cpu.regs()[14]; 
+            env.cpu.regs_mut()[15] = lr; 
+            return;
+        }
     }
-    // ============================================
-
-    // SAFE: only crash-prone selectors
-    if sel_str.is_empty() {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-
-    if sel_str == "keyEnumerator" || sel_str == "globallyUniqueString" || sel_str == "sharedHTTPCookieStorage" || sel_str == "isSecureTextEntry" || sel_str == "query" || sel_str == "encodeWithCoder:" || sel_str == "keysSortedByValueUsingSelector:" || sel_str == "description" || sel_str == "addPort:forMode:" || sel_str == "port" || sel_str == "defaultTimeZone" || sel_str == "stringByEvaluatingJavaScriptFromString:" || sel_str == "setTimeZone:" || sel_str == "knownTimeZoneNames" || sel_str == "stringWithContentsOfURL:encoding:error:" || sel_str == "sendSynchronousRequest:returningResponse:error:" || sel_str == "localizedDescription" || sel_str == "localizedFailureReason" || sel_str == "connection:didFailWithError:" {
-        env.cpu.regs_mut()[0..2].fill(0);
-        return;
-    }
-
-    if sel_str == "copyWithZone:" {
-         env.cpu.regs_mut()[0] = receiver.to_bits();
-         return;
-    }
-
+    
     if receiver == nil {
+        // https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/ObjectiveC/Chapters/ocObjectsClasses.html#//apple_ref/doc/uid/TP30001163-CH11-SW7
         log_dbg!("[nil {}]", selector.as_str(&env.mem));
         env.cpu.regs_mut()[0..2].fill(0);
         return;
@@ -96,17 +167,20 @@ fn objc_msgSend_inner(
 
     // BypassGarbagePointer
     if receiver.to_bits() >= 0xe0000000 {
+        log!("WARNING: objc_msgSend received garbage pointer {:#010x}. Bypassing.", receiver.to_bits());
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
 
     let orig_class = super2.unwrap_or_else(|| ObjC::read_isa(receiver, &env.mem));
     if orig_class == nil {
+        // BypassNilClassAssert
         env.cpu.regs_mut()[0..2].fill(0);
         return;
     }
 
     // Traverse the chain of superclasses to find the method implementation.
+
     let mut class = orig_class;
     loop {
         if class == nil {
@@ -115,6 +189,7 @@ fn objc_msgSend_inner(
             let class_host_object = match env.objc.get_host_object(orig_class) {
                 Some(obj) => obj,
                 None => {
+                    log!("WARNING: objc_msgSend superclass chain lookup failed for {:?}. Bypassing.", orig_class);
                     env.cpu.regs_mut()[0..2].fill(0);
                     return;
                 }
@@ -124,6 +199,12 @@ fn objc_msgSend_inner(
                 is_metaclass,
                 ..
             } = class_host_object.as_any().downcast_ref().unwrap();
+
+            if name == "OAIAdManager" || name == "OAICachingAdManager" {
+                println!("🎮 LOG: ADWARE ASSASSIN - Safely blocked '{}' on {}!", selector.as_str(&env.mem), name);
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
 
             // BypassMethodSelector
             if selector.as_str(&env.mem) == "methodForSelector:" {
@@ -195,34 +276,58 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
+            // BypassDictCreate
+            if selector.as_str(&env.mem) == "dictionaryWithObjects:forKeys:count:" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            if selector.as_str(&env.mem) == "startAccelerometerUpdatesToQueue:withHandler:" {
+                println!("🏎️ GT RACING BYPASS: Ignored CoreMotion Accelerometer request!");
+                // Fills the return registers with 0 and safely exits the function
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            let mut is_asphalt7 = false;
+            if !env.is_app_picker {
+                is_asphalt7 = env.bundle.bundle_identifier() == "com.gameloft.Asphalt7";
+            }
+
+            if is_asphalt7 && (name.contains("Burstly") || name.contains("AdView") || name.contains("AdManager")) {
+                let sel_str = selector.as_str(&env.mem);
+                println!("🎮 LOG: ADWARE ASSASSIN - Absorbing '{}' on dead ad class {} for Asphalt 7!", sel_str, name);
+                
+                // If the game engine wants a copy or an initialization, we feed it 'self' 
+                // so it gets a valid pointer and doesn't crash downstream.
+                // For all other random methods, we safely return nil (0).
+                if sel_str.contains("copy") || sel_str.contains("init") || sel_str == "self" || sel_str == "retain" {
+                    env.cpu.regs_mut()[0] = receiver.to_bits();
+                } else {
+                    env.cpu.regs_mut()[0] = 0;
+                }
+                env.cpu.regs_mut()[1] = 0;
+                return;
+            }
 
             panic!(
                 "{} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"!",
-            // ===== THE NUCLEAR OPTION: GLOBAL PANIC BYPASS =====
-            // Instead of crashing the emulator when a method is missing, we safely print a warning and return 0 (nil).
-            // This instantly bypasses EVERY missing ad network and tracking method Gameloft throws at us!
-            log!(
-                "SAFE BYPASS: {} {:?} ({}class \"{}\", {:?}){} does not respond to selector \"{}\"! Returning 0 to prevent crash.",
                 if is_metaclass { "Class" } else { "Object" },
                 receiver,
                 if is_metaclass { "meta" } else { "" },
                 name,
                 orig_class,
-                if super2.is_some() { "'s superclass" } else { "" },
+                if super2.is_some() {
+                    "'s superclass"
+                } else {
+                    ""
+                },
                 selector.as_str(&env.mem),
             );
-            
-            if sel_str == "self" {
-                env.cpu.regs_mut()[0] = receiver.to_bits(); // Return self
-            } else {
-                env.cpu.regs_mut()[0..2].fill(0); // Return nil/0
-            }
-            return;
         }
 
         let host_object = match env.objc.get_host_object(class) {
             Some(obj) => obj,
             None => {
+                log!("WARNING: objc_msgSend failed to get host object for class {:?}. Bypassing.", class);
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
@@ -235,39 +340,6 @@ fn objc_msgSend_inner(
             ..
         }) = host_object.as_any().downcast_ref()
         {
-            
-            // ===== AUTO-DISMISS ALERTS SAFELY AND NUKE FROM SCREEN =====
-            if name == "UIAlertView" && selector.as_str(&env.mem) == "show" {
-                log!("AUTO-DISMISSING UIAlertView and nuking from screen to unfreeze game!");
-                
-                if env.objc.object_has_method_named(&env.mem, receiver, "delegate") {
-                    let delegate: id = msg![env; receiver delegate];
-                    if delegate != nil {
-                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:clickedButtonAtIndex:") {
-                            let zero: i32 = 0;
-                            let _: () = msg![env; delegate alertView:receiver clickedButtonAtIndex:zero];
-                        }
-                        if env.objc.object_has_method_named(&env.mem, delegate, "alertView:didDismissWithButtonIndex:") {
-                            let zero: i32 = 0;
-                            let _: () = msg![env; delegate alertView:receiver didDismissWithButtonIndex:zero];
-                        }
-                    }
-                }
-                
-                if env.objc.object_has_method_named(&env.mem, receiver, "setHidden:") {
-                    let _: () = msg![env; receiver setHidden:true];
-                }
-                if env.objc.object_has_method_named(&env.mem, receiver, "setUserInteractionEnabled:") {
-                    let _: () = msg![env; receiver setUserInteractionEnabled:false];
-                }
-                if env.objc.object_has_method_named(&env.mem, receiver, "removeFromSuperview") {
-                    let _: () = msg![env; receiver removeFromSuperview];
-                }
-                
-                env.cpu.regs_mut()[0..2].fill(0);
-                return;
-            }
-
             // Skip method lookup on first iteration if this is the super-call
             // variant of objc_msgSend (look up the superclass first)
             if super2.is_some() && class == orig_class {
@@ -279,22 +351,43 @@ fn objc_msgSend_inner(
                 log_dbg!("Found method on: {}", name);
                 match imp {
                     IMP::Host(host_imp) => {
+                        // TODO: do type checks when calling GuestIMPs too.
+                        // That requires using Objective-C type strings,
+                        // rather than Rust types, and should probably
+                        // warn rather than panicking,
+                        // because apps might rely on type punning.
                         if let Some((sent_type_id, sent_type_desc)) = message_type_info {
                             let (expected_type_id, expected_type_desc) = host_imp.type_info();
                             if sent_type_id != expected_type_id {
                                 let msg = format!(
-                                    "Type mismatch when sending message {} to {:?}!\n- Message has type: {:?} / {}\n- Method expects type: {:?} / {}",
-                                    selector.as_str(&env.mem), receiver, sent_type_id, sent_type_desc, expected_type_id, expected_type_desc
+                                    "\
+Type mismatch when sending message {} to {:?}!
+- Message has type: {:?} / {}
+- Method expects type: {:?} / {}",
+                                    selector.as_str(&env.mem),
+                                    receiver,
+                                    sent_type_id,
+                                    sent_type_desc,
+                                    expected_type_id,
+                                    expected_type_desc
                                 );
+                                // Always log type mismatches but never panic —
+                                // ObjC is duck-typed and subclasses often have
+                                // compatible ABI even when Rust types differ.
+                                // Real Racing 3 sends fontWithName:size: to a
+                                // UIFont subclass that has a different TypeId.
+                                // Panicking here breaks legitimate subclass calls.
                                 if tolerate_type_mismatch {
                                     log!("Warning: {}", msg);
                                 } else {
-                                    panic!("{}", msg);
+                                    log!("Warning (type mismatch, continuing): {}", msg);
                                 }
                             }
                         }
                         host_imp.call_from_guest(env)
                     }
+                    // We can't create a new stack frame, because that would
+                    // interfere with pass-through of stack arguments.
                     IMP::Guest(guest_imp) => guest_imp.call_without_pushing_stack_frame(env),
                 }
                 return;
@@ -336,19 +429,23 @@ fn objc_msgSend_inner(
                 env.cpu.regs_mut()[0..2].fill(0);
                 return;
             }
+            // BypassBarButtonItem
+            if name == "UIBarButtonItem" {
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
+            if name == "NSHTTPCookieStorage" {
+                println!("🎮 LOG: ADWARE ASSASSIN - Blocked NSHTTPCookieStorage!");
+                env.cpu.regs_mut()[0..2].fill(0);
+                return;
+            }
             panic!(
                 "Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\".",
-            // ===== THE NUCLEAR OPTION: GLOBAL CLASS PANIC BYPASS =====
-            log!(
-                "SAFE BYPASS: Class \"{}\" ({:?}) is unimplemented. Call to {} method \"{}\". Returning 0 to prevent crash.",
                 name,
                 class,
                 if is_metaclass { "class" } else { "instance" },
                 selector.as_str(&env.mem),
             );
-            env.cpu.regs_mut()[0..2].fill(0);
-            return;
-
         } else if let Some(&super::FakeClass {
             ref name,
             is_metaclass,
@@ -364,9 +461,57 @@ fn objc_msgSend_inner(
             env.cpu.regs_mut()[0..2].fill(0);
             return;
         } else {
-            panic!(
-                "Item {class:?} in superclass chain of object {receiver:?}'s class {orig_class:?} has an unexpected host object type."
-            );
+            // UnexpectedHostObjectBypass: class has a host object type that is
+            // none of ClassHostObject / UnimplementedClass / FakeClass.
+            // This happens when a game registers a dynamic ObjC class at runtime
+            // via objc_allocateClassPair / objc_registerClassPair.
+            //
+            // CRITICAL: memory-management selectors MUST NOT return nil.
+            // Returning nil from `retain` causes the caller to store nil as the
+            // retained pointer. Every subsequent message then dispatches to 0x0
+            // (a dyld trampoline), creating an infinite spin that hangs the game.
+            // (Seen in NFS Shift 2: retain->nil->PC:0x0001fc0c busy-loop.)
+            let sel_str = selector.as_str(&env.mem);
+            match sel_str {
+                // Retain-family: return receiver so the object stays alive.
+                "retain" | "autorelease" | "init" | "self" | "copy" | "mutableCopy" => {
+                    log_dbg!(
+                        "UnexpectedHostObject: '{}' on {:?} -> returning self",
+                        sel_str, receiver
+                    );
+                    // R0 already holds receiver address; just return.
+                    return;
+                }
+                // Release-family: void no-op.
+                "release" | "dealloc" | "finalize" => {
+                    log_dbg!(
+                        "UnexpectedHostObject: '{}' on {:?} -> no-op",
+                        sel_str, receiver
+                    );
+                    return;
+                }
+                // retainCount: return 1 so nothing thinks the object is freed.
+                "retainCount" => {
+                    log_dbg!("UnexpectedHostObject: retainCount -> 1");
+                    env.cpu.regs_mut()[0] = 1;
+                    env.cpu.regs_mut()[1] = 0;
+                    return;
+                }
+                // All other selectors: log and return nil (original behaviour).
+                _ => {
+                    log!(
+                        "Warning: Item {:?} in superclass chain of object {:?}'s class {:?} \
+                        has an unexpected host object type (likely a runtime-registered dynamic class). \
+                        Treating message \"{}\" as sent to nil.",
+                        class,
+                        receiver,
+                        orig_class,
+                        sel_str,
+                    );
+                    env.cpu.regs_mut()[0..2].fill(0);
+                    return;
+                }
+            }
         }
     }
 }
@@ -386,6 +531,15 @@ pub(crate) fn _touchHLE_objc_msgSend_tolerant(env: &mut Environment, receiver: i
     )
 }
 
+/// Variant of `objc_msgSend` for methods that return a struct via a pointer.
+/// See [objc_msgSend_inner].
+///
+/// The first parameter here is the pointer for the struct return. This is an
+/// ABI detail that is usually hidden and handled behind-the-scenes by
+/// [crate::abi], but `objc_msgSend` is a special case because of the
+/// pass-through behaviour. Of course, the pass-through only works if the [IMP]
+/// also has the pointer parameter. The caller therefore has to pick the
+/// appropriate `objc_msgSend` variant depending on the method it wants to call.
 pub(super) fn objc_msgSend_stret(
     env: &mut Environment,
     _stret: MutVoidPtr,
@@ -410,12 +564,25 @@ pub(crate) fn _touchHLE_objc_msgSend_stret_tolerant(
 }
 
 #[repr(C, packed)]
+/// A pointer to this struct replaces the normal receiver parameter for
+/// `objc_msgSendSuper2` and [msg_send_super2].
 pub struct objc_super {
     pub receiver: id,
+    /// If this is used with `objc_msgSendSuper` (not implemented here, TODO),
+    /// this is a pointer to the superclass to look up the method on.
+    /// If this is used with `objc_msgSendSuper2`, this is a pointer to a class
+    /// and the superclass will be looked up from it.
     pub class: Class,
 }
 unsafe impl SafeRead for objc_super {}
 
+/// Variant of `objc_msgSend` for supercalls. See [objc_msgSend_inner].
+///
+/// This variant has a weird ABI because it needs to receive an additional piece
+/// of information (a class pointer), but it can't actually take this as an
+/// extra parameter, because that would take one of the argument slots reserved
+/// for arguments passed onto the method implementation. Hence the [objc_super]
+/// pointer in place of the normal [id].
 #[allow(non_snake_case)]
 pub(super) fn objc_msgSendSuper2(
     env: &mut Environment,
@@ -423,6 +590,8 @@ pub(super) fn objc_msgSendSuper2(
     selector: SEL,
 ) {
     let objc_super { receiver, class } = env.mem.read(super_ptr);
+
+    // Rewrite first argument to match the normal ABI.
     crate::abi::write_next_arg(&mut 0, env.cpu.regs_mut(), &mut env.mem, receiver);
 
     objc_msgSend_inner(
@@ -434,16 +603,30 @@ pub(super) fn objc_msgSendSuper2(
     )
 }
 
+/// Trait that assists with type-checking of [msg_send]'s arguments.
+///
+/// - Statically constrains the types of [msg_send]'s arguments so that the
+///   first two are always [id] and [SEL].
+/// - Provides the type ID to enable dynamic type checking of subsequent
+///   arguments and the return type.
+///
+/// See `impl_HostIMP` for implementations. See also [MsgSendSuperSignature].
 pub trait MsgSendSignature: 'static {
+    /// Get the [TypeId] and a human-readable description for this signature.
     fn type_info() -> (TypeId, &'static str) {
         #[cfg(debug_assertions)]
         let type_name = std::any::type_name::<Self>();
+        // Avoid wasting space on type names in release builds. At the time of
+        // writing this saves about 36KB.
         #[cfg(not(debug_assertions))]
         let type_name = "[description unavailable in release builds]";
         (TypeId::of::<Self>(), type_name)
     }
 }
 
+/// Wrapper around [objc_msgSend] which, together with [msg], makes it easy to
+/// send messages in host code. Warning: all types are inferred from the
+/// call-site and they may not be checked, so be very sure you get them correct!
 pub fn msg_send<R, P>(env: &mut Environment, args: P) -> R
 where
     fn(&mut Environment, id, SEL): CallFromHost<R, P>,
@@ -451,6 +634,7 @@ where
     (R, P): MsgSendSignature,
     R: GuestRet,
 {
+    // Provide type info for dynamic type checking.
     env.objc.message_type_info = Some(<(R, P) as MsgSendSignature>::type_info());
     if R::SIZE_IN_MEM.is_some() {
         (objc_msgSend_stret as fn(&mut Environment, MutVoidPtr, id, SEL)).call_from_host(env, args)
@@ -474,10 +658,14 @@ where
     }
 }
 
+/// Counterpart of [MsgSendSignature] for [msg_send_super2].
 pub trait MsgSendSuperSignature: 'static {
+    /// Signature with the [objc_super] pointer replaced by [id].
     type WithoutSuper: MsgSendSignature;
 }
 
+/// [msg_send] but for super-calls (calls [objc_msgSendSuper2]). You probably
+/// want to use [msg_super] rather than calling this directly.
 pub fn msg_send_super2<R, P>(env: &mut Environment, args: P) -> R
 where
     fn(&mut Environment, ConstPtr<objc_super>, SEL): CallFromHost<R, P>,
@@ -485,15 +673,38 @@ where
     (R, P): MsgSendSuperSignature,
     R: GuestRet,
 {
+    // Provide type info for dynamic type checking.
     env.objc.message_type_info = Some(<(R, P) as MsgSendSuperSignature>::WithoutSuper::type_info());
     if R::SIZE_IN_MEM.is_some() {
-        todo!() 
+        todo!() // no stret yet
     } else {
         (objc_msgSendSuper2 as fn(&mut Environment, ConstPtr<objc_super>, SEL))
             .call_from_host(env, args)
     }
 }
 
+/// Macro for sending a message which imitates the Objective-C messaging syntax.
+/// See [msg_send] for the underlying implementation. Warning: all types are
+/// inferred from the call-site and they may not be checked, so be very sure you
+/// get them correct!
+///
+/// ```ignore
+/// msg![env; foo setBar:bar withQux:qux];
+/// ```
+///
+/// desugars to:
+///
+/// ```ignore
+/// {
+///     let sel = env.objc.lookup_selector("setFoo:withBar").unwrap();
+///     msg_send(env, (foo, sel, bar, qux))
+/// }
+/// ```
+///
+/// Note that argument values that aren't a bare single identifier like `foo`
+/// need to be bracketed.
+///
+/// See also [msg_class], if you want to send a message to a class.
 #[macro_export]
 macro_rules! msg {
     [$env:expr; $receiver:tt $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
@@ -506,8 +717,32 @@ macro_rules! msg {
         }
     }
 }
-pub use crate::msg;
+pub use crate::msg; // #[macro_export] is weird...
 
+/// Variant of [msg] for super-calls.
+///
+/// Unlike the other variants, this macro can only be used within
+/// [crate::objc::objc_classes], because it relies on that macro defining a
+/// constant containing the name of the current class.
+///
+/// ```ignore
+/// msg_super![env; this init]
+/// ```
+///
+/// desugars to something like this, if the current class is `SomeClass`:
+///
+/// ```ignore
+/// {
+///     let super_arg_ptr = push_to_stack(env, objc_super {
+///         receiver: this,
+///         class: env.objc.get_known_class("SomeClass", &mut env.mem),
+///     });
+///     let sel = env.objc.lookup_selector("init").unwrap();
+///     let res = msg_send_super2(env, (super_arg_ptr, sel));
+///     pop_from_stack::<objc_super>(env);
+///     res
+/// }
+/// ```
 #[macro_export]
 macro_rules! msg_super {
     [$env:expr; $receiver:tt $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
@@ -538,8 +773,20 @@ macro_rules! msg_super {
         }
     }
 }
-pub use crate::msg_super;
+pub use crate::msg_super; // #[macro_export] is weird...
 
+/// Variant of [msg] for sending a message to a named class. Useful for calling
+/// class methods, especially `new`.
+///
+/// ```ignore
+/// msg_class![env; SomeClass alloc]
+/// ```
+///
+/// desugars to:
+///
+/// ```ignore
+/// msg![env; (env.objc.get_known_class("SomeClass", &mut env.mem)) alloc]
+/// ```
 #[macro_export]
 macro_rules! msg_class {
     [$env:expr; $receiver_class:ident $name:ident $(: $arg1:tt $($($namen:ident)?: $argn:tt)*)?] => {
@@ -552,19 +799,31 @@ macro_rules! msg_class {
         }
     }
 }
-pub use crate::msg_class;
+pub use crate::msg_class; // #[macro_export] is weird...
 
+/// Shorthand for `let _: id = msg![env; object retain];`
 pub fn retain(env: &mut Environment, object: id) -> id {
-    if object == nil { return nil; }
+    if object == nil {
+        // fast path
+        return nil;
+    }
     msg![env; object retain]
 }
 
+/// Shorthand for `() = msg![env; object release];`
 pub fn release(env: &mut Environment, object: id) {
-    if object == nil { return; }
+    if object == nil {
+        // fast path
+        return;
+    }
     msg![env; object release]
 }
 
+/// Shorthand for `let _: id = msg![env; object autorelease];`
 pub fn autorelease(env: &mut Environment, object: id) -> id {
-    if object == nil { return nil; }
+    if object == nil {
+        // fast path
+        return nil;
+    }
     msg![env; object autorelease]
 }

@@ -28,6 +28,8 @@ mod bundle;
 
 pub use bundle::BundleData;
 
+use crate::dyld::{export_c_func, FunctionExports};
+use crate::Environment;
 use crate::fs::bundle::{IpaFile, IpaFileRef};
 use crate::paths;
 use std::collections::HashMap;
@@ -58,6 +60,28 @@ pub enum FsError {
     InvalidParentDir,
     NonexistentParentDir,
     ReadonlyParentDir,
+}
+
+// POSIX file control stubs required by Gameloft games
+
+fn fcntl(env: &mut Environment, fd: i32, cmd: i32, arg: u32) -> i32 {
+    log!("fcntl(fd={}, cmd={:#x}, arg={:#x}) -> 0 (stubbed)", fd, cmd, arg);
+    match cmd {
+        // F_GETFL (3) -> return O_RDWR (2)
+        3 => 2,
+        // F_SETFL (4) -> ignore
+        4 => 0,
+        // F_GETFD (1), F_SETFD (2)
+        1 => 0,
+        2 => 0,
+        // Other commands return success
+        _ => 0,
+    }
+}
+
+pub fn flock(env: &mut Environment, fd: i32, operation: i32) -> i32 {
+    log!("flock(fd={}, operation={:#x}) -> 0 (stubbed)", fd, operation);
+    0 // success
 }
 
 #[derive(Debug)]
@@ -117,9 +141,6 @@ impl FsNode {
             },
         }
     }
-
-    // Convenience methods for constructing the read-only parts of the initial
-    // filesystem layout
 
     fn dir() -> Self {
         FsNode::Directory {
@@ -444,6 +465,13 @@ impl Read for GuestFile {
                 std::io::ErrorKind::IsADirectory,
                 "Attempt to read from a directory as a guest file",
             )),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX reads on Sockets!
+            // ==========================================================
+            GuestFile::Socket => {
+                println!("🎮 LOG: Absorbed read() on GuestFile::Socket to prevent unimplemented panic!");
+                Ok(0) // Return 0 to simulate EOF or no data
+            }
             _ => unimplemented!(),
         }
     }
@@ -460,6 +488,13 @@ impl Write for GuestFile {
                 panic!("Attempt to write to a read-only file: {file:?}")
             }
             GuestFile::Directory => panic!("Attempt to write to a directory as a guest file"),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX writes on Sockets!
+            // ==========================================================
+            GuestFile::Socket => {
+                println!("🎮 LOG: Absorbed write() on GuestFile::Socket to prevent unimplemented panic!");
+                Ok(buf.len()) // Pretend we successfully wrote the payload
+            }
             _ => unimplemented!(),
         }
     }
@@ -474,6 +509,10 @@ impl Write for GuestFile {
                 panic!("Attempt to flush a read-only file: {file:?}")
             }
             GuestFile::Directory => panic!("Attempt to flush a directory as a guest file"),
+            // ==========================================================
+            // 🏎️ GAMELOFT BYPASS: Safely absorb POSIX flushes on Sockets!
+            // ==========================================================
+            GuestFile::Socket => Ok(()),
             _ => unimplemented!(),
         }
     }
@@ -1209,52 +1248,70 @@ impl Fs {
 
     /// Like [std::fs::create_dir] but for the guest filesystem.
     pub fn create_dir<P: AsRef<GuestPath>>(&mut self, path: P) -> Result<(), FsError> {
-        let path = path.as_ref();
+    let path = path.as_ref();
 
-        let (parent_node, new_dir_name) = self
-            .lookup_parent_node(path)
-            .ok_or(FsError::NonexistentParentDir)?;
+    let (parent_node, new_dir_name) = self
+        .lookup_parent_node(path)
+        .ok_or(FsError::NonexistentParentDir)?;
 
-        // Parent directory is not a directory
-        let FsNode::Directory {
-            children,
-            writeable: dir_host_path,
-        } = parent_node
-        else {
-            return Err(FsError::InvalidParentDir);
-        };
+    let FsNode::Directory {
+        children,
+        writeable: dir_host_path,
+    } = parent_node
+    else {
+        return Err(FsError::InvalidParentDir);
+    };
 
-        // There's already a file/directory with this name
-        if children.contains_key(&new_dir_name) {
+    if children.contains_key(&new_dir_name) {
+        return Err(FsError::AlreadyExist);
+    }
+
+    let Some(dir_host_path) = dir_host_path else {
+        log!("Warning: attempt to create directory at path {:?}, but parent directory is read-only", path);
+        return Err(FsError::ReadonlyParentDir);
+    };
+
+    for c in new_dir_name.chars() {
+        if std::path::is_separator(c) {
+            panic!("Attempt to create directory at path {path:?}, but directory name contains path separator character {c:?}!");
+        }
+    }
+
+    let host_path = dir_host_path.join(&new_dir_name);
+
+    // ---- FIX: handle AlreadyExists without panicking ----
+    match std::fs::create_dir(&host_path) {
+        Ok(()) => {
+            log_dbg!(
+                "Created directory at path {:?} (host path: {:?})",
+                path,
+                host_path
+            );
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            // The directory already exists on the host. This can happen legitimately
+            // when create_dir_all is called on an existing path or when multiple
+            // components are being created. Return AlreadyExist so the caller
+            // (create_dir_all) can ignore it.
             return Err(FsError::AlreadyExist);
         }
-
-        let Some(dir_host_path) = dir_host_path else {
-            log!("Warning: attempt to create directory at path {:?}, but parent directory is read-only", path);
-            return Err(FsError::ReadonlyParentDir);
-        };
-
-        for c in new_dir_name.chars() {
-            if std::path::is_separator(c) {
-                panic!("Attempt to create directory at path {path:?}, but directory name contains path separator character {c:?}!");
-            }
+        Err(e) => {
+            // Other errors are still unexpected and should panic.
+            panic!("Unexpected I/O failure when trying to create directory at {:?}: {}", host_path, e);
         }
+    }
 
-        let host_path = dir_host_path.join(&new_dir_name);
-
-        handle_open_err(std::fs::create_dir(&host_path), &host_path);
-        log_dbg!(
-            "Created directory at path {:?} (host path: {:?})",
-            path,
-            host_path
-        );
-        children.insert(
-            new_dir_name,
-            FsNode::Directory {
-                children: HashMap::new(),
-                writeable: Some(host_path),
-            },
-        );
-        Ok(())
+    children.insert(
+        new_dir_name,
+        FsNode::Directory {
+            children: HashMap::new(),
+            writeable: Some(host_path),
+        },
+    );
+    Ok(())
     }
 }
+pub const FUNCTIONS: FunctionExports = &[
+    export_c_func!(fcntl(_, _, _)),
+    export_c_func!(flock(_, _)),
+];

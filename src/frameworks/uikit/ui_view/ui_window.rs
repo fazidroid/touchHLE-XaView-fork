@@ -78,6 +78,30 @@ pub const CLASSES: ClassExports = objc_classes! {
     this
 }
 
+- (())setTransform:(CGAffineTransform)transform {
+        let mut is_gtr2 = false;
+        
+        if !env.is_app_picker {
+            is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
+        }
+        
+        if is_gtr2 {
+            println!("🎮 LOG: GT Racing 2 Detected! Flipping UIWindow 180 degrees to match touch controls.");
+            
+            let mut flipped = transform;
+            // Negating the scaling/rotation components creates a perfect 180-degree mathematical flip!
+            flipped.a = -transform.a;
+            flipped.b = -transform.b;
+            flipped.c = -transform.c;
+            flipped.d = -transform.d;
+            
+            crate::msg_super![env; this setTransform:flipped]
+        } else {
+            // Let all other games rotate normally!
+            crate::msg_super![env; this setTransform:transform]
+        }
+    }
+
 - (())dealloc {
     if let Some(key_window) = env.framework_state.uikit.ui_view.ui_window.key_window {
         if key_window == this {
@@ -126,7 +150,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let frame: CGRect = msg![env; this frame];
     //DebugMakeKeyVis
     log!("DEBUG_UIWINDOW: makeKeyAndVisible on {:?} | Screen Bounds: {:?} | Window Frame: {:?}", this, bounds, frame);
-    
+
     if frame.size.width <= 0.0 || frame.size.height <= 0.0 {
         log!("Fixing empty window frame to {:?}", bounds);
         () = msg![env; this setFrame:bounds];
@@ -209,9 +233,18 @@ pub const CLASSES: ClassExports = objc_classes! {
         log_dbg!("[{:?} shouldAutorotateToInterfaceOrientation:{:?}] => {:?}", vc, orientation, should);
         if should {
             log_dbg!("App requested autorotation; applying orientation transform to view {:?}.", view);
+            // GT Racing 2 renders upside-down with the default landscape
+            // rotation, so we flip the sign exclusively for that bundle.
+            let is_gtr2 = env.bundle.bundle_identifier() == "com.gameloft.gtr2";
             let transform = match orientation {
-                UIInterfaceOrientationLandscapeLeft => CGAffineTransform::make_rotation(-std::f32::consts::FRAC_PI_2),
-                UIInterfaceOrientationLandscapeRight => CGAffineTransform::make_rotation(std::f32::consts::FRAC_PI_2),
+                UIInterfaceOrientationLandscapeLeft => {
+                    let angle = if is_gtr2 { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 };
+                    CGAffineTransform::make_rotation(angle)
+                }
+                UIInterfaceOrientationLandscapeRight => {
+                    let angle = if is_gtr2 { -std::f32::consts::FRAC_PI_2 } else { std::f32::consts::FRAC_PI_2 };
+                    CGAffineTransform::make_rotation(angle)
+                }
                 _ => unimplemented!(),
             };
 
@@ -245,20 +278,69 @@ pub const CLASSES: ClassExports = objc_classes! {
     let other_layer: id = msg![env; other layer];
     msg![env; this_layer convertPoint:point fromLayer:other_layer]
 }
+
 - (CGPoint)convertPoint:(CGPoint)point
-               toWindow:(id)other { // UIWindow*
+             toWindow:(id)other { // UIWindow*
     let this_layer: id = msg![env; this layer];
     // Resolves to nil if other is nil.
     let other_layer: id = msg![env; other layer];
     msg![env; this_layer convertPoint:point toLayer:other_layer]
 }
 
+- (())sendEvent:(id)event {
+    let touches: id = msg![env; event allTouches];
+    let count: u32 = msg![env; touches count];
+
+    if count > 0 {
+        let any_touch: id = msg![env; touches anyObject];
+        let phase: u32 = msg![env; any_touch phase];
+        
+        // Let the view hierarchy properly resolve the rotated touch target
+        let window_point: crate::frameworks::core_graphics::CGPoint = msg![env; any_touch locationInView:this];
+        let hit_view: id = msg![env; this hitTest:window_point withEvent:event];
+
+        if hit_view != crate::objc::nil {
+            // Standard touch routing based on natural hit testing
+            match phase {
+                0 => { let _: () = msg![env; hit_view touchesBegan:touches withEvent:event]; },
+                1 => { let _: () = msg![env; hit_view touchesMoved:touches withEvent:event]; },
+                3 => { let _: () = msg![env; hit_view touchesEnded:touches withEvent:event]; },
+                4 => { let _: () = msg![env; hit_view touchesCancelled:touches withEvent:event]; },
+                _ => {}
+            }
+        }
+    }
+}
+
 @end
 
-};
+@implementation AVAudioSessionDelegate: NSObject
+    @end
+
+    // 🛡️ GT RACING BYPASS: Fake the Audio Session
+    @implementation AVAudioSession: NSObject
+    + (id)sharedInstance {
+        // Silenced for performance
+        crate::objc::nil
+    }
+    @end
+
+    @implementation GCController: NSObject
+    + (id)controllers {
+        // Silenced for performance: Polled 60x a second!
+        crate::objc::nil
+    }
+    @end
+
+    @implementation NSTimeZone: NSObject
+    + (id)knownTimeZoneNames {
+        // Silenced for performance
+        crate::objc::nil
+    }
+    @end
+}; // <--- This now correctly closes the macro AFTER all implementation blocks.
 
 /// Window life-cycle notifications
-/// TODO: more notifications
 const UIWindowDidBecomeKeyNotification: &str = "UIWindowDidBecomeKeyNotification";
 /// Keyboard notifications
 /// TODO: more keyboard notifications

@@ -23,6 +23,7 @@ use crate::objc::{
     NSZonePtr, SEL,
 };
 use crate::Environment;
+use super::{send_actions_from_text_field, UIControlEventEditingDidEndOnExit};
 
 type UIKeyboardAppearance = NSInteger;
 type UIKeyboardType = NSInteger;
@@ -107,6 +108,24 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     this
 }
+
+// ==========================================================
+    // 🏎️ GAMELOFT BYPASS: Hardcode Profile Name & Keyboard Close
+    // ==========================================================
+    - (bool)isSecureTextEntry {
+        println!("🎮 LOG: Caught [UITextField isSecureTextEntry] safely! Returning false.");
+        false
+    }
+
+    - (id)text {
+        println!("🎮 LOG: Caught [UITextField text]. Spoofing profile name!");
+        crate::frameworks::foundation::ns_string::from_rust_string(env, "Player".to_string())
+    }
+
+    - (bool)resignFirstResponder {
+        println!("🎮 LOG: Caught [UITextField resignFirstResponder]. Closing keyboard!");
+        true
+    }
 
 - (())dealloc {
     let UITextFieldHostObject {
@@ -408,15 +427,31 @@ pub fn handle_backspace(env: &mut Environment, text_field: id) {
 
 pub fn handle_return(env: &mut Environment, text_field: id) {
     log_dbg!("Calling handle_return for {:?}", text_field);
+
     let delegate: id = env
         .objc
         .borrow::<UITextFieldHostObject>(text_field)
         .delegate;
-    let sel: SEL = env
-        .objc
-        .register_host_selector("textFieldShouldReturn:".to_string(), &mut env.mem);
-    if msg![env; delegate respondsToSelector:sel] {
-        log_dbg!("handle_return");
-        () = msg![env; delegate textFieldShouldReturn:text_field];
+
+    // Ask the delegate whether editing should end. Default is YES.
+    let mut should_return = true;
+    if delegate != nil {
+        let sel: SEL = env
+            .objc
+            .register_host_selector("textFieldShouldReturn:".to_string(), &mut env.mem);
+        let responds: bool = msg![env; delegate respondsToSelector:sel];
+        if responds {
+            log_dbg!("handle_return: calling textFieldShouldReturn:");
+            should_return = msg![env; delegate textFieldShouldReturn:text_field];
+        }
+    }
+
+    if should_return {
+        // Fire UIControlEventEditingDidEndOnExit so any addTarget:action:forControlEvents:
+        // handler registered by the game (e.g. "confirmName:") gets invoked.
+        send_actions_from_text_field(env, text_field, UIControlEventEditingDidEndOnExit);
+
+        // Dismiss the keyboard — this also fires textFieldDidEndEditing: on the delegate.
+        let _: bool = msg![env; text_field resignFirstResponder];
     }
 }

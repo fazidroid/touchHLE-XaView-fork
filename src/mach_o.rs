@@ -36,38 +36,22 @@ const VM_PROT_EXECUTE: vm_prot_t = 4;
 
 #[derive(Debug)]
 pub struct MachO {
-    /// Name (for debugging purposes and sorting)
     pub name: String,
-    /// Paths of dynamic libraries referenced by the binary.
     pub dynamic_libraries: Vec<String>,
-    /// Metadata related to sections.
     pub sections: Vec<Section>,
-    /// Defined symbols in the binary (both external and local). This is a
-    /// hashmap so the dynamic linker can look things up quickly. Thumb function
-    /// symbols always have the Thumb bit set.
-    pub exported_symbols: HashMap<String, u32>,
-    /// List of addresses and names of external relocations for the dynamic
-    /// linker to resolve.
-    pub external_relocations: Vec<(u32, String)>,
-    /// Address/program counter value for the entry point.
-    pub entry_point_pc: Option<u32>,
-    /// End address of the highest-addressed segment.
-    /// This is used by get_end() to return the first address after the last
-    /// segment in the executable.
-    pub last_segment_end: u32,
+    // Change these from u32 to GuestUSize
+    pub exported_symbols: HashMap<String, GuestUSize>,
+    pub external_relocations: Vec<(GuestUSize, String)>,
+    pub entry_point_pc: Option<GuestUSize>,
+    pub last_segment_end: GuestUSize,
 }
 
 #[derive(Debug)]
 pub struct Section {
-    /// Section name.
     pub name: String,
-    /// Section address in memory.
-    pub addr: u32,
-    /// Section size in bytes.
-    pub size: u32,
-    /// What type of section is this?
+    pub addr: GuestUSize, // Change to GuestUSize
+    pub size: GuestUSize, // Change to GuestUSize
     pub type_: SectionType,
-    /// Information specific to special dynamic linker sections, if this is one.
     pub dyld_indirect_symbol_info: Option<DyldIndirectSymbolInfo>,
 }
 
@@ -224,7 +208,10 @@ impl Reloc {
     }
 }
 
-fn cpu_subtype_to_str(ty: cpu_subtype_t) -> &'static str {
+fn cpu_subtype_to_str(ty: cpu_subtype_t, is_64bit: bool) -> &'static str {
+    if is_64bit {
+        return "arm64";
+    }
     match ty {
         mach_object::CPU_SUBTYPE_ARM_ALL => "armv???",
         mach_object::CPU_SUBTYPE_ARM_V4T => "armv4t",
@@ -236,7 +223,7 @@ fn cpu_subtype_to_str(ty: cpu_subtype_t) -> &'static str {
         mach_object::CPU_SUBTYPE_ARM_V7S => "armv7s",
         mach_object::CPU_SUBTYPE_ARM_V7K => "armv7k",
         mach_object::CPU_SUBTYPE_ARM_V8 => "armv8",
-        _ => panic!("Unexpected cpu subtype: {ty:?}"),
+        _ => "unknown", // 🏎️ Prevent panic on unmapped 64-bit subtypes
     }
 }
 
@@ -253,7 +240,6 @@ impl MachO {
         log_dbg!("Reading {:?}", name);
 
         let mut cursor = Cursor::new(bytes);
-
         let file = OFile::parse(&mut cursor).map_err(|_| "Could not parse Mach-O file")?;
 
         let (header, commands) = match file {
@@ -262,6 +248,14 @@ impl MachO {
                 let mut best_subslice = None;
                 let mut best_type = None;
                 for (arch, _) in files {
+                    // 🏎️ 64-BIT BYPASS: Hunt for the AArch64 Slice (0x0100000C)
+                    #[cfg(feature = "aarch64")]
+                    if arch.cputype == 0x0100000C {
+                        best_subslice = Some(&bytes[arch.offset as usize..arch.offset as usize + arch.size as usize]);
+                        best_type = Some(arch.cpusubtype);
+                        break; 
+                    }
+
                     if arch.cputype != mach_object::CPU_TYPE_ARM {
                         continue;
                     }
@@ -282,29 +276,43 @@ impl MachO {
                     Err("No supported architecture in the fat binary")
                 };
             }
-            OFile::ArFile { .. } | OFile::SymDef { .. } => {
-                return Err("Unexpected Mach-O file kind: not an executable");
-            }
+            _ => return Err("Unexpected Mach-O file kind: not an executable"),
         };
 
-        if header.cputype != mach_object::CPU_TYPE_ARM {
-            return Err("Executable is not for an ARM CPU!");
-        }
-        log!(
-            "Loading {} slice for {:?}",
-            cpu_subtype_to_str(header.cpusubtype),
-            name
-        );
-
+        // 🏎️ UNIFIED ARCHITECTURE & ENDIANNESS CHECK
         let is_bigend = header.is_bigend();
         if is_bigend {
             return Err("Executable is not little-endian!");
         }
+
         let is_64bit = header.is_64bit();
-        if is_64bit {
-            return Err("Executable is not 32-bit!");
+
+        #[cfg(not(feature = "aarch64"))]
+        {
+            if is_64bit { 
+                return Err("Executable is not 32-bit!"); 
+            }
+            if header.cputype != mach_object::CPU_TYPE_ARM { 
+                return Err("Executable is not for an ARM CPU!"); 
+            }
         }
-        // TODO: Check cpusubtype (should be some flavour of ARMv6/ARMv7)
+
+        #[cfg(feature = "aarch64")]
+        {
+            if !is_64bit { 
+                return Err("Executable is not 64-bit! Please use a 64-bit app."); 
+            }
+            // 0x0100000C is CPU_TYPE_ARM64
+            if header.cputype != 0x0100000C && header.cputype != mach_object::CPU_TYPE_ARM { 
+                return Err("Executable is not for an ARM64 CPU!"); 
+            }
+        }
+
+        log!(
+            "Loading {} slice for {:?}",
+            cpu_subtype_to_str(header.cpusubtype, header.is_64bit()),
+            name
+        );
 
         let split_segs = (header.flags & mach_object::MH_SPLIT_SEGS) != 0;
 
@@ -328,22 +336,14 @@ impl MachO {
 
         for MachCommand(command, _size) in commands {
             match command {
-                LoadCommand::Segment {
-                    segname,
-                    vmaddr,
-                    vmsize,
-                    fileoff,
-                    filesize,
-                    initprot,
-                    sections,
-                    ..
-                } => {
-                    let vmaddr: u32 = vmaddr.try_into().unwrap();
-                    let vmsize: u32 = vmsize.try_into().unwrap();
-                    let filesize: u32 = filesize.try_into().unwrap();
+                LoadCommand::Segment { segname, vmaddr, vmsize, fileoff, filesize, initprot, sections, .. } |
+                LoadCommand::Segment64 { segname, vmaddr, vmsize, fileoff, filesize, initprot, sections, .. } => {
+                    let vmaddr: GuestUSize = vmaddr.try_into().unwrap();
+                    let vmsize: GuestUSize = vmsize.try_into().unwrap();
+                    let filesize: GuestUSize = filesize.try_into().unwrap();
 
                     if first_segment_base.is_none() {
-                        first_segment_base = Some(vmaddr + slide);
+                        first_segment_base = Some(vmaddr + slide as GuestUSize);
                     }
                     if first_read_write_segment_base.is_none()
                         && (initprot & VM_PROT_READ) != 0

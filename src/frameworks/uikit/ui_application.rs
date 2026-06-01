@@ -103,6 +103,25 @@ pub const CLASSES: ClassExports = objc_classes! {
     app_init
 }
 
+- (())registerUserNotificationSettings:(id)settings {
+    log_dbg!("UIApplication registerUserNotificationSettings: {:?} (ignored)", settings);
+}
+
+- (id)currentUserNotificationSettings {
+    log_dbg!("UIApplication currentUserNotificationSettings stub called, returning nil");
+    nil
+}
+
+- (NSUInteger)beginBackgroundTaskWithExpirationHandler:(id)_handler {
+    log!("TODO: UIApplication beginBackgroundTaskWithExpirationHandler: returning dummy task id 1");
+    // UIBackgroundTaskInvalid is 0, so 1 is a valid identifier.
+    1
+}
+
+- (())endBackgroundTask:(NSUInteger)_task_id {
+    log!("TODO: UIApplication endBackgroundTask: {} ignored", _task_id);
+}
+
 - (id)init {
     env.framework_state.uikit.ui_application.shared_application = Some(this);
     this
@@ -151,11 +170,38 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation {
+    // GT Racing 2 (com.gameloft.gtr2) renders upside-down because it requests
+    // UIInterfaceOrientationLandscapeLeft but the rotation direction is
+    // +90° when it needs -90°. Swapping Left↔Right corrects the 180° flip.
+    let orientation = if env.bundle.bundle_identifier().starts_with("com.gameloft.gtr2") {
+        match orientation {
+            UIDeviceOrientationLandscapeLeft  => UIDeviceOrientationLandscapeRight,
+            UIDeviceOrientationLandscapeRight => UIDeviceOrientationLandscapeLeft,
+            other => other,
+        }
+    } else {
+        orientation
+    };
+
     env.on_parent_stack_in_coroutine(|window, _| {window.rotate_device(match orientation {
         UIDeviceOrientationPortrait => DeviceOrientation::Portrait,
         UIDeviceOrientationLandscapeLeft => DeviceOrientation::LandscapeLeft,
         UIDeviceOrientationLandscapeRight => DeviceOrientation::LandscapeRight,
-        _ => unimplemented!("Orientation {} not handled yet", orientation),
+
+        // 🛡️ N.O.V.A. 3 EXCLUSIVE BYPASSES - Flipped to LandscapeLeft!
+        0 => {
+            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 0");
+            DeviceOrientation::LandscapeLeft
+        },
+        2 => {
+            println!("WARNING: N.O.V.A. 3 Hack - Safely falling back to LandscapeLeft for orientation 2");
+            DeviceOrientation::LandscapeLeft
+        },
+
+        _ => {
+            log!("Warning: setStatusBarOrientation: unhandled orientation {}, ignoring", orientation);
+            DeviceOrientation::Portrait
+        },
     })});
 }
 - (())setStatusBarOrientation:(UIInterfaceOrientation)orientation animated:(bool)_animated {
@@ -395,6 +441,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setSecond:(NSInteger)_v {}
 @end
 
+// ==========================================================
+// Stub for UIUserNotificationSettings (iOS 8+)
+// ==========================================================
+@implementation UIUserNotificationSettings: NSObject
+
++ (id)settingsForTypes:(NSUInteger)types categories:(id)categories {
+    log_dbg!("UIUserNotificationSettings settingsForTypes:{} categories:{:?}", types, categories);
+    // Return a dummy object (the actual settings are never used by the game)
+    let obj: id = msg![env; this alloc];
+    msg![env; obj init]
+}
+
+- (id)init {
+    this
+}
+
+// Needed for the dummy object to be properly retained/released.
+- (id)retain { this }
+- (())release {}
+- (id)autorelease { this }
+
+@end
+
 };
 
 pub(super) fn UIApplicationMain(
@@ -512,6 +581,37 @@ pub(super) fn UIApplicationMain(
         () = msg![env; center postNotificationName:notif_name object:ui_application userInfo:nil];
 
         let _: () = msg![env; pool drain];
+    }
+
+    // GT Racing Free+ (and similar Gameloft games) maintain an internal
+    // s_nSuspendCount. When the Android window fires app-will-terminate
+    // during loading, the game's applicationWillResignActive increments
+    // s_nSuspendCount to 1. Our bypass prevents the process from exiting
+    // but s_nSuspendCount stays at 1, so applicationDidBecomeActive above
+    // decrements it to 0 but does NOT restart the render loop (it only
+    // restarts on the 1→0 transition if it was previously rendering).
+    //
+    // Fix: fire a second resign+becomeActive pair so the game sees a clean
+    // 0→1→0 cycle and unconditionally restarts its render loop.
+    if env.bundle.bundle_identifier().starts_with("com.gameloft.GTRacingFreemium")
+        || env.bundle.bundle_identifier().starts_with("com.gameloft.gtr")
+    {
+        log!("GTRacing suspend-count fix: draining s_nSuspendCount with 3x becomeActive");
+        let center: id = msg_class![env; NSNotificationCenter defaultCenter];
+        let delegate: id = msg![env; ui_application delegate];
+
+        // Fire applicationDidBecomeActive 3 times to drain s_nSuspendCount
+        // regardless of how high it got during loading. The game clamps at 0
+        // internally so extra calls are harmless.
+        for _i in 0..3u32 {
+            let pool: id = msg_class![env; NSAutoreleasePool new];
+            if env.objc.object_has_method_named(&env.mem, delegate, "applicationDidBecomeActive:") {
+                () = msg![env; delegate applicationDidBecomeActive:ui_application];
+            }
+            let n = get_static_str(env, UIApplicationDidBecomeActiveNotification);
+            () = msg![env; center postNotificationName:n object:ui_application userInfo:nil];
+            let _: () = msg![env; pool drain];
+        }
     }
 
     let run_loop: id = msg_class![env; NSRunLoop mainRunLoop];

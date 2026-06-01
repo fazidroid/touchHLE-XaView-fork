@@ -10,6 +10,7 @@ use crate::objc::{
     autorelease, id, msg, msg_class, objc_classes, retain, ClassExports, HostObject, NSZonePtr,
 };
 use std::collections::HashSet;
+use crate::frameworks::foundation::NSRange;
 
 // Unicode General Category Zs and CHARACTER TABULATION (U+0009).
 const WHITESPACE_CHARACTERS: [char; 18] = [
@@ -20,6 +21,12 @@ const WHITESPACE_CHARACTERS: [char; 18] = [
 // The newline characters (U+000A - U+000D, U+0085, U+2028, and U+2029).
 const NEWLINE_CHARACTERS: [char; 7] = [
     '\u{000A}', '\u{000B}', '\u{000C}', '\u{000D}', '\u{0085}', '\u{2028}', '\u{2029}',
+];
+// ==========================================================
+// 🏎️ EA BYPASS: Decimal Digits for Text Parsing
+// ==========================================================
+const DECIMAL_DIGIT_CHARACTERS: [char; 10] = [
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 ];
 
 /// Belongs to _touchHLE_NSCharacterSet
@@ -86,6 +93,17 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     autorelease(env, new)
 }
+// ==========================================================
+// 🏎️ EA BYPASS: Expose Decimal Digits to the Engine
+// ==========================================================
++ (id)decimalDigitCharacterSet {
+    let set = HashSet::from(DECIMAL_DIGIT_CHARACTERS.map(|c| unichar::try_from(c).unwrap()));
+
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
+
+    autorelease(env, new)
+}
 
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
@@ -119,6 +137,128 @@ pub const CLASSES: ClassExports = objc_classes! {
     let host_object = Box::new(CharacterSetHostObject {
         set: old_host_object.set.clone(),
         inverted: !old_host_object.inverted
+    });
+    let class = env.objc.get_known_class("_touchHLE_NSCharacterSet", &mut env.mem);
+    env.objc.alloc_object(class, host_object, &mut env.mem)
+}
+
+@end
+
+// ==========================================================
+// NSMutableCharacterSet implementation
+// ==========================================================
+@implementation NSMutableCharacterSet: NSCharacterSet
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::new(CharacterSetHostObject {
+        set: HashSet::new(),
+        inverted: false,
+    });
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
++ (id)characterSetWithRange:(NSRange)range {
+    let mut set = HashSet::new();
+    for i in 0..range.length {
+        let code = range.location + i;
+        if code <= 0xFFFF {
+            set.insert(code as unichar);
+        }
+    }
+    let new: id = msg![env; this alloc];
+    env.objc.borrow_mut::<CharacterSetHostObject>(new).set = set;
+    autorelease(env, new)
+}
+
+- (())addCharactersInString:(id)string {
+    log_dbg!("NSMutableCharacterSet addCharactersInString: {:?}", string);
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
+        log!("Warning: addCharactersInString called on inverted character set");
+    }
+    let mut chars = Vec::new();
+    ns_string::for_each_code_unit(env, string, |_idx, c| {
+        chars.push(c);
+    });
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.insert(c);
+    }
+}
+
+- (())removeCharactersInString:(id)string {
+    log_dbg!("NSMutableCharacterSet removeCharactersInString: {:?}", string);
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
+        log!("Warning: removeCharactersInString called on inverted character set");
+    }
+    let mut chars = Vec::new();
+    ns_string::for_each_code_unit(env, string, |_idx, c| {
+        chars.push(c);
+    });
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.remove(&c);
+    }
+}
+
+- (())addCharactersInRange:(NSRange)range {
+    log_dbg!("NSMutableCharacterSet addCharactersInRange: {:?}", range);
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
+        log!("Warning: addCharactersInRange called on inverted character set");
+    }
+    let mut chars = Vec::new();
+    for i in 0..range.length {
+        let code = range.location + i;
+        if code <= 0xFFFF {
+            chars.push(code as unichar);
+        }
+    }
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.insert(c);
+    }
+}
+
+- (())removeCharactersInRange:(NSRange)range {
+    log_dbg!("NSMutableCharacterSet removeCharactersInRange: {:?}", range);
+    let is_inverted = {
+        let host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+        host_obj.inverted
+    };
+    if is_inverted {
+        log!("Warning: removeCharactersInRange called on inverted character set");
+    }
+    let mut chars = Vec::new();
+    for i in 0..range.length {
+        let code = range.location + i;
+        if code <= 0xFFFF {
+            chars.push(code as unichar);
+        }
+    }
+    let mut host_obj = env.objc.borrow_mut::<CharacterSetHostObject>(this);
+    for c in chars {
+        host_obj.set.remove(&c);
+    }
+}
+
+- (id)invertedSet {
+    let old_host_obj = env.objc.borrow::<CharacterSetHostObject>(this);
+    let new_set = old_host_obj.set.clone();
+    let new_inverted = !old_host_obj.inverted;
+    let host_object = Box::new(CharacterSetHostObject {
+        set: new_set,
+        inverted: new_inverted,
     });
     let class = env.objc.get_known_class("_touchHLE_NSCharacterSet", &mut env.mem);
     env.objc.alloc_object(class, host_object, &mut env.mem)

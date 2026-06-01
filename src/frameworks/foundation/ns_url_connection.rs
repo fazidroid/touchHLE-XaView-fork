@@ -7,11 +7,18 @@
 
 use crate::objc::{autorelease, id, msg, nil, objc_classes, retain, ClassExports};
 
+type void = (); // <-- add this
+
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
 
 @implementation NSURLConnection: NSObject
+
++ (id)sendSynchronousRequest:(id)_request returningResponse:(u32)_response error:(u32)_error {
+    println!("🛡️ GAMELOFT BYPASS: Ignored NSURLConnection sendSynchronousRequest");
+    crate::objc::nil
+}
 
 + (id)connectionWithRequest:(id)request
                    delegate:(id)delegate {
@@ -33,6 +40,10 @@ pub const CLASSES: ClassExports = objc_classes! {
         let _: () = msg![env; delegate connection:this didFailWithError:nil];
     }
     this
+}
+
+- (void)cancel {
+    println!("🛡️ GAMELOFT BYPASS: Ignored NSURLConnection cancel");
 }
 
 @end

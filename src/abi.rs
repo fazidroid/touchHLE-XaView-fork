@@ -338,6 +338,12 @@ pub trait GuestArg: std::fmt::Debug + Sized {
     fn to_regs(self, regs: &mut [u32]);
 }
 
+#[cfg(not(feature = "aarch64"))]
+const MAX_ARG_REGS: usize = 4;
+
+#[cfg(feature = "aarch64")]
+const MAX_ARG_REGS: usize = 8;
+
 /// Read a single argument from registers or the stack. Call this for each
 /// argument in order.
 fn read_next_arg<T: GuestArg>(
@@ -346,19 +352,14 @@ fn read_next_arg<T: GuestArg>(
     stack_ptr: ConstPtr<u32>,
     mem: &Mem,
 ) -> T {
-    // After the fourth register is used, the arguments go on the stack.
-    // In some cases the argument is split over both registers and the stack.
-
-    // Rust doesn't allow [0u32; Trait::T] alas, so we need to set some
-    // arbitrary limit. 16 is high enough for everything right now.
     let mut fake_regs = [0u32; 16];
     let fake_regs = &mut fake_regs[0..T::REG_COUNT];
 
     for fake_reg in fake_regs.iter_mut() {
-        if *reg_offset < 4 {
+        if *reg_offset < MAX_ARG_REGS {
             *fake_reg = regs[*reg_offset];
         } else {
-            *fake_reg = mem.read(stack_ptr + (*reg_offset - 4).try_into().unwrap());
+            *fake_reg = mem.read(stack_ptr + (*reg_offset - MAX_ARG_REGS).try_into().unwrap());
         }
         *reg_offset += 1;
     }
@@ -371,13 +372,10 @@ fn read_next_arg<T: GuestArg>(
 /// and this will update the stack pointer if necessary, as well as returning
 /// a copy of the original stack pointer so it can be restored later.
 pub fn extend_stack_for_args(reg_count_sum: usize, regs: &mut [u32]) -> u32 {
-    // After the fourth register is used, the arguments go on the stack.
-    // In some cases the argument is split over both registers and the stack.
-
     let old = regs[Cpu::SP];
-    if reg_count_sum > 4 {
+    if reg_count_sum > MAX_ARG_REGS {
         let old: ConstPtr<u32> = Ptr::from_bits(old);
-        regs[Cpu::SP] = (old - (reg_count_sum - 4).try_into().unwrap()).to_bits()
+        regs[Cpu::SP] = (old - (reg_count_sum - MAX_ARG_REGS).try_into().unwrap()).to_bits()
     }
     old
 }
@@ -385,7 +383,7 @@ pub fn extend_stack_for_args(reg_count_sum: usize, regs: &mut [u32]) -> u32 {
 /// Write a single argument to registers or the stack. Call this for each
 /// argument in order.
 ///
-/// If `reg_offset` is or will be >= 4, the stack pointer **must** be
+/// If `reg_offset` is or will be >= MAX_ARG_REGS, the stack pointer **must** be
 /// appropriately decremented in advance! See [extend_stack_for_args].
 pub fn write_next_arg<T: GuestArg>(
     reg_offset: &mut usize,
@@ -393,21 +391,16 @@ pub fn write_next_arg<T: GuestArg>(
     mem: &mut Mem,
     arg: T,
 ) {
-    // After the fourth register is used, the arguments go on the stack.
-    // In some cases the argument is split over both registers and the stack.
-
-    // Rust doesn't allow [0u32; Trait::T] alas.
-    // 16 is high enough for everything right now.
     let mut fake_regs = [0u32; 16];
     let fake_regs = &mut fake_regs[0..T::REG_COUNT];
     arg.to_regs(fake_regs);
 
     for &mut fake_reg in fake_regs {
-        if *reg_offset < 4 {
+        if *reg_offset < MAX_ARG_REGS {
             regs[*reg_offset] = fake_reg;
         } else {
             let stack_ptr: MutPtr<u32> = Ptr::from_bits(regs[Cpu::SP]);
-            mem.write(stack_ptr + (*reg_offset - 4).try_into().unwrap(), fake_reg);
+            mem.write(stack_ptr + (*reg_offset - MAX_ARG_REGS).try_into().unwrap(), fake_reg);
         }
         *reg_offset += 1;
     }

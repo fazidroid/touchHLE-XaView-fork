@@ -6,8 +6,14 @@
 //! `UIAlertView`.
 
 use crate::frameworks::foundation::ns_string;
-use crate::objc::{id, msg_super, nil, objc_classes, ClassExports};
-use std::borrow::Cow;
+use crate::frameworks::uikit::ui_view::UIViewHostObject;
+use crate::objc::{id, impl_HostObject_with_superclass, msg, msg_super, nil, objc_classes, release, retain, ClassExports, NSZonePtr};
+
+struct UIAlertViewHostObject {
+    superclass: UIViewHostObject,
+    delegate: id,
+}
+impl_HostObject_with_superclass!(UIAlertViewHostObject);
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -15,27 +21,60 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 @implementation UIAlertView: UIView
 
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host_object = Box::new(UIAlertViewHostObject {
+        superclass: Default::default(),
+        delegate: nil,
+    });
+    env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
 - (id)initWithTitle:(id)title
                       message:(id)message
                      delegate:(id)delegate
             cancelButtonTitle:(id)cancelButtonTitle
             otherButtonTitles:(id)otherButtonTitles {
 
-    log!("TODO: [(UIAlertView*){:?} initWithTitle:{:?} message:{:?} delegate:{:?} cancelButtonTitle:{:?} otherButtonTitles:{:?}]", this, title, message, delegate, cancelButtonTitle, otherButtonTitles);
-
-    let msg = if message == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, message) };
-    let title = if title == nil { Cow::from("(nil)") } else { ns_string::to_rust_string(env, title) };
-    log!("UIAlertView: title: {:?}, message: {:?}", title, msg);
-
+    log!("UIAlertView init: title={:?}, msg={:?}", title, message);
+    if delegate != nil {
+        retain(env, delegate);
+    }
+    let host = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
+    host.delegate = delegate;
     msg_super![env; this init]
 }
 
+- (id)delegate {
+    env.objc.borrow::<UIAlertViewHostObject>(this).delegate
+}
+
+- (())setDelegate:(id)delegate {
+    let host = env.objc.borrow_mut::<UIAlertViewHostObject>(this);
+    let old = std::mem::replace(&mut host.delegate, delegate);
+    if delegate != old {
+        if delegate != nil { retain(env, delegate); }
+        if old != nil { release(env, old); }
+    }
+}
+
 - (())addButtonWithTitle:(id)title {
-    log!("TODO: [(UIAlertView *){:?} addButtonWithTitle:{}]", this, ns_string::to_rust_string(env, title));
+    log!("UIAlertView addButton: {}", ns_string::to_rust_string(env, title));
 }
 
 - (())show {
-    log!("TODO: [(UIAlertView*){:?} show]", this);
+    log!("UIAlertView: AUTO-DISMISS (storage alert bypass)");
+    // The delegate will be called by the game, not by us.
+    // Our PlatformAlertViewDelegate now implements the method.
+}
+
+@end
+
+@implementation PlatformAlertViewDelegate: NSObject
+
+- (())alertView:(id)alertView clickedButtonAtIndex:(i32)buttonIndex {
+    log!("PlatformAlertViewDelegate - clicked button {}", buttonIndex);
+    // In a real app, you'd handle the button action.
+    // For the emulator, just log.
 }
 
 @end

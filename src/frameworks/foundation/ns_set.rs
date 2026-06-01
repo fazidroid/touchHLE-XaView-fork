@@ -61,6 +61,12 @@ pub const CLASSES: ClassExports = objc_classes! {
     autorelease(env, new)
 }
 
++ (id)setWithArray:(id)array {
+    let new: id = msg![env; this alloc];
+    let new: id = msg![env; new initWithArray:array];
+    autorelease(env, new)
+}
+
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
     retain(env, this)
@@ -119,6 +125,20 @@ pub const CLASSES: ClassExports = objc_classes! {
         dict: Default::default(),
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
+- (id)initWithArray:(id)array {
+    let count: NSUInteger = msg![env; array count];
+    let null: id = msg_class![env; NSNull null];
+
+    let mut dict = <DictionaryHostObject as Default>::default();
+    for i in 0..count {
+        let obj: id = msg![env; array objectAtIndex:i];
+        dict.insert(env, obj, null, /* copy_key: */ false);
+    }
+
+    env.objc.borrow_mut::<SetHostObject>(this).dict = dict;
+    this
 }
 
 - (id)initWithObject:(id)object {
@@ -195,6 +215,20 @@ pub const CLASSES: ClassExports = objc_classes! {
         dict: Default::default(),
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
+}
+
+- (id)initWithArray:(id)array {
+    let count: NSUInteger = msg![env; array count];
+    let null: id = msg_class![env; NSNull null];
+
+    let mut dict = <DictionaryHostObject as Default>::default();
+    for i in 0..count {
+        let obj: id = msg![env; array objectAtIndex:i];
+        dict.insert(env, obj, null, /* copy_key: */ false);
+    }
+
+    env.objc.borrow_mut::<SetHostObject>(this).dict = dict;
+    this
 }
 
 - (id)initWithObject:(id)object {

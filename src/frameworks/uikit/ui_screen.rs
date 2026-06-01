@@ -6,12 +6,23 @@
 //! `UIScreen`.
 
 use crate::frameworks::core_graphics::{CGFloat, CGPoint, CGRect, CGSize};
-use crate::objc::{id, msg, msg_class, objc_classes, ClassExports, TrivialHostObject};
+use crate::objc::{
+    autorelease, id, msg, msg_class, nil, objc_classes, ClassExports, HostObject, NSZonePtr,
+    TrivialHostObject,
+};
+use crate::Environment;
 
 #[derive(Default)]
 pub struct State {
     main_screen: Option<id>,
 }
+
+// Host object for UIScreenMode instances
+struct UIScreenModeHostObject {
+    size: CGSize,
+    pixel_aspect_ratio: CGFloat,
+}
+impl HostObject for UIScreenModeHostObject {}
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -92,6 +103,49 @@ pub const CLASSES: ClassExports = objc_classes! {
     // ReturnDisplayLinkStub
     let cls = env.objc.get_known_class("CADisplayLink", &mut env.mem);
     msg![env; cls displayLinkWithTarget:target selector:sel]
+}
+
+- (id)currentMode {
+        // ==========================================================
+        // 🏎️ UNIVERSAL BYPASS: CGFloat Type Mismatch Fixed!
+        // (Removed the old GT Racing 2 'nil' hack since the root crash is solved)
+        // ==========================================================
+        let bounds: CGRect = msg![env; this bounds];
+        let size = bounds.size;
+        
+        let mode: id = msg_class![env; UIScreenMode alloc];
+        let mode: id = msg![env; mode initWithSize:size pixelAspectRatio:(1.0 as CGFloat)];
+        
+        autorelease(env, mode)
+    }
+
+
+@end
+
+// UIScreenMode implementation
+@implementation UIScreenMode: NSObject
+
++ (id)allocWithZone:(NSZonePtr)_zone {
+    let host = Box::new(UIScreenModeHostObject {
+        size: CGSize { width: 0.0, height: 0.0 },
+        pixel_aspect_ratio: 1.0,
+    });
+    env.objc.alloc_object(this, host, &mut env.mem)
+}
+
+- (id)initWithSize:(CGSize)size pixelAspectRatio:(CGFloat)ratio {
+    let host = env.objc.borrow_mut::<UIScreenModeHostObject>(this);
+    host.size = size;
+    host.pixel_aspect_ratio = ratio;
+    this
+}
+
+- (CGSize)size {
+    env.objc.borrow::<UIScreenModeHostObject>(this).size
+}
+
+- (CGFloat)pixelAspectRatio {
+    env.objc.borrow::<UIScreenModeHostObject>(this).pixel_aspect_ratio
 }
 
 @end

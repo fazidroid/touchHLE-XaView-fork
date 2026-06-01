@@ -148,7 +148,22 @@ pub const CLASSES: ClassExports = objc_classes! {
     pthread_create(env, thread_ptr, attr.cast_const(), gf, this.cast());
 
     let pthread = env.mem.read(thread_ptr);
-    assert!(!State::get(env).ns_threads.contains_key(&pthread));
+
+    // SoftAssertThreadId: was a hard assert! that would panic (and silently
+    // kill the simulation on Android) if pthread IDs are ever recycled.
+    // Now handled gracefully.
+    if State::get(env).ns_threads.contains_key(&pthread) {
+        log!(
+            "Warning: NSThread start: pthread {:?} already registered (ID recycled?), overwriting",
+            pthread
+        );
+        // Release the old entry to avoid a leak. Do NOT release if it's `this`
+        // (same object re-started).
+        let old = State::get(env).ns_threads.remove(&pthread).unwrap();
+        if old != this {
+            release(env, old);
+        }
+    }
     State::get(env).ns_threads.insert(pthread, this);
 
     env.framework_state.foundation.ns_thread.is_multi_threaded = true;
@@ -224,7 +239,15 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())dealloc {
     log_dbg!("[(NSThread*){:?} dealloc]", this);
     let host_object = env.objc.borrow::<NSThreadHostObject>(this);
-    release(env, host_object.thread_dictionary);
+    // DeallocFullCleanup: release target and object too (they are nil if
+    // _touchHLE_NSThreadInvocationHelper already ran, so release(nil) is a no-op).
+    // This covers threads that are dealloc'd without ever being started.
+    let target = host_object.target;
+    let object = host_object.object;
+    let thread_dictionary = host_object.thread_dictionary;
+    release(env, target);
+    release(env, object);
+    release(env, thread_dictionary);
     env.objc.dealloc_object(this, &mut env.mem)
 }
 
@@ -259,10 +282,19 @@ pub fn _touchHLE_NSThreadInvocationHelper(env: &mut Environment, ns_thread_obj: 
     // of the detached thread. They are released when the thread finally exits.
     release(env, object);
     release(env, target);
+    // ZeroAfterRelease: zero the fields so that dealloc never double-releases them.
+    env.objc.borrow_mut::<NSThreadHostObject>(ns_thread_obj).target = nil;
+    env.objc.borrow_mut::<NSThreadHostObject>(ns_thread_obj).object = nil;
 
     let pthread = pthread_self(env);
+    // SoftAssertRemove: was assert!(res.is_some()) — silent Android crash on mismatch.
     let res = State::get(env).ns_threads.remove(&pthread);
-    assert!(res.is_some());
+    if res.is_none() {
+        log!(
+            "Warning: _touchHLE_NSThreadInvocationHelper: pthread {:?} not found in ns_threads",
+            pthread
+        );
+    }
 
     if owned {
         // Releasing only if the object was owned

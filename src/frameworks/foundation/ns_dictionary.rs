@@ -22,9 +22,8 @@ use crate::frameworks::foundation::ns_file_manager::{
 use crate::fs::GuestPath;
 use crate::mem::{ConstPtr, MutPtr, Ptr, SafeRead};
 use crate::objc::{
-    autorelease, id, msg, msg_class, nil, objc_classes, release, retain, Class, ClassExports,
-    HostObject, NSZonePtr,
-};
+    autorelease, id, msg, msg_class, msg_send, nil, objc_classes, release, retain, Class, ClassExports,
+    HostObject, NSZonePtr, SEL,};
 use crate::{impl_HostObject_with_superclass, Environment};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -38,8 +37,7 @@ pub(super) struct DictionaryHostObject {
     /// Since we need custom hashing and custom equality, and these both need a
     /// `&mut Environment`, we can't just use a `HashMap<id, id>`.
     /// So here we are using a `HashMap` as a primitive for implementing a
-    /// hash-map, which is not ideally efficient.
-    ///
+    /// hash-map, which is not ideally efficient. :)
     /// The keys are the hash values, the values are a list of key-value pairs
     /// where the keys have the same hash value.
     pub(super) map: HashMap<Hash, Vec<(id, id)>>,
@@ -68,6 +66,7 @@ impl DictionaryHostObject {
         let hash: Hash = msg![env; key hash];
 
         let value = retain(env, value);
+
         let Some(collisions) = self.map.get_mut(&hash) else {
             self.map.insert(hash, vec![(key, value)]);
             self.count += 1;
@@ -288,7 +287,13 @@ pub fn init_with_objects_and_keys(
     mut va_args: VaList,
 ) -> id {
     let first_key: id = va_args.next(env);
-    assert!(first_key != nil); // TODO: raise proper exception
+    // BypassNilKeyCrash: nil first key means an empty/broken varargs list —
+    // return an empty dict rather than panicking.
+    if first_key == nil {
+        log!("Warning: dictionaryWithObjectsAndKeys: called with nil first key — returning empty dict");
+        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
+        return this;
+    }
 
     let mut host_object = <DictionaryHostObject as Default>::default();
     host_object.insert(env, first_key, first_object, /* copy_key: */ true);
@@ -299,8 +304,12 @@ pub fn init_with_objects_and_keys(
             break;
         }
         let key: id = va_args.next(env);
-        assert!(key != nil);
-        // TODO: raise proper exception
+        // BypassNilKeyCrash: skip nil keys rather than panicking; the object
+        // has already been read so we just discard it and continue.
+        if key == nil {
+            log!("Warning: dictionaryWithObjectsAndKeys: nil key for object {:?} — skipping entry", object);
+            continue;
+        }
         host_object.insert(env, key, object, /* copy_key: */ true);
     }
 
@@ -311,19 +320,21 @@ pub fn init_with_objects_and_keys(
 
 /// Helper function to share `initWithDictionary:` implementations
 fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) -> id {
+    if other_dict == nil {
+        *env.objc.borrow_mut(this) = <DictionaryHostObject as Default>::default();
+        return this;
+    }
+    let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
+
     let mut host_object = <DictionaryHostObject as Default>::default();
-    
-    // SAFE BYPASS: Do not attempt to borrow 'nil' if the provided dictionary is empty
-    if other_dict != nil {
-        let other_host_object: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other_dict));
-        for key in other_host_object.iter_keys() {
-            let object = other_host_object.lookup(env, key);
-            host_object.insert(env, key, object, /* copy_key: */ true);
-        }
-        *env.objc.borrow_mut(other_dict) = other_host_object;
+
+    for key in other_host_object.iter_keys() {
+        let object = other_host_object.lookup(env, key);
+        host_object.insert(env, key, object, /* copy_key: */ true);
     }
 
     *env.objc.borrow_mut(this) = host_object;
+    *env.objc.borrow_mut(other_dict) = other_host_object;
     this
 }
 
@@ -331,8 +342,17 @@ fn init_with_dictionary_common(env: &mut Environment, this: id, other_dict: id) 
 fn init_with_objects_for_keys_common(env: &mut Environment, this: id, objects: id, keys: id) -> id {
     let keys_size: NSUInteger = msg![env; keys count];
     let objects_size: NSUInteger = msg![env; objects count];
-    assert_eq!(keys_size, objects_size);
-    // TODO: raise proper exception
+    // BypassMismatchedArraysCrash: real iOS raises NSInvalidArgumentException
+    // when counts differ. RR3 occasionally passes mismatched arrays (e.g. one
+    // extra object), so log a warning and proceed up to the shorter count.
+    if keys_size != objects_size {
+        log!(
+            "Warning: initWithObjects:forKeys: count mismatch — {} keys vs {} objects, \
+             will insert up to the shorter count",
+            keys_size,
+            objects_size
+        );
+    }
 
     let mut host_object = <DictionaryHostObject as Default>::default();
 
@@ -342,8 +362,18 @@ fn init_with_objects_for_keys_common(env: &mut Environment, this: id, objects: i
     loop {
         let next_key: id = msg![env; keys_enumerator nextObject];
         let next_object: id = msg![env; objects_enumerator nextObject];
-        if next_key == nil {
-            assert_eq!(next_object, nil);
+        if next_key == nil || next_object == nil {
+            // BypassMismatchedEnumeratorCrash: if one enumerator runs out
+            // before the other (mismatched arrays), stop silently instead of
+            // asserting. This was crashing RR3 at ns_dictionary.rs:356.
+            if next_key != next_object {
+                log!(
+                    "Warning: initWithObjects:forKeys: enumerators ended out of sync \
+                     (next_key={:?}, next_object={:?}) — stopping early",
+                    next_key,
+                    next_object
+                );
+            }
             break;
         }
         host_object.insert(env, next_key, next_object, /* copy_key: */ true);
@@ -354,6 +384,7 @@ fn init_with_objects_for_keys_common(env: &mut Environment, this: id, objects: i
 
 /// Helper function to share `allKeys` implementations
 fn all_keys_common(env: &mut Environment, this: id) -> id {
+    if this == nil { return msg_class![env; NSArray array]; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let keys: Vec<id> = host_obj
         .map
@@ -372,6 +403,7 @@ fn all_keys_common(env: &mut Environment, this: id) -> id {
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
+
 // NSDictionary is an abstract class. A subclass must provide:
 // - (id)initWithObjects:(id*)forKeys:(id*)count:(NSUInteger)
 // - (NSUInteger)count
@@ -382,8 +414,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSDictionary: NSObject
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    // Safely force allocation of native _touchHLE_NSDictionary to bypass broken NSObject subclasses
-    msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
+    // NSDictionary is subclassed by apps (e.g. GT Racing 2 uses a custom
+    // NSDictionary subclass). When called on a subclass, fall through to the
+    // normal NSObject allocWithZone: behaviour so the subclass gets its own
+    // memory. Only redirect to our internal implementation when called directly
+    // on NSDictionary itself.
+    if this == env.objc.get_known_class("NSDictionary", &mut env.mem) {
+        msg_class![env; _touchHLE_NSDictionary allocWithZone:zone]
+    } else {
+        // Subclass: allocate normally via NSObject and return the instance.
+        log_dbg!("NSDictionary allocWithZone: called on subclass, using NSObject alloc");
+        msg![env; (env.objc.get_known_class("NSObject", &mut env.mem)) alloc]
+    }
 }
 
 + (id)dictionary {
@@ -393,8 +435,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)dictionaryWithObject:(id)object forKey:(id)key {
-    assert_ne!(key, nil);
-    // TODO: raise proper exception
+    // BypassNilKeyCrash: real iOS raises NSInvalidArgumentException for a nil
+    // key, but crashing the emulator is worse than silently returning nil.
+    // RR3 triggers this when a lookup earlier in its pipeline returns nil.
+    if key == nil {
+        log!("Warning: dictionaryWithObject:forKey: called with nil key — returning nil");
+        return nil;
+    }
 
     let new_dict = dict_from_keys_and_objects(env, &[(key, object)]);
     autorelease(env, new_dict)
@@ -432,7 +479,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)init {
-    todo!("TODO: Implement [dictionary init] for custom subclasses")
+    // Called on a custom NSDictionary subclass — return self so the object
+    // is usable. The subclass may override specific methods on top of this.
+    log_dbg!("NSDictionary -init: returning self for subclass instance");
+    this
 }
 
 // These probably comes from some category related to plists.
@@ -511,8 +561,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSMutableDictionary: NSDictionary
 
 + (id)allocWithZone:(NSZonePtr)zone {
-    // Safely force allocation of native _touchHLE_NSMutableDictionary to bypass broken NSObject subclasses
+    // NSDictionary might be subclassed by something which needs allocWithZone:
+    // to have the normal behaviour. Unimplemented: call superclass alloc then.
+    
+    // 🏎️ GAMELOFT BYPASS: Relax strict class check!
+    // assert!(this == env.objc.get_known_class("NSMutableDictionary", &mut env.mem));
     msg_class![env; _touchHLE_NSMutableDictionary allocWithZone:zone]
+}
+
+// 🏎️ GAMELOFT BYPASS: Catch the convenience 'new' allocator
++ (id)new {
+    let new_dict: id = msg![env; this alloc];
+    msg![env; new_dict init]
 }
 
 + (id)dictionaryWithCapacity:(NSUInteger)capacity {
@@ -566,7 +626,37 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())dealloc {
     std::mem::take(env.objc.borrow_mut::<DictionaryHostObject>(this)).release(env);
+
     env.objc.dealloc_object(this, &mut env.mem)
+}
+
+- (id)keysSortedByValueUsingSelector:(SEL)comparator {
+    let keys: id = msg![env; this allKeys];
+    let count: NSUInteger = msg![env; keys count];
+    let mut vec: Vec<id> = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let key: id = msg![env; keys objectAtIndex:i];
+        vec.push(key);
+    }
+
+    vec.sort_by(|a, b| {
+        // Dereference and bind to local variables
+        let a: id = *a;
+        let b: id = *b;
+        let val_a: id = msg![env; this objectForKey:a];
+        let val_b: id = msg![env; this objectForKey:b];
+        let ordering: i32 = msg_send(env, (val_a, comparator, val_b));
+        if ordering < 0 {
+            core::cmp::Ordering::Less
+        } else if ordering > 0 {
+            core::cmp::Ordering::Greater
+        } else {
+            core::cmp::Ordering::Equal
+        }
+    });
+
+    let sorted_keys = ns_array::from_vec(env, vec);
+    autorelease(env, sorted_keys)
 }
 
 - (id)initWithObjectsAndKeys:(id)first_object, ...dots {
@@ -590,9 +680,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO: enumeration, more init methods, etc
 
 - (NSUInteger)count {
+    if this == nil { return 0; }
     env.objc.borrow::<DictionaryHostObject>(this).count
 }
 - (id)objectForKey:(id)key {
+    if this == nil || key == nil { return nil; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let res = host_obj.lookup(env, key);
     *env.objc.borrow_mut(this) = host_obj;
@@ -603,10 +695,34 @@ pub const CLASSES: ClassExports = objc_classes! {
     all_keys_common(env, this)
 }
 
+- (id)allValues {
+    if this == nil { return msg_class![env; NSArray array]; }
+    let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
+    let values: Vec<id> = host_obj.map.values().flatten().map(|&(_key, value)| value).collect();
+    *env.objc.borrow_mut(this) = host_obj;
+
+    for &val in &values {
+        retain(env, val);
+    }
+    let res = ns_array::from_vec(env, values);
+    autorelease(env, res)
+}
+
+- (id)keyEnumerator {
+    let keys: id = msg![env; this allKeys];
+    msg![env; keys objectEnumerator]
+}
+
+- (id)objectEnumerator {
+    let values: id = msg![env; this allValues];
+    msg![env; values objectEnumerator]
+}
+
 // NSFastEnumeration implementation
 - (NSUInteger)countByEnumeratingWithState:(MutPtr<NSFastEnumerationState>)state
                                   objects:(MutPtr<id>)stackbuf
                                     count:(NSUInteger)len {
+    if this == nil { return 0; }
     // We assume that order in which objects are reported is consistent
     // between calls!
     let objects: id = msg![env; this allKeys];
@@ -622,11 +738,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
+    if this == nil { return nil; }
     retain(env, this)
 }
 
 // NSMutableCopying implementation
 - (id)mutableCopyWithZone:(NSZonePtr)_zone {
+    if this == nil { return msg_class![env; NSMutableDictionary new]; }
     let mut_dict: id = msg_class![env; NSMutableDictionary alloc];
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     for (k, v) in host_obj.map.values().flatten() {
@@ -640,6 +758,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     build_description(env, this)
 }
 
+- (())enumerateKeysAndObjectsUsingBlock:(crate::abi::GuestFunction)_block {
+    log_dbg!("_touchHLE_NSDictionary enumerateKeysAndObjectsUsingBlock: stub (ignoring block)");
+    // The block is ignored – real implementation would enumerate.
+}
+
 @end
 
 // Our private subclass that is the single implementation of
@@ -651,9 +774,43 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
 
+- (id)keysSortedByValueUsingSelector:(SEL)comparator {
+    let keys: id = msg![env; this allKeys];
+    let count: NSUInteger = msg![env; keys count];
+    let mut vec: Vec<id> = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let key: id = msg![env; keys objectAtIndex:i];
+        vec.push(key);
+    }
+
+    vec.sort_by(|a, b| {
+        // Dereference and bind to local variables
+        let a: id = *a;
+        let b: id = *b;
+        let val_a: id = msg![env; this objectForKey:a];
+        let val_b: id = msg![env; this objectForKey:b];
+        let ordering: i32 = msg_send(env, (val_a, comparator, val_b));
+        if ordering < 0 {
+            core::cmp::Ordering::Less
+        } else if ordering > 0 {
+            core::cmp::Ordering::Greater
+        } else {
+            core::cmp::Ordering::Equal
+        }
+    });
+
+    let sorted_keys = ns_array::from_vec(env, vec);
+    autorelease(env, sorted_keys)
+}
+
 - (())dealloc {
     std::mem::take(env.objc.borrow_mut::<DictionaryHostObject>(this)).release(env);
+
     env.objc.dealloc_object(this, &mut env.mem)
+}
+
+- (())encodeWithCoder:(id)_coder {
+    log!("_touchHLE_NSMutableDictionary encodeWithCoder: stub called");
 }
 
 - (id)initWithObjectsAndKeys:(id)first_object, ...dots {
@@ -697,6 +854,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         unimplemented!()
     };
+
     release(env, this);
     let dict = dict_from_keys_and_objects(env, &tuples);
 
@@ -713,9 +871,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO: enumeration, more init methods, etc
 
 - (NSUInteger)count {
+    if this == nil { return 0; }
     env.objc.borrow::<DictionaryHostObject>(this).count
 }
 - (id)objectForKey:(id)key {
+    if this == nil || key == nil { return nil; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let res = host_obj.lookup(env, key);
     *env.objc.borrow_mut(this) = host_obj;
@@ -726,6 +886,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (NSUInteger)countByEnumeratingWithState:(MutPtr<NSFastEnumerationState>)state
                                   objects:(MutPtr<id>)stackbuf
                                     count:(NSUInteger)len {
+    if this == nil { return 0; }
     // TODO: check that dict wasn't mutated!
     // We assume that order in which objects are reported is consistent
     // between calls!
@@ -742,6 +903,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // NSCopying implementation
 - (id)copyWithZone:(NSZonePtr)_zone {
+    if this == nil { return nil; }
     let entries: Vec<_> =
         env.objc.borrow_mut::<DictionaryHostObject>(this).map.values().flatten().copied().collect();
     dict_from_keys_and_objects(env, &entries)
@@ -749,6 +911,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // NSMutableCopying implementation
 - (id)mutableCopyWithZone:(NSZonePtr)_zone {
+    if this == nil { return msg_class![env; NSMutableDictionary new]; }
     let mut_dict: id = msg_class![env; NSMutableDictionary alloc];
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     for (k, v) in host_obj.map.values().flatten() {
@@ -780,7 +943,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())removeObjectForKey:(id)key {
-    assert!(!key.is_null());
+    if this == nil || key == nil { return; }
     let mut host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     host_obj.remove(env, key);
     *env.objc.borrow_mut(this) = host_obj;
@@ -792,9 +955,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())addEntriesFromDictionary:(id)other { // NSDictionary *
-    // SAFE BYPASS: Do not attempt to read from a 'nil' dictionary
-    if other == nil { return; }
-    
+    if other == nil || this == nil { return; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(other));
     for (k, v) in host_obj.map.values().flatten() {
         () = msg![env; this setObject:(*v) forKey:(*k)];
@@ -811,9 +972,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)allValues {
+    if this == nil { return msg_class![env; NSArray array]; }
     let host_obj: DictionaryHostObject = std::mem::take(env.objc.borrow_mut(this));
     let values: Vec<id> = host_obj.map.values().flatten().map(|&(_key, value)| value).collect();
     *env.objc.borrow_mut(this) = host_obj;
+
     for &val in &values {
         retain(env, val);
     }
@@ -841,6 +1004,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)objectEnumerator { // NSEnumerator*
     let values: id = msg![env; this allValues];
     msg![env; values objectEnumerator]
+}
+
+- (id)keyEnumerator {
+    let keys: id = msg![env; this allKeys];
+    msg![env; keys objectEnumerator]
 }
 
 @end
@@ -923,10 +1091,10 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 };
+
 /// Direct constructor for use by host code, similar to
 /// `[[NSDictionary alloc] initWithObjectsAndKeys:]` but without variadics and
-/// with a more intuitive argument order.
-/// Unlike [super::ns_array::from_vec],
+/// with a more intuitive argument order. Unlike [super::ns_array::from_vec],
 /// this **does** copy and retain!
 pub fn dict_from_keys_and_objects(env: &mut Environment, keys_and_objects: &[(id, id)]) -> id {
     let dict: id = msg_class![env; NSDictionary alloc];

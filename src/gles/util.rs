@@ -53,16 +53,12 @@ pub enum ParamType {
 pub struct ParamTable(pub &'static [(GLenum, ParamType, u8)]);
 
 impl ParamTable {
-    /// Look up the component type and count for a parameter.
+    /// Look up the component type and count for a parameter. Panics if the name
+    /// is not recognized.
     pub fn get_type_info(&self, pname: GLenum) -> (ParamType, u8) {
         match self.0.iter().find(|&&(pname2, _, _)| pname == pname2) {
             Some(&(_, type_, count)) => (type_, count),
-            None => {
-                // FIXED: Instead of panicking on ES 2.0 queries like 0x8df9 (Shader Binary Formats),
-                // we return a default Int type. This allows the query to pass safely to the 
-                // native host GPU driver (which natively supports ES 2.0/3.2!).
-                (ParamType::Int, 1)
-            }
+            None => panic!("Unhandled parameter name: {pname:#x}"),
         }
     }
 
@@ -72,8 +68,6 @@ impl ParamTable {
     }
 
     pub fn contains(&self, pname: GLenum) -> bool {
-        // Allow ES 2.0 queries to bypass the check
-        if pname == 0x8df8 || pname == 0x8df9 { return true; }
         self.0.iter().any(|(pname2, _, _)| pname == *pname2)
     }
 
@@ -101,10 +95,9 @@ impl ParamTable {
     {
         let (type_, component_count) = self.get_type_info(pname);
         assert!(component_count == 1);
-        // Yes, the OpenGL standard lets you mismatch types.
-        // Yes, it requires an implicit conversion.
-        // Yes, it requires no scaling of fixed-point values when converting to integer.
-        // :(
+        // Yes, the OpenGL standard lets you mismatch types. Yes, it requires
+        // an implicit conversion. Yes, it requires no scaling of fixed-point
+        // values when converting to integer. :(
         // On the other hand, fixed-to-float/float-to-fixed conversion is always
         // the same even for the weird float-ish values.
         match type_ {
@@ -163,12 +156,11 @@ pub fn try_decode_pvrtc(
     pvrtc_data: &[u8],
 ) -> bool {
     let is_2bit = match internalformat {
-        gles11::COMPRESSED_RGB_PVRTC_4BPPV1_IMG |
-        gles11::COMPRESSED_RGBA_PVRTC_4BPPV1_IMG => false,
-        gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG |
-        gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG => true,
+        gles11::COMPRESSED_RGB_PVRTC_4BPPV1_IMG | gles11::COMPRESSED_RGBA_PVRTC_4BPPV1_IMG => false,
+        gles11::COMPRESSED_RGB_PVRTC_2BPPV1_IMG | gles11::COMPRESSED_RGBA_PVRTC_2BPPV1_IMG => true,
         _ => return false,
     };
+
     assert!(border == 0);
     let pixels = crate::image::decode_pvrtc(
         pvrtc_data,

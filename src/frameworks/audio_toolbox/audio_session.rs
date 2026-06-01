@@ -193,7 +193,10 @@ fn AudioSessionSetProperty(
 // TraceSessionActive
 fn AudioSessionSetActive(_env: &mut Environment, active: bool) -> OSStatus {
     let result = 0; // success
-    println!("AUDIO_TRACE: AudioSessionSetActive({:?}) -> {:?}", active, result);
+    println!(
+        "AUDIO_TRACE: AudioSessionSetActive({:?}) -> {:?}",
+        active, result
+    );
     log!("TODO: AudioSessionSetActive({:?}) -> {:?}", active, result);
     result
 }

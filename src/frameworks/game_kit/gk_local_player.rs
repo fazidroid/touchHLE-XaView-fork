@@ -6,7 +6,8 @@
 //! `GKLocalPlayer`.
 
 use crate::dyld::{ConstantExports, HostConstant};
-use crate::objc::{objc_classes, ClassExports};
+use crate::objc::{id, objc_classes, ClassExports};
+use crate::msg;
 
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -14,8 +15,36 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // TODO: proper inheritance chain
 @implementation GKLocalPlayer: NSObject
+
++ (id)localPlayer {
+        println!("🎮 LOG: Caught [GKLocalPlayer localPlayer]. Returning fake player!");
+        let player: id = msg![env; this alloc];
+        let player: id = msg![env; player init];
+        crate::objc::autorelease(env, player)
+    }
+
+    // 🏎️ PROACTIVE STUBS: Game Center Auth Bypasses
+    - (bool)isAuthenticated {
+        println!("🎮 LOG: Caught [GKLocalPlayer isAuthenticated]. Returning false (offline mode)!");
+        false // Tells the game we are not logged into Game Center!
+    }
+
+    - (())authenticateWithCompletionHandler:(id)handler {
+        println!("🎮 LOG: Caught [GKLocalPlayer authenticateWithCompletionHandler:]. Absorbing safely!");
+        // We just absorb this so it doesn't try to pop up a login screen!
+    }
+    
 // TODO
 @end
+
+@implementation GKMatchmaker: NSObject
+
+        + (id)sharedMatchmaker {
+            println!("🎮 LOG: Caught [GKMatchmaker sharedMatchmaker]. Returning nil to disable multiplayer!");
+            crate::objc::nil
+        }
+
+    @end
 
 };
 

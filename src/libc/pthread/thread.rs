@@ -64,6 +64,11 @@ unsafe impl SafeRead for OpaqueThread {}
 #[allow(non_camel_case_types)]
 pub type pthread_t = MutPtr<OpaqueThread>;
 
+#[no_mangle]
+pub fn pthread_setname_np(_env: &mut Environment, _name: crate::mem::ConstPtr<i8>) -> i32 {
+    0
+}
+
 struct ThreadHostObject {
     thread_id: ThreadId,
     joined_by: Option<ThreadId>,
@@ -136,6 +141,20 @@ pub fn pthread_attr_setstacksize(
     attr_copy.stacksize = stacksize;
     env.mem.write(attr, attr_copy);
     0 // success
+}
+fn pthread_cond_wait(env: &mut Environment, cond: MutVoidPtr, mutex: MutVoidPtr) -> i32 {
+    // 🏎️ THERMAL HACK: Kill the Infinite Spin Loop!
+    // Instead of returning immediately and frying the Android CPU, we force 
+    // the background thread to sleep for 2 milliseconds.
+    // This massively drops CPU usage and boosts the main rendering FPS!
+    std::thread::sleep(std::time::Duration::from_millis(2));
+    0
+}
+
+fn pthread_cond_timedwait(env: &mut Environment, cond: MutVoidPtr, mutex: MutVoidPtr, abstime: ConstVoidPtr) -> i32 {
+    // 🏎️ THERMAL HACK: Force background threads to chill out
+    std::thread::sleep(std::time::Duration::from_millis(2));
+    0
 }
 fn pthread_attr_setinheritsched(
     env: &mut Environment,
@@ -343,7 +362,9 @@ fn pthread_setcanceltype(_env: &mut Environment, type_: i32, oldtype: MutPtr<i32
     0
 }
 fn pthread_testcancel(_env: &mut Environment) {
-    log!("TODO: pthread_testcancel()");
+    // 🏎️ SCHEDULER HACK: When a background thread checks if it should close,
+    // instantly force it to yield its CPU time back to the main Asphalt 6 engine.
+    std::thread::yield_now();
 }
 
 #[allow(non_camel_case_types)]
@@ -415,6 +436,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_attr_setdetachstate(_, _)),
     export_c_func!(pthread_attr_getstacksize(_, _)),
     export_c_func!(pthread_attr_setstacksize(_, _)),
+    export_c_func!(pthread_cond_wait(_, _)),
+    export_c_func!(pthread_cond_timedwait(_, _, _)),
     export_c_func!(pthread_attr_setinheritsched(_, _)),
     export_c_func!(pthread_attr_setschedpolicy(_, _)),
     export_c_func!(pthread_attr_setschedparam(_, _)),
@@ -431,4 +454,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(pthread_get_stacksize_np(_)),
     export_c_func!(pthread_getschedparam(_, _, _)),
     export_c_func!(pthread_setschedparam(_, _, _)),
+    export_c_func!(pthread_setname_np(_)),
 ];

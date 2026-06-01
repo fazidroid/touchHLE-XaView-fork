@@ -28,6 +28,7 @@ struct NSURLRequestHostObject {
     // Header fields
     /// `NSDictionary*`
     http_header_fields: id,
+    http_should_handle_cookies: bool,
 }
 impl HostObject for NSURLRequestHostObject {}
 
@@ -46,6 +47,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         http_method: ns_string::get_static_str(env, "GET"),
         http_body: nil,
         http_header_fields,
+        http_should_handle_cookies: true,
     });
     env.objc.alloc_object(this, host_object, &mut env.mem)
 }
@@ -98,6 +100,14 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<NSURLRequestHostObject>(this).http_body
 }
 
+- (id)HTTPMethod {
+    env.objc.borrow::<NSURLRequestHostObject>(this).http_method
+}
+
+- (id)allHTTPHeaderFields {
+    env.objc.borrow::<NSURLRequestHostObject>(this).http_header_fields
+}
+
 - (())dealloc {
     log_dbg!("[(NSURLRequest*){:?} dealloc]", this);
     let &NSURLRequestHostObject {
@@ -117,6 +127,93 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 @implementation NSMutableURLRequest: NSURLRequest
+
+- (())setHTTPShouldHandleCookies:(bool)flag {
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).http_should_handle_cookies = flag;
+}
+
+// ==========================================================
+// 🏎️ EA BYPASS: Absorb the Network Timeout to Prevent Freezes
+// ==========================================================
+- (())setTimeoutInterval:(NSTimeInterval)timeout_interval {
+    // Safely store the timeout value so the C++ engine is satisfied
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).timeout_interval = timeout_interval;
+    println!("🎮 LOG: NSMutableURLRequest setTimeoutInterval: {} safely absorbed!", timeout_interval);
+}
+
+- (())setURL:(id)url {
+    log_dbg!("NSMutableURLRequest setURL: {:?}", url);
+    if url == nil { return; }
+    let url_copy = msg![env; url copy];
+    let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
+    let old_url = std::mem::replace(&mut host_obj.url, url_copy);
+    release(env, old_url);
+}
+
+- (())setCachePolicy:(NSUInteger)cache_policy {
+    log_dbg!("NSMutableURLRequest setCachePolicy: {}", cache_policy);
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).cache_policy = cache_policy;
+}
+
+- (())setExpiration:(NSTimeInterval)expiration {
+    log_dbg!("NSMutableURLRequest setExpiration: {} (stub)", expiration);
+    // Not a standard iOS method; ignore.
+}
+
+// Ensure setHTTPShouldHandleCookies: exists (it does, but if not, add this)
+- (())setHTTPShouldHandleCookies:(bool)flag {
+    log_dbg!("NSMutableURLRequest setHTTPShouldHandleCookies: {}", flag);
+    env.objc.borrow_mut::<NSURLRequestHostObject>(this).http_should_handle_cookies = flag;
+}
+
+- (())addValue:(id)value // NSString*
+    forHTTPHeaderField:(id)field { // NSString*
+    if value == nil || field == nil { return; }
+    log_dbg!("[(NSMutableURLRequest*){:?} addValue:'{}' forHTTPHeaderField:'{}']", this, to_rust_string(env, value), to_rust_string(env, field));
+
+    let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
+    let http_header_fields = host_obj.http_header_fields;
+
+    // Check if a value already exists for this field
+    let existing_value: id = msg![env; http_header_fields objectForKey:field];
+    if existing_value != nil {
+        // Append the new value with a comma separator
+        let separator = ns_string::get_static_str(env, ", ");
+        let combined: id = msg![env; existing_value stringByAppendingString:separator];
+        let combined: id = msg![env; combined stringByAppendingString:value];
+        () = msg![env; http_header_fields setObject:combined forKey:field];
+    } else {
+        // No existing value, just set it
+        () = msg![env; http_header_fields setObject:value forKey:field];
+    }
+}
+
+- (())setAllHTTPHeaderFields:(id)headers { // NSDictionary *
+    if headers == nil { return; }
+    let headers_copy = msg![env; headers copy];
+    let host_obj = env.objc.borrow_mut::<NSURLRequestHostObject>(this);
+    let old_headers = std::mem::replace(&mut host_obj.http_header_fields, headers_copy);
+    release(env, old_headers);
+}
+
+- (id)mutableCopyWithZone:(NSZonePtr)_zone {
+    let new: id = msg_class![env; NSMutableURLRequest alloc];
+    let url: id = msg![env; this URL];
+    let new: id = msg![env; new initWithURL:url];
+    let method: id = msg![env; this HTTPMethod];
+    if method != nil {
+        () = msg![env; new setHTTPMethod:method];
+    }
+    let headers: id = msg![env; this allHTTPHeaderFields];
+    if headers != nil {
+        () = msg![env; new setAllHTTPHeaderFields:headers];
+    }
+    let body: id = msg![env; this HTTPBody];
+    if body != nil {
+        () = msg![env; new setHTTPBody:body];
+    }
+    new
+}
 
 - (())setHTTPMethod:(id)http_method { // NSString *
     if http_method == nil { return; }
